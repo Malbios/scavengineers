@@ -98,7 +98,11 @@ public partial class Player : CharacterBody3D
         }
     }
 
-    private static void CaptureMouse() => Input.MouseMode = Input.MouseModeEnum.Captured;
+    // Instance method, not static: the FocusEntered connection below is then tied to this
+    // Player's lifetime, so Godot auto-disconnects it when this instance is freed (e.g. on a
+    // scene change). A static method's connection has no instance to track, so travelling
+    // between scenes would try to reconnect the exact same callable and hit "already connected."
+    private void CaptureMouse() => Input.MouseMode = Input.MouseModeEnum.Captured;
 
     public override void _PhysicsProcess(double delta)
     {
