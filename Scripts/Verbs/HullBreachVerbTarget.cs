@@ -14,7 +14,8 @@ namespace Scavengineers.Scripts.Verbs;
 /// </summary>
 public partial class HullBreachVerbTarget : StaticBody3D, IVerbTarget, ISaveable
 {
-    private static readonly Verb RepairVerb = new("repair", "VERB_REPAIR", DurationSeconds: 3f)
+    // Placeholder/tunable — dropped to 1s for fast testing; real balancing is later work.
+    private static readonly Verb RepairVerb = new("repair", "VERB_REPAIR", DurationSeconds: 1f)
     {
         Requirements = [new ItemRequirement("hull_patch_kit", 1)],
     };

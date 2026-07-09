@@ -13,7 +13,8 @@ namespace Scavengineers.Scripts.Travel;
 /// </summary>
 public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget
 {
-    private static readonly Verb TravelVerb = new("travel", "VERB_TRAVEL", DurationSeconds: 5f);
+    // Placeholder/tunable — dropped to 1s for fast testing; real balancing is later work.
+    private static readonly Verb TravelVerb = new("travel", "VERB_TRAVEL", DurationSeconds: 1f);
 
     [Export]
     public string DestinationScenePath { get; set; } = "";
