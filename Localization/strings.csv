@@ -1,2 +1,3 @@
 keys,en,de
-INTERACTION_TOGGLE_LIGHT,Toggle light,Licht umschalten
+VERB_TOGGLE,Toggle,Umschalten
+VERB_REPAIR,Repair,Reparieren

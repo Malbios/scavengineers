@@ -1,5 +1,5 @@
 using Godot;
-using Scavengineers.Scripts.Interaction;
+using Scavengineers.Scripts.Verbs;
 
 namespace Scavengineers.Scripts.Player;
 
@@ -84,9 +84,9 @@ public partial class Player : CharacterBody3D
             return;
         }
 
-        if (_interactRay.GetCollider() is IInteractable interactable)
+        if (_interactRay.GetCollider() is IVerbTarget target && target.AvailableVerbs.Count > 0)
         {
-            interactable.Interact();
+            target.ExecuteVerb(target.AvailableVerbs[0]);
         }
     }
 }
