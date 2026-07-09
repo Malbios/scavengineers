@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Godot;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
+using Scavengineers.Scripts.Ship;
 using Scavengineers.Scripts.Travel;
 using Scavengineers.Scripts.Verbs;
 
@@ -14,12 +15,16 @@ public partial class Player : CharacterBody3D
     private const float MouseSensitivity = 0.0025f;
     private const float MaxPitchRadians = Mathf.Pi / 2 - 0.05f;
 
+    [Export]
+    public ShipSim? ShipSimRef { get; set; }
+
     private Node3D? _head;
     private RayCast3D? _interactRay;
     private Label? _verbLabel;
     private ProgressBar? _verbProgressBar;
     private ProgressBar? _o2Bar;
     private ProgressBar? _powerBar;
+    private Label? _roomO2Label;
     private Label? _inventoryLabel;
     private readonly SuitResources _suitResources = new();
     private readonly PlayerInventory _inventory = new();
@@ -44,6 +49,7 @@ public partial class Player : CharacterBody3D
         _verbProgressBar = GetNode<ProgressBar>("HUD/VerbProgressBar");
         _o2Bar = GetNode<ProgressBar>("HUD/ResourcesPanel/O2Bar");
         _powerBar = GetNode<ProgressBar>("HUD/ResourcesPanel/PowerBar");
+        _roomO2Label = GetNode<Label>("HUD/ResourcesPanel/RoomO2Label");
         _inventoryLabel = GetNode<Label>("HUD/InventoryLabel");
         CaptureMouse();
         // Setting MouseMode here alone is unreliable if the window doesn't yet have OS
@@ -144,10 +150,22 @@ public partial class Player : CharacterBody3D
 
         // Suit resources keep draining while busy performing a verb — a task's duration is a
         // real elapsed-time cost, not a pause (docs/project-plan.md's "time acceleration ...
-        // pays the full bill" framing).
-        _suitResources.Tick(delta);
+        // pays the full bill" framing). A breached room's dropping O2 burns the suit's own
+        // reserve faster on top of the flat drain (see SuitResources.Tick).
+        var roomVolume = ShipSimRef?.VolumeAt(ShipSim.DemoCell);
+        _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21);
         _o2Bar!.Value = _suitResources.O2Percent;
         _powerBar!.Value = _suitResources.PowerPercent;
+
+        if (roomVolume is not null)
+        {
+            _roomO2Label!.Visible = true;
+            _roomO2Label.Text = Tr("HUD_ROOM_O2") + $": {roomVolume.O2Fraction * 100:F0}%";
+        }
+        else
+        {
+            _roomO2Label!.Visible = false;
+        }
 
         UpdateVerbHud();
     }
@@ -273,6 +291,8 @@ public partial class Player : CharacterBody3D
             _inventory.Add(itemId, count);
         }
     }
+
+    public void RefillSuitResources() => _suitResources.RestoreFrom(100f, 100f);
 
     public TravelPayload CaptureTravelPayload()
     {

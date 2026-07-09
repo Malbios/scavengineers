@@ -107,3 +107,8 @@ custom_minimum_size = Vector2(0, 16)
 layout_mode = 2
 value = 100.0
 show_percentage = false
+
+[node name="RoomO2Label" type="Label" parent="HUD/ResourcesPanel"]
+visible = false
+layout_mode = 2
+text = ""

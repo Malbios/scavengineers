@@ -2,15 +2,25 @@ using System.Collections.Generic;
 using Godot;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
+using Scavengineers.Scripts.Ship;
 
 namespace Scavengineers.Scripts.Verbs;
 
+/// <summary>
+/// The room's breaker. Toggling flips the visible light and the sim's switch fixture
+/// together — the light is no longer purely cosmetic, since the same switch also gates
+/// power to the recharge station (docs/architecture/atmosphere-power-sim.md's "an open
+/// switch cuts power to a region", finally reachable from actual gameplay).
+/// </summary>
 public partial class ToggleLightVerbTarget : StaticBody3D, IVerbTarget, ISaveable
 {
     private static readonly Verb ToggleVerb = new("toggle", "VERB_TOGGLE", DurationSeconds: 0f);
 
     [Export]
     public Light3D? TargetLight { get; set; }
+
+    [Export]
+    public ShipSim? ShipSimRef { get; set; }
 
     [Export]
     public string SaveId { get; set; } = "";
@@ -27,6 +37,7 @@ public partial class ToggleLightVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
         }
 
         TargetLight.Visible = !TargetLight.Visible;
+        ShipSimRef?.SetSwitchOpen(!TargetLight.Visible);
     }
 
     public void CancelVerb()
@@ -42,5 +53,7 @@ public partial class ToggleLightVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
         {
             TargetLight.Visible = state;
         }
+
+        ShipSimRef?.SetSwitchOpen(!state);
     }
 }
