@@ -61,21 +61,35 @@ public partial class FloatPlayer : CharacterBody3D
 
     private void TryPushOff(Key key)
     {
-        var localDirection = key switch
+        // Space/Ctrl push along world-up/down regardless of where the camera is looking —
+        // W/A/S/D push in the body's horizontal facing (yaw only; pitch lives on Head, not
+        // the body), so mixing in a pitch-relative "forward" for vertical would be inconsistent.
+        Vector3 worldDirection;
+        switch (key)
         {
-            Key.W => new Vector3(0, 0, -1),
-            Key.S => new Vector3(0, 0, 1),
-            Key.A => new Vector3(-1, 0, 0),
-            Key.D => new Vector3(1, 0, 0),
-            _ => Vector3.Zero,
-        };
-
-        if (localDirection == Vector3.Zero)
-        {
-            return;
+            case Key.W:
+                worldDirection = Transform.Basis * new Vector3(0, 0, -1);
+                break;
+            case Key.S:
+                worldDirection = Transform.Basis * new Vector3(0, 0, 1);
+                break;
+            case Key.A:
+                worldDirection = Transform.Basis * new Vector3(-1, 0, 0);
+                break;
+            case Key.D:
+                worldDirection = Transform.Basis * new Vector3(1, 0, 0);
+                break;
+            case Key.Space:
+                worldDirection = Vector3.Up;
+                break;
+            case Key.Ctrl:
+                worldDirection = Vector3.Down;
+                break;
+            default:
+                return;
         }
 
-        var worldDirection = (Transform.Basis * localDirection).Normalized();
+        worldDirection = worldDirection.Normalized();
         var newVelocity = Velocity + worldDirection * PushImpulse;
 
         if (newVelocity.Length() > MaxSpeed)
