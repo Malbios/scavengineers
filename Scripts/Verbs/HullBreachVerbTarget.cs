@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Godot;
+using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.Ship;
 
 namespace Scavengineers.Scripts.Verbs;
@@ -12,7 +13,10 @@ namespace Scavengineers.Scripts.Verbs;
 /// </summary>
 public partial class HullBreachVerbTarget : StaticBody3D, IVerbTarget
 {
-    private static readonly Verb RepairVerb = new("repair", "VERB_REPAIR", DurationSeconds: 3f);
+    private static readonly Verb RepairVerb = new("repair", "VERB_REPAIR", DurationSeconds: 3f)
+    {
+        Requirements = [new ItemRequirement("hull_patch_kit", 1)],
+    };
 
     [Export]
     public ShipSim? ShipSimRef { get; set; }
@@ -44,7 +48,7 @@ public partial class HullBreachVerbTarget : StaticBody3D, IVerbTarget
         _idleMaterial = Mesh?.GetSurfaceOverrideMaterial(0);
     }
 
-    public void ExecuteVerb(Verb verb)
+    public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
         if (verb.Id != RepairVerb.Id || _repairInProgress)
         {

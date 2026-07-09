@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Godot;
+using Scavengineers.Scripts.Inventory;
 
 namespace Scavengineers.Scripts.Verbs;
 
@@ -14,7 +15,7 @@ public partial class ToggleLightVerbTarget : StaticBody3D, IVerbTarget
 
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 
-    public void ExecuteVerb(Verb verb)
+    public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
         if (verb.Id != ToggleVerb.Id || TargetLight is null)
         {

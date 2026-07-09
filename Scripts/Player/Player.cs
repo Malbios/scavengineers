@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using Godot;
+using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.Verbs;
 
 namespace Scavengineers.Scripts.Player;
@@ -16,7 +18,9 @@ public partial class Player : CharacterBody3D
     private ProgressBar? _verbProgressBar;
     private ProgressBar? _o2Bar;
     private ProgressBar? _powerBar;
+    private Label? _inventoryLabel;
     private readonly SuitResources _suitResources = new();
+    private readonly PlayerInventory _inventory = new();
     private float _pitch;
 
     /// <summary>Set while a timed verb we started is still running — occupies the player,
@@ -34,6 +38,7 @@ public partial class Player : CharacterBody3D
         _verbProgressBar = GetNode<ProgressBar>("HUD/VerbProgressBar");
         _o2Bar = GetNode<ProgressBar>("HUD/ResourcesPanel/O2Bar");
         _powerBar = GetNode<ProgressBar>("HUD/ResourcesPanel/PowerBar");
+        _inventoryLabel = GetNode<Label>("HUD/InventoryLabel");
         CaptureMouse();
         // Setting MouseMode here alone is unreliable if the window doesn't yet have OS
         // input focus at this exact point in startup — reapply whenever focus is (re)gained.
@@ -144,12 +149,35 @@ public partial class Player : CharacterBody3D
         }
 
         var verb = target.AvailableVerbs[0];
-        target.ExecuteVerb(verb);
+        if (!HasRequirements(verb))
+        {
+            return;
+        }
+
+        foreach (var requirement in verb.Requirements)
+        {
+            _inventory.TryRemove(requirement.ItemId, requirement.Count);
+        }
+
+        target.ExecuteVerb(verb, _inventory);
 
         if (verb.DurationSeconds > 0)
         {
             _busyTarget = target;
         }
+    }
+
+    private bool HasRequirements(Verb verb)
+    {
+        foreach (var requirement in verb.Requirements)
+        {
+            if (!_inventory.Has(requirement.ItemId, requirement.Count))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void UpdateVerbHud()
@@ -158,8 +186,10 @@ public partial class Player : CharacterBody3D
 
         if (target is not null && target.AvailableVerbs.Count > 0)
         {
-            _verbLabel!.Text = Tr(target.AvailableVerbs[0].LocalizationKey);
+            var verb = target.AvailableVerbs[0];
+            _verbLabel!.Text = Tr(verb.LocalizationKey);
             _verbLabel.Visible = true;
+            _verbLabel.Modulate = HasRequirements(verb) ? Colors.White : Colors.Red;
 
             var progress = target.CurrentVerbProgress;
             _verbProgressBar!.Visible = progress is not null;
@@ -173,5 +203,24 @@ public partial class Player : CharacterBody3D
             _verbLabel!.Visible = false;
             _verbProgressBar!.Visible = false;
         }
+
+        UpdateInventoryHud();
+    }
+
+    private void UpdateInventoryHud()
+    {
+        if (_inventory.Counts.Count == 0)
+        {
+            _inventoryLabel!.Text = "";
+            return;
+        }
+
+        var lines = new List<string>();
+        foreach (var (itemId, count) in _inventory.Counts)
+        {
+            lines.Add($"{Tr("ITEM_" + itemId.ToUpperInvariant())}: {count}");
+        }
+
+        _inventoryLabel!.Text = string.Join("\n", lines);
     }
 }

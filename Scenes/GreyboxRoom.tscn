@@ -1,9 +1,10 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=20 format=3]
 
 [ext_resource type="Script" path="res://Scripts/Verbs/ToggleLightVerbTarget.cs" id="1"]
 [ext_resource type="PackedScene" path="res://Scenes/Player.tscn" id="2"]
 [ext_resource type="Script" path="res://Scripts/Ship/ShipSim.cs" id="3"]
 [ext_resource type="Script" path="res://Scripts/Verbs/HullBreachVerbTarget.cs" id="4"]
+[ext_resource type="Script" path="res://Scripts/Inventory/PickupItem.cs" id="5"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 2
@@ -48,6 +49,15 @@ albedo_color = Color(0.9, 0.55, 0.05, 1)
 
 [sub_resource type="StandardMaterial3D" id="RepairingMaterial"]
 albedo_color = Color(0.9, 0.85, 0.1, 1)
+
+[sub_resource type="BoxShape3D" id="PickupItemShape"]
+size = Vector3(0.3, 0.3, 0.3)
+
+[sub_resource type="BoxMesh" id="PickupItemMesh"]
+size = Vector3(0.3, 0.3, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="PickupItemMaterial"]
+albedo_color = Color(0.15, 0.8, 0.2, 1)
 
 [node name="GreyboxRoom" type="Node3D"]
 
@@ -136,6 +146,18 @@ shape = SubResource("BreachPatchShape")
 [node name="MeshInstance3D" type="MeshInstance3D" parent="HullBreachPatch"]
 mesh = SubResource("BreachPatchMesh")
 surface_material_override/0 = SubResource("BreachPatchMaterial")
+
+[node name="HullPatchKit" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.15, 2)
+script = ExtResource("5")
+ItemId = "hull_patch_kit"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HullPatchKit"]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HullPatchKit"]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("PickupItemMaterial")
 
 [node name="Player" parent="." instance=ExtResource("2")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
