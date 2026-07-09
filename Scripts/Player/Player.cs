@@ -28,6 +28,10 @@ public partial class Player : CharacterBody3D
     /// to null (reuses the existing progress signal instead of a separate completion event).</summary>
     private IVerbTarget? _busyTarget;
 
+    /// <summary>The verb that made us busy — kept so a cancel can refund its Requirements.
+    /// Naturally finishing does NOT refund; only an explicit cancel does.</summary>
+    private Verb? _busyVerb;
+
     private bool IsBusy => _busyTarget is not null;
 
     public override void _Ready()
@@ -64,7 +68,14 @@ public partial class Player : CharacterBody3D
         else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } && IsBusy)
         {
             _busyTarget!.CancelVerb();
+
+            foreach (var requirement in _busyVerb!.Requirements)
+            {
+                _inventory.Add(requirement.ItemId, requirement.Count);
+            }
+
             _busyTarget = null;
+            _busyVerb = null;
         }
         else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true }
                  && Input.MouseMode != Input.MouseModeEnum.Captured)
@@ -83,7 +94,9 @@ public partial class Player : CharacterBody3D
     {
         if (IsBusy && _busyTarget!.CurrentVerbProgress is null)
         {
-            _busyTarget = null; // the task we started has finished
+            // The task we started has finished naturally — no refund, unlike an explicit cancel.
+            _busyTarget = null;
+            _busyVerb = null;
         }
 
         var velocity = Velocity;
@@ -164,6 +177,7 @@ public partial class Player : CharacterBody3D
         if (verb.DurationSeconds > 0)
         {
             _busyTarget = target;
+            _busyVerb = verb;
         }
     }
 
