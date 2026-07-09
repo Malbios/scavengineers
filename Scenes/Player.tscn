@@ -1,31 +1,32 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://dkr1y6qs26kfd"]
 
-[ext_resource type="Script" path="res://Scripts/Player/Player.cs" id="1"]
-[ext_resource type="Script" path="res://Scripts/Player/Crosshair.cs" id="2"]
+[ext_resource type="Script" uid="uid://dd5isx558nv1v" path="res://Scripts/Player/Player.cs" id="1"]
+[ext_resource type="Script" uid="uid://gtalqbepbiga" path="res://Scripts/Player/Crosshair.cs" id="2"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
 height = 1.8
 
-[node name="Player" type="CharacterBody3D"]
+[node name="Player" type="CharacterBody3D" unique_id=66675123]
 script = ExtResource("1")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=2108591933]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 shape = SubResource("CapsuleShape3D_1")
 
-[node name="Head" type="Node3D" parent="."]
+[node name="Head" type="Node3D" parent="." unique_id=1256205786]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
 
-[node name="Camera3D" type="Camera3D" parent="Head"]
+[node name="Camera3D" type="Camera3D" parent="Head" unique_id=2096032838]
 current = true
 
-[node name="InteractRay" type="RayCast3D" parent="Head/Camera3D"]
+[node name="InteractRay" type="RayCast3D" parent="Head/Camera3D" unique_id=884361321]
 target_position = Vector3(0, 0, -2.5)
 
-[node name="HUD" type="CanvasLayer" parent="."]
+[node name="HUD" type="CanvasLayer" parent="." unique_id=1671283592]
 
-[node name="Crosshair" type="Control" parent="HUD"]
+[node name="Crosshair" type="Control" parent="HUD" unique_id=2109340878]
+layout_mode = 3
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
@@ -35,10 +36,12 @@ offset_left = -8.0
 offset_top = -8.0
 offset_right = 8.0
 offset_bottom = 8.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("2")
 
-[node name="VerbLabel" type="Label" parent="HUD"]
+[node name="VerbLabel" type="Label" parent="HUD" unique_id=143274282]
 visible = false
 anchors_preset = 8
 anchor_left = 0.5
@@ -49,10 +52,9 @@ offset_left = -100.0
 offset_top = 20.0
 offset_right = 100.0
 offset_bottom = 44.0
-mouse_filter = 2
 horizontal_alignment = 1
 
-[node name="VerbProgressBar" type="ProgressBar" parent="HUD"]
+[node name="VerbProgressBar" type="ProgressBar" parent="HUD" unique_id=1093955890]
 visible = false
 anchors_preset = 8
 anchor_left = 0.5
@@ -64,40 +66,35 @@ offset_top = 48.0
 offset_right = 60.0
 offset_bottom = 64.0
 mouse_filter = 2
-min_value = 0.0
-max_value = 100.0
 show_percentage = false
 
-[node name="ResourcesPanel" type="VBoxContainer" parent="HUD"]
+[node name="ResourcesPanel" type="VBoxContainer" parent="HUD" unique_id=926658065]
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = -140.0
+offset_top = -108.0
 offset_right = 176.0
-offset_bottom = -16.0
+offset_bottom = -17.0
+grow_vertical = 0
 mouse_filter = 2
 
-[node name="O2Label" type="Label" parent="HUD/ResourcesPanel"]
+[node name="O2Label" type="Label" parent="HUD/ResourcesPanel" unique_id=1009985224]
 layout_mode = 2
 text = "O2"
 
-[node name="O2Bar" type="ProgressBar" parent="HUD/ResourcesPanel"]
-layout_mode = 2
+[node name="O2Bar" type="ProgressBar" parent="HUD/ResourcesPanel" unique_id=1829003878]
 custom_minimum_size = Vector2(0, 16)
-min_value = 0.0
-max_value = 100.0
+layout_mode = 2
 value = 100.0
 show_percentage = false
 
-[node name="PowerLabel" type="Label" parent="HUD/ResourcesPanel"]
+[node name="PowerLabel" type="Label" parent="HUD/ResourcesPanel" unique_id=1180030098]
 layout_mode = 2
 text = "PWR"
 
-[node name="PowerBar" type="ProgressBar" parent="HUD/ResourcesPanel"]
-layout_mode = 2
+[node name="PowerBar" type="ProgressBar" parent="HUD/ResourcesPanel" unique_id=1991756466]
 custom_minimum_size = Vector2(0, 16)
-min_value = 0.0
-max_value = 100.0
+layout_mode = 2
 value = 100.0
 show_percentage = false
