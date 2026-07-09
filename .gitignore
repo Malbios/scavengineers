@@ -1,0 +1,18 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# .NET / Godot C# build artifacts
+bin/
+obj/
+.vs/
+*.csproj.user
+data_*.pck
+.mono/
+
+# VS Code
+.vscode/
+
+# JetBrains Rider
+.idea/
+*.sln.iml
