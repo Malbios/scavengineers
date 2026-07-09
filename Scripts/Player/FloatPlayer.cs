@@ -17,11 +17,15 @@ public partial class FloatPlayer : CharacterBody3D
     private const float MaxPitchRadians = Mathf.Pi / 2 - 0.05f;
 
     private Node3D? _head;
+    private ShapeCast3D? _touchCast;
     private float _pitch;
+    private bool _isTouchingSurface;
 
     public override void _Ready()
     {
         _head = GetNode<Node3D>("Head");
+        _touchCast = GetNode<ShapeCast3D>("TouchCast");
+        _touchCast.AddException(this);
         CaptureMouse();
         GetWindow().FocusEntered += CaptureMouse;
     }
@@ -57,10 +61,29 @@ public partial class FloatPlayer : CharacterBody3D
     {
         // No gravity, no damping: velocity only changes from a push-off or a collision slide.
         MoveAndSlide();
+
+        // CharacterBody3D's IsOnFloor()/IsOnWall()/IsOnCeiling() are movement-based
+        // classifications from MoveAndSlide()'s motion test — with no gravity and zero
+        // velocity there's no motion to classify, so they stay false even while physically
+        // resting against a surface. An overlap-based ShapeCast3D detects "touching" correctly
+        // regardless of velocity.
+        if (_touchCast is not null)
+        {
+            _touchCast.ForceShapecastUpdate();
+            _isTouchingSurface = _touchCast.IsColliding();
+        }
     }
 
     private void TryPushOff(Key key)
     {
+        // This is a push-*off* (Ostranauts-style: kick off a surface), not sustained thruster
+        // EVA — no reaction mass to push against means no impulse, per docs/architecture/
+        // locomotion.md's distinction between the two movement modes.
+        if (!_isTouchingSurface)
+        {
+            return;
+        }
+
         // Space/Ctrl push along world-up/down regardless of where the camera is looking —
         // W/A/S/D push in the body's horizontal facing (yaw only; pitch lives on Head, not
         // the body), so mixing in a pitch-relative "forward" for vertical would be inconsistent.
