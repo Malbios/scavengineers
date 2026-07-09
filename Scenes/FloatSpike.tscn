@@ -1,0 +1,124 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/FloatPlayer.tscn" id="1"]
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 2
+ambient_light_color = Color(0.3, 0.3, 0.35, 1)
+ambient_light_energy = 1.0
+
+[sub_resource type="BoxShape3D" id="FloorCeilingShape"]
+size = Vector3(12, 0.2, 12)
+
+[sub_resource type="BoxMesh" id="FloorCeilingMesh"]
+size = Vector3(12, 0.2, 12)
+
+[sub_resource type="BoxShape3D" id="WallShapeNS"]
+size = Vector3(12, 12, 0.2)
+
+[sub_resource type="BoxMesh" id="WallMeshNS"]
+size = Vector3(12, 12, 0.2)
+
+[sub_resource type="BoxShape3D" id="WallShapeEW"]
+size = Vector3(0.2, 12, 12)
+
+[sub_resource type="BoxMesh" id="WallMeshEW"]
+size = Vector3(0.2, 12, 12)
+
+[sub_resource type="BoxShape3D" id="ObstacleShape"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="BoxMesh" id="ObstacleMesh"]
+size = Vector3(1, 1, 1)
+
+[node name="FloatSpike" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_1")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866, -0.25, 0.433, 0, 0.866, 0.5, -0.5, -0.433, 0.75, 0, 4, 0)
+light_energy = 0.8
+
+[node name="Floor" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -6, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+shape = SubResource("FloorCeilingShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+mesh = SubResource("FloorCeilingMesh")
+
+[node name="Ceiling" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ceiling"]
+shape = SubResource("FloorCeilingShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ceiling"]
+mesh = SubResource("FloorCeilingMesh")
+
+[node name="WallNorth" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WallNorth"]
+shape = SubResource("WallShapeNS")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WallNorth"]
+mesh = SubResource("WallMeshNS")
+
+[node name="WallSouth" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 6)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WallSouth"]
+shape = SubResource("WallShapeNS")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WallSouth"]
+mesh = SubResource("WallMeshNS")
+
+[node name="WallEast" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WallEast"]
+shape = SubResource("WallShapeEW")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WallEast"]
+mesh = SubResource("WallMeshEW")
+
+[node name="WallWest" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WallWest"]
+shape = SubResource("WallShapeEW")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WallWest"]
+mesh = SubResource("WallMeshEW")
+
+[node name="ObstacleA" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 2, -2)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ObstacleA"]
+shape = SubResource("ObstacleShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="ObstacleA"]
+mesh = SubResource("ObstacleMesh")
+
+[node name="ObstacleB" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, -1, 2)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ObstacleB"]
+shape = SubResource("ObstacleShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="ObstacleB"]
+mesh = SubResource("ObstacleMesh")
+
+[node name="ObstacleC" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2, 3)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ObstacleC"]
+shape = SubResource("ObstacleShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="ObstacleC"]
+mesh = SubResource("ObstacleMesh")
+
+[node name="FloatPlayer" parent="." instance=ExtResource("1")]
