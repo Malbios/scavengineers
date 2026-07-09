@@ -84,35 +84,41 @@ public partial class FloatPlayer : CharacterBody3D
             return;
         }
 
-        // Space/Ctrl push along world-up/down regardless of where the camera is looking —
-        // W/A/S/D push in the body's horizontal facing (yaw only; pitch lives on Head, not
-        // the body), so mixing in a pitch-relative "forward" for vertical would be inconsistent.
-        Vector3 worldDirection;
+        if (_head is null)
+        {
+            return;
+        }
+
+        // Full 6DOF, view-relative: in zero-g there's no "up" to anchor to, so every push
+        // direction (including Space/Ctrl) is relative to where the camera is actually
+        // looking — pitch included, not just the body's yaw.
+        var viewBasis = _head.GlobalTransform.Basis;
+        Vector3 localDirection;
         switch (key)
         {
             case Key.W:
-                worldDirection = Transform.Basis * new Vector3(0, 0, -1);
+                localDirection = new Vector3(0, 0, -1);
                 break;
             case Key.S:
-                worldDirection = Transform.Basis * new Vector3(0, 0, 1);
+                localDirection = new Vector3(0, 0, 1);
                 break;
             case Key.A:
-                worldDirection = Transform.Basis * new Vector3(-1, 0, 0);
+                localDirection = new Vector3(-1, 0, 0);
                 break;
             case Key.D:
-                worldDirection = Transform.Basis * new Vector3(1, 0, 0);
+                localDirection = new Vector3(1, 0, 0);
                 break;
             case Key.Space:
-                worldDirection = Vector3.Up;
+                localDirection = new Vector3(0, 1, 0);
                 break;
             case Key.Ctrl:
-                worldDirection = Vector3.Down;
+                localDirection = new Vector3(0, -1, 0);
                 break;
             default:
                 return;
         }
 
-        worldDirection = worldDirection.Normalized();
+        var worldDirection = (viewBasis * localDirection).Normalized();
         var newVelocity = Velocity + worldDirection * PushImpulse;
 
         if (newVelocity.Length() > MaxSpeed)
