@@ -14,6 +14,9 @@ public partial class Player : CharacterBody3D
     private RayCast3D? _interactRay;
     private Label? _verbLabel;
     private ProgressBar? _verbProgressBar;
+    private ProgressBar? _o2Bar;
+    private ProgressBar? _powerBar;
+    private readonly SuitResources _suitResources = new();
     private float _pitch;
 
     /// <summary>Set while a timed verb we started is still running — occupies the player,
@@ -29,6 +32,8 @@ public partial class Player : CharacterBody3D
         _interactRay = GetNode<RayCast3D>("Head/Camera3D/InteractRay");
         _verbLabel = GetNode<Label>("HUD/VerbLabel");
         _verbProgressBar = GetNode<ProgressBar>("HUD/VerbProgressBar");
+        _o2Bar = GetNode<ProgressBar>("HUD/ResourcesPanel/O2Bar");
+        _powerBar = GetNode<ProgressBar>("HUD/ResourcesPanel/PowerBar");
         CaptureMouse();
         // Setting MouseMode here alone is unreliable if the window doesn't yet have OS
         // input focus at this exact point in startup — reapply whenever focus is (re)gained.
@@ -104,6 +109,13 @@ public partial class Player : CharacterBody3D
 
         Velocity = velocity;
         MoveAndSlide();
+
+        // Suit resources keep draining while busy performing a verb — a task's duration is a
+        // real elapsed-time cost, not a pause (docs/project-plan.md's "time acceleration ...
+        // pays the full bill" framing).
+        _suitResources.Tick(delta);
+        _o2Bar!.Value = _suitResources.O2Percent;
+        _powerBar!.Value = _suitResources.PowerPercent;
 
         UpdateVerbHud();
     }

@@ -67,3 +67,37 @@ mouse_filter = 2
 min_value = 0.0
 max_value = 100.0
 show_percentage = false
+
+[node name="ResourcesPanel" type="VBoxContainer" parent="HUD"]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -84.0
+offset_right = 176.0
+offset_bottom = -16.0
+mouse_filter = 2
+
+[node name="O2Label" type="Label" parent="HUD/ResourcesPanel"]
+layout_mode = 2
+text = "O2"
+
+[node name="O2Bar" type="ProgressBar" parent="HUD/ResourcesPanel"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 16)
+min_value = 0.0
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="PowerLabel" type="Label" parent="HUD/ResourcesPanel"]
+layout_mode = 2
+text = "PWR"
+
+[node name="PowerBar" type="ProgressBar" parent="HUD/ResourcesPanel"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 16)
+min_value = 0.0
+max_value = 100.0
+value = 100.0
+show_percentage = false
