@@ -6,6 +6,6 @@
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/GreyboxRoom.tscn"
+$scene = "res://Scenes/HomeShip.tscn"
 
 & $godotExe --path $projectPath $scene

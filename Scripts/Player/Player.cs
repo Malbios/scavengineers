@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Godot;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
+using Scavengineers.Scripts.Travel;
 using Scavengineers.Scripts.Verbs;
 
 namespace Scavengineers.Scripts.Player;
@@ -48,6 +49,14 @@ public partial class Player : CharacterBody3D
         // Setting MouseMode here alone is unreliable if the window doesn't yet have OS
         // input focus at this exact point in startup — reapply whenever focus is (re)gained.
         GetWindow().FocusEntered += CaptureMouse;
+
+        AddToGroup("player");
+
+        if (TravelState.Instance?.Pending is { } payload)
+        {
+            ApplyTravelPayload(payload);
+            TravelState.Instance.Pending = null;
+        }
     }
 
     public override void _Input(InputEvent @event)
@@ -256,6 +265,27 @@ public partial class Player : CharacterBody3D
 
         _inventory.Clear();
         foreach (var (itemId, count) in data.Inventory)
+        {
+            _inventory.Add(itemId, count);
+        }
+    }
+
+    public TravelPayload CaptureTravelPayload()
+    {
+        return new TravelPayload
+        {
+            O2Percent = _suitResources.O2Percent,
+            PowerPercent = _suitResources.PowerPercent,
+            Inventory = new Dictionary<string, int>(_inventory.Counts),
+        };
+    }
+
+    public void ApplyTravelPayload(TravelPayload payload)
+    {
+        _suitResources.RestoreFrom(payload.O2Percent, payload.PowerPercent);
+
+        _inventory.Clear();
+        foreach (var (itemId, count) in payload.Inventory)
         {
             _inventory.Add(itemId, count);
         }
