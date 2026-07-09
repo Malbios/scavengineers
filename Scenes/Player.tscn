@@ -1,6 +1,7 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://Scripts/Player/Player.cs" id="1"]
+[ext_resource type="Script" path="res://Scripts/Player/Crosshair.cs" id="2"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -21,3 +22,48 @@ current = true
 
 [node name="InteractRay" type="RayCast3D" parent="Head/Camera3D"]
 target_position = Vector3(0, 0, -2.5)
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="Crosshair" type="Control" parent="HUD"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -8.0
+offset_top = -8.0
+offset_right = 8.0
+offset_bottom = 8.0
+mouse_filter = 2
+script = ExtResource("2")
+
+[node name="VerbLabel" type="Label" parent="HUD"]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = 20.0
+offset_right = 100.0
+offset_bottom = 44.0
+mouse_filter = 2
+horizontal_alignment = 1
+
+[node name="VerbProgressBar" type="ProgressBar" parent="HUD"]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -60.0
+offset_top = 48.0
+offset_right = 60.0
+offset_bottom = 64.0
+mouse_filter = 2
+min_value = 0.0
+max_value = 100.0
+show_percentage = false

@@ -17,10 +17,22 @@ public partial class HullBreachVerbTarget : StaticBody3D, IVerbTarget
     [Export]
     public ShipSim? ShipSimRef { get; set; }
 
+    [Export]
+    public MeshInstance3D? Mesh { get; set; }
+
+    [Export]
+    public CollisionShape3D? Collider { get; set; }
+
+    [Export]
+    public Material? RepairingMaterial { get; set; }
+
     private Timer? _repairTimer;
     private bool _repairInProgress;
 
     public IReadOnlyList<Verb> AvailableVerbs { get; } = [RepairVerb];
+
+    public float? CurrentVerbProgress =>
+        _repairInProgress ? 1f - (float)(_repairTimer!.TimeLeft / _repairTimer.WaitTime) : null;
 
     public override void _Ready()
     {
@@ -38,11 +50,22 @@ public partial class HullBreachVerbTarget : StaticBody3D, IVerbTarget
 
         _repairInProgress = true;
         _repairTimer!.Start();
+
+        if (Mesh is not null && RepairingMaterial is not null)
+        {
+            Mesh.SetSurfaceOverrideMaterial(0, RepairingMaterial);
+        }
     }
 
     private void OnRepairComplete()
     {
         _repairInProgress = false;
         ShipSimRef!.Deck.RepairHull(ShipSim.DemoCell);
+
+        Visible = false;
+        if (Collider is not null)
+        {
+            Collider.Disabled = true;
+        }
     }
 }

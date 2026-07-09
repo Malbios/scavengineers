@@ -12,12 +12,16 @@ public partial class Player : CharacterBody3D
 
     private Node3D? _head;
     private RayCast3D? _interactRay;
+    private Label? _verbLabel;
+    private ProgressBar? _verbProgressBar;
     private float _pitch;
 
     public override void _Ready()
     {
         _head = GetNode<Node3D>("Head");
         _interactRay = GetNode<RayCast3D>("Head/Camera3D/InteractRay");
+        _verbLabel = GetNode<Label>("HUD/VerbLabel");
+        _verbProgressBar = GetNode<ProgressBar>("HUD/VerbProgressBar");
         CaptureMouse();
         // Setting MouseMode here alone is unreliable if the window doesn't yet have OS
         // input focus at this exact point in startup — reapply whenever focus is (re)gained.
@@ -75,18 +79,49 @@ public partial class Player : CharacterBody3D
 
         Velocity = velocity;
         MoveAndSlide();
+
+        UpdateVerbHud();
+    }
+
+    private IVerbTarget? GetCurrentVerbTarget()
+    {
+        if (_interactRay is null || !_interactRay.IsColliding())
+        {
+            return null;
+        }
+
+        return _interactRay.GetCollider() as IVerbTarget;
     }
 
     private void Interact()
     {
-        if (_interactRay is null || !_interactRay.IsColliding())
-        {
-            return;
-        }
-
-        if (_interactRay.GetCollider() is IVerbTarget target && target.AvailableVerbs.Count > 0)
+        var target = GetCurrentVerbTarget();
+        if (target is not null && target.AvailableVerbs.Count > 0)
         {
             target.ExecuteVerb(target.AvailableVerbs[0]);
+        }
+    }
+
+    private void UpdateVerbHud()
+    {
+        var target = GetCurrentVerbTarget();
+
+        if (target is not null && target.AvailableVerbs.Count > 0)
+        {
+            _verbLabel!.Text = Tr(target.AvailableVerbs[0].LocalizationKey);
+            _verbLabel.Visible = true;
+
+            var progress = target.CurrentVerbProgress;
+            _verbProgressBar!.Visible = progress is not null;
+            if (progress is not null)
+            {
+                _verbProgressBar.Value = progress.Value * 100;
+            }
+        }
+        else
+        {
+            _verbLabel!.Visible = false;
+            _verbProgressBar!.Visible = false;
         }
     }
 }
