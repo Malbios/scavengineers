@@ -21,4 +21,10 @@ public sealed class SuitResources
         O2Percent = Math.Clamp(O2Percent - O2DrainPerSecond * (float)delta, 0f, 100f);
         PowerPercent = Math.Clamp(PowerPercent - PowerDrainPerSecond * (float)delta, 0f, 100f);
     }
+
+    public void RestoreFrom(float o2Percent, float powerPercent)
+    {
+        O2Percent = Math.Clamp(o2Percent, 0f, 100f);
+        PowerPercent = Math.Clamp(powerPercent, 0f, 100f);
+    }
 }

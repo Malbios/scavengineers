@@ -5,6 +5,7 @@
 [ext_resource type="Script" path="res://Scripts/Ship/ShipSim.cs" id="3"]
 [ext_resource type="Script" path="res://Scripts/Verbs/HullBreachVerbTarget.cs" id="4"]
 [ext_resource type="Script" path="res://Scripts/Inventory/PickupItem.cs" id="5"]
+[ext_resource type="Script" path="res://Scripts/SaveLoad/SaveManager.cs" id="6"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 2
@@ -64,6 +65,10 @@ albedo_color = Color(0.15, 0.8, 0.2, 1)
 [node name="ShipSim" type="Node" parent="."]
 script = ExtResource("3")
 
+[node name="SaveManager" type="Node" parent="." node_paths=PackedStringArray("PlayerRef")]
+script = ExtResource("6")
+PlayerRef = NodePath("../Player")
+
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_1")
 
@@ -120,10 +125,11 @@ mesh = SubResource("WallMeshEW")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
 omni_range = 8.0
 
-[node name="LightSwitch" type="StaticBody3D" parent="." node_paths=PackedStringArray("TargetLight")]
+[node name="LightSwitch" type="StaticBody3D" parent="." node_paths=PackedStringArray("TargetLight") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 1, -2.9)
 script = ExtResource("1")
 TargetLight = NodePath("../RoomLight")
+SaveId = "light_switch_1"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="LightSwitch"]
 shape = SubResource("SwitchShape")
@@ -132,9 +138,10 @@ shape = SubResource("SwitchShape")
 mesh = SubResource("SwitchMesh")
 surface_material_override/0 = SubResource("SwitchMaterial")
 
-[node name="HullBreachPatch" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipSimRef", "Mesh", "Collider")]
+[node name="HullBreachPatch" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipSimRef", "Mesh", "Collider") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.9, 1, 2.5)
 script = ExtResource("4")
+SaveId = "hull_breach_patch_1"
 ShipSimRef = NodePath("../ShipSim")
 Mesh = NodePath("MeshInstance3D")
 Collider = NodePath("CollisionShape3D")

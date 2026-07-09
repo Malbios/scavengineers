@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Godot;
 using Scavengineers.Scripts.Inventory;
+using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Scripts.Verbs;
 
 namespace Scavengineers.Scripts.Player;
@@ -223,6 +224,41 @@ public partial class Player : CharacterBody3D
         }
 
         UpdateInventoryHud();
+    }
+
+    public PlayerSaveData CapturePlayerState()
+    {
+        return new PlayerSaveData
+        {
+            PosX = Position.X,
+            PosY = Position.Y,
+            PosZ = Position.Z,
+            Yaw = Rotation.Y,
+            Pitch = _pitch,
+            O2Percent = _suitResources.O2Percent,
+            PowerPercent = _suitResources.PowerPercent,
+            Inventory = new Dictionary<string, int>(_inventory.Counts),
+        };
+    }
+
+    public void ApplyPlayerState(PlayerSaveData data)
+    {
+        Position = new Vector3(data.PosX, data.PosY, data.PosZ);
+        Rotation = new Vector3(0, data.Yaw, 0);
+
+        _pitch = data.Pitch;
+        if (_head is not null)
+        {
+            _head.Rotation = new Vector3(_pitch, 0, 0);
+        }
+
+        _suitResources.RestoreFrom(data.O2Percent, data.PowerPercent);
+
+        _inventory.Clear();
+        foreach (var (itemId, count) in data.Inventory)
+        {
+            _inventory.Add(itemId, count);
+        }
     }
 
     private void UpdateInventoryHud()

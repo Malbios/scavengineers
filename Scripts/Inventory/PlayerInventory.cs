@@ -18,6 +18,8 @@ public sealed class PlayerInventory
 
     public void Add(string itemId, int count = 1) => _counts[itemId] = CountOf(itemId) + count;
 
+    public void Clear() => _counts.Clear();
+
     public bool TryRemove(string itemId, int count = 1)
     {
         if (!Has(itemId, count))

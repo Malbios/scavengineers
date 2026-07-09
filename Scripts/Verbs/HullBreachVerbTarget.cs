@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Godot;
 using Scavengineers.Scripts.Inventory;
+using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Scripts.Ship;
 
 namespace Scavengineers.Scripts.Verbs;
@@ -11,7 +12,7 @@ namespace Scavengineers.Scripts.Verbs;
 /// ticking AtmosphereSystem reads (see docs/architecture/verbs-and-interaction.md — a verb's
 /// duration is a real elapsed-time task, not gated on continued input).
 /// </summary>
-public partial class HullBreachVerbTarget : StaticBody3D, IVerbTarget
+public partial class HullBreachVerbTarget : StaticBody3D, IVerbTarget, ISaveable
 {
     private static readonly Verb RepairVerb = new("repair", "VERB_REPAIR", DurationSeconds: 3f)
     {
@@ -29,6 +30,9 @@ public partial class HullBreachVerbTarget : StaticBody3D, IVerbTarget
 
     [Export]
     public Material? RepairingMaterial { get; set; }
+
+    [Export]
+    public string SaveId { get; set; } = "";
 
     private Timer? _repairTimer;
     private bool _repairInProgress;
@@ -86,5 +90,32 @@ public partial class HullBreachVerbTarget : StaticBody3D, IVerbTarget
         _repairInProgress = false;
         _repairTimer!.Stop();
         Mesh?.SetSurfaceOverrideMaterial(0, _idleMaterial);
+    }
+
+    public bool GetSaveState() => !Visible; // true = repaired
+
+    public void ApplySaveState(bool state)
+    {
+        if (state)
+        {
+            // Repaired: jump straight to the end-state without replaying the timer.
+            ShipSimRef?.Deck.RepairHull(ShipSim.DemoCell);
+            Visible = false;
+            if (Collider is not null)
+            {
+                Collider.Disabled = true;
+            }
+        }
+        else
+        {
+            ShipSimRef?.Deck.BreachHull(ShipSim.DemoCell);
+            Visible = true;
+            if (Collider is not null)
+            {
+                Collider.Disabled = false;
+            }
+
+            Mesh?.SetSurfaceOverrideMaterial(0, _idleMaterial);
+        }
     }
 }
