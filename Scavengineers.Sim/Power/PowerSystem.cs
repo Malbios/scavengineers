@@ -1,58 +1,51 @@
 using Scavengineers.Sim.Connectivity;
+using Scavengineers.Sim.Grid;
+using Scavengineers.Sim.ShipModel;
 
 namespace Scavengineers.Sim.Power;
 
 /// <summary>
-/// Minimal power sim for Phase 0 Spike 2: a graph of conduit/machine nodes connected by
-/// conduit links, where a switch is a toggleable link rather than a node. Reuses
-/// <see cref="ConnectivitySolver"/> — the same solver <see cref="Scavengineers.Sim.Atmosphere.AtmosphereSystem"/>
-/// reuses for its own network.
+/// A pure reader of a <see cref="Deck"/> (the shared structural tier — see
+/// docs/architecture/ship-model.md): graph nodes are the deck's conductive fixtures
+/// (<see cref="ConduitFixture"/>/<see cref="SwitchFixture"/>/<see cref="MachineFixture"/>),
+/// connected by adjacent-cell connectivity (the option the ship-model doc recommends for
+/// MVP over explicit port-to-port routing) — a switch on the connecting tile-pair that
+/// is open conducts nowhere. Reuses <see cref="ConnectivitySolver"/> — the same solver
+/// <see cref="Scavengineers.Sim.Atmosphere.AtmosphereSystem"/> reuses for its own network.
 /// </summary>
 public sealed class PowerSystem : IConnectivityGraph<PowerNodeId>
 {
-    private readonly HashSet<PowerNodeId> _nodes = [];
-    private readonly HashSet<(PowerNodeId, PowerNodeId)> _links = [];
-    private readonly HashSet<(PowerNodeId, PowerNodeId)> _openSwitches = [];
+    private readonly Deck _deck;
     private readonly HashSet<PowerNodeId> _sources = [];
 
-    public IEnumerable<PowerNodeId> Nodes => _nodes;
+    public PowerSystem(Deck deck) => _deck = deck;
+
+    public IEnumerable<PowerNodeId> Nodes =>
+        _deck.Fixtures.Where(IsConductive).Select(f => new PowerNodeId(f.Id));
 
     public IEnumerable<PowerNodeId> Neighbors(PowerNodeId node)
     {
-        foreach (var link in _links)
+        var fixture = FindFixture(node);
+        if (fixture is null || IsOpenSwitch(fixture))
         {
-            if (_openSwitches.Contains(link))
+            yield break;
+        }
+
+        foreach (var other in _deck.Fixtures)
+        {
+            if (other.Id == fixture.Id || !IsConductive(other) || IsOpenSwitch(other))
             {
                 continue;
             }
 
-            if (link.Item1.Equals(node))
+            if (AreConnected(fixture.Tile, other.Tile))
             {
-                yield return link.Item2;
-            }
-            else if (link.Item2.Equals(node))
-            {
-                yield return link.Item1;
+                yield return new PowerNodeId(other.Id);
             }
         }
     }
 
-    public void Connect(PowerNodeId a, PowerNodeId b)
-    {
-        _nodes.Add(a);
-        _nodes.Add(b);
-        _links.Add(Normalize(a, b));
-    }
-
-    public void MarkSource(PowerNodeId source)
-    {
-        _nodes.Add(source);
-        _sources.Add(source);
-    }
-
-    public void OpenSwitch(PowerNodeId a, PowerNodeId b) => _openSwitches.Add(Normalize(a, b));
-
-    public void CloseSwitch(PowerNodeId a, PowerNodeId b) => _openSwitches.Remove(Normalize(a, b));
+    public void MarkSource(PowerNodeId source) => _sources.Add(source);
 
     public IReadOnlySet<PowerNodeId> PoweredNodes()
     {
@@ -71,6 +64,15 @@ public sealed class PowerSystem : IConnectivityGraph<PowerNodeId>
 
     public bool IsPowered(PowerNodeId node) => PoweredNodes().Contains(node);
 
-    private static (PowerNodeId, PowerNodeId) Normalize(PowerNodeId a, PowerNodeId b) =>
-        string.CompareOrdinal(a.Value, b.Value) <= 0 ? (a, b) : (b, a);
+    private Fixture? FindFixture(PowerNodeId node) =>
+        _deck.Fixtures.FirstOrDefault(f => f.Id == node.Value);
+
+    private static bool IsConductive(Fixture fixture) =>
+        fixture is ConduitFixture or SwitchFixture or MachineFixture;
+
+    private static bool IsOpenSwitch(Fixture fixture) =>
+        fixture is SwitchFixture { IsOpen: true };
+
+    private static bool AreConnected(CellCoord a, CellCoord b) =>
+        a == b || (Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y) == 1);
 }

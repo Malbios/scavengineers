@@ -1,36 +1,36 @@
 using Scavengineers.Sim.Connectivity;
 using Scavengineers.Sim.Grid;
+using Scavengineers.Sim.ShipModel;
 
 namespace Scavengineers.Sim.Atmosphere;
 
 /// <summary>
-/// Minimal atmosphere sim for Phase 0 Spike 2: a single-deck grid of cells, sealed internal
-/// edges (walls) and breached hull cells (open to vacuum). Reuses <see cref="ConnectivitySolver"/> —
-/// the same solver <see cref="Scavengineers.Sim.Power.PowerSystem"/> reuses for its own network.
+/// A pure reader of a <see cref="Deck"/> (the shared structural tier — see
+/// docs/architecture/ship-model.md) plus its own atmosphere-specific state (per-cell
+/// <see cref="AtmosphereVolume"/>). Reuses <see cref="ConnectivitySolver"/> — the same
+/// solver <see cref="Scavengineers.Sim.Power.PowerSystem"/> reuses for its own network.
 /// </summary>
 public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
 {
     private const double VentRatePerSecond = 0.5;
 
-    private readonly HashSet<CellCoord> _cells;
-    private readonly HashSet<(CellCoord, CellCoord)> _sealedEdges = [];
-    private readonly HashSet<CellCoord> _breachedHull = [];
+    private readonly Deck _deck;
     private readonly Dictionary<CellCoord, AtmosphereVolume> _volumes;
 
-    public AtmosphereSystem(IEnumerable<CellCoord> cells, AtmosphereVolume? initialVolume = null)
+    public AtmosphereSystem(Deck deck, AtmosphereVolume? initialVolume = null)
     {
-        _cells = [.. cells];
-        _volumes = _cells.ToDictionary(c => c, _ => initialVolume ?? AtmosphereVolume.Breathable);
+        _deck = deck;
+        _volumes = _deck.Cells.ToDictionary(c => c, _ => initialVolume ?? AtmosphereVolume.Breathable);
     }
 
     public IEnumerable<AtmosphereNode> Nodes =>
-        _cells.Select(c => new AtmosphereNode(c)).Append(AtmosphereNode.Outside);
+        _deck.Cells.Select(c => new AtmosphereNode(c)).Append(AtmosphereNode.Outside);
 
     public IEnumerable<AtmosphereNode> Neighbors(AtmosphereNode node)
     {
         if (node.IsOutside)
         {
-            foreach (var breached in _breachedHull)
+            foreach (var breached in _deck.HullBreaches)
             {
                 yield return new AtmosphereNode(breached);
             }
@@ -39,27 +39,19 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
 
         var cell = node.Cell!.Value;
 
-        if (_breachedHull.Contains(cell))
+        if (_deck.IsHullBreached(cell))
         {
             yield return AtmosphereNode.Outside;
         }
 
         foreach (var neighbor in AdjacentCells(cell))
         {
-            if (_cells.Contains(neighbor) && !_sealedEdges.Contains(Normalize(cell, neighbor)))
+            if (_deck.Cells.Contains(neighbor) && !_deck.IsEdgeSealed(cell, neighbor))
             {
                 yield return new AtmosphereNode(neighbor);
             }
         }
     }
-
-    public void SealEdge(CellCoord a, CellCoord b) => _sealedEdges.Add(Normalize(a, b));
-
-    public void UnsealEdge(CellCoord a, CellCoord b) => _sealedEdges.Remove(Normalize(a, b));
-
-    public void BreachHull(CellCoord cell) => _breachedHull.Add(cell);
-
-    public void RepairHull(CellCoord cell) => _breachedHull.Remove(cell);
 
     public AtmosphereVolume VolumeAt(CellCoord cell) => _volumes[cell];
 
@@ -131,15 +123,5 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
         yield return cell with { X = cell.X - 1 };
         yield return cell with { Y = cell.Y + 1 };
         yield return cell with { Y = cell.Y - 1 };
-    }
-
-    private static (CellCoord, CellCoord) Normalize(CellCoord a, CellCoord b)
-    {
-        if (a.X != b.X)
-        {
-            return a.X < b.X ? (a, b) : (b, a);
-        }
-
-        return a.Y <= b.Y ? (a, b) : (b, a);
     }
 }
