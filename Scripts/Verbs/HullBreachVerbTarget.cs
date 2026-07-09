@@ -28,6 +28,7 @@ public partial class HullBreachVerbTarget : StaticBody3D, IVerbTarget
 
     private Timer? _repairTimer;
     private bool _repairInProgress;
+    private Material? _idleMaterial;
 
     public IReadOnlyList<Verb> AvailableVerbs { get; } = [RepairVerb];
 
@@ -39,6 +40,8 @@ public partial class HullBreachVerbTarget : StaticBody3D, IVerbTarget
         _repairTimer = new Timer { OneShot = true, WaitTime = RepairVerb.DurationSeconds };
         AddChild(_repairTimer);
         _repairTimer.Timeout += OnRepairComplete;
+
+        _idleMaterial = Mesh?.GetSurfaceOverrideMaterial(0);
     }
 
     public void ExecuteVerb(Verb verb)
@@ -67,5 +70,17 @@ public partial class HullBreachVerbTarget : StaticBody3D, IVerbTarget
         {
             Collider.Disabled = true;
         }
+    }
+
+    public void CancelVerb()
+    {
+        if (!_repairInProgress)
+        {
+            return;
+        }
+
+        _repairInProgress = false;
+        _repairTimer!.Stop();
+        Mesh?.SetSurfaceOverrideMaterial(0, _idleMaterial);
     }
 }

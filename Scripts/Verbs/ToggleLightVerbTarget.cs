@@ -23,4 +23,9 @@ public partial class ToggleLightVerbTarget : StaticBody3D, IVerbTarget
 
         TargetLight.Visible = !TargetLight.Visible;
     }
+
+    public void CancelVerb()
+    {
+        // Instant, already complete by the time anyone could cancel it — nothing to do.
+    }
 }

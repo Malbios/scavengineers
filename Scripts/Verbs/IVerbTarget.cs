@@ -10,4 +10,8 @@ public interface IVerbTarget
     float? CurrentVerbProgress { get; }
 
     void ExecuteVerb(Verb verb);
+
+    /// <summary>Cancels whatever verb is currently in progress on this target, if any,
+    /// reverting to its idle state without applying the verb's effect.</summary>
+    void CancelVerb();
 }

@@ -51,6 +51,11 @@ public partial class Player : CharacterBody3D
         {
             Interact();
         }
+        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } && IsBusy)
+        {
+            _busyTarget!.CancelVerb();
+            _busyTarget = null;
+        }
         else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true }
                  && Input.MouseMode != Input.MouseModeEnum.Captured)
         {
