@@ -187,11 +187,15 @@ public partial class Player : CharacterBody3D
         if (target is not null && target.AvailableVerbs.Count > 0)
         {
             var verb = target.AvailableVerbs[0];
+            var progress = target.CurrentVerbProgress;
+
             _verbLabel!.Text = Tr(verb.LocalizationKey);
             _verbLabel.Visible = true;
-            _verbLabel.Modulate = HasRequirements(verb) ? Colors.White : Colors.Red;
+            // Once started, the requirement was already consumed to get here — re-checking it
+            // mid-repair would show red on an already-succeeding action, which reads as an
+            // error rather than "in progress." Only gate the color on requirements before start.
+            _verbLabel.Modulate = progress is not null || HasRequirements(verb) ? Colors.White : Colors.Red;
 
-            var progress = target.CurrentVerbProgress;
             _verbProgressBar!.Visible = progress is not null;
             if (progress is not null)
             {
