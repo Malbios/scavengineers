@@ -2,7 +2,6 @@ keys,en,de
 VERB_TOGGLE,Toggle,Umschalten
 VERB_REPAIR,Repair,Reparieren
 VERB_PICK_UP,Pick Up,Aufheben
-ITEM_HULL_PATCH_KIT,Hull Patch Kit,Hüllenflicken-Kit
 VERB_TRAVEL,Travel,Reisen
 VERB_RECHARGE,Recharge,Aufladen
 HUD_ROOM_O2,Room O2,Raum-O2
@@ -10,7 +9,18 @@ ITEM_SCRAP_METAL,Scrap Metal,Schrott
 ITEM_SPARE_PARTS,Spare Parts,Ersatzteile
 VERB_OPEN_AIRLOCK,Open Airlock,Schleuse öffnen
 VERB_CLOSE_AIRLOCK,Close Airlock,Schleuse schließen
-OBJECT_HULL_BREACH,Hull Breach,Hüllenbruch
 OBJECT_LIGHT_SWITCH,Light Switch,Lichtschalter
 OBJECT_RECHARGE_STATION,Recharge Station,Ladestation
 OBJECT_AIRLOCK,Airlock,Luftschleuse
+VERB_OPEN_DOOR,Open Door,Tür öffnen
+VERB_CLOSE_DOOR,Close Door,Tür schließen
+OBJECT_DOOR,Door,Tür
+OBJECT_DAMAGED_CONDUIT,Damaged Conduit,Beschädigte Leitung
+VERB_INSTALL_CONDUIT,Install Conduit,Leitung verlegen
+VERB_REMOVE_CONDUIT,Remove Conduit,Leitung entfernen
+OBJECT_COMPUTER,Computer,Computer
+HUD_HOLDING,Holding,Hält
+HUD_HOLDING_EMPTY,Empty-handed,Leere Hände
+ITEM_WALL_PANEL,Wall Panel,Wandpaneel
+VERB_BUILD_WALL,Build Wall,Wand bauen
+VERB_REMOVE_WALL,Remove Wall,Wand entfernen
