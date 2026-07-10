@@ -95,4 +95,44 @@ public class AtmosphereSystemTests
 
         Assert.Equal(AtmosphereVolume.Breathable.Pressure, system.VolumeAt(untouched).Pressure);
     }
+
+    [Fact]
+    public void DepletedSealedRoom_WithoutLifeSupport_StaysDepleted()
+    {
+        var cell = new CellCoord(0, 0);
+        var deck = DeckWithCells(cell);
+        var system = new AtmosphereSystem(deck, AtmosphereVolume.Vacuum);
+
+        system.Tick(50);
+
+        Assert.Equal(AtmosphereVolume.Vacuum.O2Fraction, system.VolumeAt(cell).O2Fraction);
+    }
+
+    [Fact]
+    public void DepletedSealedRoom_WithLifeSupport_RecoversTowardBreathableOverTime()
+    {
+        var cell = new CellCoord(0, 0);
+        var deck = DeckWithCells(cell);
+        var system = new AtmosphereSystem(deck, AtmosphereVolume.Vacuum, hasLifeSupport: true);
+
+        for (var i = 0; i < 50; i++)
+        {
+            system.Tick(1);
+        }
+
+        Assert.True(system.VolumeAt(cell).O2Fraction > AtmosphereVolume.Vacuum.O2Fraction);
+    }
+
+    [Fact]
+    public void BreachedRoom_WithLifeSupport_StillVentsInsteadOfRegenerating()
+    {
+        var cell = new CellCoord(0, 0);
+        var deck = DeckWithCells(cell);
+        deck.BreachHull(cell);
+        var system = new AtmosphereSystem(deck, hasLifeSupport: true);
+
+        system.Tick(1);
+
+        Assert.True(system.VolumeAt(cell).O2Fraction < AtmosphereVolume.Breathable.O2Fraction);
+    }
 }

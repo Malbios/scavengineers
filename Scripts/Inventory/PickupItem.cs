@@ -18,6 +18,8 @@ public partial class PickupItem : StaticBody3D, IVerbTarget
 
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 
+    public string? DisplayNameKey => "ITEM_" + ItemId.ToUpperInvariant();
+
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
         if (verb.Id != PickUpVerb.Id)

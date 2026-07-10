@@ -1,0 +1,506 @@
+[gd_scene format=3 uid="uid://b8mrhcml41ra7"]
+
+[ext_resource type="Script" uid="uid://7j8qpxs8iafi" path="res://Scripts/Verbs/ToggleLightVerbTarget.cs" id="1"]
+[ext_resource type="PackedScene" uid="uid://dkr1y6qs26kfd" path="res://Scenes/Player.tscn" id="2"]
+[ext_resource type="Script" uid="uid://61vdtspe71v5" path="res://Scripts/Ship/ShipSim.cs" id="3"]
+[ext_resource type="Script" uid="uid://dmmawqmxq6nou" path="res://Scripts/SaveLoad/SaveManager.cs" id="4"]
+[ext_resource type="Script" uid="uid://bfch41rtxlbym" path="res://Scripts/Verbs/RechargeStationVerbTarget.cs" id="5"]
+[ext_resource type="Material" path="res://Assets/Materials/home_floor_material.tres" id="6"]
+[ext_resource type="Material" path="res://Assets/Materials/home_wall_material.tres" id="7"]
+[ext_resource type="Material" path="res://Assets/Materials/home_ceiling_material.tres" id="8"]
+[ext_resource type="Material" path="res://Assets/Materials/derelict_floor_material.tres" id="9"]
+[ext_resource type="Material" path="res://Assets/Materials/derelict_wall_material.tres" id="10"]
+[ext_resource type="Material" path="res://Assets/Materials/derelict_ceiling_material.tres" id="11"]
+[ext_resource type="Script" uid="uid://b3w78g4xa8w7i" path="res://Scripts/Inventory/PickupItem.cs" id="12"]
+[ext_resource type="Script" uid="uid://covx0j37qbjya" path="res://Scripts/Verbs/HullBreachVerbTarget.cs" id="13"]
+[ext_resource type="Script" uid="uid://bqso6f6rldkhi" path="res://Scripts/Ship/ShipAtmosphereZone.cs" id="14"]
+[ext_resource type="Script" uid="uid://b3pisg5wqt743" path="res://Scripts/Ship/AirlockDoorVerbTarget.cs" id="15"]
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 2
+ambient_light_color = Color(0.18, 0.18, 0.22, 1)
+ambient_light_energy = 0.75
+
+[sub_resource type="BoxShape3D" id="ShipZoneShape"]
+size = Vector3(16.2, 3.2, 6.4)
+
+[sub_resource type="BoxShape3D" id="FloorShape"]
+size = Vector3(12, 0.2, 6)
+
+[sub_resource type="BoxMesh" id="FloorMesh"]
+size = Vector3(12, 0.2, 6)
+
+[sub_resource type="BoxShape3D" id="WallShapeNS"]
+size = Vector3(12, 3, 0.2)
+
+[sub_resource type="BoxMesh" id="WallMeshNS"]
+size = Vector3(12, 3, 0.2)
+
+[sub_resource type="BoxShape3D" id="WallShapeEW"]
+size = Vector3(0.2, 3, 6)
+
+[sub_resource type="BoxMesh" id="WallMeshEW"]
+size = Vector3(0.2, 3, 6)
+
+[sub_resource type="BoxShape3D" id="MidWallShapeEW"]
+size = Vector3(0.2, 3, 2)
+
+[sub_resource type="BoxMesh" id="MidWallMeshEW"]
+size = Vector3(0.2, 3, 2)
+
+[sub_resource type="BoxShape3D" id="SwitchShape"]
+size = Vector3(0.3, 0.3, 0.1)
+
+[sub_resource type="BoxMesh" id="SwitchMesh"]
+size = Vector3(0.3, 0.3, 0.1)
+
+[sub_resource type="StandardMaterial3D" id="SwitchMaterial"]
+albedo_color = Color(0.9, 0.15, 0.1, 1)
+
+[sub_resource type="BoxShape3D" id="RechargeStationShape"]
+size = Vector3(0.5, 0.8, 0.4)
+
+[sub_resource type="BoxMesh" id="RechargeStationMesh"]
+size = Vector3(0.5, 0.8, 0.4)
+
+[sub_resource type="StandardMaterial3D" id="RechargeStationMaterial"]
+albedo_color = Color(0.1, 0.8, 0.7, 1)
+
+[sub_resource type="BoxShape3D" id="PickupItemShape"]
+size = Vector3(0.3, 0.3, 0.3)
+
+[sub_resource type="BoxMesh" id="PickupItemMesh"]
+size = Vector3(0.3, 0.3, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="PickupItemMaterial"]
+albedo_color = Color(0.15, 0.8, 0.2, 1)
+
+[sub_resource type="StandardMaterial3D" id="ScrapMetalMaterial"]
+albedo_color = Color(0.55, 0.55, 0.6, 1)
+
+[sub_resource type="StandardMaterial3D" id="SparePartsMaterial"]
+albedo_color = Color(0.85, 0.7, 0.15, 1)
+
+[sub_resource type="StandardMaterial3D" id="RepairingMaterial"]
+albedo_color = Color(0.9, 0.85, 0.1, 1)
+
+[sub_resource type="BoxShape3D" id="BreachPatchShape"]
+size = Vector3(0.4, 0.4, 0.1)
+
+[sub_resource type="BoxMesh" id="BreachPatchMesh"]
+size = Vector3(0.4, 0.4, 0.1)
+
+[sub_resource type="StandardMaterial3D" id="BreachPatchMaterial"]
+albedo_color = Color(0.9, 0.55, 0.05, 1)
+
+[sub_resource type="BoxShape3D" id="CorridorFloorShape"]
+size = Vector3(8, 0.2, 2)
+
+[sub_resource type="BoxMesh" id="CorridorFloorMesh"]
+size = Vector3(8, 0.2, 2)
+
+[sub_resource type="StandardMaterial3D" id="CorridorMaterial"]
+albedo_color = Color(0.5, 0.5, 0.55, 1)
+
+[sub_resource type="BoxShape3D" id="CorridorWallShape"]
+size = Vector3(8, 3, 0.2)
+
+[sub_resource type="BoxMesh" id="CorridorWallMesh"]
+size = Vector3(8, 3, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="AirlockDoorMaterial"]
+albedo_color = Color(0.85, 0.75, 0.15, 1)
+
+[sub_resource type="BoxShape3D" id="AirlockPanelShape"]
+size = Vector3(0.3, 0.3, 0.1)
+
+[sub_resource type="BoxMesh" id="AirlockPanelMesh"]
+size = Vector3(0.3, 0.3, 0.1)
+
+[sub_resource type="StandardMaterial3D" id="AirlockPanelMaterial"]
+albedo_color = Color(0.9, 0.65, 0.05, 1)
+
+[node name="World" type="Node3D" unique_id=474587780]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=285196794]
+environment = SubResource("Environment_1")
+
+[node name="SaveManager" type="Node" parent="." unique_id=1837839685 node_paths=PackedStringArray("PlayerRef")]
+script = ExtResource("4")
+PlayerRef = NodePath("../Player")
+
+[node name="HomeShip" type="Node3D" parent="." unique_id=880604177]
+
+[node name="ShipSim" type="Node" parent="HomeShip" unique_id=3569856]
+script = ExtResource("3")
+HasPowerGrid = true
+HasLifeSupport = true
+
+[node name="ShipZone" type="Area3D" parent="HomeShip" unique_id=2098398177 node_paths=PackedStringArray("ShipSimRef")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.9, 1.5, 0)
+script = ExtResource("14")
+ShipSimRef = NodePath("../ShipSim")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/ShipZone" unique_id=633757514]
+shape = SubResource("ShipZoneShape")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="HomeShip" unique_id=1413109270]
+transform = Transform3D(0.866, -0.25, 0.433, 0, 0.866, 0.5, -0.5, -0.433, 0.75, 0, 4, 0)
+light_energy = 0.8
+
+[node name="Floor" type="StaticBody3D" parent="HomeShip" unique_id=61458931]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, -0.1, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/Floor" unique_id=1868991503]
+shape = SubResource("FloorShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/Floor" unique_id=1222421747]
+mesh = SubResource("FloorMesh")
+surface_material_override/0 = ExtResource("6")
+
+[node name="WallNorth" type="StaticBody3D" parent="HomeShip" unique_id=751239905]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.5, -3)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/WallNorth" unique_id=1480774332]
+shape = SubResource("WallShapeNS")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/WallNorth" unique_id=1712819360]
+mesh = SubResource("WallMeshNS")
+surface_material_override/0 = ExtResource("7")
+
+[node name="WallSouth" type="StaticBody3D" parent="HomeShip" unique_id=1969597709]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.5, 3)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/WallSouth" unique_id=163806024]
+shape = SubResource("WallShapeNS")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/WallSouth" unique_id=414817501]
+mesh = SubResource("WallMeshNS")
+surface_material_override/0 = ExtResource("7")
+
+[node name="WallWest" type="StaticBody3D" parent="HomeShip" unique_id=1636675638]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 1.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/WallWest" unique_id=973720204]
+shape = SubResource("WallShapeEW")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/WallWest" unique_id=1999877113]
+mesh = SubResource("WallMeshEW")
+surface_material_override/0 = ExtResource("7")
+
+[node name="WallEastA" type="StaticBody3D" parent="HomeShip" unique_id=1568529492]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 1.5, -2)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/WallEastA" unique_id=1865621365]
+shape = SubResource("MidWallShapeEW")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/WallEastA" unique_id=1685618897]
+mesh = SubResource("MidWallMeshEW")
+surface_material_override/0 = ExtResource("7")
+
+[node name="WallEastB" type="StaticBody3D" parent="HomeShip" unique_id=1966639206]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 1.5, 2)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/WallEastB" unique_id=541493723]
+shape = SubResource("MidWallShapeEW")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/WallEastB" unique_id=547124082]
+mesh = SubResource("MidWallMeshEW")
+surface_material_override/0 = ExtResource("7")
+
+[node name="MidWallA" type="StaticBody3D" parent="HomeShip" unique_id=663800392]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.5, -2)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/MidWallA" unique_id=942391418]
+shape = SubResource("MidWallShapeEW")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/MidWallA" unique_id=1178267123]
+mesh = SubResource("MidWallMeshEW")
+surface_material_override/0 = ExtResource("7")
+
+[node name="MidWallB" type="StaticBody3D" parent="HomeShip" unique_id=1737639011]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.5, 2)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/MidWallB" unique_id=8119215]
+shape = SubResource("MidWallShapeEW")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/MidWallB" unique_id=310721753]
+mesh = SubResource("MidWallMeshEW")
+surface_material_override/0 = ExtResource("7")
+
+[node name="Ceiling" type="StaticBody3D" parent="HomeShip" unique_id=325094412]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 3.1, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/Ceiling" unique_id=99486624]
+shape = SubResource("FloorShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/Ceiling" unique_id=7826118]
+mesh = SubResource("FloorMesh")
+surface_material_override/0 = ExtResource("8")
+
+[node name="RoomLight" type="OmniLight3D" parent="HomeShip" unique_id=587716326]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
+omni_range = 8.0
+
+[node name="LightSwitch" type="StaticBody3D" parent="HomeShip" unique_id=721884858 node_paths=PackedStringArray("TargetLight", "ShipSimRef") groups=["saveable"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 1, -2.9)
+script = ExtResource("1")
+TargetLight = NodePath("../RoomLight")
+ShipSimRef = NodePath("../ShipSim")
+SaveId = "light_switch_1"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/LightSwitch" unique_id=111952623]
+shape = SubResource("SwitchShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/LightSwitch" unique_id=1367835528]
+mesh = SubResource("SwitchMesh")
+surface_material_override/0 = SubResource("SwitchMaterial")
+
+[node name="RechargeStation" type="StaticBody3D" parent="HomeShip" unique_id=1419214516 node_paths=PackedStringArray("ShipSimRef")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.5, -2.7)
+script = ExtResource("5")
+ShipSimRef = NodePath("../ShipSim")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/RechargeStation" unique_id=230900116]
+shape = SubResource("RechargeStationShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/RechargeStation" unique_id=92315017]
+mesh = SubResource("RechargeStationMesh")
+surface_material_override/0 = SubResource("RechargeStationMaterial")
+
+[node name="Derelict" type="Node3D" parent="." unique_id=116891484]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 0, 0)
+
+[node name="ShipSim" type="Node" parent="Derelict" unique_id=709254306]
+script = ExtResource("3")
+HasHullBreach = true
+
+[node name="ShipZone" type="Area3D" parent="Derelict" unique_id=1576398669 node_paths=PackedStringArray("ShipSimRef")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 1.5, 0)
+script = ExtResource("14")
+ShipSimRef = NodePath("../ShipSim")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/ShipZone" unique_id=636571991]
+shape = SubResource("ShipZoneShape")
+
+[node name="Floor" type="StaticBody3D" parent="Derelict" unique_id=1453566541]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, -0.1, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/Floor" unique_id=371087974]
+shape = SubResource("FloorShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/Floor" unique_id=343295271]
+mesh = SubResource("FloorMesh")
+surface_material_override/0 = ExtResource("9")
+
+[node name="WallNorth" type="StaticBody3D" parent="Derelict" unique_id=1694744418]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.5, -3)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/WallNorth" unique_id=2120940172]
+shape = SubResource("WallShapeNS")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallNorth" unique_id=1784311837]
+mesh = SubResource("WallMeshNS")
+surface_material_override/0 = ExtResource("10")
+
+[node name="WallSouth" type="StaticBody3D" parent="Derelict" unique_id=341057874]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.5, 3)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/WallSouth" unique_id=1999460043]
+shape = SubResource("WallShapeNS")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallSouth" unique_id=142073440]
+mesh = SubResource("WallMeshNS")
+surface_material_override/0 = ExtResource("10")
+
+[node name="WallEast" type="StaticBody3D" parent="Derelict" unique_id=794719843]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 1.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/WallEast" unique_id=1982163572]
+shape = SubResource("WallShapeEW")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallEast" unique_id=725819178]
+mesh = SubResource("WallMeshEW")
+surface_material_override/0 = ExtResource("10")
+
+[node name="WallWestA" type="StaticBody3D" parent="Derelict" unique_id=736840175]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 1.5, -2)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/WallWestA" unique_id=343832043]
+shape = SubResource("MidWallShapeEW")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallWestA" unique_id=288778608]
+mesh = SubResource("MidWallMeshEW")
+surface_material_override/0 = ExtResource("10")
+
+[node name="WallWestB" type="StaticBody3D" parent="Derelict" unique_id=474725168]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 1.5, 2)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/WallWestB" unique_id=834407101]
+shape = SubResource("MidWallShapeEW")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallWestB" unique_id=6616454]
+mesh = SubResource("MidWallMeshEW")
+surface_material_override/0 = ExtResource("10")
+
+[node name="MidWallA" type="StaticBody3D" parent="Derelict" unique_id=1461756098]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.5, -2)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/MidWallA" unique_id=1657899624]
+shape = SubResource("MidWallShapeEW")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/MidWallA" unique_id=1075898967]
+mesh = SubResource("MidWallMeshEW")
+surface_material_override/0 = ExtResource("10")
+
+[node name="MidWallB" type="StaticBody3D" parent="Derelict" unique_id=883558225]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.5, 2)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/MidWallB" unique_id=251449466]
+shape = SubResource("MidWallShapeEW")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/MidWallB" unique_id=246224119]
+mesh = SubResource("MidWallMeshEW")
+surface_material_override/0 = ExtResource("10")
+
+[node name="Ceiling" type="StaticBody3D" parent="Derelict" unique_id=1015045709]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 3.1, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/Ceiling" unique_id=458212308]
+shape = SubResource("FloorShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/Ceiling" unique_id=1913437045]
+mesh = SubResource("FloorMesh")
+surface_material_override/0 = ExtResource("11")
+
+[node name="HullPatchKit" type="StaticBody3D" parent="Derelict" unique_id=1031519158]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.15, -2)
+script = ExtResource("12")
+ItemId = "hull_patch_kit"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/HullPatchKit" unique_id=1190772127]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/HullPatchKit" unique_id=467814908]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("PickupItemMaterial")
+
+[node name="ScrapMetal" type="StaticBody3D" parent="Derelict" unique_id=225809168]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0.15, -2)
+script = ExtResource("12")
+ItemId = "scrap_metal"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/ScrapMetal" unique_id=1503916654]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/ScrapMetal" unique_id=1778977634]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("ScrapMetalMaterial")
+
+[node name="SpareParts" type="StaticBody3D" parent="Derelict" unique_id=498314835]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.606081, 0.15, 2)
+script = ExtResource("12")
+ItemId = "spare_parts"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/SpareParts" unique_id=802464128]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/SpareParts" unique_id=1966985226]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("SparePartsMaterial")
+
+[node name="HullBreachPatch" type="StaticBody3D" parent="Derelict" unique_id=1637833731 node_paths=PackedStringArray("ShipSimRef", "Mesh", "Collider") groups=["saveable"]]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 3.136888, 1, 2.5)
+script = ExtResource("13")
+ShipSimRef = NodePath("../ShipSim")
+Mesh = NodePath("MeshInstance3D")
+Collider = NodePath("CollisionShape3D")
+RepairingMaterial = SubResource("RepairingMaterial")
+SaveId = "hull_breach_patch_1"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/HullBreachPatch" unique_id=908188452]
+shape = SubResource("BreachPatchShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/HullBreachPatch" unique_id=315733401]
+mesh = SubResource("BreachPatchMesh")
+surface_material_override/0 = SubResource("BreachPatchMaterial")
+
+[node name="CorridorFloor" type="StaticBody3D" parent="." unique_id=1944015123]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, -0.1, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="CorridorFloor" unique_id=1701635675]
+shape = SubResource("CorridorFloorShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="CorridorFloor" unique_id=1031324381]
+mesh = SubResource("CorridorFloorMesh")
+surface_material_override/0 = SubResource("CorridorMaterial")
+
+[node name="CorridorCeiling" type="StaticBody3D" parent="." unique_id=142820253]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 3.1, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="CorridorCeiling" unique_id=1075881568]
+shape = SubResource("CorridorFloorShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="CorridorCeiling" unique_id=548443566]
+mesh = SubResource("CorridorFloorMesh")
+surface_material_override/0 = SubResource("CorridorMaterial")
+
+[node name="CorridorWallNorth" type="StaticBody3D" parent="." unique_id=1921653449]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 1.5, -1)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="CorridorWallNorth" unique_id=805433364]
+shape = SubResource("CorridorWallShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="CorridorWallNorth" unique_id=993190974]
+mesh = SubResource("CorridorWallMesh")
+surface_material_override/0 = SubResource("CorridorMaterial")
+
+[node name="CorridorWallSouth" type="StaticBody3D" parent="." unique_id=735587100]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 1.5, 1)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="CorridorWallSouth" unique_id=1703533565]
+shape = SubResource("CorridorWallShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="CorridorWallSouth" unique_id=1336500104]
+mesh = SubResource("CorridorWallMesh")
+surface_material_override/0 = SubResource("CorridorMaterial")
+
+[node name="AirlockDoorBarrier" type="StaticBody3D" parent="." unique_id=1160987610]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 1.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AirlockDoorBarrier" unique_id=1962067331]
+shape = SubResource("MidWallShapeEW")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="AirlockDoorBarrier" unique_id=1797338788]
+mesh = SubResource("MidWallMeshEW")
+surface_material_override/0 = SubResource("AirlockDoorMaterial")
+
+[node name="AirlockControlPanel" type="StaticBody3D" parent="." unique_id=1628707438 node_paths=PackedStringArray("ShipARef", "ShipBRef", "DoorBarrierMesh", "DoorBarrierCollision")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1, -0.9276888)
+script = ExtResource("15")
+ShipARef = NodePath("../HomeShip/ShipSim")
+ShipBRef = NodePath("../Derelict/ShipSim")
+DoorBarrierMesh = NodePath("../AirlockDoorBarrier/MeshInstance3D")
+DoorBarrierCollision = NodePath("../AirlockDoorBarrier/CollisionShape3D")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AirlockControlPanel" unique_id=219134613]
+shape = SubResource("AirlockPanelShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="AirlockControlPanel" unique_id=363571374]
+mesh = SubResource("AirlockPanelMesh")
+surface_material_override/0 = SubResource("AirlockPanelMaterial")
+
+[node name="AirlockControlPanelDerelictSide" type="StaticBody3D" parent="." node_paths=PackedStringArray("MirrorOf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 1, -0.9276888)
+script = ExtResource("15")
+MirrorOf = NodePath("../AirlockControlPanel")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AirlockControlPanelDerelictSide"]
+shape = SubResource("AirlockPanelShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="AirlockControlPanelDerelictSide"]
+mesh = SubResource("AirlockPanelMesh")
+surface_material_override/0 = SubResource("AirlockPanelMaterial")
+
+[node name="Player" parent="." unique_id=191954104 instance=ExtResource("2")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)

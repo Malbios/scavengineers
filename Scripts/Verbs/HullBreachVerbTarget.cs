@@ -41,6 +41,8 @@ public partial class HullBreachVerbTarget : StaticBody3D, IVerbTarget, ISaveable
 
     public IReadOnlyList<Verb> AvailableVerbs { get; } = [RepairVerb];
 
+    public string? DisplayNameKey => "OBJECT_HULL_BREACH";
+
     public float? CurrentVerbProgress =>
         _repairInProgress ? 1f - (float)(_repairTimer!.TimeLeft / _repairTimer.WaitTime) : null;
 

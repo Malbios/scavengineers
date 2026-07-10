@@ -8,3 +8,9 @@ VERB_RECHARGE,Recharge,Aufladen
 HUD_ROOM_O2,Room O2,Raum-O2
 ITEM_SCRAP_METAL,Scrap Metal,Schrott
 ITEM_SPARE_PARTS,Spare Parts,Ersatzteile
+VERB_OPEN_AIRLOCK,Open Airlock,Schleuse öffnen
+VERB_CLOSE_AIRLOCK,Close Airlock,Schleuse schließen
+OBJECT_HULL_BREACH,Hull Breach,Hüllenbruch
+OBJECT_LIGHT_SWITCH,Light Switch,Lichtschalter
+OBJECT_RECHARGE_STATION,Recharge Station,Ladestation
+OBJECT_AIRLOCK,Airlock,Luftschleuse

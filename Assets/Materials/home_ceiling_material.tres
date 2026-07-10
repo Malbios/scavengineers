@@ -1,0 +1,12 @@
+[gd_resource type="StandardMaterial3D" load_steps=3 format=3]
+
+[ext_resource type="Texture2D" path="res://Assets/Textures/home_ceiling_albedo.png" id="1"]
+[ext_resource type="Texture2D" path="res://Assets/Textures/home_ceiling_normal.png" id="2"]
+
+[resource]
+albedo_texture = ExtResource("1")
+roughness = 0.75
+uv1_scale = Vector3(0.3333, 0.3333, 0.3333)
+uv1_triplanar = true
+normal_enabled = true
+normal_texture = ExtResource("2")

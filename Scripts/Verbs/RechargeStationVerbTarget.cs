@@ -25,6 +25,8 @@ public partial class RechargeStationVerbTarget : StaticBody3D, IVerbTarget
 
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 
+    public string? DisplayNameKey => "OBJECT_RECHARGE_STATION";
+
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
         if (verb.Id != RechargeVerb.Id)

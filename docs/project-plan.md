@@ -179,14 +179,15 @@ Prove the scary bits before committing.
 
 ### Phase 1 — Greybox vertical slice  *(~2–4 months)* ← **the real go/no-go**
 The whole core loop, entirely in cubes and capsules.
-- One home ship, one derelict, the full loop from §4: board → salvage → return → maintain → next.
-- Suit O2/power pressure, 2–3 hazard types, inventory + install/repair/consume, save/load.
-- **Exit gate:** you (and ideally 1–2 testers) find a 15–30 minute greybox session *tense and fun*. This is where you decide whether the game is worth building. Be honest here.
+- One home ship, one derelict, the loop from §4 steps 1–6: board → salvage → return → maintain. Step 7 ("move on to the next, harder wreck," and the survival-pressure ratchet) is Phase 2 content — Phase 1 tests a single wreck run, not a sustained multi-wreck session.
+- **Mechanics existing is not the same as content that takes time to get through.** Suit pressure, a hazard, verbs, and inventory are all quick, mechanical interactions on their own — a two-room derelict with three pickups clears in 2–3 minutes no matter how well each mechanic works, because there's too little physical space and too few decisions to make. Phase 1 therefore also needs real scale: a derelict layout big enough (multiple rooms, real travel distance, enough salvage that carry capacity/priority is an actual choice) that navigating and handling it *is* the content, not padding around a handful of instant interactions.
+- At least two hazard types that can genuinely threaten the player on their own — not an upkeep mechanic (like a power switch gating a recharge station) relabeled as a hazard for the sake of hitting a number. Plus inventory + install/repair/consume, and save/load.
+- **Exit gate:** a single wreck run — suit up, navigate a derelict with real spatial extent, face at least one hazard, make actual salvage decisions, return, patch up — takes a genuine 5–10 minutes of engaged (not padded) play and feels tense, not just functional. This is deliberately a lower bar than a full session: Phase 1 is one wreck, not a campaign.
 
 ### Phase 2 — Systems depth  *(~2–4 months)*
 Make the sim rich enough to generate emergent stories.
 - Deeper interacting systems (temperature, electrical faults → fire, cascading failures), more hazard/salvage variety, meaningful upgrade tree for the home ship, difficulty/reward ratchet across wrecks.
-- **Exit gate:** emergent "oh no" moments happen without being scripted.
+- **Exit gate:** emergent "oh no" moments happen without being scripted, and a 15–30 minute session spanning 2+ wrecks holds up as tense and fun end-to-end — this is where the original full-session bar actually belongs, once a second wreck and the ratchet exist to justify a longer sit.
 
 ### Phase 3 — Art & feel pass  *(~2–4 months)*
 Only now does it stop being cubes.

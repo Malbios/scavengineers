@@ -13,14 +13,21 @@ namespace Scavengineers.Sim.Atmosphere;
 public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
 {
     private const double VentRatePerSecond = 0.5;
+    private const double LifeSupportRegenRatePerSecond = 0.2;
 
     private readonly Deck _deck;
     private readonly Dictionary<CellCoord, AtmosphereVolume> _volumes;
+    private readonly bool _hasLifeSupport;
 
-    public AtmosphereSystem(Deck deck, AtmosphereVolume? initialVolume = null)
+    /// <param name="hasLifeSupport">Whether a sealed (non-vented) component should drift back
+    /// toward <see cref="AtmosphereVolume.Breathable"/> over time, representing always-on
+    /// scrubbers/O2 generation — defaults to <c>false</c> so anything that doesn't opt in keeps
+    /// today's behavior (a sealed room just holds whatever scalars it's at).</param>
+    public AtmosphereSystem(Deck deck, AtmosphereVolume? initialVolume = null, bool hasLifeSupport = false)
     {
         _deck = deck;
         _volumes = _deck.Cells.ToDictionary(c => c, _ => initialVolume ?? AtmosphereVolume.Breathable);
+        _hasLifeSupport = hasLifeSupport;
     }
 
     public IEnumerable<AtmosphereNode> Nodes =>
@@ -56,6 +63,13 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
     public AtmosphereVolume VolumeAt(CellCoord cell) => _volumes[cell];
 
     /// <summary>
+    /// Overwrites a cell's volume from outside this system's own <see cref="Tick"/> — the hook
+    /// <see cref="AirlockBridge"/> uses to write back a cell's state after equalizing it against
+    /// another, independent <see cref="AtmosphereSystem"/> (e.g. a docked ship's).
+    /// </summary>
+    public void ApplyExternalVolume(CellCoord cell, AtmosphereVolume volume) => _volumes[cell] = volume;
+
+    /// <summary>
     /// Advances the sim by <paramref name="dt"/> seconds: equalizes each sealed component's
     /// scalars across its cells, then vents any component connected to the outside toward vacuum.
     /// </summary>
@@ -74,6 +88,10 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
             if (component.Contains(AtmosphereNode.Outside))
             {
                 Vent(cells, dt);
+            }
+            else if (_hasLifeSupport)
+            {
+                Regenerate(cells, dt);
             }
         }
     }
@@ -111,6 +129,22 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
             {
                 Pressure = Lerp(current.Pressure, AtmosphereVolume.Vacuum.Pressure, factor),
                 O2Fraction = Lerp(current.O2Fraction, AtmosphereVolume.Vacuum.O2Fraction, factor),
+            };
+        }
+    }
+
+    private void Regenerate(IReadOnlyList<CellCoord> cells, double dt)
+    {
+        var factor = Math.Clamp(LifeSupportRegenRatePerSecond * dt, 0, 1);
+
+        foreach (var cell in cells)
+        {
+            var current = _volumes[cell];
+            _volumes[cell] = current with
+            {
+                Pressure = Lerp(current.Pressure, AtmosphereVolume.Breathable.Pressure, factor),
+                O2Fraction = Lerp(current.O2Fraction, AtmosphereVolume.Breathable.O2Fraction, factor),
+                Temperature = Lerp(current.Temperature, AtmosphereVolume.Breathable.Temperature, factor),
             };
         }
     }

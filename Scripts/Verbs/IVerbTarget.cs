@@ -18,4 +18,9 @@ public interface IVerbTarget
     /// <summary>Cancels whatever verb is currently in progress on this target, if any,
     /// reverting to its idle state without applying the verb's effect.</summary>
     void CancelVerb();
+
+    /// <summary>Localization key for the target's own name, shown above the verb label so the
+    /// player can tell what they're about to repair/pick up/toggle — null if this target
+    /// doesn't have (or need) one.</summary>
+    string? DisplayNameKey => null;
 }

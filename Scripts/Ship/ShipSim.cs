@@ -33,7 +33,16 @@ public partial class ShipSim : Node
     [Export]
     public bool HasPowerGrid { get; set; }
 
+    /// <summary>Whether this ship's atmosphere regenerates toward breathable over time when
+    /// sealed (always-on scrubbers/O2 generation) — true only for a ship meant to be a safe
+    /// base to retreat to, e.g. the Home Ship. Off by default: a Derelict's air, once spent,
+    /// should stay spent even after its hull is patched.</summary>
+    [Export]
+    public bool HasLifeSupport { get; set; }
+
     public Deck Deck { get; private set; } = null!;
+
+    public AtmosphereSystem? Atmosphere => _atmosphere;
 
     private AtmosphereSystem? _atmosphere;
     private PowerSystem? _power;
@@ -43,11 +52,21 @@ public partial class ShipSim : Node
         Deck = new Deck();
         Deck.AddCell(DemoCell);
 
+        // A ship that starts the scene already breached has been open to space this whole
+        // time (a derelict drifting for who-knows-how-long) — it starts at vacuum, not a
+        // few seconds of "still venting from breathable." A breach that happens mid-play
+        // instead (not modeled yet) would correctly decay in real time from whatever it was.
+        AtmosphereVolume? initialVolume = null;
         if (HasHullBreach)
         {
             Deck.BreachHull(DemoCell);
-            _atmosphere = new AtmosphereSystem(Deck);
+            initialVolume = AtmosphereVolume.Vacuum;
         }
+
+        // Always present, even for a never-breached ship (e.g. the Home Ship) — it needs a
+        // real AtmosphereSystem to bridge against once an AirlockDoorVerbTarget links the two
+        // ships' atmospheres. A never-breached deck just sits at Breathable and never changes.
+        _atmosphere = new AtmosphereSystem(Deck, initialVolume, HasLifeSupport);
 
         if (HasPowerGrid)
         {

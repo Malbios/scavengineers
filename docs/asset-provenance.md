@@ -6,3 +6,9 @@ AI-generated **textures, decals, and icons** are fine to log here. AI-generated 
 
 | Asset | Source | License | Date added | Notes |
 |---|---|---|---|---|
+| `Assets/Textures/home_floor_{albedo,normal}.png` | Procedurally generated (custom C# script, not AI-generated) | Project-owned | 2026-07-10 | Clean/light panel pair, ~1m tiles, shallow seam groove — Home Ship floor |
+| `Assets/Textures/home_wall_{albedo,normal}.png` | Procedurally generated (custom C# script, not AI-generated) | Project-owned | 2026-07-10 | Clean/light panel pair, ~2m tiles, shallow seam groove — Home Ship walls |
+| `Assets/Textures/home_ceiling_{albedo,normal}.png` | Procedurally generated (custom C# script, not AI-generated) | Project-owned | 2026-07-10 | Clean/light panel pair, ~1.3m tiles, shallow seam groove — Home Ship ceiling |
+| `Assets/Textures/derelict_floor_{albedo,normal}.png` | Procedurally generated (custom C# script, not AI-generated) | Project-owned | 2026-07-10 | Worn/dingy panel pair, ~1m tiles, deep seam groove — Derelict floor |
+| `Assets/Textures/derelict_wall_{albedo,normal}.png` | Procedurally generated (custom C# script, not AI-generated) | Project-owned | 2026-07-10 | Worn/dingy panel pair, ~2m tiles, deep seam groove — Derelict walls |
+| `Assets/Textures/derelict_ceiling_{albedo,normal}.png` | Procedurally generated (custom C# script, not AI-generated) | Project-owned | 2026-07-10 | Worn/dingy panel pair, ~1.3m tiles, deep seam groove — Derelict ceiling |

@@ -29,6 +29,8 @@ public partial class ToggleLightVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
 
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 
+    public string? DisplayNameKey => "OBJECT_LIGHT_SWITCH";
+
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
         if (verb.Id != ToggleVerb.Id || TargetLight is null)

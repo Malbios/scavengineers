@@ -15,11 +15,17 @@ public partial class Player : CharacterBody3D
     private const float MouseSensitivity = 0.0025f;
     private const float MaxPitchRadians = Mathf.Pi / 2 - 0.05f;
 
-    [Export]
-    public ShipSim? ShipSimRef { get; set; }
+    /// <summary>Which ship's atmosphere currently governs the player's ambient O2 reading —
+    /// set at runtime by whichever <see cref="Scavengineers.Scripts.Ship.ShipAtmosphereZone"/>
+    /// the player is standing in, since both ships are loaded simultaneously and the player
+    /// walks between them (no more one-ship-per-scene).</summary>
+    public ShipSim? ShipSimRef { get; private set; }
+
+    public void SetAmbientShipSim(ShipSim? shipSim) => ShipSimRef = shipSim;
 
     private Node3D? _head;
     private RayCast3D? _interactRay;
+    private Label? _targetNameLabel;
     private Label? _verbLabel;
     private ProgressBar? _verbProgressBar;
     private ProgressBar? _o2Bar;
@@ -45,6 +51,7 @@ public partial class Player : CharacterBody3D
     {
         _head = GetNode<Node3D>("Head");
         _interactRay = GetNode<RayCast3D>("Head/Camera3D/InteractRay");
+        _targetNameLabel = GetNode<Label>("HUD/TargetNameLabel");
         _verbLabel = GetNode<Label>("HUD/VerbLabel");
         _verbProgressBar = GetNode<ProgressBar>("HUD/VerbProgressBar");
         _o2Bar = GetNode<ProgressBar>("HUD/ResourcesPanel/O2Bar");
@@ -242,6 +249,16 @@ public partial class Player : CharacterBody3D
             // error rather than "in progress." Only gate the color on requirements before start.
             _verbLabel.Modulate = progress is not null || HasRequirements(verb) ? Colors.White : Colors.Red;
 
+            if (target.DisplayNameKey is { } displayNameKey)
+            {
+                _targetNameLabel!.Text = Tr(displayNameKey);
+                _targetNameLabel.Visible = true;
+            }
+            else
+            {
+                _targetNameLabel!.Visible = false;
+            }
+
             _verbProgressBar!.Visible = progress is not null;
             if (progress is not null)
             {
@@ -250,6 +267,7 @@ public partial class Player : CharacterBody3D
         }
         else
         {
+            _targetNameLabel!.Visible = false;
             _verbLabel!.Visible = false;
             _verbProgressBar!.Visible = false;
         }
