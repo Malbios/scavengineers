@@ -135,4 +135,27 @@ public class AtmosphereSystemTests
 
         Assert.True(system.VolumeAt(cell).O2Fraction < AtmosphereVolume.Breathable.O2Fraction);
     }
+
+    [Fact]
+    public void TwoTileWideDoor_SealedOnBothEdges_KeepsRoomsIndependent()
+    {
+        // A 2-tile-wide doorway (InteriorDoorVerbTarget's shape) is really two edges that must
+        // both be sealed for the rooms to be properly independent — sealing only one would
+        // leave a gap the flood-fill could route through.
+        var roomA1 = new CellCoord(5, 2);
+        var roomB1 = new CellCoord(6, 2);
+        var roomA2 = new CellCoord(5, 3);
+        var roomB2 = new CellCoord(6, 3);
+        var deck = DeckWithCells(roomA1, roomB1, roomA2, roomB2);
+        deck.SealEdge(roomA1, roomB1);
+        deck.SealEdge(roomA2, roomB2);
+        deck.BreachHull(roomB1);
+
+        var system = new AtmosphereSystem(deck);
+        system.Tick(50);
+
+        Assert.Equal(AtmosphereVolume.Breathable.Pressure, system.VolumeAt(roomA1).Pressure);
+        Assert.Equal(AtmosphereVolume.Breathable.Pressure, system.VolumeAt(roomA2).Pressure);
+        Assert.True(system.VolumeAt(roomB1).Pressure < 0.1);
+    }
 }
