@@ -12,6 +12,7 @@ public sealed class Deck
     private readonly HashSet<CellCoord> _cells = [];
     private readonly HashSet<(CellCoord, CellCoord)> _sealedEdges = [];
     private readonly HashSet<CellCoord> _hullBreaches = [];
+    private readonly HashSet<CellCoord> _fires = [];
     private readonly List<Fixture> _fixtures = [];
 
     public IReadOnlySet<CellCoord> Cells => _cells;
@@ -19,6 +20,8 @@ public sealed class Deck
     public IReadOnlyList<Fixture> Fixtures => _fixtures;
 
     public IReadOnlySet<CellCoord> HullBreaches => _hullBreaches;
+
+    public IReadOnlySet<CellCoord> Fires => _fires;
 
     public void AddCell(CellCoord cell) => _cells.Add(cell);
 
@@ -33,6 +36,12 @@ public sealed class Deck
     public void RepairHull(CellCoord cell) => _hullBreaches.Remove(cell);
 
     public bool IsHullBreached(CellCoord cell) => _hullBreaches.Contains(cell);
+
+    public void IgniteFire(CellCoord cell) => _fires.Add(cell);
+
+    public void ExtinguishFire(CellCoord cell) => _fires.Remove(cell);
+
+    public bool IsOnFire(CellCoord cell) => _fires.Contains(cell);
 
     public void AddFixture(Fixture fixture) => _fixtures.Add(fixture);
 
