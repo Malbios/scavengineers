@@ -4,8 +4,10 @@
 #
 # Usage: & ./test.ps1
 
+clear
+
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/HomeShip.tscn"
+$scene = "res://Scenes/World.tscn"
 
 & $godotExe --path $projectPath $scene
