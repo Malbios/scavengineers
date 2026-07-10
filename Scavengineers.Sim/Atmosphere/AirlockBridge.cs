@@ -3,11 +3,17 @@ using Scavengineers.Sim.Grid;
 namespace Scavengineers.Sim.Atmosphere;
 
 /// <summary>
-/// Links two otherwise-independent <see cref="AtmosphereSystem"/>s (e.g. two docked ships) at
-/// one cell each. Deliberately a bolt-on, not a merge of the two ships' connectivity graphs —
-/// see docs/architecture/atmosphere-power-sim.md. Reuses the same lumped-scalar equalization
-/// idea <see cref="AtmosphereSystem"/> already applies within a single deck, just gradually
-/// (via a rate) instead of instantly, since the two sides are only linked through an airlock.
+/// Links two otherwise-independent <see cref="AtmosphereSystem"/>s (e.g. two docked ships) —
+/// deliberately a bolt-on, not a merge of the two ships' connectivity graphs — see
+/// docs/architecture/atmosphere-power-sim.md. Reuses the same lumped-scalar equalization idea
+/// <see cref="AtmosphereSystem"/> already applies within a single deck, just gradually (via a
+/// rate) instead of instantly, since the two sides are only linked through an airlock.
+///
+/// Averages each side's *entire currently-connected volume* (via
+/// <see cref="AtmosphereSystem.ComponentContaining"/>), not just the two named cells — a real
+/// airlock joins two whole rooms, not two points, and with either ship now a multi-cell grid,
+/// nudging one cell alone gets diluted away by that ship's own internal equalize before it
+/// could ever show up.
 /// </summary>
 public sealed class AirlockBridge(AtmosphereSystem systemA, CellCoord cellA, AtmosphereSystem systemB, CellCoord cellB)
 {
@@ -22,28 +28,40 @@ public sealed class AirlockBridge(AtmosphereSystem systemA, CellCoord cellA, Atm
             return;
         }
 
-        var a = systemA.VolumeAt(cellA);
-        var b = systemB.VolumeAt(cellB);
+        var cellsA = systemA.ComponentContaining(cellA);
+        var cellsB = systemB.ComponentContaining(cellB);
 
-        var averagePressure = (a.Pressure + b.Pressure) / 2;
-        var averageO2 = (a.O2Fraction + b.O2Fraction) / 2;
-        var averageTemperature = (a.Temperature + b.Temperature) / 2;
+        var volumesA = cellsA.Select(systemA.VolumeAt).ToList();
+        var volumesB = cellsB.Select(systemB.VolumeAt).ToList();
+        var allVolumes = volumesA.Concat(volumesB).ToList();
+
+        var averagePressure = allVolumes.Average(v => v.Pressure);
+        var averageO2 = allVolumes.Average(v => v.O2Fraction);
+        var averageTemperature = allVolumes.Average(v => v.Temperature);
 
         var factor = Math.Clamp(EqualizeRatePerSecond * dt, 0, 1);
 
-        systemA.ApplyExternalVolume(cellA, a with
+        foreach (var cell in cellsA)
         {
-            Pressure = Lerp(a.Pressure, averagePressure, factor),
-            O2Fraction = Lerp(a.O2Fraction, averageO2, factor),
-            Temperature = Lerp(a.Temperature, averageTemperature, factor),
-        });
+            var current = systemA.VolumeAt(cell);
+            systemA.ApplyExternalVolume(cell, current with
+            {
+                Pressure = Lerp(current.Pressure, averagePressure, factor),
+                O2Fraction = Lerp(current.O2Fraction, averageO2, factor),
+                Temperature = Lerp(current.Temperature, averageTemperature, factor),
+            });
+        }
 
-        systemB.ApplyExternalVolume(cellB, b with
+        foreach (var cell in cellsB)
         {
-            Pressure = Lerp(b.Pressure, averagePressure, factor),
-            O2Fraction = Lerp(b.O2Fraction, averageO2, factor),
-            Temperature = Lerp(b.Temperature, averageTemperature, factor),
-        });
+            var current = systemB.VolumeAt(cell);
+            systemB.ApplyExternalVolume(cell, current with
+            {
+                Pressure = Lerp(current.Pressure, averagePressure, factor),
+                O2Fraction = Lerp(current.O2Fraction, averageO2, factor),
+                Temperature = Lerp(current.Temperature, averageTemperature, factor),
+            });
+        }
     }
 
     private static double Lerp(double from, double to, double factor) => from + (to - from) * factor;

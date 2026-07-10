@@ -70,6 +70,26 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
     public void ApplyExternalVolume(CellCoord cell, AtmosphereVolume volume) => _volumes[cell] = volume;
 
     /// <summary>
+    /// Every cell currently connected to <paramref name="cell"/> (through unsealed edges, not
+    /// vented to Outside) — the hook <see cref="AirlockBridge"/> uses to bridge two ships'
+    /// *entire* currently-connected volumes rather than just one named tile each, since a real
+    /// airlock joins two whole rooms, not two points.
+    /// </summary>
+    public IReadOnlySet<CellCoord> ComponentContaining(CellCoord cell)
+    {
+        var node = new AtmosphereNode(cell);
+        foreach (var component in ConnectivitySolver.FindComponents(this))
+        {
+            if (component.Contains(node))
+            {
+                return component.Where(n => !n.IsOutside).Select(n => n.Cell!.Value).ToHashSet();
+            }
+        }
+
+        return new HashSet<CellCoord> { cell };
+    }
+
+    /// <summary>
     /// Advances the sim by <paramref name="dt"/> seconds: equalizes each sealed component's
     /// scalars across its cells, then vents any component connected to the outside toward vacuum.
     /// </summary>

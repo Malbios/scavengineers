@@ -69,4 +69,60 @@ public class AirlockBridgeTests
 
         Assert.True(home.VolumeAt(homeCell).Pressure < 10);
     }
+
+    [Fact]
+    public void Open_AffectsTheWholeConnectedRoomNotJustTheNamedTile()
+    {
+        // Regression: a multi-cell ship's own Equalize used to dilute the bridge's effect on a
+        // single named tile almost to nothing. The bridge must move the *whole* connected
+        // volume together with the ship's own Tick, not fight it.
+        var doorwayCell = new CellCoord(0, 0);
+        var homeDeck = new Deck();
+        for (var i = 0; i < 10; i++)
+        {
+            homeDeck.AddCell(new CellCoord(i, 0));
+        }
+
+        var home = new AtmosphereSystem(homeDeck);
+        var (derelict, derelictCell) = BreachedSystem();
+        derelict.Tick(50); // derelict is now near-vacuum, isolated
+
+        var bridge = new AirlockBridge(home, doorwayCell, derelict, derelictCell) { IsOpen = true };
+
+        for (var i = 0; i < 20; i++)
+        {
+            home.Tick(1); // the ship's own internal equalize, every tick, same as ShipSim
+            bridge.Tick(1);
+        }
+
+        // Every cell in the home ship's connected volume should have dropped noticeably —
+        // not just the doorway tile, and not by the old bug's diluted fraction of a percent
+        // (10 home cells outnumber 1 derelict cell, so full equilibrium settles well above
+        // the derelict's own near-vacuum level — the point is "noticeable", not "equal").
+        var farCell = new CellCoord(9, 0);
+        Assert.True(home.VolumeAt(farCell).Pressure < AtmosphereVolume.Breathable.Pressure * 0.95);
+    }
+
+    [Fact]
+    public void Open_WithASealedOffRoom_LeavesThatRoomUnaffected()
+    {
+        // If the home ship's own interior door has sealed off a room from the doorway tile,
+        // the bridge should only touch the connected room, not the whole ship.
+        var doorwayCell = new CellCoord(0, 0);
+        var sealedCell = new CellCoord(1, 0);
+        var homeDeck = new Deck();
+        homeDeck.AddCell(doorwayCell);
+        homeDeck.AddCell(sealedCell);
+        homeDeck.SealEdge(doorwayCell, sealedCell);
+
+        var home = new AtmosphereSystem(homeDeck);
+        var (derelict, derelictCell) = BreachedSystem();
+        derelict.Tick(50);
+
+        var bridge = new AirlockBridge(home, doorwayCell, derelict, derelictCell) { IsOpen = true };
+        bridge.Tick(10);
+
+        Assert.Equal(AtmosphereVolume.Breathable.Pressure, home.VolumeAt(sealedCell).Pressure);
+        Assert.True(home.VolumeAt(doorwayCell).Pressure < AtmosphereVolume.Breathable.Pressure);
+    }
 }
