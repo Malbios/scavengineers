@@ -3,6 +3,7 @@ using Godot;
 using Scavengineers.Sim.Atmosphere;
 using Scavengineers.Sim.Grid;
 using Scavengineers.Scripts.Inventory;
+using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Scripts.Verbs;
 
 namespace Scavengineers.Scripts.Ship;
@@ -19,7 +20,7 @@ namespace Scavengineers.Scripts.Ship;
 /// disappears when open, while the frame stays put as both the "door not fully open" visual
 /// and the thing you click to close it again.
 /// </summary>
-public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget
+public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveable
 {
     private static readonly Verb OpenVerb = new("open_airlock", "VERB_OPEN_AIRLOCK", DurationSeconds: 1.5f);
     private static readonly Verb CloseVerb = new("close_airlock", "VERB_CLOSE_AIRLOCK", DurationSeconds: 1.5f);
@@ -45,6 +46,9 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget
 
     [Export]
     public CollisionShape3D? SlabCollision { get; set; }
+
+    [Export]
+    public string SaveId { get; set; } = "";
 
     private AirlockBridge? _bridge;
     private Timer? _cycleTimer;
@@ -116,6 +120,28 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget
         if (SlabCollision is not null)
         {
             SlabCollision.Disabled = _pendingOpenState;
+        }
+    }
+
+    public bool GetSaveState() => IsOpen;
+
+    /// <summary>Jumps straight to the saved open/closed state without replaying the timer —
+    /// same "already-settled" pattern the old HullBreachVerbTarget used.</summary>
+    public void ApplySaveState(bool state)
+    {
+        if (_bridge is not null)
+        {
+            _bridge.IsOpen = state;
+        }
+
+        if (SlabMesh is not null)
+        {
+            SlabMesh.Visible = !state;
+        }
+
+        if (SlabCollision is not null)
+        {
+            SlabCollision.Disabled = state;
         }
     }
 }

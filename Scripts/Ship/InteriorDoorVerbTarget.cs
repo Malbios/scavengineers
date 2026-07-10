@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Godot;
 using Scavengineers.Sim.Grid;
 using Scavengineers.Scripts.Inventory;
+using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Scripts.Verbs;
 
 namespace Scavengineers.Scripts.Ship;
@@ -17,7 +18,7 @@ namespace Scavengineers.Scripts.Ship;
 /// actually toggles: covers most of the opening and disappears when open, while the frame
 /// stays put as both the "door not fully open" visual and the thing you click to close it.
 /// </summary>
-public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget
+public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveable
 {
     private static readonly Verb OpenVerb = new("open_door", "VERB_OPEN_DOOR", DurationSeconds: 1f);
     private static readonly Verb CloseVerb = new("close_door", "VERB_CLOSE_DOOR", DurationSeconds: 1f);
@@ -37,6 +38,9 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget
 
     [Export]
     public CollisionShape3D? SlabCollision { get; set; }
+
+    [Export]
+    public string SaveId { get; set; } = "";
 
     private Timer? _cycleTimer;
     private bool _cycling;
@@ -111,6 +115,36 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget
         {
             ShipSimRef!.Deck.SealEdge(Edge1.A, Edge1.B);
             ShipSimRef.Deck.SealEdge(Edge2.A, Edge2.B);
+        }
+
+        if (SlabMesh is not null)
+        {
+            SlabMesh.Visible = !_isOpen;
+        }
+
+        if (SlabCollision is not null)
+        {
+            SlabCollision.Disabled = _isOpen;
+        }
+    }
+
+    public bool GetSaveState() => _isOpen;
+
+    /// <summary>Jumps straight to the saved open/closed state without replaying the timer —
+    /// same "already-settled" pattern the old HullBreachVerbTarget used.</summary>
+    public void ApplySaveState(bool state)
+    {
+        _isOpen = state;
+
+        if (_isOpen)
+        {
+            ShipSimRef?.Deck.UnsealEdge(Edge1.A, Edge1.B);
+            ShipSimRef?.Deck.UnsealEdge(Edge2.A, Edge2.B);
+        }
+        else
+        {
+            ShipSimRef?.Deck.SealEdge(Edge1.A, Edge1.B);
+            ShipSimRef?.Deck.SealEdge(Edge2.A, Edge2.B);
         }
 
         if (SlabMesh is not null)

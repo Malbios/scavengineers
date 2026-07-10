@@ -3,6 +3,7 @@ using Godot;
 using Scavengineers.Sim.Grid;
 using Scavengineers.Sim.ShipModel;
 using Scavengineers.Scripts.Inventory;
+using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Scripts.Ship;
 
 namespace Scavengineers.Scripts.Verbs;
@@ -15,7 +16,7 @@ namespace Scavengineers.Scripts.Verbs;
 /// primitive InteriorDoorVerbTarget already uses at its two fixed edges — so no Scavengineers.Sim
 /// changes are needed, just deciding which edge/tile the player means.
 /// </summary>
-public partial class ShipBuildTarget : StaticBody3D, IVerbTarget
+public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSaveable
 {
     // Public so Player can compare its filtered/affordable verb against these exact instances to
     // decide when the placement ghost should show, without duplicating verb ids as strings.
@@ -74,6 +75,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget
     /// generic tool could silently reseal/unseal them too. -1 disables the exclusion.</summary>
     [Export]
     public int ExcludedEdgeColumn { get; set; } = -1;
+
+    [Export]
+    public string SaveId { get; set; } = "";
 
     private readonly Dictionary<Vector2I, MeshInstance3D> _placedConduits = new();
     private readonly Dictionary<(CellCoord, CellCoord), (MeshInstance3D Mesh, CollisionShape3D Collision)> _placedWalls = new();
@@ -398,4 +402,49 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget
     }
 
     private static string ConduitFixtureId(Vector2I tile) => $"player_conduit_{tile.X}_{tile.Y}";
+
+    public BuildTargetSaveData CaptureBuildState()
+    {
+        var data = new BuildTargetSaveData();
+
+        foreach (var tile in _placedConduits.Keys)
+        {
+            data.Conduits.Add(new TileCoord(tile.X, tile.Y));
+        }
+
+        foreach (var (a, b) in _placedWalls.Keys)
+        {
+            data.Walls.Add(new EdgeCoord(a.X, a.Y, b.X, b.Y));
+        }
+
+        return data;
+    }
+
+    /// <summary>Replays saved tiles/edges through the same helpers Install/BuildWall use —
+    /// already inventory-free at this level (the verb/cost logic lives in ExecuteVerb, never
+    /// called here), so restoring a save never re-charges scrap_metal/wall_panel.</summary>
+    public void ApplyBuildState(BuildTargetSaveData state)
+    {
+        foreach (var tile in state.Conduits)
+        {
+            InstallConduit(new Vector2I(tile.X, tile.Y));
+        }
+
+        foreach (var edge in state.Walls)
+        {
+            var a = new CellCoord(edge.AX, edge.AY);
+            var b = new CellCoord(edge.BX, edge.BY);
+
+            if (ShipSimRef!.Deck.Cells.Contains(b))
+            {
+                ShipSimRef.Deck.SealEdge(a, b);
+            }
+            else
+            {
+                ShipSimRef.Deck.RepairHull(a);
+            }
+
+            SpawnWallSegment(a, b);
+        }
+    }
 }
