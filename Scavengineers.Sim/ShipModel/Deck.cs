@@ -45,6 +45,8 @@ public sealed class Deck
 
     public void AddFixture(Fixture fixture) => _fixtures.Add(fixture);
 
+    public void RemoveFixture(string id) => _fixtures.RemoveAll(f => f.Id == id);
+
     public static (CellCoord, CellCoord) Normalize(CellCoord a, CellCoord b)
     {
         if (a.X != b.X)

@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
+using Scavengineers.Sim.Grid;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Scripts.Ship;
@@ -15,13 +17,20 @@ public partial class Player : CharacterBody3D
     private const float MouseSensitivity = 0.0025f;
     private const float MaxPitchRadians = Mathf.Pi / 2 - 0.05f;
 
-    /// <summary>Which ship's atmosphere currently governs the player's ambient O2 reading —
-    /// set at runtime by whichever <see cref="Scavengineers.Scripts.Ship.ShipAtmosphereZone"/>
-    /// the player is standing in, since both ships are loaded simultaneously and the player
-    /// walks between them (no more one-ship-per-scene).</summary>
+    /// <summary>Which ship (and which of its tiles) currently governs the player's ambient O2
+    /// reading — set at runtime by whichever <see cref="Scavengineers.Scripts.Ship.ShipAtmosphereZone"/>
+    /// the player is standing in. Both ships (and both of a ship's rooms) are loaded and
+    /// simulated simultaneously, and a room can now be sealed off from the rest of its own
+    /// ship, so this has to follow the player's actual room, not just which ship they're on.</summary>
     public ShipSim? ShipSimRef { get; private set; }
 
-    public void SetAmbientShipSim(ShipSim? shipSim) => ShipSimRef = shipSim;
+    private Vector2I _ambientTile;
+
+    public void SetAmbientShipSim(ShipSim? shipSim, Vector2I tile)
+    {
+        ShipSimRef = shipSim;
+        _ambientTile = tile;
+    }
 
     private Node3D? _head;
     private RayCast3D? _interactRay;
@@ -32,9 +41,22 @@ public partial class Player : CharacterBody3D
     private ProgressBar? _powerBar;
     private Label? _roomO2Label;
     private Label? _inventoryLabel;
+    private Label? _heldItemLabel;
     private readonly SuitResources _suitResources = new();
     private readonly PlayerInventory _inventory = new();
     private float _pitch;
+
+    /// <summary>A real "what's in my hand" slot, independent of how much of that item the
+    /// PlayerInventory actually holds — a verb needing an item is only affordable while this
+    /// matches its Requirement's ItemId AND the inventory has enough of it (see IsAffordable).</summary>
+    private static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel"];
+
+    private string? _heldItemId;
+
+    /// <summary>The build target whose ghost we last turned on — tracked so we can turn it back
+    /// off the moment the player looks somewhere else (SetGhostVisible is only ever called on
+    /// whichever build target is the *current* raycast target).</summary>
+    private ShipBuildTarget? _activeBuildTarget;
 
     /// <summary>Set while a timed verb we started is still running — occupies the player,
     /// locking movement/look, until <see cref="IVerbTarget.CurrentVerbProgress"/> goes back
@@ -58,6 +80,7 @@ public partial class Player : CharacterBody3D
         _powerBar = GetNode<ProgressBar>("HUD/ResourcesPanel/PowerBar");
         _roomO2Label = GetNode<Label>("HUD/ResourcesPanel/RoomO2Label");
         _inventoryLabel = GetNode<Label>("HUD/InventoryLabel");
+        _heldItemLabel = GetNode<Label>("HUD/HeldItemLabel");
         CaptureMouse();
         // Setting MouseMode here alone is unreliable if the window doesn't yet have OS
         // input focus at this exact point in startup — reapply whenever focus is (re)gained.
@@ -109,6 +132,21 @@ public partial class Player : CharacterBody3D
         {
             Input.MouseMode = Input.MouseModeEnum.Visible;
         }
+        else if (@event is InputEventKey { Pressed: true } hotbarKey && !IsBusy)
+        {
+            var index = hotbarKey.Keycode switch
+            {
+                Key.Key1 => 0,
+                Key.Key2 => 1,
+                Key.Key3 => 2,
+                _ => -1,
+            };
+
+            if (index >= 0 && index < HotbarItems.Length)
+            {
+                _heldItemId = _heldItemId == HotbarItems[index] ? null : HotbarItems[index];
+            }
+        }
     }
 
     // Instance method, not static: the FocusEntered connection below is then tied to this
@@ -159,7 +197,7 @@ public partial class Player : CharacterBody3D
         // real elapsed-time cost, not a pause (docs/project-plan.md's "time acceleration ...
         // pays the full bill" framing). A breached room's dropping O2 burns the suit's own
         // reserve faster on top of the flat drain (see SuitResources.Tick).
-        var roomVolume = ShipSimRef?.VolumeAt(ShipSim.DemoCell);
+        var roomVolume = ShipSimRef?.VolumeAt(new CellCoord(_ambientTile.X, _ambientTile.Y));
         _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21);
         _o2Bar!.Value = _suitResources.O2Percent;
         _powerBar!.Value = _suitResources.PowerPercent;
@@ -184,6 +222,12 @@ public partial class Player : CharacterBody3D
             return null;
         }
 
+        if (_interactRay.GetCollider() is ShipBuildTarget floorTarget)
+        {
+            floorTarget.SetAimPoint(_interactRay.GetCollisionPoint());
+            return floorTarget;
+        }
+
         return _interactRay.GetCollider() as IVerbTarget;
     }
 
@@ -195,13 +239,8 @@ public partial class Player : CharacterBody3D
         }
 
         var target = GetCurrentVerbTarget();
-        if (target is null || target.AvailableVerbs.Count == 0)
-        {
-            return;
-        }
-
-        var verb = target.AvailableVerbs[0];
-        if (!HasRequirements(verb))
+        var verb = target?.AvailableVerbs.FirstOrDefault(IsAffordable);
+        if (target is null || verb is null)
         {
             return;
         }
@@ -220,44 +259,54 @@ public partial class Player : CharacterBody3D
         }
     }
 
-    private bool HasRequirements(Verb verb)
-    {
-        foreach (var requirement in verb.Requirements)
-        {
-            if (!_inventory.Has(requirement.ItemId, requirement.Count))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
+    /// <summary>A verb with no item Requirements is always affordable. One that does have
+    /// Requirements needs the player to actually be holding that exact item (see _heldItemId)
+    /// with enough of it in the inventory — this is the single place every item-gated verb
+    /// (repair hull breach, repair damaged conduit, install conduit, ...) is gated, so a target
+    /// never needs its own affordability logic.</summary>
+    private bool IsAffordable(Verb verb) =>
+        verb.Requirements.Count == 0 ||
+        verb.Requirements.All(r => r.ItemId == _heldItemId && _inventory.Has(r.ItemId, r.Count));
 
     private void UpdateVerbHud()
     {
         var target = GetCurrentVerbTarget();
 
-        if (target is not null && target.AvailableVerbs.Count > 0)
+        // A verb already in progress on this exact target keeps showing/counting down as-is —
+        // its Requirements were already deducted to start it, so re-checking affordability here
+        // would hide the HUD partway through an already-succeeding action.
+        var verb = IsBusy && _busyTarget == target ? _busyVerb : target?.AvailableVerbs.FirstOrDefault(IsAffordable);
+
+        var buildTarget = target as ShipBuildTarget;
+        if (_activeBuildTarget is not null && _activeBuildTarget != buildTarget)
         {
-            var verb = target.AvailableVerbs[0];
-            var progress = target.CurrentVerbProgress;
+            _activeBuildTarget.SetGhostVisible(false);
+        }
+
+        var isInstallVerb = verb == ShipBuildTarget.InstallConduitVerb || verb == ShipBuildTarget.InstallWallVerb;
+        buildTarget?.SetGhostVisible(isInstallVerb);
+        _activeBuildTarget = buildTarget;
+
+        // The name label identifies whatever you're looking at, independent of whether you can
+        // currently afford its verb — e.g. a damaged conduit should still read as "Damaged
+        // Conduit" even while you're not holding spare parts, not go blank.
+        if (target?.DisplayNameKey is { } displayNameKey)
+        {
+            _targetNameLabel!.Text = Tr(displayNameKey);
+            _targetNameLabel.Visible = true;
+        }
+        else
+        {
+            _targetNameLabel!.Visible = false;
+        }
+
+        if (verb is not null)
+        {
+            var progress = target!.CurrentVerbProgress;
 
             _verbLabel!.Text = Tr(verb.LocalizationKey);
             _verbLabel.Visible = true;
-            // Once started, the requirement was already consumed to get here — re-checking it
-            // mid-repair would show red on an already-succeeding action, which reads as an
-            // error rather than "in progress." Only gate the color on requirements before start.
-            _verbLabel.Modulate = progress is not null || HasRequirements(verb) ? Colors.White : Colors.Red;
-
-            if (target.DisplayNameKey is { } displayNameKey)
-            {
-                _targetNameLabel!.Text = Tr(displayNameKey);
-                _targetNameLabel.Visible = true;
-            }
-            else
-            {
-                _targetNameLabel!.Visible = false;
-            }
+            _verbLabel.Modulate = Colors.White;
 
             _verbProgressBar!.Visible = progress is not null;
             if (progress is not null)
@@ -267,7 +316,6 @@ public partial class Player : CharacterBody3D
         }
         else
         {
-            _targetNameLabel!.Visible = false;
             _verbLabel!.Visible = false;
             _verbProgressBar!.Visible = false;
         }
@@ -335,6 +383,10 @@ public partial class Player : CharacterBody3D
 
     private void UpdateInventoryHud()
     {
+        _heldItemLabel!.Text = _heldItemId is { } heldItemId
+            ? Tr("HUD_HOLDING") + ": " + Tr("ITEM_" + heldItemId.ToUpperInvariant())
+            : Tr("HUD_HOLDING_EMPTY");
+
         if (_inventory.Counts.Count == 0)
         {
             _inventoryLabel!.Text = "";
