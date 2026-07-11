@@ -39,6 +39,14 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private const float EdgeMargin = 0.25f;
 
     private const float WallCenterHeight = 1.5f;
+    private const float FloorConduitHeight = 0.2f;
+
+    // Both fixed compile-time constants, so a wall-to-floor drop connector's shape never varies
+    // per tile: every tile is the same size, so a wall conduit's mount point and a floor
+    // conduit's tile-center are always this same fixed distance apart (see BuildWallConduitVisual).
+    private const float WallToFloorDropHeight = WallCenterHeight - FloorConduitHeight;
+    private const float WallMountRoomOffset = 0.15f; // matches WallConduitTransform's own push
+    private const float WallToFloorHorizontalReach = 0.5f - WallMountRoomOffset;
 
     // The 4 cardinal neighbor tiles a floor conduit checks for its connection-aware shape (see
     // BuildFloorConduitVisual) — AlongX says whether that direction's arm needs the 90-degree
@@ -86,6 +94,13 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// Authored long-axis Z (north/south); rotated 90 degrees for east/west arms.</summary>
     [Export]
     public Mesh? ConduitArmMesh { get; set; }
+
+    /// <summary>The vertical leg of a wall-to-floor connector (see
+    /// <see cref="BuildWallConduitVisual"/>) — a fixed length matching
+    /// <see cref="WallToFloorDropHeight"/>, since every tile's wall-mount-to-floor-height gap is
+    /// identical.</summary>
+    [Export]
+    public Mesh? ConduitDropMesh { get; set; }
 
     /// <summary>Distinct shape from <see cref="ConduitMesh"/> — thin front-to-back rather than
     /// thin top-to-bottom, so it reads as mounted flush against a wall face instead of lying on
@@ -498,13 +513,15 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
     }
 
-    /// <summary>Same idea as <see cref="BuildFloorConduitVisual"/>, adapted to a wall mount's two
-    /// relevant relationships instead of 4 cardinal tiles: another conduit further along the
-    /// *same* wall (an along-wall arm, reused ConduitArmMesh again) or any other conduit sharing
-    /// this tile — a different wall, or a floor conduit — which only ever gets a short inward
-    /// stub pointing into the room, not a precise arm reaching all the way to it (that would mean
-    /// wrapping a corner or dropping to floor height, real extra geometry this pass skips). Zero
-    /// of either falls back to the plain lone wall-conduit box.</summary>
+    /// <summary>Same idea as <see cref="BuildFloorConduitVisual"/>, adapted to a wall mount's
+    /// relationships: another conduit further along the *same* wall (an along-wall arm, reused
+    /// ConduitArmMesh again), a floor conduit on the same tile (a real 2-segment connector — a
+    /// horizontal reach out from the wall then a vertical drop to floor height, both fixed
+    /// lengths since every tile is the same size), or a *different* wall's conduit on the same
+    /// tile (a short inward stub only — actually reaching it would mean wrapping the room's
+    /// corner, real extra geometry this pass still skips). Floor takes priority if both a floor
+    /// and another wall share the tile. Nothing connected at all falls back to the plain lone
+    /// wall-conduit box.</summary>
     private Node3D BuildWallConduitVisual(ConduitSlot slot)
     {
         var tile = slot.Tile;
@@ -540,7 +557,31 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             container.AddChild(arm);
         }
 
-        if (_placedConduits.Keys.Any(other => other.Tile == tile && other != slot))
+        var hasFloorCompanion = _placedConduits.Keys.Any(other => other.Tile == tile && other.WallNeighbor is null);
+        var hasOtherWallCompanion = _placedConduits.Keys.Any(other => other.Tile == tile && other.OnWall && other != slot);
+
+        if (hasFloorCompanion)
+        {
+            // A real connector reaching the floor conduit's own tile-center hub, not just a
+            // gesture toward it — both legs are fixed lengths (WallToFloorHorizontalReach,
+            // WallToFloorDropHeight) since every tile is the same size, so this shape never
+            // needs to vary per tile.
+            hasArm = true;
+            var intoRoom = new Vector2I(-directionToWall.X, -directionToWall.Y);
+
+            var reachOut = new MeshInstance3D { Mesh = ConduitArmMesh };
+            reachOut.SetSurfaceOverrideMaterial(0, ConduitMaterial);
+            reachOut.Scale = new Vector3(1, 1, WallToFloorHorizontalReach / 0.5f);
+            reachOut.Position = new Vector3(intoRoom.X * WallToFloorHorizontalReach / 2f, 0, intoRoom.Y * WallToFloorHorizontalReach / 2f);
+            reachOut.RotationDegrees = intoRoom.X != 0 ? new Vector3(0, 90, 0) : Vector3.Zero;
+            container.AddChild(reachOut);
+
+            var drop = new MeshInstance3D { Mesh = ConduitDropMesh };
+            drop.SetSurfaceOverrideMaterial(0, ConduitMaterial);
+            drop.Position = new Vector3(intoRoom.X * WallToFloorHorizontalReach, -WallToFloorDropHeight / 2f, intoRoom.Y * WallToFloorHorizontalReach);
+            container.AddChild(drop);
+        }
+        else if (hasOtherWallCompanion)
         {
             hasArm = true;
             var intoRoom = new Vector2I(-directionToWall.X, -directionToWall.Y);
@@ -610,13 +651,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     {
         var (position, rotationDegrees) = EdgeTransform(edgeA, edgeB);
 
-        const float mountOffset = 0.15f;
         var midX = (edgeA.X + edgeB.X) / 2f;
         var midY = (edgeA.Y + edgeB.Y) / 2f;
         var offset = new Vector3(
-            Mathf.Sign(nearTile.X - midX) * mountOffset,
+            Mathf.Sign(nearTile.X - midX) * WallMountRoomOffset,
             0,
-            Mathf.Sign(nearTile.Y - midY) * mountOffset);
+            Mathf.Sign(nearTile.Y - midY) * WallMountRoomOffset);
 
         return (position + offset, rotationDegrees);
     }
@@ -716,7 +756,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     private Vector3 TileCenterWorld(Vector2I tile)
     {
-        var shipLocal = new Vector3(tile.X - 3 + 0.5f, 0.2f, tile.Y - 3 + 0.5f);
+        var shipLocal = new Vector3(tile.X - 3 + 0.5f, FloorConduitHeight, tile.Y - 3 + 0.5f);
         return (ShipRoot ?? GetParent<Node3D>()).ToGlobal(shipLocal);
     }
 

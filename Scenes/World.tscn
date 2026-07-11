@@ -130,6 +130,9 @@ size = Vector3(0.15, 0.05, 0.5)
 [sub_resource type="BoxMesh" id="WallConduitMesh"]
 size = Vector3(0.4, 0.4, 0.08)
 
+[sub_resource type="BoxMesh" id="ConduitDropMesh"]
+size = Vector3(0.08, 1.3, 0.08)
+
 [sub_resource type="StandardMaterial3D" id="ConduitSlotWiredMaterial"]
 albedo_color = Color(0.15, 0.75, 0.85, 1)
 
@@ -278,6 +281,7 @@ ShipSimRef = NodePath("../ShipSim")
 ShipRoot = NodePath("..")
 ConduitMesh = SubResource("ConduitSlotMesh")
 ConduitArmMesh = SubResource("ConduitArmMesh")
+ConduitDropMesh = SubResource("ConduitDropMesh")
 ConduitMaterial = SubResource("ConduitSlotWiredMaterial")
 WallConduitMesh = SubResource("WallConduitMesh")
 WallSegmentMesh = SubResource("WallSegmentMesh")
@@ -527,6 +531,7 @@ ShipSimRef = NodePath("../ShipSim")
 ShipRoot = NodePath("..")
 ConduitMesh = SubResource("ConduitSlotMesh")
 ConduitArmMesh = SubResource("ConduitArmMesh")
+ConduitDropMesh = SubResource("ConduitDropMesh")
 ConduitMaterial = SubResource("ConduitSlotWiredMaterial")
 WallConduitMesh = SubResource("WallConduitMesh")
 WallSegmentMesh = SubResource("WallSegmentMesh")
