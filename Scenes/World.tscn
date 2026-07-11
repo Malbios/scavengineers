@@ -328,12 +328,16 @@ shape = SubResource("FloorShape")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
 omni_range = 8.0
 
-[node name="TravelConsole" type="StaticBody3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "StationAirlock", "DerelictAirlock") groups=["saveable"]]
+[node name="TravelConsole" type="StaticBody3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "StationAirlock", "DerelictAirlock", "StationGroup", "DerelictGroup", "StationCorridor", "DerelictCorridor") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 1, -2.7)
 script = ExtResource("21")
 ShipSimRef = NodePath("../ShipSim")
 StationAirlock = NodePath("../../StationAirlock")
 DerelictAirlock = NodePath("../../DerelictAirlock")
+StationGroup = NodePath("../../Station")
+DerelictGroup = NodePath("../../Derelict")
+StationCorridor = NodePath("../../StationCorridor")
+DerelictCorridor = NodePath("../../DerelictCorridor")
 SaveId = "travel_console"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/TravelConsole"]
@@ -666,43 +670,45 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
 mesh = SubResource("DoorSlabMesh")
 surface_material_override/0 = SubResource("AirlockDoorMaterial")
 
-[node name="CorridorFloor" type="StaticBody3D" parent="." unique_id=1944015123]
+[node name="DerelictCorridor" type="Node3D" parent="."]
+
+[node name="CorridorFloor" type="StaticBody3D" parent="DerelictCorridor" unique_id=1944015123]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, -0.1, 0)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="CorridorFloor" unique_id=1701635675]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DerelictCorridor/CorridorFloor" unique_id=1701635675]
 shape = SubResource("CorridorFloorShape")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="CorridorFloor" unique_id=1031324381]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="DerelictCorridor/CorridorFloor" unique_id=1031324381]
 mesh = SubResource("CorridorFloorMesh")
 surface_material_override/0 = SubResource("CorridorMaterial")
 
-[node name="CorridorCeiling" type="StaticBody3D" parent="." unique_id=142820253]
+[node name="CorridorCeiling" type="StaticBody3D" parent="DerelictCorridor" unique_id=142820253]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 3.1, 0)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="CorridorCeiling" unique_id=1075881568]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DerelictCorridor/CorridorCeiling" unique_id=1075881568]
 shape = SubResource("CorridorFloorShape")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="CorridorCeiling" unique_id=548443566]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="DerelictCorridor/CorridorCeiling" unique_id=548443566]
 mesh = SubResource("CorridorFloorMesh")
 surface_material_override/0 = SubResource("CorridorMaterial")
 
-[node name="CorridorWallNorth" type="StaticBody3D" parent="." unique_id=1921653449]
+[node name="CorridorWallNorth" type="StaticBody3D" parent="DerelictCorridor" unique_id=1921653449]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 1.5, -1)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="CorridorWallNorth" unique_id=805433364]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DerelictCorridor/CorridorWallNorth" unique_id=805433364]
 shape = SubResource("CorridorWallShape")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="CorridorWallNorth" unique_id=993190974]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="DerelictCorridor/CorridorWallNorth" unique_id=993190974]
 mesh = SubResource("CorridorWallMesh")
 surface_material_override/0 = SubResource("CorridorMaterial")
 
-[node name="CorridorWallSouth" type="StaticBody3D" parent="." unique_id=735587100]
+[node name="CorridorWallSouth" type="StaticBody3D" parent="DerelictCorridor" unique_id=735587100]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 1.5, 1)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="CorridorWallSouth" unique_id=1703533565]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DerelictCorridor/CorridorWallSouth" unique_id=1703533565]
 shape = SubResource("CorridorWallShape")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="CorridorWallSouth" unique_id=1336500104]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="DerelictCorridor/CorridorWallSouth" unique_id=1336500104]
 mesh = SubResource("CorridorWallMesh")
 surface_material_override/0 = SubResource("CorridorMaterial")
 
@@ -839,43 +845,45 @@ shape = SubResource("ComputerShape")
 mesh = SubResource("ComputerMesh")
 surface_material_override/0 = SubResource("TradeConsoleMaterial")
 
-[node name="StationCorridorFloor" type="StaticBody3D" parent="."]
+[node name="StationCorridor" type="Node3D" parent="."]
+
+[node name="StationCorridorFloor" type="StaticBody3D" parent="StationCorridor"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, -0.1, 0)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="StationCorridorFloor"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StationCorridor/StationCorridorFloor"]
 shape = SubResource("CorridorFloorShape")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="StationCorridorFloor"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StationCorridor/StationCorridorFloor"]
 mesh = SubResource("CorridorFloorMesh")
 surface_material_override/0 = SubResource("CorridorMaterial")
 
-[node name="StationCorridorCeiling" type="StaticBody3D" parent="."]
+[node name="StationCorridorCeiling" type="StaticBody3D" parent="StationCorridor"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 3.1, 0)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="StationCorridorCeiling"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StationCorridor/StationCorridorCeiling"]
 shape = SubResource("CorridorFloorShape")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="StationCorridorCeiling"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StationCorridor/StationCorridorCeiling"]
 mesh = SubResource("CorridorFloorMesh")
 surface_material_override/0 = SubResource("CorridorMaterial")
 
-[node name="StationCorridorWallNorth" type="StaticBody3D" parent="."]
+[node name="StationCorridorWallNorth" type="StaticBody3D" parent="StationCorridor"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 1.5, -1)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="StationCorridorWallNorth"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StationCorridor/StationCorridorWallNorth"]
 shape = SubResource("CorridorWallShape")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="StationCorridorWallNorth"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StationCorridor/StationCorridorWallNorth"]
 mesh = SubResource("CorridorWallMesh")
 surface_material_override/0 = SubResource("CorridorMaterial")
 
-[node name="StationCorridorWallSouth" type="StaticBody3D" parent="."]
+[node name="StationCorridorWallSouth" type="StaticBody3D" parent="StationCorridor"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 1.5, 1)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="StationCorridorWallSouth"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StationCorridor/StationCorridorWallSouth"]
 shape = SubResource("CorridorWallShape")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="StationCorridorWallSouth"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StationCorridor/StationCorridorWallSouth"]
 mesh = SubResource("CorridorWallMesh")
 surface_material_override/0 = SubResource("CorridorMaterial")
 

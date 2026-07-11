@@ -35,6 +35,24 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     [Export]
     public AirlockDoorVerbTarget? DerelictAirlock { get; set; }
 
+    /// <summary>The whole Station/Derelict structure (and its connecting corridor) — hidden and
+    /// decollided while the Home Ship isn't docked there, so the two aren't both spatially
+    /// present at once. The airlock alone only fakes this from ground level (see
+    /// AirlockDoorVerbTarget's own "opens to space while undocked" doc) — flying outside in
+    /// zero-g would otherwise reveal both ships floating right next to each other regardless of
+    /// which one's actually docked.</summary>
+    [Export]
+    public Node3D? StationGroup { get; set; }
+
+    [Export]
+    public Node3D? DerelictGroup { get; set; }
+
+    [Export]
+    public Node3D? StationCorridor { get; set; }
+
+    [Export]
+    public Node3D? DerelictCorridor { get; set; }
+
     [Export]
     public string SaveId { get; set; } = "";
 
@@ -59,7 +77,7 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         // Deferred: both airlocks' ShipSim refs may belong to sibling branches of the scene
         // tree that haven't built their Deck yet at this exact point in _Ready() order (see
         // ShipSim's own deferred vacuum seeding for the same reason).
-        CallDeferred(nameof(ApplyLocationToAirlocks));
+        CallDeferred(nameof(ApplyCurrentLocation));
     }
 
     public override void _PhysicsProcess(double delta)
@@ -96,7 +114,7 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     {
         _traveling = false;
         _currentLocation = _currentLocation == Location.Station ? Location.Derelict : Location.Station;
-        ApplyLocationToAirlocks();
+        ApplyCurrentLocation();
     }
 
     public string GetSaveState() => _currentLocation == Location.Station ? "station" : "derelict";
@@ -104,19 +122,47 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     public void ApplySaveState(string state)
     {
         _currentLocation = state == "derelict" ? Location.Derelict : Location.Station;
-        ApplyLocationToAirlocks();
+        ApplyCurrentLocation();
     }
 
-    private void ApplyLocationToAirlocks()
+    private void ApplyCurrentLocation()
     {
+        var atStation = _currentLocation == Location.Station;
+
         if (StationAirlock is not null)
         {
-            StationAirlock.Docked = _currentLocation == Location.Station;
+            StationAirlock.Docked = atStation;
         }
 
         if (DerelictAirlock is not null)
         {
-            DerelictAirlock.Docked = _currentLocation == Location.Derelict;
+            DerelictAirlock.Docked = !atStation;
+        }
+
+        SetShipPresence(StationGroup, atStation);
+        SetShipPresence(StationCorridor, atStation);
+        SetShipPresence(DerelictGroup, !atStation);
+        SetShipPresence(DerelictCorridor, !atStation);
+    }
+
+    /// <summary>Toggles both halves of "is this ship actually here": Node3D.Visible for
+    /// rendering, plus every descendant CollisionShape3D's own Disabled flag for physics — Visible
+    /// alone doesn't stop the player from walking/floating into a hidden ship's geometry.</summary>
+    private static void SetShipPresence(Node3D? group, bool present)
+    {
+        if (group is null)
+        {
+            return;
+        }
+
+        group.Visible = present;
+
+        foreach (var node in group.FindChildren("*", nameof(CollisionShape3D), recursive: true, owned: false))
+        {
+            if (node is CollisionShape3D shape)
+            {
+                shape.Disabled = !present;
+            }
         }
     }
 }
