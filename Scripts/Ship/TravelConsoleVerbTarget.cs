@@ -19,8 +19,8 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 {
     private enum Location { Station, Derelict }
 
-    // Placeholder/tunable — a few seconds so the trip reads as a real beat, not instant.
-    private static readonly Verb TravelVerb = new("travel", "VERB_TRAVEL", DurationSeconds: 4f);
+    // Placeholder/tunable — dropped to near-instant for testing, was 4s for "a real beat."
+    private static readonly Verb TravelVerb = new("travel", "VERB_TRAVEL", DurationSeconds: 0.2f);
 
     [Export]
     public AirlockDoorVerbTarget? StationAirlock { get; set; }

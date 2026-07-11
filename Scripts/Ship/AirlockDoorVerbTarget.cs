@@ -27,8 +27,8 @@ namespace Scavengineers.Scripts.Ship;
 /// </summary>
 public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveable
 {
-    private static readonly Verb OpenVerb = new("open_airlock", "VERB_OPEN_AIRLOCK", DurationSeconds: 1.5f);
-    private static readonly Verb CloseVerb = new("close_airlock", "VERB_CLOSE_AIRLOCK", DurationSeconds: 1.5f);
+    private static readonly Verb OpenVerb = new("open_airlock", "VERB_OPEN_AIRLOCK", DurationSeconds: 0.2f);
+    private static readonly Verb CloseVerb = new("close_airlock", "VERB_CLOSE_AIRLOCK", DurationSeconds: 0.2f);
 
     [Export]
     public ShipSim? ShipARef { get; set; }

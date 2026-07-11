@@ -13,7 +13,7 @@ namespace Scavengineers.Scripts.Verbs;
 /// </summary>
 public partial class RechargeStationVerbTarget : StaticBody3D, IVerbTarget
 {
-    private static readonly Verb RechargeVerb = new("recharge", "VERB_RECHARGE", DurationSeconds: 1f);
+    private static readonly Verb RechargeVerb = new("recharge", "VERB_RECHARGE", DurationSeconds: 0.2f);
 
     [Export]
     public ShipSim? ShipSimRef { get; set; }

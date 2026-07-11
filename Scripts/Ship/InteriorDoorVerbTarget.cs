@@ -20,8 +20,8 @@ namespace Scavengineers.Scripts.Ship;
 /// </summary>
 public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveable
 {
-    private static readonly Verb OpenVerb = new("open_door", "VERB_OPEN_DOOR", DurationSeconds: 1f);
-    private static readonly Verb CloseVerb = new("close_door", "VERB_CLOSE_DOOR", DurationSeconds: 1f);
+    private static readonly Verb OpenVerb = new("open_door", "VERB_OPEN_DOOR", DurationSeconds: 0.2f);
+    private static readonly Verb CloseVerb = new("close_door", "VERB_CLOSE_DOOR", DurationSeconds: 0.2f);
 
     // The room-1/room-2 doorway is always these 4 tiles, per ShipSim's fixed grid (Room 1 =
     // i 0-5, Room 2 = i 6-11, doorway at j=2,3).
