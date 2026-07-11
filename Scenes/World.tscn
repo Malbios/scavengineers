@@ -160,9 +160,6 @@ size = Vector3(0.5, 0.8, 0.4)
 [sub_resource type="BoxMesh" id="ComputerMesh"]
 size = Vector3(0.5, 0.8, 0.4)
 
-[sub_resource type="StandardMaterial3D" id="ComputerMaterial"]
-albedo_color = Color(0.2, 0.25, 0.3, 1)
-
 [sub_resource type="BoxShape3D" id="CorridorFloorShape"]
 size = Vector3(8, 0.2, 2)
 
@@ -414,28 +411,6 @@ shape = SubResource("RechargeStationShape")
 [node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/RechargeStation" unique_id=92315017]
 mesh = SubResource("RechargeStationMesh")
 surface_material_override/0 = SubResource("RechargeStationMaterial")
-
-[node name="Computer" type="StaticBody3D" parent="HomeShip"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 1, 1.5)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/Computer"]
-shape = SubResource("ComputerShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/Computer"]
-mesh = SubResource("ComputerMesh")
-surface_material_override/0 = SubResource("ComputerMaterial")
-
-[node name="IndicatorLight" type="OmniLight3D" parent="HomeShip/Computer"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
-light_color = Color(0.2, 0.9, 1, 1)
-omni_range = 2.0
-visible = false
-
-[node name="PoweredDeviceIndicator" type="Node" parent="HomeShip/Computer" node_paths=PackedStringArray("ShipSimRef", "IndicatorLight")]
-script = ExtResource("19")
-ShipSimRef = NodePath("../../ShipSim")
-FixtureId = "computer"
-IndicatorLight = NodePath("../IndicatorLight")
 
 [node name="TravelConsole" type="StaticBody3D" parent="HomeShip" node_paths=PackedStringArray("StationAirlock", "DerelictAirlock") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 1, -2.7)

@@ -37,11 +37,6 @@ public partial class ShipSim : Node
     // (docs/project-plan.md Appendix A7 — conduits physically route power between fixtures).
     private static readonly CellCoord[] ConduitCells = [new(6, 0), new(7, 0), new(8, 0)];
 
-    // A device the player must wire up themselves via ShipBuildTarget's free-form conduit
-    // placement — deliberately not pre-connected. Tile (7,4) sits 3 tiles south of the existing
-    // conduit_1 at (7,0); the tiles between are left empty for the player to wire freely.
-    private static readonly CellCoord ComputerCell = new(7, 4);
-
     // The Derelict's two starting hull breaches — a real gap cut into the wall mesh at these
     // tiles, repaired via ShipBuildTarget's generic wall-building (docs/project-plan.md
     // Appendix A7/A8) rather than a dedicated repair object.
@@ -60,7 +55,6 @@ public partial class ShipSim : Node
     public const string RechargeFixtureId = "recharge_station";
     public const string FireGeneratorFixtureId = "fire_generator";
     public const string DamagedConduitFixtureId = "damaged_conduit";
-    public const string ComputerFixtureId = "computer";
 
     [Export]
     public bool HasPowerGrid { get; set; }
@@ -142,7 +136,6 @@ public partial class ShipSim : Node
             }
 
             Deck.AddFixture(new MachineFixture(RechargeFixtureId, RechargeCell, FixtureSurface.WallInner));
-            Deck.AddFixture(new MachineFixture(ComputerFixtureId, ComputerCell, FixtureSurface.WallInner));
 
             _power = new PowerSystem(Deck);
             _power.MarkSource(new PowerNodeId(GeneratorFixtureId));
