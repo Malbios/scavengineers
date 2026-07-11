@@ -26,7 +26,7 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, IStat
         Requirements = [new ItemRequirement("spare_parts", 1)],
     };
 
-    private static readonly Verb ScrapVerb = new("scrap", "VERB_SCRAP", DurationSeconds: 0.2f);
+    private static readonly Verb ScrapVerb = new("scrap", "VERB_SCRAP", DurationSeconds: 0.2f) { IsDestructive = true };
 
     [Export]
     public ShipSim? ShipSimRef { get; set; }

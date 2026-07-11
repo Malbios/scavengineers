@@ -568,8 +568,8 @@ public partial class Player : CharacterBody3D
         }
 
         var target = GetCurrentVerbTarget();
-        var verbs = target?.AvailableVerbs.Where(IsAffordable).ToList();
-        if (target is null || verbs is null || verbs.Count == 0)
+        var verbs = SelectableVerbs(target);
+        if (target is null || verbs.Count == 0)
         {
             return;
         }
@@ -599,7 +599,7 @@ public partial class Player : CharacterBody3D
     /// currently selected. A no-op for the common case of a target with 0 or 1 verbs.</summary>
     private void CycleSelectedVerb(int direction)
     {
-        var count = GetCurrentVerbTarget()?.AvailableVerbs.Count(IsAffordable) ?? 0;
+        var count = SelectableVerbs(GetCurrentVerbTarget()).Count;
         if (count == 0)
         {
             return;
@@ -618,6 +618,14 @@ public partial class Player : CharacterBody3D
         verb.Requirements.Count == 0 ||
         verb.Requirements.All(r => (r.ItemId == LeftHandItemId || r.ItemId == RightHandItemId) && _inventory.Has(r.ItemId, r.Count));
 
+    /// <summary>The single place a target's verbs are filtered to affordable ones and ordered
+    /// for cycling/selection — every caller (Interact, CycleSelectedVerb, UpdateVerbHud) must
+    /// see the exact same list, since _selectedVerbIndex indexes into whatever this returns.
+    /// Creating/using verbs always sort before deconstruction/scrapping ones (a stable sort, so
+    /// relative order within each group is otherwise unchanged) — see Verb.IsDestructive.</summary>
+    private List<Verb> SelectableVerbs(IVerbTarget? target) =>
+        target?.AvailableVerbs.Where(IsAffordable).OrderBy(v => v.IsDestructive).ToList() ?? [];
+
     private void UpdateVerbHud()
     {
         // No depletion check needed here anymore: a hand is a real PlayerInventory slot now, so
@@ -634,10 +642,10 @@ public partial class Player : CharacterBody3D
         // A verb already in progress on this exact target keeps showing/counting down as-is —
         // its Requirements were already deducted to start it, so re-checking affordability here
         // would hide the HUD partway through an already-succeeding action.
-        var verbs = target?.AvailableVerbs.Where(IsAffordable).ToList();
+        var verbs = SelectableVerbs(target);
         var verb = IsBusy && _busyTarget == target
             ? _busyVerb
-            : verbs is { Count: > 0 } ? verbs[_selectedVerbIndex % verbs.Count] : null;
+            : verbs.Count > 0 ? verbs[_selectedVerbIndex % verbs.Count] : null;
 
         var buildTarget = target as ShipBuildTarget;
         if (_activeBuildTarget is not null && _activeBuildTarget != buildTarget)

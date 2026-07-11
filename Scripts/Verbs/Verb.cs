@@ -20,6 +20,12 @@ public sealed record Verb(string Id, string LocalizationKey, float DurationSecon
     /// the usual Requirements-based affordability gate that hides a verb entirely. Executing a
     /// disabled verb is a no-op (see Player.Interact).</summary>
     public bool Disabled { get; init; }
+
+    /// <summary>True for deconstruction/scrapping (Remove/Uninstall/Scrap) — Player.cs sorts
+    /// these after every creating/using verb on the same target (a stable sort, so relative
+    /// order within each group is otherwise unchanged), so the default/first-cycled verb is
+    /// never a destructive one when a constructive alternative also applies.</summary>
+    public bool IsDestructive { get; init; }
 }
 
 public sealed record ItemRequirement(string ItemId, int Count);
