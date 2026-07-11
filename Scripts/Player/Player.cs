@@ -5,7 +5,6 @@ using Scavengineers.Sim.Grid;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Scripts.Ship;
-using Scavengineers.Scripts.Travel;
 using Scavengineers.Scripts.Verbs;
 
 namespace Scavengineers.Scripts.Player;
@@ -46,12 +45,20 @@ public partial class Player : CharacterBody3D
     private readonly PlayerInventory _inventory = new();
     private float _pitch;
 
+    /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-3) —
+    /// also reused by StationConsoleVerbTarget as the set of things Buy can offer, since there's
+    /// no separate item-definition data yet.</summary>
+    public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel"];
+
     /// <summary>A real "what's in my hand" slot, independent of how much of that item the
     /// PlayerInventory actually holds — a verb needing an item is only affordable while this
     /// matches its Requirement's ItemId AND the inventory has enough of it (see IsAffordable).</summary>
-    private static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel"];
 
     private string? _heldItemId;
+
+    public string? HeldItemId => _heldItemId;
+
+    public PlayerInventory Inventory => _inventory;
 
     /// <summary>The build target whose ghost we last turned on — tracked so we can turn it back
     /// off the moment the player looks somewhere else (SetGhostVisible is only ever called on
@@ -94,12 +101,6 @@ public partial class Player : CharacterBody3D
         GetWindow().FocusEntered += CaptureMouse;
 
         AddToGroup("player");
-
-        if (TravelState.Instance?.Pending is { } payload)
-        {
-            ApplyTravelPayload(payload);
-            TravelState.Instance.Pending = null;
-        }
     }
 
     public override void _Input(InputEvent @event)
@@ -309,6 +310,15 @@ public partial class Player : CharacterBody3D
 
     private void UpdateVerbHud()
     {
+        // Whatever just consumed the last of the held item (installing the final wall panel,
+        // selling it, ...) doesn't know about _heldItemId — this is the one place that catches
+        // it dropping to zero and clears the selection, instead of the HUD claiming you're still
+        // holding something you no longer have any of.
+        if (_heldItemId is { } heldItemId && !_inventory.Has(heldItemId, 1))
+        {
+            _heldItemId = null;
+        }
+
         var target = GetCurrentVerbTarget();
 
         if (target != _lastTarget)
@@ -409,27 +419,6 @@ public partial class Player : CharacterBody3D
     }
 
     public void RefillSuitResources() => _suitResources.RestoreFrom(100f, 100f);
-
-    public TravelPayload CaptureTravelPayload()
-    {
-        return new TravelPayload
-        {
-            O2Percent = _suitResources.O2Percent,
-            PowerPercent = _suitResources.PowerPercent,
-            Inventory = new Dictionary<string, int>(_inventory.Counts),
-        };
-    }
-
-    public void ApplyTravelPayload(TravelPayload payload)
-    {
-        _suitResources.RestoreFrom(payload.O2Percent, payload.PowerPercent);
-
-        _inventory.Clear();
-        foreach (var (itemId, count) in payload.Inventory)
-        {
-            _inventory.Add(itemId, count);
-        }
-    }
 
     private void UpdateInventoryHud()
     {

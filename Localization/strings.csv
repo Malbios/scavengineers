@@ -25,3 +25,9 @@ ITEM_WALL_PANEL,Wall Panel,Wandpaneel
 VERB_BUILD_WALL,Build Wall,Wand bauen
 VERB_REMOVE_WALL,Remove Wall,Wand entfernen
 VERB_SCRAP,Scrap,Verschrotten
+VERB_BUY_SCRAP_METAL,Buy Scrap Metal,Schrott kaufen
+VERB_BUY_SPARE_PARTS,Buy Spare Parts,Ersatzteile kaufen
+VERB_BUY_WALL_PANEL,Buy Wall Panel,Wandpaneel kaufen
+VERB_SELL,Sell All,Alles verkaufen
+OBJECT_SHIP_CONSOLE,Ship Console,Schiffskonsole
+OBJECT_TRADE_CONSOLE,Trade Console,Handelskonsole
