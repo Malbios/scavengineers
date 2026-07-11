@@ -10,6 +10,9 @@ obj/
 data_*.pck
 .mono/
 
+# gdUnit4's own test-adapter scaffold — regenerated on every test run, not source
+gdunit4_testadapter*/
+
 # VS Code
 .vscode/
 

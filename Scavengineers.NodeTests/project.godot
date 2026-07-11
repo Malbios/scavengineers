@@ -1,0 +1,15 @@
+; Engine configuration file for the Tier 2 (gdUnit4) test project — a minimal, separate Godot
+; project (not the game itself) so its res:// resolves correctly for the test adapter's own
+; generated runner scene. References Scavengineers.csproj via ProjectReference for the real
+; node classes under test.
+
+config_version=5
+
+[application]
+
+config/name="Scavengineers.NodeTests"
+config/features=PackedStringArray("4.7", "C#")
+
+[dotnet]
+
+project/assembly_name="Scavengineers.NodeTests"

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+
 using Godot;
 using Scavengineers.Sim.Grid;
 using Scavengineers.Sim.ShipModel;
@@ -707,19 +708,19 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     /// <summary>Which machine type/pending action a machine verb id maps to — Action is null for
     /// any non-machine verb id, the signal ExecuteVerb/IsMachineVerb use to fall through.</summary>
-    private static (MachineType Type, PendingAction? Action) ResolveMachineVerb(Verb verb)
+    private static (MachineType Type, PendingAction? Action) ResolveMachineVerb(Verb verb) => verb.Id switch
     {
-        if (verb.Id == InstallBatteryVerb.Id) return (MachineType.Battery, PendingAction.InstallMachine);
-        if (verb.Id == UninstallBatteryVerb.Id) return (MachineType.Battery, PendingAction.UninstallMachine);
-        if (verb.Id == ScrapBatteryVerb.Id) return (MachineType.Battery, PendingAction.ScrapMachine);
-        if (verb.Id == InstallSwitchVerb.Id) return (MachineType.Switch, PendingAction.InstallMachine);
-        if (verb.Id == UninstallSwitchVerb.Id) return (MachineType.Switch, PendingAction.UninstallMachine);
-        if (verb.Id == ScrapSwitchVerb.Id) return (MachineType.Switch, PendingAction.ScrapMachine);
-        if (verb.Id == InstallRechargeStationVerb.Id) return (MachineType.RechargeStation, PendingAction.InstallMachine);
-        if (verb.Id == UninstallRechargeStationVerb.Id) return (MachineType.RechargeStation, PendingAction.UninstallMachine);
-        if (verb.Id == ScrapRechargeStationVerb.Id) return (MachineType.RechargeStation, PendingAction.ScrapMachine);
-        return (default, null);
-    }
+        _ when verb.Id == InstallBatteryVerb.Id => (MachineType.Battery, PendingAction.InstallMachine),
+        _ when verb.Id == UninstallBatteryVerb.Id => (MachineType.Battery, PendingAction.UninstallMachine),
+        _ when verb.Id == ScrapBatteryVerb.Id => (MachineType.Battery, PendingAction.ScrapMachine),
+        _ when verb.Id == InstallSwitchVerb.Id => (MachineType.Switch, PendingAction.InstallMachine),
+        _ when verb.Id == UninstallSwitchVerb.Id => (MachineType.Switch, PendingAction.UninstallMachine),
+        _ when verb.Id == ScrapSwitchVerb.Id => (MachineType.Switch, PendingAction.ScrapMachine),
+        _ when verb.Id == InstallRechargeStationVerb.Id => (MachineType.RechargeStation, PendingAction.InstallMachine),
+        _ when verb.Id == UninstallRechargeStationVerb.Id => (MachineType.RechargeStation, PendingAction.UninstallMachine),
+        _ when verb.Id == ScrapRechargeStationVerb.Id => (MachineType.RechargeStation, PendingAction.ScrapMachine),
+        _ => (default, null),
+    };
 
     private static bool IsMachineVerb(Verb verb) => ResolveMachineVerb(verb).Action is not null;
 

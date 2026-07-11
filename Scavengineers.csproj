@@ -13,5 +13,7 @@
          recursive glob would also compile their .cs files (and double-add references/usings). -->
     <Compile Remove="Scavengineers.Sim/**/*.cs" />
     <Compile Remove="Scavengineers.Sim.Tests/**/*.cs" />
+    <Compile Remove="Scavengineers.Scripts.Tests/**/*.cs" />
+    <Compile Remove="Scavengineers.NodeTests/**/*.cs" />
   </ItemGroup>
 </Project>

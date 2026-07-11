@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+    <RunConfiguration>
+        <EnvironmentVariables>
+            <!-- Confirmed installed path (see reference-godot-binary memory) — matches this
+                 project's Godot.NET.Sdk/4.7.0. -->
+            <GODOT_BIN>C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe</GODOT_BIN>
+        </EnvironmentVariables>
+    </RunConfiguration>
+    <GdUnit4>
+        <CaptureStdOut>true</CaptureStdOut>
+        <Parameters>--headless</Parameters>
+        <DisplayName>FullyQualifiedName</DisplayName>
+    </GdUnit4>
+</RunSettings>

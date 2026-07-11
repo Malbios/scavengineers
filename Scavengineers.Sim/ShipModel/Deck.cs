@@ -1,4 +1,5 @@
 using System.Linq;
+
 using Scavengineers.Sim.Grid;
 
 namespace Scavengineers.Sim.ShipModel;

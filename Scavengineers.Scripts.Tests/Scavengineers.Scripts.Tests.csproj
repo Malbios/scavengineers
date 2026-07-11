@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <!-- Dev machine only has the net10.0 runtime installed, no net8.0 (matching Godot's
+         current TFM). Roll forward so `dotnet test` still runs locally. -->
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <!-- Only needed to resolve Godot.Color/Godot.FileAccess signatures in ItemCatalog.cs below —
+         no engine process is ever launched; tests seed the catalog directly (see ItemCatalog's
+         SeedForTests) rather than exercising its real Godot.FileAccess-based Load() path. -->
+    <PackageReference Include="GodotSharp" Version="4.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!-- These are the confirmed Godot-free (or, for ItemCatalog, made test-seedable) classes
+       under Scripts/ — compiled directly into this assembly rather than via ProjectReference,
+       since referencing the whole Godot.NET.Sdk-based Scavengineers.csproj from a plain
+       Microsoft.NET.Sdk test project doesn't play cleanly with its build pipeline. -->
+  <ItemGroup>
+    <Compile Include="..\Scripts\Inventory\PlayerInventory.cs" Link="Scripts\Inventory\PlayerInventory.cs" />
+    <Compile Include="..\Scripts\Inventory\SlotContainer.cs" Link="Scripts\Inventory\SlotContainer.cs" />
+    <Compile Include="..\Scripts\Inventory\ItemCatalog.cs" Link="Scripts\Inventory\ItemCatalog.cs" />
+    <Compile Include="..\Scripts\Verbs\Verb.cs" Link="Scripts\Verbs\Verb.cs" />
+    <Compile Include="..\Scripts\Verbs\IVerbTarget.cs" Link="Scripts\Verbs\IVerbTarget.cs" />
+    <Compile Include="..\Scripts\SaveLoad\ISaveable.cs" Link="Scripts\SaveLoad\ISaveable.cs" />
+    <Compile Include="..\Scripts\SaveLoad\IStateSaveable.cs" Link="Scripts\SaveLoad\IStateSaveable.cs" />
+    <Compile Include="..\Scripts\SaveLoad\IBuildTargetSaveable.cs" Link="Scripts\SaveLoad\IBuildTargetSaveable.cs" />
+    <Compile Include="..\Scripts\SaveLoad\SaveData.cs" Link="Scripts\SaveLoad\SaveData.cs" />
+    <Compile Include="..\Scripts\Player\SuitResources.cs" Link="Scripts\Player\SuitResources.cs" />
+  </ItemGroup>
+
+</Project>

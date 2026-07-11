@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+
 using Godot;
 using Scavengineers.Sim.Grid;
 using Scavengineers.Scripts.Inventory;
@@ -422,10 +423,26 @@ public partial class Player : CharacterBody3D
         else
         {
             var inputDirection = Vector2.Zero;
-            if (Input.IsPhysicalKeyPressed(Key.W)) inputDirection.Y -= 1;
-            if (Input.IsPhysicalKeyPressed(Key.S)) inputDirection.Y += 1;
-            if (Input.IsPhysicalKeyPressed(Key.A)) inputDirection.X -= 1;
-            if (Input.IsPhysicalKeyPressed(Key.D)) inputDirection.X += 1;
+            if (Input.IsPhysicalKeyPressed(Key.W))
+            {
+                inputDirection.Y -= 1;
+            }
+
+            if (Input.IsPhysicalKeyPressed(Key.S))
+            {
+                inputDirection.Y += 1;
+            }
+
+            if (Input.IsPhysicalKeyPressed(Key.A))
+            {
+                inputDirection.X -= 1;
+            }
+
+            if (Input.IsPhysicalKeyPressed(Key.D))
+            {
+                inputDirection.X += 1;
+            }
+
             inputDirection = inputDirection.Normalized();
 
             var moveDirection = (Transform.Basis * new Vector3(inputDirection.X, 0, inputDirection.Y)).Normalized();

@@ -4,7 +4,9 @@ namespace Scavengineers.Scripts.SaveLoad;
 
 public sealed class SaveData
 {
-    public int Version { get; set; } = SaveManager.CurrentVersion;
+    public const int CurrentVersion = 1;
+
+    public int Version { get; set; } = CurrentVersion;
 
     public PlayerSaveData Player { get; set; } = new();
 

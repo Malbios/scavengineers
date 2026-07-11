@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
+
 using Godot;
 using Scavengineers.Scripts.Inventory;
 using PlayerScript = Scavengineers.Scripts.Player.Player;
@@ -15,8 +17,6 @@ namespace Scavengineers.Scripts.SaveLoad;
 /// </summary>
 public partial class SaveManager : Node
 {
-    public const int CurrentVersion = 1;
-
     private static readonly string SavePath = ProjectSettings.GlobalizePath("user://savegame.json");
 
     [Export]
@@ -45,21 +45,21 @@ public partial class SaveManager : Node
     {
         var data = new SaveData
         {
-            Version = CurrentVersion,
+            Version = SaveData.CurrentVersion,
             Player = _player!.CapturePlayerState(),
         };
 
-        foreach (var saveable in FindSaveables())
+        foreach (var saveable in FindSaveables<ISaveable>())
         {
             data.ObjectStates[saveable.SaveId] = saveable.GetSaveState();
         }
 
-        foreach (var buildSaveable in FindBuildTargetSaveables())
+        foreach (var buildSaveable in FindSaveables<IBuildTargetSaveable>())
         {
             data.BuildTargets[buildSaveable.SaveId] = buildSaveable.CaptureBuildState();
         }
 
-        foreach (var stateSaveable in FindStateSaveables())
+        foreach (var stateSaveable in FindSaveables<IStateSaveable>())
         {
             data.ObjectStringStates[stateSaveable.SaveId] = stateSaveable.GetSaveState();
         }
@@ -110,16 +110,16 @@ public partial class SaveManager : Node
             return;
         }
 
-        if (data.Version != CurrentVersion)
+        if (data.Version != SaveData.CurrentVersion)
         {
             // No migrations exist yet (only v1). This is the dispatch point for them once a
             // v2 exists — for now, proceed best-effort rather than refusing to load.
-            GD.PushWarning($"[SaveManager] Save version {data.Version} != current {CurrentVersion} (no migration available yet).");
+            GD.PushWarning($"[SaveManager] Save version {data.Version} != current {SaveData.CurrentVersion} (no migration available yet).");
         }
 
         _player!.ApplyPlayerState(data.Player);
 
-        var saveables = FindSaveables();
+        var saveables = FindSaveables<ISaveable>();
         var liveIds = new HashSet<string>();
         foreach (var saveable in saveables)
         {
@@ -138,7 +138,7 @@ public partial class SaveManager : Node
             }
         }
 
-        foreach (var buildSaveable in FindBuildTargetSaveables())
+        foreach (var buildSaveable in FindSaveables<IBuildTargetSaveable>())
         {
             if (data.BuildTargets.TryGetValue(buildSaveable.SaveId, out var buildState))
             {
@@ -146,7 +146,7 @@ public partial class SaveManager : Node
             }
         }
 
-        foreach (var stateSaveable in FindStateSaveables())
+        foreach (var stateSaveable in FindSaveables<IStateSaveable>())
         {
             if (data.ObjectStringStates.TryGetValue(stateSaveable.SaveId, out var state))
             {
@@ -176,45 +176,6 @@ public partial class SaveManager : Node
         GD.Print("[SaveManager] Loaded.");
     }
 
-    private List<ISaveable> FindSaveables()
-    {
-        var result = new List<ISaveable>();
-        foreach (var node in GetTree().GetNodesInGroup("saveable"))
-        {
-            if (node is ISaveable saveable)
-            {
-                result.Add(saveable);
-            }
-        }
-
-        return result;
-    }
-
-    private List<IBuildTargetSaveable> FindBuildTargetSaveables()
-    {
-        var result = new List<IBuildTargetSaveable>();
-        foreach (var node in GetTree().GetNodesInGroup("saveable"))
-        {
-            if (node is IBuildTargetSaveable buildSaveable)
-            {
-                result.Add(buildSaveable);
-            }
-        }
-
-        return result;
-    }
-
-    private List<IStateSaveable> FindStateSaveables()
-    {
-        var result = new List<IStateSaveable>();
-        foreach (var node in GetTree().GetNodesInGroup("saveable"))
-        {
-            if (node is IStateSaveable stateSaveable)
-            {
-                result.Add(stateSaveable);
-            }
-        }
-
-        return result;
-    }
+    private List<T> FindSaveables<T>() where T : class =>
+        GetTree().GetNodesInGroup("saveable").OfType<T>().ToList();
 }

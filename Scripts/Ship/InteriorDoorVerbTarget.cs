@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+
 using Godot;
 using Scavengineers.Sim.Grid;
 using Scavengineers.Scripts.Inventory;
@@ -72,16 +73,10 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
 
         // Sync the slab's visibility/collision to the starting _isOpen = true — the scene
         // file's own initial state for these nodes must agree, but this makes it correct even
-        // if it doesn't.
-        if (SlabMesh is not null)
-        {
-            SlabMesh.Visible = !_isOpen;
-        }
-
-        if (SlabCollision is not null)
-        {
-            SlabCollision.Disabled = _isOpen;
-        }
+        // if it doesn't. Deliberately not calling ApplyEdgeSeal here: ShipSimRef's own Deck may
+        // not be built yet at this exact point in _Ready() order, and the doorway already starts
+        // unsealed by default, matching _isOpen's own starting value.
+        ApplySlabVisual();
     }
 
     public override void _PhysicsProcess(double delta)
@@ -119,27 +114,8 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
     {
         _cycling = false;
         _isOpen = _pendingOpenState;
-
-        if (_isOpen)
-        {
-            ShipSimRef!.Deck.UnsealEdge(Edge1.A, Edge1.B);
-            ShipSimRef.Deck.UnsealEdge(Edge2.A, Edge2.B);
-        }
-        else
-        {
-            ShipSimRef!.Deck.SealEdge(Edge1.A, Edge1.B);
-            ShipSimRef.Deck.SealEdge(Edge2.A, Edge2.B);
-        }
-
-        if (SlabMesh is not null)
-        {
-            SlabMesh.Visible = !_isOpen;
-        }
-
-        if (SlabCollision is not null)
-        {
-            SlabCollision.Disabled = _isOpen;
-        }
+        ApplyEdgeSeal();
+        ApplySlabVisual();
     }
 
     public bool GetSaveState() => _isOpen;
@@ -149,7 +125,12 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
     public void ApplySaveState(bool state)
     {
         _isOpen = state;
+        ApplyEdgeSeal();
+        ApplySlabVisual();
+    }
 
+    private void ApplyEdgeSeal()
+    {
         if (_isOpen)
         {
             ShipSimRef?.Deck.UnsealEdge(Edge1.A, Edge1.B);
@@ -160,7 +141,10 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
             ShipSimRef?.Deck.SealEdge(Edge1.A, Edge1.B);
             ShipSimRef?.Deck.SealEdge(Edge2.A, Edge2.B);
         }
+    }
 
+    private void ApplySlabVisual()
+    {
         if (SlabMesh is not null)
         {
             SlabMesh.Visible = !_isOpen;

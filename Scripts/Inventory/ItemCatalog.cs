@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+
 using Godot;
 
 namespace Scavengineers.Scripts.Inventory;
@@ -38,6 +39,14 @@ public static class ItemCatalog
 
     private static Dictionary<string, ItemDefinition> Items => _items ??= Load();
 
+    /// <summary>Test-only seam: lets Scavengineers.Scripts.Tests seed the catalog directly,
+    /// bypassing <see cref="Load"/>'s Godot.FileAccess call, which needs a running engine.</summary>
+    internal static void SeedForTests(Dictionary<string, ItemDefinition> items) => _items = items;
+
+    /// <summary>Test-only seam: clears the seeded/cached catalog between tests so one test's
+    /// seed data can't leak into the next.</summary>
+    internal static void ResetForTests() => _items = null;
+
     private static Dictionary<string, ItemDefinition> Load()
     {
         if (!Godot.FileAccess.FileExists(ResourcePath))
@@ -51,7 +60,7 @@ public static class ItemCatalog
         return definitions.ToDictionary(d => d.Id);
     }
 
-    private sealed class ItemDefinition
+    internal sealed class ItemDefinition
     {
         [JsonPropertyName("id")]
         public string Id { get; set; } = "";
