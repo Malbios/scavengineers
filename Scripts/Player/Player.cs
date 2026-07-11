@@ -117,6 +117,12 @@ public partial class Player : CharacterBody3D
         _inventoryLabel = GetNode<Label>("HUD/InventoryLabel");
         _heldItemLabel = GetNode<Label>("HUD/HeldItemLabel");
         _creditsLabel = GetNode<Label>("HUD/CreditsLabel");
+
+        // Placeholder/tunable starting stipend for testing the free-form conduit wiring
+        // extensively — same "don't wait on it" spirit as the near-instant verb durations.
+        // Overwritten by ApplyPlayerState on load, same as every other fresh-start default.
+        _inventory.Add("scrap_metal", 50);
+
         CaptureMouse();
         // Setting MouseMode here alone is unreliable if the window doesn't yet have OS
         // input focus at this exact point in startup — reapply whenever focus is (re)gained.
