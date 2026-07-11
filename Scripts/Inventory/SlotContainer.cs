@@ -147,6 +147,53 @@ public sealed class SlotContainer
         _slots[from] = remaining > 0 ? (source.ItemId, remaining) : null;
     }
 
+    /// <summary>Same drag-and-drop mutation as <see cref="MoveSlot"/>, but for two different
+    /// containers (e.g. a body slot and a worn backpack's own contents — see InventorySlotUI) —
+    /// delegates to <see cref="MoveSlot"/> when `from` and `to` are actually the same container.</summary>
+    public static void MoveBetween(SlotContainer from, int fromIndex, SlotContainer to, int toIndex)
+    {
+        if (ReferenceEquals(from, to))
+        {
+            from.MoveSlot(fromIndex, toIndex);
+            return;
+        }
+
+        if (fromIndex < 0 || fromIndex >= from._slots.Length || toIndex < 0 || toIndex >= to._slots.Length)
+        {
+            return;
+        }
+
+        if (from._slots[fromIndex] is not { } source)
+        {
+            return;
+        }
+
+        if (to._slots[toIndex] is not { } dest)
+        {
+            to._slots[toIndex] = source;
+            from._slots[fromIndex] = null;
+            return;
+        }
+
+        if (dest.ItemId != source.ItemId)
+        {
+            to._slots[toIndex] = source;
+            from._slots[fromIndex] = dest;
+            return;
+        }
+
+        var room = ItemCatalog.MaxStackSize(source.ItemId) - dest.Count;
+        if (room <= 0)
+        {
+            return;
+        }
+
+        var moved = Math.Min(room, source.Count);
+        to._slots[toIndex] = (dest.ItemId, dest.Count + moved);
+        var remaining = source.Count - moved;
+        from._slots[fromIndex] = remaining > 0 ? (source.ItemId, remaining) : null;
+    }
+
     public void Clear()
     {
         for (var i = 0; i < _slots.Length; i++)

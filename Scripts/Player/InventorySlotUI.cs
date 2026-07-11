@@ -100,35 +100,44 @@ public partial class InventorySlotUI : Control
         preview.AddChild(new ColorRect { Color = ItemCatalog.Color(slot.ItemId), Size = Size });
         SetDragPreview(preview);
 
-        // -1 is the sentinel for "dragging the equipped backpack itself" — the Back slot has no
-        // ordinary Container index to report.
-        return IsBackSlot ? -1 : SlotIndex;
+        // The source slot itself, not just an index — body and backpack-contents slots address
+        // *different* SlotContainer instances, so a bare index alone can't say which array it
+        // came from (see SlotContainer.MoveBetween).
+        return this;
     }
 
-    public override bool _CanDropData(Vector2 atPosition, Variant data) => data.VariantType == Variant.Type.Int;
+    public override bool _CanDropData(Vector2 atPosition, Variant data) =>
+        data.AsGodotObject() is InventorySlotUI;
 
     public override void _DropData(Vector2 atPosition, Variant data)
     {
-        if (data.VariantType != Variant.Type.Int || PlayerRef is null)
+        if (data.AsGodotObject() is not InventorySlotUI source || PlayerRef is null || ReferenceEquals(source, this))
         {
             return;
         }
-
-        var from = data.AsInt32();
 
         if (IsBackSlot)
         {
-            PlayerRef.TryEquipBackpackFromBody(from);
+            if (!source.IsBackSlot)
+            {
+                PlayerRef.TryEquipBackpackFromBody(source.SlotIndex);
+            }
+
             return;
         }
 
-        if (from == -1)
+        if (source.IsBackSlot)
         {
             PlayerRef.TryUnequipBackpack();
             return;
         }
 
-        Container?.MoveSlot(from, SlotIndex);
+        if (source.Container is null || Container is null)
+        {
+            return;
+        }
+
+        SlotContainer.MoveBetween(source.Container, source.SlotIndex, Container, SlotIndex);
     }
 
     private (string ItemId, int Count)? CurrentSlot()
