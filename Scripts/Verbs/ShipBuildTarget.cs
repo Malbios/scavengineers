@@ -337,11 +337,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
         _aimedTile = new Vector2I(i, j);
 
-        // The aimed tile itself must be a real cell — once a wall is gone the player can stand
-        // in the gap and aim past the ship's own footprint, and (i, j) here becomes e.g. (1, -1).
-        // Every downstream verb (floor/ceiling/wall breach) trusts this tile blindly, so refusing
-        // to resolve to Tile/Edge at all here is the one place that has to catch it.
-        if (ShipSimRef is null || !ShipSimRef.Deck.Cells.Contains(new CellCoord(i, j)))
+        if (ShipSimRef is null)
         {
             _aimKind = AimKind.None;
             UpdateGhostTransform();
@@ -352,27 +348,50 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         {
             _aimKind = AimKind.Edge;
 
+            CellCoord near;
+            CellCoord far;
             if (distX <= distZ)
             {
                 var neighborI = withinX < 0.5f ? i - 1 : i + 1;
-                _edgeA = new CellCoord(i, j);
-                _edgeB = new CellCoord(neighborI, j);
+                near = new CellCoord(i, j);
+                far = new CellCoord(neighborI, j);
             }
             else
             {
                 var neighborJ = withinZ < 0.5f ? j - 1 : j + 1;
-                _edgeA = new CellCoord(i, j);
-                _edgeB = new CellCoord(i, neighborJ);
+                near = new CellCoord(i, j);
+                far = new CellCoord(i, neighborJ);
             }
 
-            if (IsExcludedColumn(_edgeA, _edgeB))
+            // The raw hit point's own cell is normally the "inside" one, but a wall's collider
+            // has real thickness — once an adjacent wall is gone, the player can end up standing
+            // in that gap and aim at the next wall over from its outward face instead, which
+            // flips which side the hit point falls on. Swap so _edgeA always ends up as whichever
+            // side is real ship structure, regardless of which face actually got hit.
+            if (!ShipSimRef.Deck.Cells.Contains(near) && ShipSimRef.Deck.Cells.Contains(far))
+            {
+                (near, far) = (far, near);
+            }
+
+            if (!ShipSimRef.Deck.Cells.Contains(near))
             {
                 _aimKind = AimKind.None;
+            }
+            else
+            {
+                _edgeA = near;
+                _edgeB = far;
+                _aimedTile = new Vector2I(near.X, near.Y);
+
+                if (IsExcludedColumn(_edgeA, _edgeB))
+                {
+                    _aimKind = AimKind.None;
+                }
             }
         }
         else
         {
-            _aimKind = AimKind.Tile;
+            _aimKind = ShipSimRef.Deck.Cells.Contains(new CellCoord(i, j)) ? AimKind.Tile : AimKind.None;
         }
 
         UpdateGhostTransform();
