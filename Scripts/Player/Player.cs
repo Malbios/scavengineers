@@ -17,6 +17,15 @@ public partial class Player : CharacterBody3D
     private const float MouseSensitivity = 0.0025f;
     private const float MaxPitchRadians = Mathf.Pi / 2 - 0.05f;
 
+    // Zero-g movement (placeholder/tunable) — triggers whenever the room's own O2 reads at or
+    // below this fraction (see ShipSimRef.VolumeAt), same "vacuum" threshold spirit as
+    // AtmosphereVolume.Vacuum's O2Fraction of 0, with a little slack so the switch doesn't
+    // flicker right at the exact boundary while a room is still venting/equalizing.
+    private const float ZeroGO2Threshold = 0.01f;
+    private const float ZeroGThrustAcceleration = 6f;
+    private const float ZeroGDrag = 2f; // passive deceleration per second, always applied
+    private const float ZeroGMaxSpeed = 3.5f;
+
     /// <summary>Which ship (and which of its tiles) currently governs the player's ambient O2
     /// reading — set at runtime by whichever <see cref="Scavengineers.Scripts.Ship.ShipAtmosphereZone"/>
     /// the player is standing in. Both ships (and both of a ship's rooms) are loaded and
@@ -456,46 +465,110 @@ public partial class Player : CharacterBody3D
             _busyVerb = null;
         }
 
+        // A vented/breached room reads as vacuum — read up front since it now also decides which
+        // movement mode applies below, not just the suit-resource drain further down.
+        var roomVolume = ShipSimRef?.VolumeAt(new CellCoord(_ambientTile.X, _ambientTile.Y));
+        var inZeroG = (roomVolume?.O2Fraction ?? 0.21) <= ZeroGO2Threshold;
+        MotionMode = inZeroG ? MotionModeEnum.Floating : MotionModeEnum.Grounded;
+
         var velocity = Velocity;
 
-        if (!IsOnFloor())
+        if (inZeroG)
         {
-            velocity.Y -= Gravity * (float)delta;
-        }
+            // Thrust-based, not direct-velocity — you drift and have to counter-thrust to stop,
+            // a first real taste of the "precise maneuvering is earned" framing
+            // docs/architecture/locomotion.md describes for the complete game's free-float mode.
+            velocity = velocity.MoveToward(Vector3.Zero, ZeroGDrag * (float)delta);
 
-        if (IsBusy)
-        {
-            velocity.X = 0;
-            velocity.Z = 0;
+            if (!IsBusy)
+            {
+                var thrust = Vector3.Zero;
+                if (Input.IsPhysicalKeyPressed(Key.W))
+                {
+                    thrust -= _head!.GlobalTransform.Basis.Z;
+                }
+
+                if (Input.IsPhysicalKeyPressed(Key.S))
+                {
+                    thrust += _head!.GlobalTransform.Basis.Z;
+                }
+
+                if (Input.IsPhysicalKeyPressed(Key.A))
+                {
+                    thrust -= Transform.Basis.X;
+                }
+
+                if (Input.IsPhysicalKeyPressed(Key.D))
+                {
+                    thrust += Transform.Basis.X;
+                }
+
+                if (Input.IsPhysicalKeyPressed(Key.Space))
+                {
+                    thrust += Vector3.Up;
+                }
+
+                if (Input.IsPhysicalKeyPressed(Key.Ctrl))
+                {
+                    thrust += Vector3.Down;
+                }
+
+                if (thrust != Vector3.Zero)
+                {
+                    velocity += thrust.Normalized() * ZeroGThrustAcceleration * (float)delta;
+                }
+            }
+            else
+            {
+                velocity = Vector3.Zero;
+            }
+
+            if (velocity.Length() > ZeroGMaxSpeed)
+            {
+                velocity = velocity.Normalized() * ZeroGMaxSpeed;
+            }
         }
         else
         {
-            var inputDirection = Vector2.Zero;
-            if (Input.IsPhysicalKeyPressed(Key.W))
+            if (!IsOnFloor())
             {
-                inputDirection.Y -= 1;
+                velocity.Y -= Gravity * (float)delta;
             }
 
-            if (Input.IsPhysicalKeyPressed(Key.S))
+            if (IsBusy)
             {
-                inputDirection.Y += 1;
+                velocity.X = 0;
+                velocity.Z = 0;
             }
-
-            if (Input.IsPhysicalKeyPressed(Key.A))
+            else
             {
-                inputDirection.X -= 1;
+                var inputDirection = Vector2.Zero;
+                if (Input.IsPhysicalKeyPressed(Key.W))
+                {
+                    inputDirection.Y -= 1;
+                }
+
+                if (Input.IsPhysicalKeyPressed(Key.S))
+                {
+                    inputDirection.Y += 1;
+                }
+
+                if (Input.IsPhysicalKeyPressed(Key.A))
+                {
+                    inputDirection.X -= 1;
+                }
+
+                if (Input.IsPhysicalKeyPressed(Key.D))
+                {
+                    inputDirection.X += 1;
+                }
+
+                inputDirection = inputDirection.Normalized();
+
+                var moveDirection = (Transform.Basis * new Vector3(inputDirection.X, 0, inputDirection.Y)).Normalized();
+                velocity.X = moveDirection.X * MoveSpeed;
+                velocity.Z = moveDirection.Z * MoveSpeed;
             }
-
-            if (Input.IsPhysicalKeyPressed(Key.D))
-            {
-                inputDirection.X += 1;
-            }
-
-            inputDirection = inputDirection.Normalized();
-
-            var moveDirection = (Transform.Basis * new Vector3(inputDirection.X, 0, inputDirection.Y)).Normalized();
-            velocity.X = moveDirection.X * MoveSpeed;
-            velocity.Z = moveDirection.Z * MoveSpeed;
         }
 
         Velocity = velocity;
@@ -505,7 +578,6 @@ public partial class Player : CharacterBody3D
         // real elapsed-time cost, not a pause (docs/project-plan.md's "time acceleration ...
         // pays the full bill" framing). A breached room's dropping O2 burns the suit's own
         // reserve faster on top of the flat drain (see SuitResources.Tick).
-        var roomVolume = ShipSimRef?.VolumeAt(new CellCoord(_ambientTile.X, _ambientTile.Y));
         _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21);
         _o2Bar!.Value = _suitResources.O2Percent;
         _powerBar!.Value = _suitResources.PowerPercent;
