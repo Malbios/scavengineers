@@ -124,6 +124,9 @@ emission_energy_multiplier = 2.5
 [sub_resource type="BoxMesh" id="ConduitSlotMesh"]
 size = Vector3(0.5, 0.05, 0.5)
 
+[sub_resource type="BoxMesh" id="ConduitArmMesh"]
+size = Vector3(0.15, 0.05, 0.5)
+
 [sub_resource type="BoxMesh" id="WallConduitMesh"]
 size = Vector3(0.4, 0.4, 0.08)
 
@@ -274,6 +277,7 @@ script = ExtResource("18")
 ShipSimRef = NodePath("../ShipSim")
 ShipRoot = NodePath("..")
 ConduitMesh = SubResource("ConduitSlotMesh")
+ConduitArmMesh = SubResource("ConduitArmMesh")
 ConduitMaterial = SubResource("ConduitSlotWiredMaterial")
 WallConduitMesh = SubResource("WallConduitMesh")
 WallSegmentMesh = SubResource("WallSegmentMesh")
@@ -522,6 +526,7 @@ script = ExtResource("18")
 ShipSimRef = NodePath("../ShipSim")
 ShipRoot = NodePath("..")
 ConduitMesh = SubResource("ConduitSlotMesh")
+ConduitArmMesh = SubResource("ConduitArmMesh")
 ConduitMaterial = SubResource("ConduitSlotWiredMaterial")
 WallConduitMesh = SubResource("WallConduitMesh")
 WallSegmentMesh = SubResource("WallSegmentMesh")

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using Scavengineers.Sim.Grid;
 using Scavengineers.Sim.ShipModel;
@@ -39,6 +40,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     private const float WallCenterHeight = 1.5f;
 
+    // The 4 cardinal neighbor tiles a floor conduit checks for its connection-aware shape (see
+    // BuildFloorConduitVisual) — AlongX says whether that direction's arm needs the 90-degree
+    // rotation (ConduitArmMesh is authored long-axis Z, i.e. the north/south direction).
+    private static readonly (Vector2I Offset, bool AlongX)[] CardinalDirections =
+    [
+        (new Vector2I(0, -1), false),
+        (new Vector2I(0, 1), false),
+        (new Vector2I(-1, 0), true),
+        (new Vector2I(1, 0), true),
+    ];
+
     private enum AimKind { None, Tile, Edge }
 
     private enum PendingAction { InstallConduit, RemoveConduit, BuildWall, RepairHullWall, RemoveWall }
@@ -62,12 +74,23 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public Node3D? ShipRoot { get; set; }
 
+    /// <summary>The lone-conduit default shape — shown for a floor conduit with no connected
+    /// neighbors at all (see BuildFloorConduitVisual), and for the Tile-aim ghost preview.</summary>
     [Export]
     public Mesh? ConduitMesh { get; set; }
 
+    /// <summary>One arm segment, reused once per connected cardinal direction to build a floor
+    /// conduit's straight/corner/T/cross shape — thin and short enough that several fit on one
+    /// tile without visually merging into a blob (docs/project-plan.md's "small boxes" note).
+    /// Authored long-axis Z (north/south); rotated 90 degrees for east/west arms.</summary>
+    [Export]
+    public Mesh? ConduitArmMesh { get; set; }
+
     /// <summary>Distinct shape from <see cref="ConduitMesh"/> — thin front-to-back rather than
     /// thin top-to-bottom, so it reads as mounted flush against a wall face instead of lying on
-    /// the floor. Same <see cref="ConduitMaterial"/> either way.</summary>
+    /// the floor. Same <see cref="ConduitMaterial"/> either way. Wall-mounted conduits don't get
+    /// the connection-aware arm treatment yet — every wall orientation would need its own corner
+    /// geometry, real scope beyond this pass — so they stay a single fixed box for now.</summary>
     [Export]
     public Mesh? WallConduitMesh { get; set; }
 
@@ -96,7 +119,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public string SaveId { get; set; } = "";
 
-    private readonly Dictionary<ConduitSlot, MeshInstance3D> _placedConduits = new();
+    private readonly Dictionary<ConduitSlot, Node3D> _placedConduits = new();
     private readonly Dictionary<(CellCoord, CellCoord), (MeshInstance3D Mesh, CollisionShape3D Collision)> _placedWalls = new();
 
     private Timer? _cycleTimer;
@@ -388,23 +411,27 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         var surface = slot.OnWall ? FixtureSurface.WallInner : FixtureSurface.FloorUnderside;
         ShipSimRef?.Deck.AddFixture(new ConduitFixture(ConduitFixtureId(slot), new CellCoord(slot.Tile.X, slot.Tile.Y), surface));
 
-        var visual = new MeshInstance3D { Mesh = slot.OnWall ? WallConduitMesh : ConduitMesh };
-        visual.SetSurfaceOverrideMaterial(0, ConduitMaterial);
-        AddChild(visual);
-
-        if (slot.WallNeighbor is { } neighbor)
+        if (slot.OnWall)
         {
+            var mesh = new MeshInstance3D { Mesh = WallConduitMesh };
+            mesh.SetSurfaceOverrideMaterial(0, ConduitMaterial);
+            AddChild(mesh);
+
             var edgeA = new CellCoord(slot.Tile.X, slot.Tile.Y);
-            var (position, rotationDegrees) = WallConduitTransform(edgeA, neighbor, slot.Tile);
-            visual.Position = position;
-            visual.RotationDegrees = rotationDegrees;
+            var (position, rotationDegrees) = WallConduitTransform(edgeA, slot.WallNeighbor!.Value, slot.Tile);
+            mesh.Position = position;
+            mesh.RotationDegrees = rotationDegrees;
+            _placedConduits[slot] = mesh;
         }
         else
         {
-            visual.Position = ToLocal(TileCenterWorld(slot.Tile));
+            _placedConduits[slot] = BuildFloorConduitVisual(slot.Tile);
         }
 
-        _placedConduits[slot] = visual;
+        // A newly wired tile can turn a neighboring floor conduit's dead-end stub into a
+        // straight/corner/T piece (or grow this one's own arms toward neighbors that already
+        // existed) — refresh everyone whose shape could have just changed.
+        RefreshFloorConduitVisualsAround(slot.Tile);
     }
 
     private void RemoveConduit(ConduitSlot slot)
@@ -414,6 +441,72 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         if (_placedConduits.Remove(slot, out var visual))
         {
             visual.QueueFree();
+        }
+
+        RefreshFloorConduitVisualsAround(slot.Tile);
+    }
+
+    /// <summary>Builds a floor conduit's shape from whichever of its 4 cardinal neighbor tiles
+    /// currently carry any fixture at all (another conduit, a machine, the battery, ...) — same
+    /// adjacency PowerSystem itself uses to decide connectivity, so the shape never lies about
+    /// what's actually wired. Zero neighbors falls back to the plain lone-conduit box; each
+    /// connected direction gets its own short arm meeting the others at the tile center, so 2
+    /// opposite directions read as a straight run, 2 adjacent as a corner, 3 as a T, 4 as a
+    /// cross — all built from the same one arm mesh, no per-shape art needed.</summary>
+    private Node3D BuildFloorConduitVisual(Vector2I tile)
+    {
+        var container = new Node3D();
+        AddChild(container);
+        container.Position = ToLocal(TileCenterWorld(tile));
+
+        var connected = CardinalDirections.Where(d => HasFixtureAt(tile + d.Offset)).ToList();
+
+        if (connected.Count == 0)
+        {
+            var lone = new MeshInstance3D { Mesh = ConduitMesh };
+            lone.SetSurfaceOverrideMaterial(0, ConduitMaterial);
+            container.AddChild(lone);
+            return container;
+        }
+
+        foreach (var (offset, alongX) in connected)
+        {
+            var arm = new MeshInstance3D { Mesh = ConduitArmMesh };
+            arm.SetSurfaceOverrideMaterial(0, ConduitMaterial);
+            arm.Position = new Vector3(offset.X * 0.25f, 0, offset.Y * 0.25f);
+            arm.RotationDegrees = alongX ? new Vector3(0, 90, 0) : Vector3.Zero;
+            container.AddChild(arm);
+        }
+
+        return container;
+    }
+
+    private bool HasFixtureAt(Vector2I tile)
+    {
+        var cell = new CellCoord(tile.X, tile.Y);
+        return ShipSimRef?.Deck.Fixtures.Any(f => f.Tile == cell) ?? false;
+    }
+
+    /// <summary>Rebuilds one tile's floor conduit shape from its current neighbors, if it has
+    /// one placed at all — a no-op otherwise (nothing to redraw).</summary>
+    private void RefreshFloorConduitVisual(Vector2I tile)
+    {
+        var slot = new ConduitSlot(tile, null);
+        if (!_placedConduits.TryGetValue(slot, out var existing))
+        {
+            return;
+        }
+
+        existing.QueueFree();
+        _placedConduits[slot] = BuildFloorConduitVisual(tile);
+    }
+
+    private void RefreshFloorConduitVisualsAround(Vector2I tile)
+    {
+        RefreshFloorConduitVisual(tile);
+        foreach (var (offset, _) in CardinalDirections)
+        {
+            RefreshFloorConduitVisual(tile + offset);
         }
     }
 
@@ -465,7 +558,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// <summary>Ghost shape/position depends on both where you're aiming AND which of the
     /// (possibly two, on an edge) install verbs is currently highlighted — "install a conduit"
     /// and "build a wall" are different objects at the same aim point, so previewing the wrong
-    /// one's shape would be actively misleading, not just imprecise.</summary>
+    /// one's shape would be actively misleading, not just imprecise. Always shows the plain
+    /// lone-conduit/wall-box shape rather than a live connection-aware preview — a rough "here's
+    /// where" indicator, not a promise of the final shape.</summary>
     private void UpdateGhostTransform()
     {
         if (_previewVerb != InstallConduitVerb && _previewVerb != InstallWallVerb)
