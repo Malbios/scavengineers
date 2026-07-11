@@ -59,7 +59,14 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     private const float WallCenterHeight = 1.5f;
     private const float FloorConduitHeight = 0.2f;
-    private const float CeilingPanelHeight = 3.0f;
+
+    // Match the existing (unsplit, collision-only) FloorShape/CeilingShape colliders' actual
+    // top/bottom surfaces exactly, so the panel mesh sits flush with where the player's feet and
+    // the ceiling's underside really are, instead of at the conduit's own floating mount height
+    // (FloorConduitHeight) — sharing that height with conduits is what caused the panels to
+    // z-fight with them.
+    private const float FloorPanelHeight = -0.025f;
+    private const float CeilingPanelHeight = 3.025f;
 
     // ConduitDropMesh's own authored length (see World.tscn) — BuildWallConduitVisual scales a
     // fresh instance of it to whatever the *actual* measured gap to the floor conduit turns out
@@ -268,7 +275,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
             var floorPanel = new MeshInstance3D { Mesh = PanelMesh };
             AddChild(floorPanel);
-            floorPanel.Position = ToLocal(TileWorldPosition(tile, FloorConduitHeight));
+            floorPanel.Position = ToLocal(TileWorldPosition(tile, FloorPanelHeight));
             floorPanel.SetSurfaceOverrideMaterial(0, FloorPanelMaterial);
             _floorPanels[cell] = floorPanel;
 
@@ -970,7 +977,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 _ghost!.Visible = true;
                 _ghost.Mesh = PanelMesh;
                 _ghost.RotationDegrees = Vector3.Zero;
-                _ghost.Position = ToLocal(TileWorldPosition(_aimedTile, FloorConduitHeight));
+                _ghost.Position = ToLocal(TileWorldPosition(_aimedTile, FloorPanelHeight));
                 break;
 
             case AimKind.Tile:
