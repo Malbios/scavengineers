@@ -35,23 +35,17 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     [Export]
     public AirlockDoorVerbTarget? DerelictAirlock { get; set; }
 
-    /// <summary>The whole Station/Derelict structure (and its connecting corridor) — hidden and
-    /// decollided while the Home Ship isn't docked there, so the two aren't both spatially
-    /// present at once. The airlock alone only fakes this from ground level (see
-    /// AirlockDoorVerbTarget's own "opens to space while undocked" doc) — flying outside in
-    /// zero-g would otherwise reveal both ships floating right next to each other regardless of
-    /// which one's actually docked.</summary>
+    /// <summary>The Station/Derelict structure itself (not its connecting corridor — that's the
+    /// Home Ship's own boarding-tube apparatus, always present) — hidden and decollided while
+    /// the Home Ship isn't docked there, so the two aren't both spatially present at once. The
+    /// airlock alone only fakes this from ground level (see AirlockDoorVerbTarget's own "opens
+    /// to space while undocked" doc) — flying outside in zero-g would otherwise reveal both
+    /// ships floating right next to each other regardless of which one's actually docked.</summary>
     [Export]
     public Node3D? StationGroup { get; set; }
 
     [Export]
     public Node3D? DerelictGroup { get; set; }
-
-    [Export]
-    public Node3D? StationCorridor { get; set; }
-
-    [Export]
-    public Node3D? DerelictCorridor { get; set; }
 
     [Export]
     public string SaveId { get; set; } = "";
@@ -140,9 +134,7 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         }
 
         SetShipPresence(StationGroup, atStation);
-        SetShipPresence(StationCorridor, atStation);
         SetShipPresence(DerelictGroup, !atStation);
-        SetShipPresence(DerelictCorridor, !atStation);
     }
 
     /// <summary>Toggles both halves of "is this ship actually here": Node3D.Visible for

@@ -328,7 +328,7 @@ shape = SubResource("FloorShape")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
 omni_range = 8.0
 
-[node name="TravelConsole" type="StaticBody3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "StationAirlock", "DerelictAirlock", "StationGroup", "DerelictGroup", "StationCorridor", "DerelictCorridor") groups=["saveable"]]
+[node name="TravelConsole" type="StaticBody3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "StationAirlock", "DerelictAirlock", "StationGroup", "DerelictGroup") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 1, -2.7)
 script = ExtResource("21")
 ShipSimRef = NodePath("../ShipSim")
@@ -336,8 +336,6 @@ StationAirlock = NodePath("../../StationAirlock")
 DerelictAirlock = NodePath("../../DerelictAirlock")
 StationGroup = NodePath("../../Station")
 DerelictGroup = NodePath("../../Derelict")
-StationCorridor = NodePath("../../StationCorridor")
-DerelictCorridor = NodePath("../../DerelictCorridor")
 SaveId = "travel_console"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/TravelConsole"]
