@@ -295,6 +295,9 @@ RechargeStationMesh = SubResource("RechargeStationMesh")
 RechargeStationShape = SubResource("RechargeStationShape")
 RechargeStationMaterial = SubResource("RechargeStationMaterial")
 RoomLight = NodePath("../RoomLight")
+DroppedItemMesh = SubResource("PickupItemMesh")
+DroppedItemShape = SubResource("PickupItemShape")
+DroppedItemMaterial = SubResource("PickupItemMaterial")
 SaveId = "home_ship_build_target"
 GhostMaterial = SubResource("ConduitGhostMaterial")
 ExcludedEdgeColumn = 6
@@ -395,6 +398,9 @@ WallSegmentShape = SubResource("WallSegmentShape")
 WallMaterial = ExtResource("10")
 GhostMaterial = SubResource("ConduitGhostMaterial")
 ExcludedEdgeColumn = 6
+DroppedItemMesh = SubResource("PickupItemMesh")
+DroppedItemShape = SubResource("PickupItemShape")
+DroppedItemMaterial = SubResource("PickupItemMaterial")
 SaveId = "derelict_build_target"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/Floor" unique_id=371087974]
@@ -603,6 +609,9 @@ Collider = NodePath("CollisionShape3D")
 RepairingMaterial = SubResource("RepairingMaterial")
 RepairedMaterial = SubResource("RepairedConduitMaterial")
 BurningMaterial = SubResource("BurningConduitMaterial")
+DroppedItemMesh = SubResource("PickupItemMesh")
+DroppedItemShape = SubResource("PickupItemShape")
+DroppedItemMaterial = SubResource("PickupItemMaterial")
 SaveId = "damaged_conduit_1"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/DamagedConduit"]

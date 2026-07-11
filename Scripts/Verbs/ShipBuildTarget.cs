@@ -311,6 +311,19 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public Light3D? RoomLight { get; set; }
 
+    /// <summary>Generic dropped-item visual (reused for every item id) — used by AddOrDrop when a
+    /// refund/scrap yield doesn't fully fit in the player's inventory, see InventoryOverflow.
+    /// Same shared box PickupItem's own pre-placed world instances already use, just wired here
+    /// too since a runtime-spawned pickup has no scene-authored mesh child of its own.</summary>
+    [Export]
+    public Mesh? DroppedItemMesh { get; set; }
+
+    [Export]
+    public Shape3D? DroppedItemShape { get; set; }
+
+    [Export]
+    public Material? DroppedItemMaterial { get; set; }
+
     [Export]
     public string SaveId { get; set; } = "";
 
@@ -924,7 +937,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 break;
             case PendingAction.RemoveConduit:
                 RemoveConduit(_pendingSlot);
-                inventory?.Add("scrap_metal", 1);
+                AddOrDrop(inventory, "scrap_metal", 1);
                 break;
             case PendingAction.BuildWall:
                 ShipSimRef!.Deck.SealEdge(_pendingEdgeA, _pendingEdgeB);
@@ -937,12 +950,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             case PendingAction.RemoveWall:
                 ShipSimRef!.Deck.UnsealEdge(_pendingEdgeA, _pendingEdgeB);
                 FreeWallSegment(_pendingEdgeA, _pendingEdgeB);
-                inventory?.Add("wall_panel", 1);
+                AddOrDrop(inventory, "wall_panel", 1);
                 break;
             case PendingAction.BreachHullWall:
                 ShipSimRef!.Deck.BreachHull(_pendingEdgeA);
                 FreeWallSegment(_pendingEdgeA, _pendingEdgeB);
-                inventory?.Add("wall_panel", 1);
+                AddOrDrop(inventory, "wall_panel", 1);
                 break;
             case PendingAction.InstallFloor:
                 ShipSimRef!.Deck.RepairHull(new CellCoord(_pendingTile.X, _pendingTile.Y), StructuralSurface.Floor);
@@ -951,7 +964,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             case PendingAction.RemoveFloor:
                 ShipSimRef!.Deck.BreachHull(new CellCoord(_pendingTile.X, _pendingTile.Y), StructuralSurface.Floor);
                 RefreshFloorPanelVisual(_pendingTile);
-                inventory?.Add("wall_panel", 1);
+                AddOrDrop(inventory, "wall_panel", 1);
                 break;
             case PendingAction.InstallCeiling:
                 ShipSimRef!.Deck.RepairHull(new CellCoord(_pendingTile.X, _pendingTile.Y), StructuralSurface.Ceiling);
@@ -960,19 +973,37 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             case PendingAction.RemoveCeiling:
                 ShipSimRef!.Deck.BreachHull(new CellCoord(_pendingTile.X, _pendingTile.Y), StructuralSurface.Ceiling);
                 RefreshCeilingPanelVisual(_pendingTile);
-                inventory?.Add("wall_panel", 1);
+                AddOrDrop(inventory, "wall_panel", 1);
                 break;
             case PendingAction.InstallMachine:
                 InstallMachine(_pendingMachineType, _pendingEdgeA, _pendingEdgeB, savedState: null);
                 break;
             case PendingAction.UninstallMachine:
                 RemoveMachine(_pendingMachineType);
-                inventory?.Add(ItemIdFor(_pendingMachineType), 1);
+                AddOrDrop(inventory, ItemIdFor(_pendingMachineType), 1);
                 break;
             case PendingAction.ScrapMachine:
                 RemoveMachine(_pendingMachineType);
-                inventory?.Add("scrap_metal", ScrapYieldFor(_pendingMachineType));
+                AddOrDrop(inventory, "scrap_metal", ScrapYieldFor(_pendingMachineType));
                 break;
+        }
+    }
+
+    /// <summary>Adds a refund/scrap-yield item to the player's inventory, dropping whatever
+    /// doesn't fit as a world pickup right where this action happened instead of losing it —
+    /// unlike picking something up that's already a world object (see PickupItem's own partial-
+    /// pickup handling), a refund has nothing else to fall back to but a freshly spawned one.</summary>
+    private void AddOrDrop(PlayerInventory? inventory, string itemId, int count)
+    {
+        if (inventory is null)
+        {
+            return;
+        }
+
+        var added = inventory.Add(itemId, count);
+        if (added < count && DroppedItemMesh is not null && DroppedItemShape is not null)
+        {
+            InventoryOverflow.DropAt(this, itemId, count - added, DroppedItemMesh, DroppedItemShape, DroppedItemMaterial);
         }
     }
 

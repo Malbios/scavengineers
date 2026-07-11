@@ -27,8 +27,16 @@ public partial class PickupItem : StaticBody3D, IVerbTarget
             return;
         }
 
-        inventory.Add(ItemId, Count);
-        QueueFree();
+        // Only the amount that actually fits is picked up — the rest stays right here rather
+        // than vanishing, no special handling needed since this object already IS the world
+        // representation of "some of this item is sitting here" (unlike a refund/scrap yield,
+        // which has no such object to fall back to — see InventoryOverflow).
+        var added = inventory.Add(ItemId, Count);
+        Count -= added;
+        if (Count <= 0)
+        {
+            QueueFree();
+        }
     }
 
     public void CancelVerb()

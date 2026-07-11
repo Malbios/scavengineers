@@ -1,0 +1,9 @@
+[
+  { "id": "scrap_metal", "maxStackSize": 50 },
+  { "id": "spare_parts", "maxStackSize": 20 },
+  { "id": "wall_panel", "maxStackSize": 20 },
+  { "id": "power_cell", "maxStackSize": 10 },
+  { "id": "battery", "maxStackSize": 1 },
+  { "id": "switch", "maxStackSize": 5 },
+  { "id": "recharge_station", "maxStackSize": 1 }
+]

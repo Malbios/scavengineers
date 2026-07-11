@@ -58,9 +58,13 @@ public partial class StationConsoleVerbTarget : StaticBody3D, IVerbTarget
 
             var verbs = new List<Verb>();
 
-            // Buy always shows, even unaffordable — Disabled (rendered red by Player's HUD)
-            // signals "not possible right now" instead of hiding the option entirely.
-            verbs.AddRange(BuyVerbs.Select(v => v with { Disabled = player.Credits < Prices[ItemIdOf(v)].Buy }));
+            // Buy always shows, even unaffordable or with no room to carry it — Disabled
+            // (rendered red by Player's HUD) signals "not possible right now" instead of hiding
+            // the option entirely.
+            verbs.AddRange(BuyVerbs.Select(v => v with
+            {
+                Disabled = player.Credits < Prices[ItemIdOf(v)].Buy || !player.Inventory.HasRoomFor(ItemIdOf(v), 1),
+            }));
             verbs.AddRange(SellVerbs.Where(v => player.Inventory.Has(ItemIdOf(v), 1)));
 
             return verbs;
@@ -89,7 +93,11 @@ public partial class StationConsoleVerbTarget : StaticBody3D, IVerbTarget
         if (BuyVerbs.Any(v => v.Id == verb.Id))
         {
             var itemId = ItemIdOf(verb);
-            if (player.TrySpendCredits(Prices[itemId].Buy))
+
+            // Checked again here, not just via Disabled above — refuses the purchase cleanly
+            // (credits untouched) rather than spending credits for an item that then has
+            // nowhere to go.
+            if (inventory.HasRoomFor(itemId, 1) && player.TrySpendCredits(Prices[itemId].Buy))
             {
                 inventory.Add(itemId, 1);
             }
