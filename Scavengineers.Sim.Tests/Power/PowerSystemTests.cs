@@ -60,6 +60,19 @@ public class PowerSystemTests
     }
 
     [Fact]
+    public void BatteryFixtureActingAsSource_PowersConnectedMachine()
+    {
+        var deck = new Deck();
+        deck.AddFixture(new BatteryFixture("battery-fixture", new CellCoord(0, 0), FixtureSurface.WallInner));
+        deck.AddFixture(new MachineFixture("lamp", new CellCoord(1, 0), FixtureSurface.CeilingUnderside));
+
+        var system = new PowerSystem(deck);
+        system.MarkSource(new PowerNodeId("battery-fixture"));
+
+        Assert.True(system.IsPowered(new PowerNodeId("lamp")));
+    }
+
+    [Fact]
     public void NodeNotConnectedToAnySource_IsNotPowered()
     {
         var deck = new Deck();

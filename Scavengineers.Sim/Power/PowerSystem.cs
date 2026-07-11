@@ -68,7 +68,7 @@ public sealed class PowerSystem : IConnectivityGraph<PowerNodeId>
         _deck.Fixtures.FirstOrDefault(f => f.Id == node.Value);
 
     private static bool IsConductive(Fixture fixture) =>
-        fixture is ConduitFixture or SwitchFixture or MachineFixture;
+        fixture is ConduitFixture or SwitchFixture or MachineFixture or BatteryFixture;
 
     private static bool IsOpenSwitch(Fixture fixture) =>
         fixture is SwitchFixture { IsOpen: true };

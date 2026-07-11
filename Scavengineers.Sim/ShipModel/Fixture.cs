@@ -38,3 +38,11 @@ public sealed class SwitchFixture(string id, CellCoord tile, FixtureSurface surf
 
 public sealed class MachineFixture(string id, CellCoord tile, FixtureSurface surface)
     : Fixture(id, tile, surface);
+
+/// <summary>
+/// A ship's finite power source. Reuses the base <see cref="Fixture.Condition"/> float as its
+/// charge fraction (0 = empty, 1 = full) rather than adding a dedicated field — the same way
+/// <see cref="ConduitFixture"/> already overloads Condition to mean "repair state."
+/// </summary>
+public sealed class BatteryFixture(string id, CellCoord tile, FixtureSurface surface)
+    : Fixture(id, tile, surface);

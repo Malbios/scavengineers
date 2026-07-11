@@ -13,7 +13,7 @@ namespace Scavengineers.Scripts.Ship;
 /// Owns and ticks a real Scavengineers.Sim <see cref="ShipModel.Deck"/> for a greybox ship: a
 /// full 1m-tile grid matching the two-room floor plan already built in the scene (Room 1 =
 /// tiles i 0-5, Room 2 = i 6-11, both j 0-5), optionally hosting a hull breach (atmosphere)
-/// and/or a generator/switch/recharge-station power grid, toggled per scene via the exported
+/// and/or a battery/switch/recharge-station power grid, toggled per scene via the exported
 /// flags. Real, data-driven ship layouts (arbitrary footprints) are still separate, larger
 /// future work — this is a fixed-shape stand-in, just no longer a single abstract cell.
 /// </summary>
@@ -28,7 +28,7 @@ public partial class ShipSim : Node
     private const int RoomSplitIndex = 6;
     private static readonly int[] DoorwayRows = [2, 3];
 
-    private static readonly CellCoord GeneratorCell = new(5, 0);
+    private static readonly CellCoord BatteryCell = new(5, 0);
     private static readonly CellCoord SwitchCell = new(5, 0);
     private static readonly CellCoord RechargeCell = new(9, 0);
 
@@ -36,6 +36,15 @@ public partial class ShipSim : Node
     // fixtures sit at their actual scene positions instead of assumed-adjacent placeholders
     // (docs/project-plan.md Appendix A7 — conduits physically route power between fixtures).
     private static readonly CellCoord[] ConduitCells = [new(6, 0), new(7, 0), new(8, 0)];
+
+    // Devices the player must wire up themselves via ShipBuildTarget's free-form conduit
+    // placement — deliberately not pre-connected, unlike the Switch/conduit/RechargeStation
+    // chain above. Tiles match each device's real scene position (docs/architecture's
+    // i=floor(localX+3), j=floor(localZ+3) mapping, same as every other fixture here).
+    private static readonly CellCoord TravelConsoleCell = new(0, 0);
+    private static readonly CellCoord InteriorDoorCell = new(5, 2);
+    private static readonly CellCoord StationAirlockCell = new(0, 2);
+    private static readonly CellCoord DerelictAirlockCell = new(11, 2);
 
     // The Derelict's two starting hull breaches — a real gap cut into the wall mesh at these
     // tiles, repaired via ShipBuildTarget's generic wall-building (docs/project-plan.md
@@ -50,11 +59,19 @@ public partial class ShipSim : Node
     private static readonly CellCoord FireGeneratorCell = new(1, 4);
     private static readonly CellCoord DamagedConduitCell = new(1, 3);
 
-    public const string GeneratorFixtureId = "generator";
+    public const string BatteryFixtureId = "battery";
     public const string SwitchFixtureId = "switch";
     public const string RechargeFixtureId = "recharge_station";
     public const string FireGeneratorFixtureId = "fire_generator";
     public const string DamagedConduitFixtureId = "damaged_conduit";
+    public const string TravelConsoleFixtureId = "travel_console_power";
+    public const string InteriorDoorFixtureId = "interior_door_power";
+    public const string StationAirlockFixtureId = "station_airlock_power";
+    public const string DerelictAirlockFixtureId = "derelict_airlock_power";
+
+    // Placeholder/tunable — one power cell (see StationConsoleVerbTarget's economy) restores
+    // this fraction of a full charge.
+    public const float PowerCellRechargeAmount = 0.5f;
 
     [Export]
     public bool HasPowerGrid { get; set; }
@@ -84,6 +101,7 @@ public partial class ShipSim : Node
     private AtmosphereSystem? _atmosphere;
     private PowerSystem? _power;
     private FireSystem? _fire;
+    private BatteryFixture? _battery;
 
     public override void _Ready()
     {
@@ -127,7 +145,8 @@ public partial class ShipSim : Node
 
         if (HasPowerGrid)
         {
-            Deck.AddFixture(new MachineFixture(GeneratorFixtureId, GeneratorCell, FixtureSurface.WallInner));
+            _battery = new BatteryFixture(BatteryFixtureId, BatteryCell, FixtureSurface.WallInner) { Condition = 1f };
+            Deck.AddFixture(_battery);
             Deck.AddFixture(new SwitchFixture(SwitchFixtureId, SwitchCell, FixtureSurface.WallInner));
 
             for (var i = 0; i < ConduitCells.Length; i++)
@@ -137,8 +156,15 @@ public partial class ShipSim : Node
 
             Deck.AddFixture(new MachineFixture(RechargeFixtureId, RechargeCell, FixtureSurface.WallInner));
 
+            // Left unwired deliberately — the player must run their own conduits from the
+            // battery, same as the old Computer demo device did.
+            Deck.AddFixture(new MachineFixture(TravelConsoleFixtureId, TravelConsoleCell, FixtureSurface.WallInner));
+            Deck.AddFixture(new MachineFixture(InteriorDoorFixtureId, InteriorDoorCell, FixtureSurface.FloorUnderside));
+            Deck.AddFixture(new MachineFixture(StationAirlockFixtureId, StationAirlockCell, FixtureSurface.FloorUnderside));
+            Deck.AddFixture(new MachineFixture(DerelictAirlockFixtureId, DerelictAirlockCell, FixtureSurface.FloorUnderside));
+
             _power = new PowerSystem(Deck);
-            _power.MarkSource(new PowerNodeId(GeneratorFixtureId));
+            _power.MarkSource(new PowerNodeId(BatteryFixtureId));
         }
 
         if (HasFireHazard)
@@ -205,8 +231,48 @@ public partial class ShipSim : Node
     public AtmosphereVolume VolumeAt(CellCoord cell) =>
         _atmosphere?.VolumeAt(cell) ?? AtmosphereVolume.Breathable;
 
+    /// <summary>Topologically connected to a source AND (if this ship has a battery at all)
+    /// that battery actually has charge — a ship with no battery (e.g. the Derelict, whose only
+    /// source is the always-on fire hazard generator) is never gated by this second check.</summary>
     public bool IsPowered(string fixtureId) =>
-        _power is not null && _power.IsPowered(new PowerNodeId(fixtureId));
+        _power is not null &&
+        _power.IsPowered(new PowerNodeId(fixtureId)) &&
+        (_battery is null || _battery.Condition > 0f);
+
+    /// <summary>0-1 charge fraction for HUD/verb-suffix display — 0 for a ship with no battery.</summary>
+    public float BatteryChargeFraction => _battery?.Condition ?? 0f;
+
+    public void DrainBattery(float amount)
+    {
+        if (_battery is null)
+        {
+            return;
+        }
+
+        _battery.Condition = Mathf.Clamp(_battery.Condition - amount, 0f, 1f);
+    }
+
+    public void RechargeBattery(float amount)
+    {
+        if (_battery is null)
+        {
+            return;
+        }
+
+        _battery.Condition = Mathf.Clamp(_battery.Condition + amount, 0f, 1f);
+    }
+
+    /// <summary>Jumps straight to a saved charge value — the save/load counterpart to
+    /// Drain/RechargeBattery's incremental changes.</summary>
+    public void SetBatteryCharge(float value)
+    {
+        if (_battery is null)
+        {
+            return;
+        }
+
+        _battery.Condition = Mathf.Clamp(value, 0f, 1f);
+    }
 
     public void SetSwitchOpen(bool isOpen)
     {
