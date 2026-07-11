@@ -99,24 +99,19 @@ offset_bottom = 56.0
 mouse_filter = 2
 show_percentage = false
 
-[node name="InventoryLabel" type="Label" parent="HUD" unique_id=1011568172]
+[node name="LeftHandLabel" type="Label" parent="HUD"]
 offset_left = 16.0
 offset_top = 16.0
 theme_override_styles/normal = SubResource("HudLabelBackground")
 
-[node name="LeftHandLabel" type="Label" parent="HUD"]
-offset_left = 16.0
-offset_top = 100.0
-theme_override_styles/normal = SubResource("HudLabelBackground")
-
 [node name="RightHandLabel" type="Label" parent="HUD"]
 offset_left = 16.0
-offset_top = 128.0
+offset_top = 44.0
 theme_override_styles/normal = SubResource("HudLabelBackground")
 
 [node name="CreditsLabel" type="Label" parent="HUD"]
 offset_left = 16.0
-offset_top = 156.0
+offset_top = 72.0
 theme_override_styles/normal = SubResource("HudLabelBackground")
 
 [node name="InventoryTooltip" type="Label" parent="HUD"]

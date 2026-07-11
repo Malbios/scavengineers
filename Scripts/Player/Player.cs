@@ -39,7 +39,6 @@ public partial class Player : CharacterBody3D
     private ProgressBar? _o2Bar;
     private ProgressBar? _powerBar;
     private Label? _roomO2Label;
-    private Label? _inventoryLabel;
     private Label? _leftHandLabel;
     private Label? _rightHandLabel;
     private Label? _creditsLabel;
@@ -142,7 +141,6 @@ public partial class Player : CharacterBody3D
         _o2Bar = GetNode<ProgressBar>("HUD/ResourcesPanel/O2Bar");
         _powerBar = GetNode<ProgressBar>("HUD/ResourcesPanel/PowerBar");
         _roomO2Label = GetNode<Label>("HUD/ResourcesPanel/RoomO2Label");
-        _inventoryLabel = GetNode<Label>("HUD/InventoryLabel");
         _leftHandLabel = GetNode<Label>("HUD/LeftHandLabel");
         _rightHandLabel = GetNode<Label>("HUD/RightHandLabel");
         _creditsLabel = GetNode<Label>("HUD/CreditsLabel");
@@ -179,6 +177,9 @@ public partial class Player : CharacterBody3D
         // Placeholder/tunable starting stipend for testing the free-form conduit wiring
         // extensively — same "don't wait on it" spirit as the near-instant verb durations.
         // Overwritten by ApplyPlayerState on load, same as every other fresh-start default.
+        // Backpack is equipped first so any future stipend increase spills into it correctly.
+        _inventory.Add("backpack", 1);
+        _inventory.EquipBackpackFromBody();
         _inventory.Add("scrap_metal", 50);
 
         CaptureMouse();
@@ -703,20 +704,5 @@ public partial class Player : CharacterBody3D
         _rightHandLabel!.Text = Tr("HUD_RIGHT_HAND") + ": " + (RightHandItemId is { } rightItem
             ? Tr("ITEM_" + rightItem.ToUpperInvariant())
             : Tr("HUD_HOLDING_EMPTY"));
-
-        if (_inventory.Counts.Count == 0)
-        {
-            _inventoryLabel!.Visible = false;
-            return;
-        }
-
-        var lines = new List<string>();
-        foreach (var (itemId, count) in _inventory.Counts)
-        {
-            lines.Add($"{Tr("ITEM_" + itemId.ToUpperInvariant())}: {count}");
-        }
-
-        _inventoryLabel!.Text = string.Join("\n", lines);
-        _inventoryLabel.Visible = true;
     }
 }

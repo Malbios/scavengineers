@@ -108,11 +108,12 @@ public sealed class PlayerInventory
     }
 
     /// <summary>Moves item `itemId` from the first body slot (pockets only, never the *other*
-    /// hand) that has it into `handIndex` — equipping it. <see cref="MoveSlot"/> already swaps if
-    /// `handIndex` is occupied by something else, which is what makes "replace whichever hand was
-    /// filled most recently" trivial: call this again on that same hand, and its old contents
-    /// land wherever the new item's body slot used to be. Returns false (no-op) if the body
-    /// doesn't currently hold this item at all.</summary>
+    /// hand) that has it into `handIndex` — equipping it, falling back to the worn backpack's own
+    /// contents if it isn't sitting in a pocket. <see cref="MoveSlot"/>/<see cref="SlotContainer.MoveBetween"/>
+    /// already swap if `handIndex` is occupied by something else, which is what makes "replace
+    /// whichever hand was filled most recently" trivial: call this again on that same hand, and
+    /// its old contents land wherever the new item came from. Returns false (no-op) if neither
+    /// the body nor the backpack currently holds this item.</summary>
     public bool EquipFromBody(string itemId, int handIndex)
     {
         for (var i = 0; i < BaseSlotCount; i++)
@@ -121,6 +122,18 @@ public sealed class PlayerInventory
             {
                 MoveSlot(i, handIndex);
                 return true;
+            }
+        }
+
+        if (Backpack is not null)
+        {
+            for (var i = 0; i < Backpack.Contents.Slots.Count; i++)
+            {
+                if (Backpack.Contents.Slots[i]?.ItemId == itemId)
+                {
+                    SlotContainer.MoveBetween(Backpack.Contents, i, _body, handIndex);
+                    return true;
+                }
             }
         }
 
