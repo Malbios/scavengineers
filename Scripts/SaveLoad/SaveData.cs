@@ -13,6 +13,26 @@ public sealed class SaveData
     public Dictionary<string, BuildTargetSaveData> BuildTargets { get; set; } = new();
 
     public Dictionary<string, string> ObjectStringStates { get; set; } = new();
+
+    /// <summary>Full backpacks (or other containers, later) sitting loose in the world — not
+    /// tied to any ShipBuildTarget, so none of the lists above fit. Scanned/respawned by
+    /// SaveManager via the "dropped_container" group (see ContainerPickupItem).</summary>
+    public List<DroppedContainerSaveData> DroppedContainers { get; set; } = new();
+}
+
+/// <summary>A ContainerPickupItem's whole world state — position plus its own contents, since
+/// it's a loose, dynamically-spawned object rather than a fixed scene node.</summary>
+public sealed class DroppedContainerSaveData
+{
+    public float PosX { get; set; }
+
+    public float PosY { get; set; }
+
+    public float PosZ { get; set; }
+
+    public string ItemId { get; set; } = "";
+
+    public Dictionary<string, int> Contents { get; set; } = new();
 }
 
 /// <summary>Everything a ShipBuildTarget places dynamically — no fixed scene node to hang the
@@ -78,4 +98,10 @@ public sealed class PlayerSaveData
     public Dictionary<string, int> Inventory { get; set; } = new();
 
     public int Credits { get; set; }
+
+    /// <summary>Null when no backpack is worn — the body's own Inventory dict above stays
+    /// backpack-contents-free either way (see Player.CapturePlayerState/ApplyPlayerState).</summary>
+    public string? BackpackItemId { get; set; }
+
+    public Dictionary<string, int> BackpackContents { get; set; } = new();
 }

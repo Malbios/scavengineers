@@ -44,9 +44,24 @@ public partial class Player : CharacterBody3D
     private Label? _rightHandLabel;
     private Label? _creditsLabel;
     private Control? _inventoryPanel;
+    private Control? _backpackGrid;
+    private readonly List<InventorySlotUI> _backpackSlotUIs = new();
     private readonly SuitResources _suitResources = new();
     private readonly PlayerInventory _inventory = new();
     private float _pitch;
+
+    /// <summary>The generic dropped-item visual (same box mesh + per-item material-override
+    /// pattern InventoryOverflow.DropAt and ShipBuildTarget's own refunds already use) — reused
+    /// here for a dropped, contents-full backpack (see SpawnDroppedBackpack). Wired in World.tscn
+    /// to the same shared sub-resources.</summary>
+    [Export]
+    public Mesh? DroppedItemMesh { get; set; }
+
+    [Export]
+    public Shape3D? DroppedItemShape { get; set; }
+
+    [Export]
+    public Material? DroppedItemMaterial { get; set; }
 
     /// <summary>Whether the mouse-driven inventory panel (Tab) is currently open — while true,
     /// look/Interact/verb-cycling/mouse-recapture are all suppressed so clicking and dragging in
@@ -54,10 +69,12 @@ public partial class Player : CharacterBody3D
     /// mid-drag.</summary>
     private bool _inventoryOpen;
 
-    /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-7) —
+    /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-8) —
     /// also reused by StationConsoleVerbTarget as the set of things Buy can offer, since there's
-    /// no separate item-definition data yet.</summary>
-    public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell", "battery", "switch", "recharge_station"];
+    /// no separate item-definition data yet. "backpack" is an ordinary holdable/purchasable item
+    /// right up until it's actually equipped via drag-and-drop onto the Back slot (see
+    /// TryEquipBackpackFromBody) — no dedicated verb needed to buy or hold one.</summary>
+    public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell", "battery", "switch", "recharge_station", "backpack"];
 
     private enum Hand { Left, Right }
 
@@ -130,20 +147,32 @@ public partial class Player : CharacterBody3D
         _rightHandLabel = GetNode<Label>("HUD/RightHandLabel");
         _creditsLabel = GetNode<Label>("HUD/CreditsLabel");
         _inventoryPanel = GetNode<Control>("HUD/InventoryPanel");
+        _backpackGrid = GetNode<Control>("HUD/InventoryPanel/Layout/BackpackGrid");
 
         foreach (var child in GetNode("HUD/InventoryPanel/Layout/Grid").GetChildren())
         {
             if (child is InventorySlotUI slot)
             {
-                slot.Inventory = _inventory;
+                slot.Container = _inventory.Body;
+                slot.PlayerRef = this;
             }
         }
 
-        foreach (var child in GetNode("HUD/InventoryPanel/Layout/Hands").GetChildren())
+        foreach (var child in GetNode("HUD/InventoryPanel/Layout/EquipSlots").GetChildren())
         {
             if (child is InventorySlotUI slot)
             {
-                slot.Inventory = _inventory;
+                slot.Container = _inventory.Body;
+                slot.PlayerRef = this;
+            }
+        }
+
+        foreach (var child in _backpackGrid.GetChildren())
+        {
+            if (child is InventorySlotUI slot)
+            {
+                slot.PlayerRef = this;
+                _backpackSlotUIs.Add(slot);
             }
         }
 
@@ -234,6 +263,7 @@ public partial class Player : CharacterBody3D
                 Key.Key5 => 4,
                 Key.Key6 => 5,
                 Key.Key7 => 6,
+                Key.Key8 => 7,
                 _ => -1,
             };
 
@@ -282,6 +312,70 @@ public partial class Player : CharacterBody3D
         var targetHandIndex = targetHand == Hand.Left ? PlayerInventory.LeftHandSlotIndex : PlayerInventory.RightHandSlotIndex;
         _inventory.EquipFromBody(itemId, targetHandIndex);
         _lastFilledHand = targetHand;
+    }
+
+    /// <summary>Called by InventorySlotUI's Back slot when something is dragged onto it — equips
+    /// a backpack only if the dragged body slot really is one (a sensible drag gesture check;
+    /// PlayerInventory.EquipBackpackFromBody doesn't care which exact slot it came from, since
+    /// the item is fungible right up until the moment it's equipped).</summary>
+    public void TryEquipBackpackFromBody(int fromSlotIndex)
+    {
+        if (fromSlotIndex < 0 || fromSlotIndex >= _inventory.Body.Slots.Count)
+        {
+            return;
+        }
+
+        if (_inventory.Body.Slots[fromSlotIndex]?.ItemId != "backpack")
+        {
+            return;
+        }
+
+        _inventory.EquipBackpackFromBody();
+    }
+
+    /// <summary>Called by an ordinary slot's InventorySlotUI when the equipped backpack itself
+    /// (the Back slot's -1 drag sentinel) is dropped onto it. An empty backpack becomes a
+    /// fungible item again if it fits (staying equipped if pockets are full — "nothing
+    /// vanishes"); a non-empty one can't fall back into an ordinary fungible slot at all, so it's
+    /// dropped in the world instead, contents intact.</summary>
+    public void TryUnequipBackpack()
+    {
+        if (_inventory.Backpack is not { } backpack)
+        {
+            return;
+        }
+
+        var isEmpty = backpack.Contents.Slots.All(s => s is null);
+        if (isEmpty)
+        {
+            if (_inventory.Body.Add(backpack.ItemId, 1) == 1)
+            {
+                _inventory.ClearBackpack();
+            }
+
+            return;
+        }
+
+        _inventory.ClearBackpack();
+        SpawnDroppedContainer(backpack.ItemId, backpack.Contents, GlobalPosition);
+    }
+
+    /// <summary>Spawns a full container's world representation at `position` — used both for an
+    /// unequip-while-full drop (see TryUnequipBackpack) and by SaveManager to respawn dropped
+    /// containers on load. Reuses the same generic dropped-item visual
+    /// (Mesh/Shape/Material pattern InventoryOverflow.DropAt and ShipBuildTarget's own refunds
+    /// already use) via this Player's own wired exports.</summary>
+    public void SpawnDroppedContainer(string itemId, SlotContainer contents, Vector3 position)
+    {
+        var pickup = new ContainerPickupItem { ItemId = itemId, Contents = contents };
+        GetParent()?.AddChild(pickup);
+        pickup.GlobalPosition = position;
+
+        var meshInstance = new MeshInstance3D { Mesh = DroppedItemMesh };
+        meshInstance.SetSurfaceOverrideMaterial(0, DroppedItemMaterial);
+        pickup.AddChild(meshInstance);
+
+        pickup.AddChild(new CollisionShape3D { Shape = DroppedItemShape });
     }
 
     // Instance method, not static: the FocusEntered connection below is then tied to this
@@ -542,8 +636,12 @@ public partial class Player : CharacterBody3D
             Pitch = _pitch,
             O2Percent = _suitResources.O2Percent,
             PowerPercent = _suitResources.PowerPercent,
-            Inventory = new Dictionary<string, int>(_inventory.Counts),
+            Inventory = new Dictionary<string, int>(_inventory.Body.Counts),
             Credits = _credits,
+            BackpackItemId = _inventory.Backpack?.ItemId,
+            BackpackContents = _inventory.Backpack is { } backpack
+                ? new Dictionary<string, int>(backpack.Contents.Counts)
+                : new Dictionary<string, int>(),
         };
     }
 
@@ -566,6 +664,20 @@ public partial class Player : CharacterBody3D
             _inventory.Add(itemId, count);
         }
 
+        // Backpack is reconstructed after the body replay above (still null at that point, so
+        // those Add calls only ever fill body slots) and filled directly into its own fresh
+        // SlotContainer, keeping body-refill and backpack-refill from cross-contaminating.
+        if (data.BackpackItemId is { } backpackItemId)
+        {
+            var contents = new SlotContainer(PlayerInventory.BackpackSlotCount);
+            foreach (var (itemId, count) in data.BackpackContents)
+            {
+                contents.Add(itemId, count);
+            }
+
+            _inventory.EquipContainerDirectly(backpackItemId, contents);
+        }
+
         _credits = data.Credits;
     }
 
@@ -573,6 +685,15 @@ public partial class Player : CharacterBody3D
 
     private void UpdateInventoryHud()
     {
+        // Re-pointed every frame rather than only on equip/unequip: equipping/unequipping
+        // creates a new SlotContainer instance, and this is the cheapest way to keep the panel's
+        // backpack section always addressing whichever one (if any) is currently worn.
+        _backpackGrid!.Visible = _inventory.Backpack is not null;
+        foreach (var slot in _backpackSlotUIs)
+        {
+            slot.Container = _inventory.Backpack?.Contents;
+        }
+
         _creditsLabel!.Text = Tr("HUD_CREDITS") + $": {_credits}";
 
         _leftHandLabel!.Text = Tr("HUD_LEFT_HAND") + ": " + (LeftHandItemId is { } leftItem

@@ -61,3 +61,6 @@ VERB_BUY_SWITCH,Buy Switch,Schalter kaufen
 VERB_SELL_SWITCH,Sell Switch,Schalter verkaufen
 VERB_BUY_RECHARGE_STATION,Buy Recharge Station,Ladestation kaufen
 VERB_SELL_RECHARGE_STATION,Sell Recharge Station,Ladestation verkaufen
+ITEM_BACKPACK,Backpack,Rucksack
+VERB_BUY_BACKPACK,Buy Backpack,Rucksack kaufen
+VERB_SELL_BACKPACK,Sell Backpack,Rucksack verkaufen

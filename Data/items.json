@@ -5,5 +5,6 @@
   { "id": "power_cell", "maxStackSize": 10, "color": "#33B3E6" },
   { "id": "battery", "maxStackSize": 1, "color": "#E6990D" },
   { "id": "switch", "maxStackSize": 5, "color": "#E6261A" },
-  { "id": "recharge_station", "maxStackSize": 1, "color": "#1ACCB3" }
+  { "id": "recharge_station", "maxStackSize": 1, "color": "#1ACCB3" },
+  { "id": "backpack", "maxStackSize": 1, "color": "#7A5230" }
 ]

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Godot;
+using Scavengineers.Scripts.Inventory;
 using PlayerScript = Scavengineers.Scripts.Player.Player;
 
 namespace Scavengineers.Scripts.SaveLoad;
@@ -61,6 +62,23 @@ public partial class SaveManager : Node
         foreach (var stateSaveable in FindStateSaveables())
         {
             data.ObjectStringStates[stateSaveable.SaveId] = stateSaveable.GetSaveState();
+        }
+
+        foreach (var node in GetTree().GetNodesInGroup("dropped_container"))
+        {
+            if (node is not ContainerPickupItem { Contents: { } contents } container)
+            {
+                continue;
+            }
+
+            data.DroppedContainers.Add(new DroppedContainerSaveData
+            {
+                PosX = container.GlobalPosition.X,
+                PosY = container.GlobalPosition.Y,
+                PosZ = container.GlobalPosition.Z,
+                ItemId = container.ItemId,
+                Contents = new Dictionary<string, int>(contents.Counts),
+            });
         }
 
         File.WriteAllText(SavePath, JsonSerializer.Serialize(data));
@@ -134,6 +152,25 @@ public partial class SaveManager : Node
             {
                 stateSaveable.ApplySaveState(state);
             }
+        }
+
+        // Loose world objects, not tied to any owner node's own ApplyBuildState — cleared and
+        // respawned wholesale here instead, same "clear then reapply" shape as ShipBuildTarget's
+        // ClearAllBuildState/ApplyBuildState uses for its own dynamically-placed machines.
+        foreach (var node in GetTree().GetNodesInGroup("dropped_container"))
+        {
+            node.QueueFree();
+        }
+
+        foreach (var dropped in data.DroppedContainers)
+        {
+            var contents = new SlotContainer(PlayerInventory.BackpackSlotCount);
+            foreach (var (itemId, count) in dropped.Contents)
+            {
+                contents.Add(itemId, count);
+            }
+
+            _player!.SpawnDroppedContainer(dropped.ItemId, contents, new Vector3(dropped.PosX, dropped.PosY, dropped.PosZ));
         }
 
         GD.Print("[SaveManager] Loaded.");

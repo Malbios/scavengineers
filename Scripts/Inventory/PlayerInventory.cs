@@ -1,57 +1,111 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Scavengineers.Scripts.Inventory;
 
 /// <summary>
-/// A fixed-size slot inventory (docs/project-plan.md §4) — BaseSlotCount "pockets" worth of
-/// stacks, each capped at that item's own <see cref="ItemCatalog.MaxStackSize"/>. Real capacity
-/// (Stage 1 of the wider inventory arc) needs a genuine limit on how much can be carried at
-/// once, not just how big one stack of one thing can get — a flat per-item count never runs
-/// out, so salvage was never actually a decision.
+/// Composes the player's body slots (pockets + hands) with, optionally, an equipped
+/// backpack's own separate <see cref="SlotContainer"/> (inventory arc Stage 3) — a backpack
+/// is the first non-fungible item (it carries real per-instance state, its own contents),
+/// so it's tracked as a distinct <see cref="EquippedContainer"/> rather than merged into the
+/// body slots.
 /// </summary>
 public sealed class PlayerInventory
 {
-    // Placeholder/tunable — "pockets" capacity with nothing else equipped. A later stage of the
-    // inventory arc adds containers with their own, separate slot arrays rather than more slots
-    // on this one.
+    // Placeholder/tunable — "pockets" capacity with nothing else equipped.
     private const int BaseSlotCount = 6;
 
     // Hands are real slots (not a separate reference like the old _heldItemId), reserved at the
-    // end of the array — Has/CountOf/Add/TryRemove/HasRoomFor all iterate _slots generically by
-    // index already, so they automatically include whatever's in a hand in every capacity/count
-    // calculation with no special-casing.
+    // end of the body array — Has/CountOf/Add/TryRemove/HasRoomFor all iterate the body
+    // generically by index already, so they automatically include whatever's in a hand in every
+    // capacity/count calculation with no special-casing.
     public const int HandCount = 2;
     public const int LeftHandSlotIndex = BaseSlotCount;
     public const int RightHandSlotIndex = BaseSlotCount + 1;
 
-    private readonly (string ItemId, int Count)?[] _slots = new (string, int)?[BaseSlotCount + HandCount];
+    // Placeholder/tunable — how many slots a worn backpack's own contents have.
+    public const int BackpackSlotCount = 8;
 
-    /// <summary>The raw per-slot view the inventory panel UI reads (see InventorySlotUI) — index
-    /// identity matters here (which physical slot holds what), unlike <see cref="Counts"/>'s
-    /// aggregated view for the plain-text HUD summary.</summary>
-    public IReadOnlyList<(string ItemId, int Count)?> Slots => _slots;
+    private readonly SlotContainer _body = new(BaseSlotCount + HandCount);
 
-    public IReadOnlyDictionary<string, int> Counts =>
-        _slots.Where(s => s is not null)
-            .GroupBy(s => s!.Value.ItemId)
-            .ToDictionary(g => g.Key, g => g.Sum(s => s!.Value.Count));
+    /// <summary>The body's own slot container (pockets + hands) — read by InventorySlotUI/
+    /// Player.cs to wire up the body/hand slots of the inventory panel.</summary>
+    public SlotContainer Body => _body;
 
-    public int CountOf(string itemId) => _slots.Where(s => s?.ItemId == itemId).Sum(s => s?.Count ?? 0);
+    /// <summary>An item id plus its own separate <see cref="SlotContainer"/> — the shape a
+    /// worn backpack takes while equipped. The one container item type this stage supports is
+    /// hardcoded as "backpack" (see EquipBackpackFromBody), matching Stage 1's "one flat
+    /// catalog" precedent rather than a speculative "which items are containers" lookup.</summary>
+    public sealed record EquippedContainer(string ItemId, SlotContainer Contents);
+
+    public EquippedContainer? Backpack { get; private set; }
+
+    /// <summary>The raw per-slot view the inventory panel UI reads for the body/hand slots
+    /// (see InventorySlotUI) — a worn backpack's own contents are addressed separately via
+    /// <see cref="Backpack"/>.Contents, never merged in here.</summary>
+    public IReadOnlyList<(string ItemId, int Count)?> Slots => _body.Slots;
+
+    public IReadOnlyDictionary<string, int> Counts
+    {
+        get
+        {
+            var counts = new Dictionary<string, int>(_body.Counts);
+            if (Backpack is not null)
+            {
+                foreach (var (itemId, count) in Backpack.Contents.Counts)
+                {
+                    counts[itemId] = counts.GetValueOrDefault(itemId) + count;
+                }
+            }
+
+            return counts;
+        }
+    }
+
+    public int CountOf(string itemId) => _body.CountOf(itemId) + (Backpack?.Contents.CountOf(itemId) ?? 0);
 
     public bool Has(string itemId, int count) => CountOf(itemId) >= count;
 
-    /// <summary>Whether `count` more of this item would fit right now, without actually adding
-    /// anything — for a caller that needs to know before committing to a cost (see
-    /// StationConsoleVerbTarget's Buy verb).</summary>
-    public bool HasRoomFor(string itemId, int count) => RoomFor(itemId) >= count;
+    /// <summary>Whether `count` more of this item would fit right now, across the body and (if
+    /// worn) the backpack's contents, without actually adding anything.</summary>
+    public bool HasRoomFor(string itemId, int count) =>
+        _body.RoomFor(itemId) + (Backpack?.Contents.RoomFor(itemId) ?? 0) >= count;
 
-    /// <summary>Adds up to `count`, respecting both this item's own stack limit
-    /// (<see cref="ItemCatalog.MaxStackSize"/>) and the number of free slots — returns how much
-    /// actually fit (0..count). A caller whose item has nowhere else to fall back to (a refund,
-    /// a purchase) must handle a partial result itself; see InventoryOverflow.</summary>
-    public int Add(string itemId, int count = 1) => AddWithinRange(itemId, count, 0, _slots.Length);
+    /// <summary>Adds up to `count`: tops up/fills the body first, then spills any remainder into
+    /// the worn backpack's own contents (if any) — returns how much actually fit (0..count).</summary>
+    public int Add(string itemId, int count = 1)
+    {
+        var addedToBody = _body.Add(itemId, count);
+        var remaining = count - addedToBody;
+        if (remaining <= 0 || Backpack is null)
+        {
+            return addedToBody;
+        }
+
+        return addedToBody + Backpack.Contents.Add(itemId, remaining);
+    }
+
+    public bool TryRemove(string itemId, int count = 1)
+    {
+        if (!Has(itemId, count))
+        {
+            return false;
+        }
+
+        var fromBody = Math.Min(_body.CountOf(itemId), count);
+        if (fromBody > 0)
+        {
+            _body.TryRemove(itemId, fromBody);
+        }
+
+        var remaining = count - fromBody;
+        if (remaining > 0)
+        {
+            Backpack?.Contents.TryRemove(itemId, remaining);
+        }
+
+        return true;
+    }
 
     /// <summary>Moves item `itemId` from the first body slot (pockets only, never the *other*
     /// hand) that has it into `handIndex` — equipping it. <see cref="MoveSlot"/> already swaps if
@@ -63,7 +117,7 @@ public sealed class PlayerInventory
     {
         for (var i = 0; i < BaseSlotCount; i++)
         {
-            if (_slots[i]?.ItemId == itemId)
+            if (_body.Slots[i]?.ItemId == itemId)
             {
                 MoveSlot(i, handIndex);
                 return true;
@@ -80,142 +134,64 @@ public sealed class PlayerInventory
     /// a completely full body means the hand keeps everything and this returns false.</summary>
     public bool UnequipToBody(int handIndex)
     {
-        if (_slots[handIndex] is not { } occupied)
+        if (_body.Slots[handIndex] is not { } occupied)
         {
             return true;
         }
 
-        _slots[handIndex] = null;
-        var added = AddWithinRange(occupied.ItemId, occupied.Count, 0, BaseSlotCount);
+        _body.SetSlot(handIndex, null);
+        var added = _body.AddWithinRange(occupied.ItemId, occupied.Count, 0, BaseSlotCount);
         var leftover = occupied.Count - added;
-        _slots[handIndex] = leftover > 0 ? (occupied.ItemId, leftover) : null;
+        _body.SetSlot(handIndex, leftover > 0 ? (occupied.ItemId, leftover) : null);
         return leftover == 0;
     }
 
-    private int AddWithinRange(string itemId, int count, int startInclusive, int endExclusive)
+    /// <summary>Moves slot `from` onto slot `to` within the body (pockets + hands) — the
+    /// inventory panel UI's drag-and-drop mutation for ordinary slots (see InventorySlotUI).</summary>
+    public void MoveSlot(int from, int to) => _body.MoveSlot(from, to);
+
+    /// <summary>Equips a worn backpack by consuming one "backpack" item from the body (wherever
+    /// it currently sits) and attaching a freshly-emptied <see cref="SlotContainer"/> as
+    /// <see cref="Backpack"/>. Fails (no-op) if a backpack is already worn, or the body doesn't
+    /// currently hold one.</summary>
+    public bool EquipBackpackFromBody(int slotCount = BackpackSlotCount)
     {
-        var remaining = count;
-        var maxStack = ItemCatalog.MaxStackSize(itemId);
-
-        // Top up existing stacks of the same item first.
-        for (var i = startInclusive; i < endExclusive && remaining > 0; i++)
-        {
-            if (_slots[i] is not { } slot || slot.ItemId != itemId)
-            {
-                continue;
-            }
-
-            var room = maxStack - slot.Count;
-            if (room <= 0)
-            {
-                continue;
-            }
-
-            var added = Math.Min(room, remaining);
-            _slots[i] = (itemId, slot.Count + added);
-            remaining -= added;
-        }
-
-        // Then spill into empty slots.
-        for (var i = startInclusive; i < endExclusive && remaining > 0; i++)
-        {
-            if (_slots[i] is not null)
-            {
-                continue;
-            }
-
-            var added = Math.Min(maxStack, remaining);
-            _slots[i] = (itemId, added);
-            remaining -= added;
-        }
-
-        return count - remaining;
-    }
-
-    /// <summary>Moves slot `from` onto slot `to` — the inventory panel UI's drag-and-drop
-    /// mutation (see InventorySlotUI). Different items swap; the same item tops `to` up from
-    /// `from` up to that item's stack limit, leaving any remainder in `from` (same "partial fit"
-    /// spirit as <see cref="Add"/>). A no-op for an out-of-range index, `from == to`, an empty
-    /// `from`, or a same-item `to` that's already full.</summary>
-    public void MoveSlot(int from, int to)
-    {
-        if (from == to || from < 0 || from >= _slots.Length || to < 0 || to >= _slots.Length)
-        {
-            return;
-        }
-
-        if (_slots[from] is not { } source)
-        {
-            return;
-        }
-
-        if (_slots[to] is not { } dest)
-        {
-            _slots[to] = source;
-            _slots[from] = null;
-            return;
-        }
-
-        if (dest.ItemId != source.ItemId)
-        {
-            (_slots[from], _slots[to]) = (_slots[to], _slots[from]);
-            return;
-        }
-
-        var room = ItemCatalog.MaxStackSize(source.ItemId) - dest.Count;
-        if (room <= 0)
-        {
-            return;
-        }
-
-        var moved = Math.Min(room, source.Count);
-        _slots[to] = (dest.ItemId, dest.Count + moved);
-        var remaining = source.Count - moved;
-        _slots[from] = remaining > 0 ? (source.ItemId, remaining) : null;
-    }
-
-    public void Clear()
-    {
-        for (var i = 0; i < _slots.Length; i++)
-        {
-            _slots[i] = null;
-        }
-    }
-
-    public bool TryRemove(string itemId, int count = 1)
-    {
-        if (!Has(itemId, count))
+        if (Backpack is not null)
         {
             return false;
         }
 
-        var remaining = count;
-        for (var i = 0; i < _slots.Length && remaining > 0; i++)
+        if (!_body.TryRemove("backpack", 1))
         {
-            if (_slots[i] is not { } slot || slot.ItemId != itemId)
-            {
-                continue;
-            }
-
-            var removed = Math.Min(slot.Count, remaining);
-            var newCount = slot.Count - removed;
-            _slots[i] = newCount > 0 ? (itemId, newCount) : null;
-            remaining -= removed;
+            return false;
         }
 
+        Backpack = new EquippedContainer("backpack", new SlotContainer(slotCount));
         return true;
     }
 
-    private int RoomFor(string itemId)
-    {
-        var maxStack = ItemCatalog.MaxStackSize(itemId);
-        var room = 0;
+    /// <summary>Detaches the worn backpack with no fungible fallback — the caller decides what
+    /// happens to what was equipped (see Player.TryUnequipBackpack).</summary>
+    public void ClearBackpack() => Backpack = null;
 
-        foreach (var slot in _slots)
+    /// <summary>Attaches an already-built container as the worn backpack directly, bypassing the
+    /// body-consume step in <see cref="EquipBackpackFromBody"/> — used by save/load restoration
+    /// and by picking a full backpack back up off the ground (see ContainerPickupItem). Fails
+    /// (no-op, returns false) if a backpack is already worn.</summary>
+    public bool EquipContainerDirectly(string itemId, SlotContainer contents)
+    {
+        if (Backpack is not null)
         {
-            room += slot is null ? maxStack : slot.Value.ItemId == itemId ? Math.Max(0, maxStack - slot.Value.Count) : 0;
+            return false;
         }
 
-        return room;
+        Backpack = new EquippedContainer(itemId, contents);
+        return true;
+    }
+
+    public void Clear()
+    {
+        _body.Clear();
+        Backpack = null;
     }
 }
