@@ -10,12 +10,14 @@ using Scavengineers.Scripts.Ship;
 namespace Scavengineers.Scripts.Verbs;
 
 /// <summary>
-/// Turns a ship's whole Floor into a free-form build target — any tile or edge the player is
-/// aiming at (fed in via <see cref="SetAimPoint"/>, computed from the interact ray's hit point)
-/// can have a conduit (tile or wall) or a wall segment (edge) installed/removed. Reuses
-/// PowerSystem's existing adjacency rule for conduits and Deck.SealEdge/UnsealEdge for walls —
-/// the exact same primitive InteriorDoorVerbTarget already uses at its two fixed edges — so no
-/// Scavengineers.Sim changes are needed, just deciding which edge/tile the player means.
+/// Turns a ship's whole Floor into a free-form build target — any tile, ceiling point, or edge
+/// the player is aiming at (fed in via <see cref="SetAimPoint"/>/<see cref="SetCeilingAimPoint"/>,
+/// computed from the interact ray's hit point) can have a conduit (tile or wall), a floor panel
+/// (tile), a ceiling panel, or a wall segment (edge) installed/removed. Reuses PowerSystem's
+/// existing adjacency rule for conduits, Deck.SealEdge/UnsealEdge for interior walls, and
+/// Deck.BreachHull/RepairHull (now reason-tagged, see StructuralSurface) for both boundary walls
+/// and floor/ceiling — so no new Scavengineers.Sim concepts are needed, just deciding which
+/// surface the player means and which existing primitive represents it.
 /// </summary>
 public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSaveable
 {
@@ -34,12 +36,30 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private static readonly Verb RemoveConduitVerb = new("remove_conduit", "VERB_REMOVE_CONDUIT", DurationSeconds: 0.2f);
     private static readonly Verb RemoveWallVerb = new("remove_wall", "VERB_REMOVE_WALL", DurationSeconds: 0.2f);
 
+    // Floor and ceiling panels reuse the same wall_panel construction-part item as walls —
+    // one item covers all three rather than inventing two more catalog entries for the same
+    // purpose.
+    private static readonly Verb InstallFloorVerb = new("install_floor", "VERB_INSTALL_FLOOR", DurationSeconds: 0.2f)
+    {
+        Requirements = [new ItemRequirement("wall_panel", 1)],
+    };
+
+    private static readonly Verb RemoveFloorVerb = new("remove_floor", "VERB_REMOVE_FLOOR", DurationSeconds: 0.2f);
+
+    private static readonly Verb InstallCeilingVerb = new("install_ceiling", "VERB_INSTALL_CEILING", DurationSeconds: 0.2f)
+    {
+        Requirements = [new ItemRequirement("wall_panel", 1)],
+    };
+
+    private static readonly Verb RemoveCeilingVerb = new("remove_ceiling", "VERB_REMOVE_CEILING", DurationSeconds: 0.2f);
+
     // How close (in meters) the aim point needs to be to a tile boundary before it resolves to
     // that edge instead of the tile itself — half of this margin on each side of every boundary.
     private const float EdgeMargin = 0.25f;
 
     private const float WallCenterHeight = 1.5f;
     private const float FloorConduitHeight = 0.2f;
+    private const float CeilingPanelHeight = 3.0f;
 
     // ConduitDropMesh's own authored length (see World.tscn) — BuildWallConduitVisual scales a
     // fresh instance of it to whatever the *actual* measured gap to the floor conduit turns out
@@ -60,9 +80,27 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         (new Vector2I(1, 0), true),
     ];
 
-    private enum AimKind { None, Tile, Edge }
+    // The doorway rows the Home Ship's boundary/interior walls leave open for the two airlocks
+    // and the interior door — matches ShipSim's own DoorwayRows exactly (kept in sync by hand;
+    // both are the same "fixed-shape stand-in" the project plan already accepts pre-data-driven
+    // ship layouts, see ShipSim.cs's own hardcoded grid).
+    private static readonly int[] HomeShipDoorwayRows = [2, 3];
 
-    private enum PendingAction { InstallConduit, RemoveConduit, BuildWall, RepairHullWall, RemoveWall }
+    private enum AimKind { None, Tile, Ceiling, Edge }
+
+    private enum PendingAction
+    {
+        InstallConduit,
+        RemoveConduit,
+        BuildWall,
+        RepairHullWall,
+        RemoveWall,
+        BreachHullWall,
+        InstallFloor,
+        RemoveFloor,
+        InstallCeiling,
+        RemoveCeiling,
+    }
 
     /// <summary>One tile can carry several conduits at once — one floor-mounted (WallNeighbor
     /// null) plus up to one per bordering wall (WallNeighbor = the cell across that specific
@@ -126,6 +164,25 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public Material? GhostMaterial { get; set; }
 
+    /// <summary>Shared 1-tile flat mesh for both floor and ceiling panels — same shape, different
+    /// position/material per instance.</summary>
+    [Export]
+    public Mesh? PanelMesh { get; set; }
+
+    [Export]
+    public Material? FloorPanelMaterial { get; set; }
+
+    [Export]
+    public Material? CeilingPanelMaterial { get; set; }
+
+    /// <summary>Swapped onto a floor/ceiling panel instead of hiding it once its surface is
+    /// missing — same "still there, but reads as open to space" language
+    /// <see cref="Ship.AirlockDoorVerbTarget.SpaceMaterial"/> already uses for a vented airlock.
+    /// The floor panel keeps its collision either way (see <see cref="ShipSim"/>'s single
+    /// unsplit collider) — this is a visual/atmosphere consequence only, you don't fall through.</summary>
+    [Export]
+    public Material? BreachedPanelMaterial { get; set; }
+
     /// <summary>The grid column of the room-split boundary (i.e. the edge between
     /// column-1 and column) — excluded from wall targeting entirely, since
     /// InteriorDoorVerbTarget already owns the two doorway edges there and would desync if this
@@ -133,11 +190,21 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public int ExcludedEdgeColumn { get; set; } = -1;
 
+    /// <summary>True only for the Home Ship's Floor — seeds its current boundary/interior wall
+    /// layout as real, player-removable structure once at startup (see
+    /// <see cref="SeedDefaultShipLayout"/>), through the exact same helpers a save replay uses.
+    /// The Derelict/Station keep their own fixed, non-retrofitted geometry — this wasn't asked
+    /// for there, and "already wrecked" fits a fixed shape better than "player-built" does.</summary>
+    [Export]
+    public bool SeedHomeShipDefaultLayout { get; set; }
+
     [Export]
     public string SaveId { get; set; } = "";
 
     private readonly Dictionary<ConduitSlot, Node3D> _placedConduits = new();
     private readonly Dictionary<(CellCoord, CellCoord), (MeshInstance3D Mesh, CollisionShape3D Collision)> _placedWalls = new();
+    private readonly Dictionary<CellCoord, MeshInstance3D> _floorPanels = new();
+    private readonly Dictionary<CellCoord, MeshInstance3D> _ceilingPanels = new();
 
     private Timer? _cycleTimer;
     private MeshInstance3D? _ghost;
@@ -151,6 +218,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     private PendingAction _pendingAction;
     private ConduitSlot _pendingSlot;
+    private Vector2I _pendingTile;
     private CellCoord _pendingEdgeA;
     private CellCoord _pendingEdgeB;
     private PlayerInventory? _pendingInventory;
@@ -172,6 +240,77 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         _ghost = new MeshInstance3D { Mesh = ConduitMesh, Visible = false };
         _ghost.SetSurfaceOverrideMaterial(0, GhostMaterial);
         AddChild(_ghost);
+
+        // Deferred: ShipSimRef's own Deck is built in its _Ready(), which may not have run yet
+        // at this exact point depending on scene-tree sibling order (the established fix for
+        // this same class of ordering issue elsewhere in the project, e.g. ShipSim's own
+        // deferred vacuum seeding).
+        CallDeferred(nameof(GenerateFloorCeilingPanels));
+        if (SeedHomeShipDefaultLayout)
+        {
+            CallDeferred(nameof(SeedDefaultShipLayout));
+        }
+    }
+
+    private void GenerateFloorCeilingPanels()
+    {
+        // PanelMesh is only wired up on ships that opt into the floor/ceiling construction-part
+        // system (currently just the Home Ship) — everything else skips this entirely rather
+        // than generating unusable null-mesh instances.
+        if (ShipSimRef is null || PanelMesh is null)
+        {
+            return;
+        }
+
+        foreach (var cell in ShipSimRef.Deck.Cells)
+        {
+            var tile = new Vector2I(cell.X, cell.Y);
+
+            var floorPanel = new MeshInstance3D { Mesh = PanelMesh };
+            AddChild(floorPanel);
+            floorPanel.Position = ToLocal(TileWorldPosition(tile, FloorConduitHeight));
+            floorPanel.SetSurfaceOverrideMaterial(0, FloorPanelMaterial);
+            _floorPanels[cell] = floorPanel;
+
+            var ceilingPanel = new MeshInstance3D { Mesh = PanelMesh };
+            AddChild(ceilingPanel);
+            ceilingPanel.Position = ToLocal(TileWorldPosition(tile, CeilingPanelHeight));
+            ceilingPanel.SetSurfaceOverrideMaterial(0, CeilingPanelMaterial);
+            _ceilingPanels[cell] = ceilingPanel;
+        }
+    }
+
+    /// <summary>The Home Ship's current wall layout, materialized as real player-removable
+    /// structure instead of fixed scene geometry — boundary walls (breach-based) and the
+    /// interior room-split wall (edge-based), both leaving <see cref="HomeShipDoorwayRows"/>
+    /// open for the airlocks/interior door, exactly matching the shape the old static
+    /// WallNorth/South/WestA-B/EastA-B/MidWallA-B nodes used to hand-author.</summary>
+    private void SeedDefaultShipLayout()
+    {
+        if (ShipSimRef is null)
+        {
+            return;
+        }
+
+        const int gridWidth = 12;
+        const int gridDepth = 6;
+
+        for (var i = 0; i < gridWidth; i++)
+        {
+            SpawnWallSegment(new CellCoord(i, 0), new CellCoord(i, -1));
+            SpawnWallSegment(new CellCoord(i, gridDepth - 1), new CellCoord(i, gridDepth));
+        }
+
+        foreach (var j in Enumerable.Range(0, gridDepth).Where(row => !HomeShipDoorwayRows.Contains(row)))
+        {
+            SpawnWallSegment(new CellCoord(0, j), new CellCoord(-1, j));
+            SpawnWallSegment(new CellCoord(11, j), new CellCoord(12, j));
+
+            var a = new CellCoord(5, j);
+            var b = new CellCoord(6, j);
+            ShipSimRef.Deck.SealEdge(a, b);
+            SpawnWallSegment(a, b);
+        }
     }
 
     /// <summary>Called by Player every time it re-reads this as the current verb target, so
@@ -221,10 +360,21 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         UpdateGhostTransform();
     }
 
+    /// <summary>Ceiling aim is always tile-scoped (there's no "edge" concept looking straight up)
+    /// — called instead of <see cref="SetAimPoint"/> when the raycast hit a ceiling's
+    /// <see cref="ShipBuildAimForwarder"/> (its IsCeiling flag), routed from Player.</summary>
+    public void SetCeilingAimPoint(Vector3 worldPoint)
+    {
+        var local = (ShipRoot ?? GetParent<Node3D>()).ToLocal(worldPoint);
+        _aimedTile = new Vector2I(Mathf.FloorToInt(local.X + 3), Mathf.FloorToInt(local.Z + 3));
+        _aimKind = AimKind.Ceiling;
+        UpdateGhostTransform();
+    }
+
     /// <summary>Which install verb (if any) is currently highlighted — Player calls this every
     /// frame once it knows the active, affordable verb here. Drives both the ghost's visibility
-    /// and its shape, since "install a conduit" and "build a wall" need different previews at
-    /// the same aim point (see <see cref="UpdateGhostTransform"/>).</summary>
+    /// and its shape, since e.g. "install a conduit" and "build a wall" need different previews
+    /// at the same aim point (see <see cref="UpdateGhostTransform"/>).</summary>
     public void SetPreviewVerb(Verb? verb)
     {
         _previewVerb = verb;
@@ -246,21 +396,34 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         switch (_aimKind)
         {
             case AimKind.Tile:
-                return [_placedConduits.ContainsKey(new ConduitSlot(_aimedTile, null)) ? RemoveConduitVerb : InstallConduitVerb];
+            {
+                var verbs = new List<Verb> { _placedConduits.ContainsKey(new ConduitSlot(_aimedTile, null)) ? RemoveConduitVerb : InstallConduitVerb };
+
+                // Floor panels are only a real, visualized thing on ships that opted into the
+                // system (PanelMesh configured) — everything else keeps its fixed floor.
+                if (PanelMesh is not null)
+                {
+                    var floorPresent = !ShipSimRef.Deck.IsHullBreached(new CellCoord(_aimedTile.X, _aimedTile.Y), StructuralSurface.Floor);
+                    verbs.Add(floorPresent ? RemoveFloorVerb : InstallFloorVerb);
+                }
+
+                return verbs;
+            }
+
+            case AimKind.Ceiling when PanelMesh is not null:
+            {
+                var ceilingPresent = !ShipSimRef.Deck.IsHullBreached(new CellCoord(_aimedTile.X, _aimedTile.Y), StructuralSurface.Ceiling);
+                return [ceilingPresent ? RemoveCeilingVerb : InstallCeilingVerb];
+            }
 
             case AimKind.Edge when !ShipSimRef.Deck.Cells.Contains(_edgeB):
             {
-                // Boundary edge — the wall action only ever repairs an existing breach, never
-                // creates one. A wall-mounted conduit needs an actual hull wall to mount on, so
-                // it's only offered while that hull is intact — a breach means open vacuum
-                // there, not a wall, so mounting a "wire" in that gap would float mid-air.
-                var breached = ShipSimRef.Deck.IsHullBreached(_edgeA);
-                var verbs = new List<Verb>();
-                if (breached)
-                {
-                    verbs.Add(InstallWallVerb);
-                }
-
+                // Boundary edge — Install repairs an existing breach, Remove deliberately
+                // creates one (a real, consequential choice, same as scrapping the floor or
+                // ceiling). A wall-mounted conduit needs an actual hull wall to mount on, so
+                // it's only offered while that hull is intact.
+                var breached = ShipSimRef.Deck.IsHullBreached(_edgeA, StructuralSurface.Wall);
+                var verbs = new List<Verb> { breached ? InstallWallVerb : RemoveWallVerb };
                 if (EdgeConduitVerb(wallPresent: !breached) is { } boundaryConduitVerb)
                 {
                     verbs.Add(boundaryConduitVerb);
@@ -318,6 +481,20 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             return;
         }
 
+        if (verb.Id == InstallFloorVerb.Id || verb.Id == RemoveFloorVerb.Id)
+        {
+            ExecutePanelVerb(verb, InstallFloorVerb.Id, StructuralSurface.Floor,
+                PendingAction.InstallFloor, PendingAction.RemoveFloor, inventory);
+            return;
+        }
+
+        if (verb.Id == InstallCeilingVerb.Id || verb.Id == RemoveCeilingVerb.Id)
+        {
+            ExecutePanelVerb(verb, InstallCeilingVerb.Id, StructuralSurface.Ceiling,
+                PendingAction.InstallCeiling, PendingAction.RemoveCeiling, inventory);
+            return;
+        }
+
         if (_aimKind == AimKind.Edge)
         {
             ExecuteWallVerb(verb, inventory);
@@ -345,6 +522,22 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         _cycleTimer!.Start();
     }
 
+    private void ExecutePanelVerb(Verb verb, string installId, StructuralSurface surface,
+        PendingAction installAction, PendingAction removeAction, PlayerInventory inventory)
+    {
+        var present = !ShipSimRef!.Deck.IsHullBreached(new CellCoord(_aimedTile.X, _aimedTile.Y), surface);
+        if ((verb.Id == installId) == present)
+        {
+            return; // Install only valid while missing, Remove only valid while present.
+        }
+
+        _pendingAction = verb.Id == installId ? installAction : removeAction;
+        _pendingTile = _aimedTile;
+        _pendingInventory = inventory;
+        _cycling = true;
+        _cycleTimer!.Start();
+    }
+
     private void ExecuteWallVerb(Verb verb, PlayerInventory inventory)
     {
         if (verb.Id != InstallWallVerb.Id && verb.Id != RemoveWallVerb.Id)
@@ -355,12 +548,19 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         var isBoundary = !ShipSimRef!.Deck.Cells.Contains(_edgeB);
         if (isBoundary)
         {
-            if (verb.Id != InstallWallVerb.Id || !ShipSimRef.Deck.IsHullBreached(_edgeA))
+            var breached = ShipSimRef.Deck.IsHullBreached(_edgeA, StructuralSurface.Wall);
+            if (verb.Id == InstallWallVerb.Id && breached)
+            {
+                _pendingAction = PendingAction.RepairHullWall;
+            }
+            else if (verb.Id == RemoveWallVerb.Id && !breached)
+            {
+                _pendingAction = PendingAction.BreachHullWall;
+            }
+            else
             {
                 return;
             }
-
-            _pendingAction = PendingAction.RepairHullWall;
         }
         else
         {
@@ -420,7 +620,54 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 FreeWallSegment(_pendingEdgeA, _pendingEdgeB);
                 inventory?.Add("wall_panel", 1);
                 break;
+            case PendingAction.BreachHullWall:
+                ShipSimRef!.Deck.BreachHull(_pendingEdgeA);
+                FreeWallSegment(_pendingEdgeA, _pendingEdgeB);
+                inventory?.Add("wall_panel", 1);
+                break;
+            case PendingAction.InstallFloor:
+                ShipSimRef!.Deck.RepairHull(new CellCoord(_pendingTile.X, _pendingTile.Y), StructuralSurface.Floor);
+                RefreshFloorPanelVisual(_pendingTile);
+                break;
+            case PendingAction.RemoveFloor:
+                ShipSimRef!.Deck.BreachHull(new CellCoord(_pendingTile.X, _pendingTile.Y), StructuralSurface.Floor);
+                RefreshFloorPanelVisual(_pendingTile);
+                inventory?.Add("wall_panel", 1);
+                break;
+            case PendingAction.InstallCeiling:
+                ShipSimRef!.Deck.RepairHull(new CellCoord(_pendingTile.X, _pendingTile.Y), StructuralSurface.Ceiling);
+                RefreshCeilingPanelVisual(_pendingTile);
+                break;
+            case PendingAction.RemoveCeiling:
+                ShipSimRef!.Deck.BreachHull(new CellCoord(_pendingTile.X, _pendingTile.Y), StructuralSurface.Ceiling);
+                RefreshCeilingPanelVisual(_pendingTile);
+                inventory?.Add("wall_panel", 1);
+                break;
         }
+    }
+
+    private void RefreshFloorPanelVisual(Vector2I tile)
+    {
+        var cell = new CellCoord(tile.X, tile.Y);
+        if (!_floorPanels.TryGetValue(cell, out var panel))
+        {
+            return;
+        }
+
+        var breached = ShipSimRef?.Deck.IsHullBreached(cell, StructuralSurface.Floor) ?? false;
+        panel.SetSurfaceOverrideMaterial(0, breached ? BreachedPanelMaterial : FloorPanelMaterial);
+    }
+
+    private void RefreshCeilingPanelVisual(Vector2I tile)
+    {
+        var cell = new CellCoord(tile.X, tile.Y);
+        if (!_ceilingPanels.TryGetValue(cell, out var panel))
+        {
+            return;
+        }
+
+        var breached = ShipSimRef?.Deck.IsHullBreached(cell, StructuralSurface.Ceiling) ?? false;
+        panel.SetSurfaceOverrideMaterial(0, breached ? BreachedPanelMaterial : CeilingPanelMaterial);
     }
 
     private void InstallConduit(ConduitSlot slot)
@@ -461,7 +708,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     {
         var container = new Node3D();
         AddChild(container);
-        container.Position = ToLocal(TileCenterWorld(tile));
+        container.Position = ToLocal(TileWorldPosition(tile, FloorConduitHeight));
 
         var connected = CardinalDirections.Where(d => HasFixtureAt(tile + d.Offset)).ToList();
 
@@ -571,7 +818,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             // jut straight out into open air at wall height and drop through nothing.
             hasArm = true;
 
-            var floorHubLocal = ToLocal(TileCenterWorld(tile));
+            var floorHubLocal = ToLocal(TileWorldPosition(tile, FloorConduitHeight));
             var delta = floorHubLocal - container.Position;
             var horizontalDelta = new Vector3(delta.X, 0, delta.Z);
             var horizontalDistance = horizontalDelta.Length();
@@ -701,15 +948,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
     }
 
-    /// <summary>Ghost shape/position depends on both where you're aiming AND which of the
-    /// (possibly two, on an edge) install verbs is currently highlighted — "install a conduit"
-    /// and "build a wall" are different objects at the same aim point, so previewing the wrong
-    /// one's shape would be actively misleading, not just imprecise. Always shows the plain
-    /// lone-conduit/wall-box shape rather than a live connection-aware preview — a rough "here's
-    /// where" indicator, not a promise of the final shape.</summary>
+    /// <summary>Ghost shape/position depends on both where you're aiming AND which install verb
+    /// is currently highlighted — e.g. "install a conduit" and "build a floor panel" are
+    /// different objects sharing the same tile aim point, so previewing the wrong one's shape
+    /// would be actively misleading, not just imprecise. Always shows the plain lone/panel-box
+    /// shape rather than a live connection-aware preview — a rough "here's where" indicator, not
+    /// a promise of the final shape.</summary>
     private void UpdateGhostTransform()
     {
-        if (_previewVerb != InstallConduitVerb && _previewVerb != InstallWallVerb)
+        var isInstall = _previewVerb == InstallConduitVerb || _previewVerb == InstallWallVerb ||
+                         _previewVerb == InstallFloorVerb || _previewVerb == InstallCeilingVerb;
+        if (!isInstall)
         {
             _ghost!.Visible = false;
             return;
@@ -717,11 +966,25 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
         switch (_aimKind)
         {
+            case AimKind.Tile when _previewVerb == InstallFloorVerb:
+                _ghost!.Visible = true;
+                _ghost.Mesh = PanelMesh;
+                _ghost.RotationDegrees = Vector3.Zero;
+                _ghost.Position = ToLocal(TileWorldPosition(_aimedTile, FloorConduitHeight));
+                break;
+
             case AimKind.Tile:
                 _ghost!.Visible = true;
                 _ghost.Mesh = ConduitMesh;
                 _ghost.RotationDegrees = Vector3.Zero;
-                _ghost.Position = ToLocal(TileCenterWorld(_aimedTile));
+                _ghost.Position = ToLocal(TileWorldPosition(_aimedTile, FloorConduitHeight));
+                break;
+
+            case AimKind.Ceiling:
+                _ghost!.Visible = true;
+                _ghost.Mesh = PanelMesh;
+                _ghost.RotationDegrees = Vector3.Zero;
+                _ghost.Position = ToLocal(TileWorldPosition(_aimedTile, CeilingPanelHeight));
                 break;
 
             case AimKind.Edge when _previewVerb == InstallConduitVerb:
@@ -767,9 +1030,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         return (ToLocal(world), rotationDegrees);
     }
 
-    private Vector3 TileCenterWorld(Vector2I tile)
+    private Vector3 TileWorldPosition(Vector2I tile, float height)
     {
-        var shipLocal = new Vector3(tile.X - 3 + 0.5f, FloorConduitHeight, tile.Y - 3 + 0.5f);
+        var shipLocal = new Vector3(tile.X - 3 + 0.5f, height, tile.Y - 3 + 0.5f);
         return (ShipRoot ?? GetParent<Node3D>()).ToGlobal(shipLocal);
     }
 
@@ -798,14 +1061,35 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             data.Walls.Add(new EdgeCoord(a.X, a.Y, b.X, b.Y));
         }
 
+        foreach (var cell in _floorPanels.Keys)
+        {
+            if (ShipSimRef!.Deck.IsHullBreached(cell, StructuralSurface.Floor))
+            {
+                data.FloorBreaches.Add(new TileCoord(cell.X, cell.Y));
+            }
+        }
+
+        foreach (var cell in _ceilingPanels.Keys)
+        {
+            if (ShipSimRef!.Deck.IsHullBreached(cell, StructuralSurface.Ceiling))
+            {
+                data.CeilingBreaches.Add(new TileCoord(cell.X, cell.Y));
+            }
+        }
+
         return data;
     }
 
-    /// <summary>Replays saved tiles/edges through the same helpers Install/BuildWall use —
+    /// <summary>Replays a save's tiles/edges through the same helpers Install/BuildWall use —
     /// already inventory-free at this level (the verb/cost logic lives in ExecuteVerb, never
-    /// called here), so restoring a save never re-charges scrap_metal/wall_panel.</summary>
+    /// called here), so restoring a save never re-charges scrap_metal/wall_panel. Clears all
+    /// current conduit/wall/floor/ceiling state first: the ship's own default layout (see
+    /// <see cref="SeedDefaultShipLayout"/>) is itself now removable, so a loaded save must be
+    /// authoritative rather than layered on top of whatever startup already built.</summary>
     public void ApplyBuildState(BuildTargetSaveData state)
     {
+        ClearAllBuildState();
+
         foreach (var tile in state.Conduits)
         {
             InstallConduit(new ConduitSlot(new Vector2I(tile.X, tile.Y), null));
@@ -829,10 +1113,59 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             }
             else
             {
-                ShipSimRef.Deck.RepairHull(a);
+                ShipSimRef.Deck.RepairHull(a, StructuralSurface.Wall);
             }
 
             SpawnWallSegment(a, b);
+        }
+
+        foreach (var tile in state.FloorBreaches)
+        {
+            ShipSimRef!.Deck.BreachHull(new CellCoord(tile.X, tile.Y), StructuralSurface.Floor);
+            RefreshFloorPanelVisual(new Vector2I(tile.X, tile.Y));
+        }
+
+        foreach (var tile in state.CeilingBreaches)
+        {
+            ShipSimRef!.Deck.BreachHull(new CellCoord(tile.X, tile.Y), StructuralSurface.Ceiling);
+            RefreshCeilingPanelVisual(new Vector2I(tile.X, tile.Y));
+        }
+    }
+
+    private void ClearAllBuildState()
+    {
+        foreach (var (slot, visual) in _placedConduits)
+        {
+            ShipSimRef?.Deck.RemoveFixture(ConduitFixtureId(slot));
+            visual.QueueFree();
+        }
+
+        _placedConduits.Clear();
+
+        foreach (var ((a, b), pair) in _placedWalls)
+        {
+            ShipSimRef?.Deck.UnsealEdge(a, b);
+            if (ShipSimRef is not null && !ShipSimRef.Deck.Cells.Contains(b))
+            {
+                ShipSimRef.Deck.BreachHull(a, StructuralSurface.Wall);
+            }
+
+            pair.Mesh.QueueFree();
+            pair.Collision.QueueFree();
+        }
+
+        _placedWalls.Clear();
+
+        foreach (var cell in _floorPanels.Keys)
+        {
+            ShipSimRef?.Deck.BreachHull(cell, StructuralSurface.Floor);
+            RefreshFloorPanelVisual(new Vector2I(cell.X, cell.Y));
+        }
+
+        foreach (var cell in _ceilingPanels.Keys)
+        {
+            ShipSimRef?.Deck.BreachHull(cell, StructuralSurface.Ceiling);
+            RefreshCeilingPanelVisual(new Vector2I(cell.X, cell.Y));
         }
     }
 }

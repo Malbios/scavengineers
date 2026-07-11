@@ -269,9 +269,17 @@ public partial class Player : CharacterBody3D
 
         var collider = _interactRay.GetCollider();
 
-        if (collider is ShipBuildAimForwarder { BuildTarget: { } forwardedTarget })
+        if (collider is ShipBuildAimForwarder { BuildTarget: { } forwardedTarget } forwarder)
         {
-            forwardedTarget.SetAimPoint(_interactRay.GetCollisionPoint());
+            if (forwarder.IsCeiling)
+            {
+                forwardedTarget.SetCeilingAimPoint(_interactRay.GetCollisionPoint());
+            }
+            else
+            {
+                forwardedTarget.SetAimPoint(_interactRay.GetCollisionPoint());
+            }
+
             return forwardedTarget;
         }
 

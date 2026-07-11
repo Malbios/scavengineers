@@ -32,6 +32,12 @@ public sealed class BuildTargetSaveData
     /// <summary>Covers both player-built interior partitions and repaired hull breaches — both
     /// already land in ShipBuildTarget's own _placedWalls dictionary today.</summary>
     public List<EdgeCoord> Walls { get; set; } = new();
+
+    /// <summary>Tiles whose floor/ceiling panel is currently missing (breached) — the ship's
+    /// default layout starts with none, so these only ever record player-scrapped tiles.</summary>
+    public List<TileCoord> FloorBreaches { get; set; } = new();
+
+    public List<TileCoord> CeilingBreaches { get; set; } = new();
 }
 
 public readonly record struct TileCoord(int X, int Y);

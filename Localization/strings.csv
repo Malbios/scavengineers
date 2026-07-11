@@ -38,3 +38,7 @@ VERB_BUY_POWER_CELL,Buy Power Cell,Energiezelle kaufen
 VERB_SELL_POWER_CELL,Sell Power Cell,Energiezelle verkaufen
 VERB_RECHARGE_BATTERY,Recharge Battery,Batterie aufladen
 OBJECT_BATTERY,Battery,Batterie
+VERB_INSTALL_FLOOR,Install Floor Panel,Bodenplatte einbauen
+VERB_REMOVE_FLOOR,Remove Floor Panel,Bodenplatte entfernen
+VERB_INSTALL_CEILING,Install Ceiling Panel,Deckenplatte einbauen
+VERB_REMOVE_CEILING,Remove Ceiling Panel,Deckenplatte entfernen

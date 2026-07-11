@@ -13,4 +13,11 @@ public partial class ShipBuildAimForwarder : StaticBody3D
 {
     [Export]
     public ShipBuildTarget? BuildTarget { get; set; }
+
+    /// <summary>True for a ceiling's forwarder — routes to
+    /// <see cref="ShipBuildTarget.SetCeilingAimPoint"/> instead of the default
+    /// <see cref="ShipBuildTarget.SetAimPoint"/>, since aiming straight up has no "edge" concept
+    /// to resolve, only a tile.</summary>
+    [Export]
+    public bool IsCeiling { get; set; }
 }
