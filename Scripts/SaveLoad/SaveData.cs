@@ -38,6 +38,11 @@ public sealed class BuildTargetSaveData
     public List<TileCoord> FloorBreaches { get; set; } = new();
 
     public List<TileCoord> CeilingBreaches { get; set; } = new();
+
+    /// <summary>Battery/Switch/RechargeStation — at most one of each Type ("battery"/"switch"/
+    /// "recharge_station") at a time. Purely additive: defaults to empty for any save predating
+    /// these being player-install/uninstall-able rather than fixed scene nodes.</summary>
+    public List<MachineCoord> Machines { get; set; } = new();
 }
 
 public readonly record struct TileCoord(int X, int Y);
@@ -47,6 +52,12 @@ public readonly record struct EdgeCoord(int AX, int AY, int BX, int BY);
 /// <summary>Slot defaults to 1 (today's "Mid" height, 3 slots per wall) so a save written before
 /// wall conduits had height slots keeps its wire at the same visual height it was saved at.</summary>
 public readonly record struct WallConduitCoord(int TileX, int TileY, int NeighborX, int NeighborY, int Slot = 1);
+
+/// <summary>State is each machine's own extra save data, stringified (Battery's charge fraction,
+/// Switch's on/off bool) — null for a stateless machine (Recharge Station). Applied directly to
+/// the freshly spawned instance on load, not through the generic "saveable" group scan (a
+/// dynamically spawned machine is never in that group).</summary>
+public readonly record struct MachineCoord(string Type, int EdgeAX, int EdgeAY, int EdgeBX, int EdgeBY, string? State);
 
 public sealed class PlayerSaveData
 {

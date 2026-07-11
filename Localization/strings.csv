@@ -42,3 +42,21 @@ VERB_INSTALL_FLOOR,Install Floor Panel,Bodenplatte einbauen
 VERB_REMOVE_FLOOR,Remove Floor Panel,Bodenplatte entfernen
 VERB_INSTALL_CEILING,Install Ceiling Panel,Deckenplatte einbauen
 VERB_REMOVE_CEILING,Remove Ceiling Panel,Deckenplatte entfernen
+ITEM_BATTERY,Battery,Batterie
+ITEM_SWITCH,Switch,Schalter
+ITEM_RECHARGE_STATION,Recharge Station,Ladestation
+VERB_INSTALL_BATTERY,Install Battery,Batterie einbauen
+VERB_UNINSTALL_BATTERY,Uninstall Battery,Batterie ausbauen
+VERB_SCRAP_BATTERY,Scrap Battery,Batterie verschrotten
+VERB_INSTALL_SWITCH,Install Switch,Schalter einbauen
+VERB_UNINSTALL_SWITCH,Uninstall Switch,Schalter ausbauen
+VERB_SCRAP_SWITCH,Scrap Switch,Schalter verschrotten
+VERB_INSTALL_RECHARGE_STATION,Install Recharge Station,Ladestation einbauen
+VERB_UNINSTALL_RECHARGE_STATION,Uninstall Recharge Station,Ladestation ausbauen
+VERB_SCRAP_RECHARGE_STATION,Scrap Recharge Station,Ladestation verschrotten
+VERB_BUY_BATTERY,Buy Battery,Batterie kaufen
+VERB_SELL_BATTERY,Sell Battery,Batterie verkaufen
+VERB_BUY_SWITCH,Buy Switch,Schalter kaufen
+VERB_SELL_SWITCH,Sell Switch,Schalter verkaufen
+VERB_BUY_RECHARGE_STATION,Buy Recharge Station,Ladestation kaufen
+VERB_SELL_RECHARGE_STATION,Sell Recharge Station,Ladestation verkaufen

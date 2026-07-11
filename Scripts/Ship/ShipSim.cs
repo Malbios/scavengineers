@@ -28,20 +28,11 @@ public partial class ShipSim : Node
     private const int RoomSplitIndex = 6;
     private static readonly int[] DoorwayRows = [2, 3];
 
-    // Tile matches the Battery node's real scene position (local x=1.5,z=-2.9 ->
-    // i=floor(1.5+3)=4, j=floor(-2.9+3)=0) — every fixture here uses that same
-    // i=floor(localX+3), j=floor(localZ+3) mapping, so the player's wiring aim always lines
-    // up with where the sim actually thinks the device is.
-    private static readonly CellCoord BatteryCell = new(4, 0);
-    private static readonly CellCoord SwitchCell = new(5, 0);
-    private static readonly CellCoord RechargeCell = new(9, 0);
-
-    // Every device below (Switch, RechargeStation, and the 4 further down) is added unwired —
-    // the player must run their own conduits via ShipBuildTarget's free-form placement to
-    // connect any of them to the battery. The only "free" connection is Battery-to-Switch,
-    // since they sit on Manhattan-adjacent tiles (mounted right next to each other on the same
-    // wall) — PowerSystem already treats directly-adjacent fixtures as touching, no conduit
-    // segment needed, same rule the Derelict's fire hazard relies on for its own adjacent pair.
+    // Every device below (the 4 further down) is added unwired — the player must run their own
+    // conduits via ShipBuildTarget's free-form placement to connect any of them to the battery.
+    // Battery/Switch/RechargeStation cells used to live here too, but they're now player-
+    // install/uninstall-able construction parts (see ShipBuildTarget's MachineType) — their
+    // cells moved there, since only it needs them now (for the default-seed replay).
     private static readonly CellCoord TravelConsoleCell = new(0, 0);
     private static readonly CellCoord InteriorDoorCell = new(5, 2);
     private static readonly CellCoord StationAirlockCell = new(0, 2);
@@ -146,20 +137,18 @@ public partial class ShipSim : Node
 
         if (HasPowerGrid)
         {
-            _battery = new BatteryFixture(BatteryFixtureId, BatteryCell, FixtureSurface.WallInner) { Condition = 1f };
-            Deck.AddFixture(_battery);
-            Deck.AddFixture(new SwitchFixture(SwitchFixtureId, SwitchCell, FixtureSurface.WallInner));
-            Deck.AddFixture(new MachineFixture(RechargeFixtureId, RechargeCell, FixtureSurface.WallInner));
-
             // None of the below are pre-connected — the player must run their own conduits
             // from the battery to every one of them via ShipBuildTarget's free-form placement.
+            // Battery/Switch/RechargeStation aren't seeded here at all anymore — they're
+            // player-install/uninstall-able construction parts (see ShipBuildTarget's
+            // MachineType), seeded (for the Home Ship) through the exact same
+            // Install*/Remove* calls below that a player action or a save replay uses.
             Deck.AddFixture(new MachineFixture(TravelConsoleFixtureId, TravelConsoleCell, FixtureSurface.WallInner));
             Deck.AddFixture(new MachineFixture(InteriorDoorFixtureId, InteriorDoorCell, FixtureSurface.FloorUnderside));
             Deck.AddFixture(new MachineFixture(StationAirlockFixtureId, StationAirlockCell, FixtureSurface.FloorUnderside));
             Deck.AddFixture(new MachineFixture(DerelictAirlockFixtureId, DerelictAirlockCell, FixtureSurface.FloorUnderside));
 
             _power = new PowerSystem(Deck);
-            _power.MarkSource(new PowerNodeId(BatteryFixtureId));
         }
 
         if (HasFireHazard)
@@ -276,4 +265,32 @@ public partial class ShipSim : Node
             switchFixture.IsOpen = isOpen;
         }
     }
+
+    // Battery/Switch/RechargeStation are player-install/uninstall-able construction parts
+    // (see ShipBuildTarget's MachineType) rather than seeded in _Ready() — these are the
+    // single place their fixtures get added to/removed from the Deck, called equally by a
+    // fresh player action, the Home Ship's own default-layout seed, and a save replay.
+
+    public void InstallBattery(CellCoord cell, FixtureSurface surface)
+    {
+        _battery = new BatteryFixture(BatteryFixtureId, cell, surface) { Condition = 1f };
+        Deck.AddFixture(_battery);
+        _power?.MarkSource(new PowerNodeId(BatteryFixtureId));
+    }
+
+    public void RemoveBattery()
+    {
+        Deck.RemoveFixture(BatteryFixtureId);
+        _battery = null;
+    }
+
+    public void InstallSwitch(CellCoord cell, FixtureSurface surface) =>
+        Deck.AddFixture(new SwitchFixture(SwitchFixtureId, cell, surface));
+
+    public void RemoveSwitch() => Deck.RemoveFixture(SwitchFixtureId);
+
+    public void InstallRechargeStation(CellCoord cell, FixtureSurface surface) =>
+        Deck.AddFixture(new MachineFixture(RechargeFixtureId, cell, surface));
+
+    public void RemoveRechargeStation() => Deck.RemoveFixture(RechargeFixtureId);
 }

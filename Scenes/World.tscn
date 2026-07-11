@@ -1,10 +1,8 @@
 [gd_scene format=3 uid="uid://b8mrhcml41ra7"]
 
-[ext_resource type="Script" uid="uid://7j8qpxs8iafi" path="res://Scripts/Verbs/ToggleLightVerbTarget.cs" id="1"]
 [ext_resource type="PackedScene" uid="uid://dkr1y6qs26kfd" path="res://Scenes/Player.tscn" id="2"]
 [ext_resource type="Script" uid="uid://61vdtspe71v5" path="res://Scripts/Ship/ShipSim.cs" id="3"]
 [ext_resource type="Script" uid="uid://dmmawqmxq6nou" path="res://Scripts/SaveLoad/SaveManager.cs" id="4"]
-[ext_resource type="Script" uid="uid://bfch41rtxlbym" path="res://Scripts/Verbs/RechargeStationVerbTarget.cs" id="5"]
 [ext_resource type="Material" path="res://Assets/Materials/home_floor_material.tres" id="6"]
 [ext_resource type="Material" path="res://Assets/Materials/home_wall_material.tres" id="7"]
 [ext_resource type="Material" path="res://Assets/Materials/home_ceiling_material.tres" id="8"]
@@ -17,11 +15,9 @@
 [ext_resource type="Script" path="res://Scripts/Ship/InteriorDoorVerbTarget.cs" id="16"]
 [ext_resource type="Script" path="res://Scripts/Verbs/DamagedConduitVerbTarget.cs" id="17"]
 [ext_resource type="Script" path="res://Scripts/Verbs/ShipBuildTarget.cs" id="18"]
-[ext_resource type="Script" path="res://Scripts/Ship/PoweredDeviceIndicator.cs" id="19"]
 [ext_resource type="Script" path="res://Scripts/Verbs/ShipBuildAimForwarder.cs" id="20"]
 [ext_resource type="Script" path="res://Scripts/Ship/TravelConsoleVerbTarget.cs" id="21"]
 [ext_resource type="Script" path="res://Scripts/Ship/StationConsoleVerbTarget.cs" id="22"]
-[ext_resource type="Script" path="res://Scripts/Ship/BatteryVerbTarget.cs" id="23"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 2
@@ -271,7 +267,7 @@ shape = SubResource("ShipZoneWideShape")
 transform = Transform3D(0.866, -0.25, 0.433, 0, 0.866, 0.5, -0.5, -0.433, 0.75, 0, 4, 0)
 light_energy = 0.8
 
-[node name="Floor" type="StaticBody3D" parent="HomeShip" unique_id=61458931 node_paths=PackedStringArray("ShipSimRef", "ShipRoot") groups=["saveable"]]
+[node name="Floor" type="StaticBody3D" parent="HomeShip" unique_id=61458931 node_paths=PackedStringArray("ShipSimRef", "ShipRoot", "RoomLight") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, -0.1, 0)
 script = ExtResource("18")
 ShipSimRef = NodePath("../ShipSim")
@@ -289,6 +285,16 @@ FloorPanelMaterial = ExtResource("6")
 CeilingPanelMaterial = ExtResource("8")
 BreachedPanelMaterial = SubResource("SpaceMaterial")
 SeedHomeShipDefaultLayout = true
+BatteryMesh = SubResource("BatteryMesh")
+BatteryShape = SubResource("BatteryShape")
+BatteryMaterial = SubResource("BatteryMaterial")
+SwitchMesh = SubResource("SwitchMesh")
+SwitchShape = SubResource("SwitchShape")
+SwitchMaterial = SubResource("SwitchMaterial")
+RechargeStationMesh = SubResource("RechargeStationMesh")
+RechargeStationShape = SubResource("RechargeStationShape")
+RechargeStationMaterial = SubResource("RechargeStationMaterial")
+RoomLight = NodePath("../RoomLight")
 SaveId = "home_ship_build_target"
 GhostMaterial = SubResource("ConduitGhostMaterial")
 ExcludedEdgeColumn = 6
@@ -308,57 +314,6 @@ shape = SubResource("FloorShape")
 [node name="RoomLight" type="OmniLight3D" parent="HomeShip" unique_id=587716326]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
 omni_range = 8.0
-
-[node name="LightSwitch" type="StaticBody3D" parent="HomeShip" unique_id=721884858 node_paths=PackedStringArray("TargetLight", "ShipSimRef") groups=["saveable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 1, -2.9)
-script = ExtResource("1")
-TargetLight = NodePath("../RoomLight")
-ShipSimRef = NodePath("../ShipSim")
-SaveId = "light_switch_1"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/LightSwitch" unique_id=111952623]
-shape = SubResource("SwitchShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/LightSwitch" unique_id=1367835528]
-mesh = SubResource("SwitchMesh")
-surface_material_override/0 = SubResource("SwitchMaterial")
-
-[node name="Battery" type="StaticBody3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef") groups=["saveable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1, -2.9)
-script = ExtResource("23")
-ShipSimRef = NodePath("../ShipSim")
-SaveId = "home_ship_battery"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/Battery"]
-shape = SubResource("BatteryShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/Battery"]
-mesh = SubResource("BatteryMesh")
-surface_material_override/0 = SubResource("BatteryMaterial")
-
-[node name="IndicatorLight" type="OmniLight3D" parent="HomeShip/Battery"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
-light_color = Color(0.95, 0.75, 0.1, 1)
-omni_range = 2.0
-visible = false
-
-[node name="PoweredDeviceIndicator" type="Node" parent="HomeShip/Battery" node_paths=PackedStringArray("ShipSimRef", "IndicatorLight")]
-script = ExtResource("19")
-ShipSimRef = NodePath("../../ShipSim")
-FixtureId = "battery"
-IndicatorLight = NodePath("../IndicatorLight")
-
-[node name="RechargeStation" type="StaticBody3D" parent="HomeShip" unique_id=1419214516 node_paths=PackedStringArray("ShipSimRef")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.5, -2.7)
-script = ExtResource("5")
-ShipSimRef = NodePath("../ShipSim")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/RechargeStation" unique_id=230900116]
-shape = SubResource("RechargeStationShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/RechargeStation" unique_id=92315017]
-mesh = SubResource("RechargeStationMesh")
-surface_material_override/0 = SubResource("RechargeStationMaterial")
 
 [node name="TravelConsole" type="StaticBody3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "StationAirlock", "DerelictAirlock") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 1, -2.7)

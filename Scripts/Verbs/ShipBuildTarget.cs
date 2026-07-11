@@ -53,6 +53,34 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     private static readonly Verb RemoveCeilingVerb = new("remove_ceiling", "VERB_REMOVE_CEILING", DurationSeconds: 0.2f);
 
+    // Battery/Switch/RechargeStation verbs — Install requires holding the machine's own item
+    // (bought from a trade console, or refunded by a prior Uninstall); Uninstall gives that same
+    // item back, Scrap gives partial scrap_metal instead (a real tradeoff, same shape as
+    // DamagedConduitVerbTarget's Repair-vs-Scrap).
+    private static readonly Verb InstallBatteryVerb = new("install_battery", "VERB_INSTALL_BATTERY", DurationSeconds: 0.2f)
+    {
+        Requirements = [new ItemRequirement("battery", 1)],
+    };
+
+    private static readonly Verb UninstallBatteryVerb = new("uninstall_battery", "VERB_UNINSTALL_BATTERY", DurationSeconds: 0.2f);
+    private static readonly Verb ScrapBatteryVerb = new("scrap_battery", "VERB_SCRAP_BATTERY", DurationSeconds: 0.2f);
+
+    private static readonly Verb InstallSwitchVerb = new("install_switch", "VERB_INSTALL_SWITCH", DurationSeconds: 0.2f)
+    {
+        Requirements = [new ItemRequirement("switch", 1)],
+    };
+
+    private static readonly Verb UninstallSwitchVerb = new("uninstall_switch", "VERB_UNINSTALL_SWITCH", DurationSeconds: 0.2f);
+    private static readonly Verb ScrapSwitchVerb = new("scrap_switch", "VERB_SCRAP_SWITCH", DurationSeconds: 0.2f);
+
+    private static readonly Verb InstallRechargeStationVerb = new("install_recharge_station", "VERB_INSTALL_RECHARGE_STATION", DurationSeconds: 0.2f)
+    {
+        Requirements = [new ItemRequirement("recharge_station", 1)],
+    };
+
+    private static readonly Verb UninstallRechargeStationVerb = new("uninstall_recharge_station", "VERB_UNINSTALL_RECHARGE_STATION", DurationSeconds: 0.2f);
+    private static readonly Verb ScrapRechargeStationVerb = new("scrap_recharge_station", "VERB_SCRAP_RECHARGE_STATION", DurationSeconds: 0.2f);
+
     // How close (in meters) the aim point needs to be to a tile boundary before it resolves to
     // that edge instead of the tile itself — half of this margin on each side of every boundary.
     private const float EdgeMargin = 0.25f;
@@ -86,6 +114,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private const float WallToFloorDropHeight = WallCenterHeight - FloorConduitHeight;
     private const float WallMountRoomOffset = 0.15f; // matches WallConduitTransform's own push
 
+    // Each machine's own mount height/room-offset — matched exactly to the old hand-placed
+    // World.tscn transforms (derived against each edge's own wall-boundary position) so the
+    // retrofit doesn't shift anything. Recharge Station sits further into the room since it's a
+    // station you approach, not a flush wall fitting like the other two.
+    private const float BatteryHeight = 1f;
+    private const float BatteryRoomOffset = 0.1f;
+    private const float SwitchHeight = 1f;
+    private const float SwitchRoomOffset = 0.1f;
+    private const float RechargeStationHeight = 0.5f;
+    private const float RechargeStationRoomOffset = 0.3f;
+
     // The 4 cardinal neighbor tiles a floor conduit checks for its connection-aware shape (see
     // BuildFloorConduitVisual) — AlongX says whether that direction's arm needs the 90-degree
     // rotation (ConduitArmMesh is authored long-axis Z, i.e. the north/south direction).
@@ -103,7 +142,18 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     // ship layouts, see ShipSim.cs's own hardcoded grid).
     private static readonly int[] HomeShipDoorwayRows = [2, 3];
 
+    // The Home Ship's default Battery/Switch/RechargeStation edges — matches the old hand-placed
+    // World.tscn positions exactly (see BatteryHeight/etc above). Battery and Switch sit on
+    // Manhattan-adjacent tiles (mounted right next to each other on the same wall) — PowerSystem
+    // already treats directly-adjacent fixtures as touching, no conduit segment needed between
+    // them, same rule the Derelict's fire hazard relies on for its own adjacent pair.
+    private static readonly (CellCoord A, CellCoord B) BatteryEdge = (new CellCoord(4, 0), new CellCoord(4, -1));
+    private static readonly (CellCoord A, CellCoord B) SwitchEdge = (new CellCoord(5, 0), new CellCoord(5, -1));
+    private static readonly (CellCoord A, CellCoord B) RechargeStationEdge = (new CellCoord(9, 0), new CellCoord(9, -1));
+
     private enum AimKind { None, Tile, Ceiling, Edge }
+
+    private enum MachineType { Battery, Switch, RechargeStation }
 
     private enum PendingAction
     {
@@ -117,6 +167,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         RemoveFloor,
         InstallCeiling,
         RemoveCeiling,
+        InstallMachine,
+        UninstallMachine,
+        ScrapMachine,
     }
 
     /// <summary>One tile can carry several conduits at once — one floor-mounted (WallNeighbor
@@ -210,12 +263,50 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     public int ExcludedEdgeColumn { get; set; } = -1;
 
     /// <summary>True only for the Home Ship's Floor — seeds its current boundary/interior wall
-    /// layout as real, player-removable structure once at startup (see
-    /// <see cref="SeedDefaultShipLayout"/>), through the exact same helpers a save replay uses.
-    /// The Derelict/Station keep their own fixed, non-retrofitted geometry — this wasn't asked
-    /// for there, and "already wrecked" fits a fixed shape better than "player-built" does.</summary>
+    /// layout (and, see <see cref="BatteryMesh"/>, its Battery/Switch/RechargeStation) as real,
+    /// player-removable structure once at startup (see <see cref="SeedDefaultShipLayout"/>),
+    /// through the exact same helpers a save replay uses. The Derelict/Station keep their own
+    /// fixed, non-retrofitted geometry — this wasn't asked for there, and "already wrecked" fits
+    /// a fixed shape better than "player-built" does.</summary>
     [Export]
     public bool SeedHomeShipDefaultLayout { get; set; }
+
+    // Battery/Switch/RechargeStation meshes/shapes/materials — only wired on ships that opted
+    // into the machine-construction-part system (currently just the Home Ship), same "null means
+    // skip this feature entirely" pattern PanelMesh already uses for floor/ceiling. Gated behind
+    // BatteryMesh specifically wherever only one flag is needed.
+    [Export]
+    public Mesh? BatteryMesh { get; set; }
+
+    [Export]
+    public Shape3D? BatteryShape { get; set; }
+
+    [Export]
+    public Material? BatteryMaterial { get; set; }
+
+    [Export]
+    public Mesh? SwitchMesh { get; set; }
+
+    [Export]
+    public Shape3D? SwitchShape { get; set; }
+
+    [Export]
+    public Material? SwitchMaterial { get; set; }
+
+    [Export]
+    public Mesh? RechargeStationMesh { get; set; }
+
+    [Export]
+    public Shape3D? RechargeStationShape { get; set; }
+
+    [Export]
+    public Material? RechargeStationMaterial { get; set; }
+
+    /// <summary>The Home Ship's single room light — wired directly to a dynamically spawned
+    /// Switch's own TargetLight, since it's no longer a fixed sibling node the switch's own
+    /// scene declaration can NodePath to.</summary>
+    [Export]
+    public Light3D? RoomLight { get; set; }
 
     [Export]
     public string SaveId { get; set; } = "";
@@ -224,6 +315,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private readonly Dictionary<(CellCoord, CellCoord), (MeshInstance3D Mesh, CollisionShape3D Collision)> _placedWalls = new();
     private readonly Dictionary<CellCoord, MeshInstance3D> _floorPanels = new();
     private readonly Dictionary<CellCoord, MeshInstance3D> _ceilingPanels = new();
+
+    /// <summary>At most one of each <see cref="MachineType"/> at a time, matching ShipSim's own
+    /// singular _battery field and fixed Switch/RechargeFixtureId — installing a second one
+    /// elsewhere isn't offered while one already exists (see ResolveAvailableVerbs).</summary>
+    private readonly Dictionary<MachineType, (CellCoord EdgeA, CellCoord EdgeB, Node3D Node)> _placedMachines = new();
 
     private Timer? _cycleTimer;
     private MeshInstance3D? _ghost;
@@ -241,6 +337,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private Vector2I _pendingTile;
     private CellCoord _pendingEdgeA;
     private CellCoord _pendingEdgeB;
+    private MachineType _pendingMachineType;
     private PlayerInventory? _pendingInventory;
 
     public IReadOnlyList<Verb> AvailableVerbs => ResolveAvailableVerbs();
@@ -330,6 +427,15 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             var b = new CellCoord(6, j);
             ShipSimRef.Deck.SealEdge(a, b);
             SpawnWallSegment(a, b);
+        }
+
+        // Battery/Switch/RechargeStation only exist on ships that opted into the machine-
+        // construction-part system (BatteryMesh wired) — same gate MachineVerbsFor uses.
+        if (BatteryMesh is not null)
+        {
+            InstallBattery(BatteryEdge.A, BatteryEdge.B, savedState: null);
+            InstallSwitch(SwitchEdge.A, SwitchEdge.B, savedState: null);
+            InstallRechargeStation(RechargeStationEdge.A, RechargeStationEdge.B, savedState: null);
         }
     }
 
@@ -481,6 +587,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                     verbs.Add(boundaryConduitVerb);
                 }
 
+                verbs.AddRange(MachineVerbsFor(wallPresent: !breached));
                 return verbs;
             }
 
@@ -495,6 +602,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                     verbs.Add(interiorConduitVerb);
                 }
 
+                verbs.AddRange(MachineVerbsFor(wallPresent: sealed_));
                 return verbs;
             }
 
@@ -520,6 +628,112 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         return wallPresent ? InstallConduitVerb : null;
     }
 
+    private static readonly MachineType[] AllMachineTypes = [MachineType.Battery, MachineType.Switch, MachineType.RechargeStation];
+
+    /// <summary>Same multi-verb-on-one-edge idea as <see cref="EdgeConduitVerb"/> — a machine
+    /// already at this exact edge offers Uninstall/Scrap; an empty, wall-present edge offers
+    /// Install for every machine type not already placed *anywhere* on the ship (at most one of
+    /// each — see <see cref="_placedMachines"/>). Every Install verb is returned regardless of
+    /// what's currently held; IsAffordable (Player.cs) is what actually narrows the visible cycle
+    /// down to whichever one item the player has in hand, same reliance
+    /// StationConsoleVerbTarget's always-present Buy verbs already use. Gated behind BatteryMesh
+    /// so ships that never opted into this system (Derelict/Station) never offer it at all.</summary>
+    private IEnumerable<Verb> MachineVerbsFor(bool wallPresent)
+    {
+        if (BatteryMesh is null || !wallPresent)
+        {
+            yield break;
+        }
+
+        var here = _placedMachines.FirstOrDefault(kv => kv.Value.EdgeA == _edgeA && kv.Value.EdgeB == _edgeB);
+        if (here.Value.Node is not null)
+        {
+            yield return UninstallVerbFor(here.Key);
+            yield return ScrapVerbFor(here.Key);
+            yield break;
+        }
+
+        foreach (var type in AllMachineTypes.Where(t => !_placedMachines.ContainsKey(t)))
+        {
+            yield return InstallVerbFor(type);
+        }
+    }
+
+    private static Verb InstallVerbFor(MachineType type) => type switch
+    {
+        MachineType.Battery => InstallBatteryVerb,
+        MachineType.Switch => InstallSwitchVerb,
+        MachineType.RechargeStation => InstallRechargeStationVerb,
+        _ => throw new System.ArgumentOutOfRangeException(nameof(type)),
+    };
+
+    private static Verb UninstallVerbFor(MachineType type) => type switch
+    {
+        MachineType.Battery => UninstallBatteryVerb,
+        MachineType.Switch => UninstallSwitchVerb,
+        MachineType.RechargeStation => UninstallRechargeStationVerb,
+        _ => throw new System.ArgumentOutOfRangeException(nameof(type)),
+    };
+
+    private static Verb ScrapVerbFor(MachineType type) => type switch
+    {
+        MachineType.Battery => ScrapBatteryVerb,
+        MachineType.Switch => ScrapSwitchVerb,
+        MachineType.RechargeStation => ScrapRechargeStationVerb,
+        _ => throw new System.ArgumentOutOfRangeException(nameof(type)),
+    };
+
+    /// <summary>Which machine type/pending action a machine verb id maps to — Action is null for
+    /// any non-machine verb id, the signal ExecuteVerb/IsMachineVerb use to fall through.</summary>
+    private static (MachineType Type, PendingAction? Action) ResolveMachineVerb(Verb verb)
+    {
+        if (verb.Id == InstallBatteryVerb.Id) return (MachineType.Battery, PendingAction.InstallMachine);
+        if (verb.Id == UninstallBatteryVerb.Id) return (MachineType.Battery, PendingAction.UninstallMachine);
+        if (verb.Id == ScrapBatteryVerb.Id) return (MachineType.Battery, PendingAction.ScrapMachine);
+        if (verb.Id == InstallSwitchVerb.Id) return (MachineType.Switch, PendingAction.InstallMachine);
+        if (verb.Id == UninstallSwitchVerb.Id) return (MachineType.Switch, PendingAction.UninstallMachine);
+        if (verb.Id == ScrapSwitchVerb.Id) return (MachineType.Switch, PendingAction.ScrapMachine);
+        if (verb.Id == InstallRechargeStationVerb.Id) return (MachineType.RechargeStation, PendingAction.InstallMachine);
+        if (verb.Id == UninstallRechargeStationVerb.Id) return (MachineType.RechargeStation, PendingAction.UninstallMachine);
+        if (verb.Id == ScrapRechargeStationVerb.Id) return (MachineType.RechargeStation, PendingAction.ScrapMachine);
+        return (default, null);
+    }
+
+    private static bool IsMachineVerb(Verb verb) => ResolveMachineVerb(verb).Action is not null;
+
+    private void ExecuteMachineVerb(Verb verb, PlayerInventory inventory)
+    {
+        var (type, action) = ResolveMachineVerb(verb);
+        if (action is null)
+        {
+            return;
+        }
+
+        _pendingAction = action.Value;
+        _pendingMachineType = type;
+        _pendingEdgeA = _edgeA;
+        _pendingEdgeB = _edgeB;
+        _pendingInventory = inventory;
+        _cycling = true;
+        _cycleTimer!.Start();
+    }
+
+    private void InstallMachine(MachineType type, CellCoord edgeA, CellCoord edgeB, string? savedState)
+    {
+        switch (type)
+        {
+            case MachineType.Battery:
+                InstallBattery(edgeA, edgeB, savedState);
+                break;
+            case MachineType.Switch:
+                InstallSwitch(edgeA, edgeB, savedState);
+                break;
+            case MachineType.RechargeStation:
+                InstallRechargeStation(edgeA, edgeB, savedState);
+                break;
+        }
+    }
+
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
         if (_cycling)
@@ -530,6 +744,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         if (verb.Id == InstallConduitVerb.Id || verb.Id == RemoveConduitVerb.Id)
         {
             ExecuteConduitVerb(verb, inventory);
+            return;
+        }
+
+        if (IsMachineVerb(verb))
+        {
+            ExecuteMachineVerb(verb, inventory);
             return;
         }
 
@@ -694,6 +914,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 ShipSimRef!.Deck.BreachHull(new CellCoord(_pendingTile.X, _pendingTile.Y), StructuralSurface.Ceiling);
                 RefreshCeilingPanelVisual(_pendingTile);
                 inventory?.Add("wall_panel", 1);
+                break;
+            case PendingAction.InstallMachine:
+                InstallMachine(_pendingMachineType, _pendingEdgeA, _pendingEdgeB, savedState: null);
+                break;
+            case PendingAction.UninstallMachine:
+                RemoveMachine(_pendingMachineType);
+                inventory?.Add(ItemIdFor(_pendingMachineType), 1);
+                break;
+            case PendingAction.ScrapMachine:
+                RemoveMachine(_pendingMachineType);
+                inventory?.Add("scrap_metal", ScrapYieldFor(_pendingMachineType));
                 break;
         }
     }
@@ -964,24 +1195,29 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// matching where the single-slot system used to always place its one conduit.</summary>
     private static float SlotHeight(int slot) => (slot + 0.5f) * WallSlotHeight;
 
-    /// <summary>Same edge position/rotation a wall segment would use, nudged a few centimeters
-    /// off the wall's centerline toward whichever tile the conduit belongs to (reads as mounted on
-    /// that tile's wall face instead of embedded in the wall itself) and raised/lowered to the
-    /// given height slot instead of the wall's fixed center.</summary>
-    private (Vector3 Position, Vector3 RotationDegrees) WallConduitTransform(CellCoord edgeA, CellCoord edgeB, Vector2I nearTile, int slot)
+    /// <summary>Same edge position/rotation a wall segment would use, nudged toward whichever tile
+    /// the mount belongs to (reads as mounted on that tile's wall face instead of embedded in the
+    /// wall itself) and raised/lowered to the given height instead of the wall's fixed center.
+    /// Shared by conduits (height/offset from the slot system) and machines (their own fixed
+    /// per-type height/offset, see BatteryHeight etc.) — the only difference between mounting a
+    /// wire and mounting a battery on the same wall is how far up and how far out it sits.</summary>
+    private (Vector3 Position, Vector3 RotationDegrees) WallMountTransform(CellCoord edgeA, CellCoord edgeB, Vector2I nearTile, float height, float roomOffset)
     {
         var (position, rotationDegrees) = EdgeTransform(edgeA, edgeB);
-        position.Y = SlotHeight(slot);
+        position.Y = height;
 
         var midX = (edgeA.X + edgeB.X) / 2f;
         var midY = (edgeA.Y + edgeB.Y) / 2f;
         var offset = new Vector3(
-            Mathf.Sign(nearTile.X - midX) * WallMountRoomOffset,
+            Mathf.Sign(nearTile.X - midX) * roomOffset,
             0,
-            Mathf.Sign(nearTile.Y - midY) * WallMountRoomOffset);
+            Mathf.Sign(nearTile.Y - midY) * roomOffset);
 
         return (position + offset, rotationDegrees);
     }
+
+    private (Vector3 Position, Vector3 RotationDegrees) WallConduitTransform(CellCoord edgeA, CellCoord edgeB, Vector2I nearTile, int slot) =>
+        WallMountTransform(edgeA, edgeB, nearTile, SlotHeight(slot), WallMountRoomOffset);
 
     private void SpawnWallSegment(CellCoord a, CellCoord b)
     {
@@ -1009,6 +1245,158 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             pair.Collision.QueueFree();
         }
     }
+
+    /// <summary>Builds the Battery's own interactable node (BatteryVerbTarget, mesh, collision,
+    /// plus its charge IndicatorLight — the same child <see cref="PoweredDeviceIndicator"/> setup
+    /// World.tscn used to hand-author), mounts it at the given edge, and registers its fixture
+    /// with ShipSim. <paramref name="savedState"/> (BatteryVerbTarget's own charge-fraction save
+    /// string), if given, is applied directly to the freshly-built instance — no group-scan save
+    /// mechanism is involved, since a dynamically spawned machine is never in the "saveable"
+    /// group (see docs/plan — ShipBuildTarget's own save record owns this instead).</summary>
+    private void InstallBattery(CellCoord edgeA, CellCoord edgeB, string? savedState)
+    {
+        var nearTile = new Vector2I(edgeA.X, edgeA.Y);
+        var (position, rotation) = WallMountTransform(edgeA, edgeB, nearTile, BatteryHeight, BatteryRoomOffset);
+
+        var node = new BatteryVerbTarget { ShipSimRef = ShipSimRef };
+        AddChild(node);
+        node.Position = position;
+        node.RotationDegrees = rotation;
+
+        var mesh = new MeshInstance3D { Mesh = BatteryMesh };
+        mesh.SetSurfaceOverrideMaterial(0, BatteryMaterial);
+        node.AddChild(mesh);
+
+        node.AddChild(new CollisionShape3D { Shape = BatteryShape });
+
+        var indicatorLight = new OmniLight3D
+        {
+            Position = new Vector3(0, 0.6f, 0),
+            LightColor = new Color(0.95f, 0.75f, 0.1f),
+            OmniRange = 2f,
+            Visible = false,
+        };
+        node.AddChild(indicatorLight);
+
+        node.AddChild(new PoweredDeviceIndicator
+        {
+            ShipSimRef = ShipSimRef,
+            FixtureId = ShipSim.BatteryFixtureId,
+            IndicatorLight = indicatorLight,
+        });
+
+        ShipSimRef!.InstallBattery(edgeA, FixtureSurface.WallInner);
+
+        if (savedState is not null)
+        {
+            node.ApplySaveState(savedState);
+        }
+
+        _placedMachines[MachineType.Battery] = (edgeA, edgeB, node);
+    }
+
+    /// <summary>Same shape as <see cref="InstallBattery"/> — RoomLight is wired directly (no
+    /// NodePath, since a dynamically spawned node has no fixed sibling to path to) and
+    /// <paramref name="savedState"/> is the switch's own on/off bool, stringified.</summary>
+    private void InstallSwitch(CellCoord edgeA, CellCoord edgeB, string? savedState)
+    {
+        var nearTile = new Vector2I(edgeA.X, edgeA.Y);
+        var (position, rotation) = WallMountTransform(edgeA, edgeB, nearTile, SwitchHeight, SwitchRoomOffset);
+
+        var node = new ToggleLightVerbTarget { ShipSimRef = ShipSimRef, TargetLight = RoomLight };
+        AddChild(node);
+        node.Position = position;
+        node.RotationDegrees = rotation;
+
+        var mesh = new MeshInstance3D { Mesh = SwitchMesh };
+        mesh.SetSurfaceOverrideMaterial(0, SwitchMaterial);
+        node.AddChild(mesh);
+
+        node.AddChild(new CollisionShape3D { Shape = SwitchShape });
+
+        ShipSimRef!.InstallSwitch(edgeA, FixtureSurface.WallInner);
+
+        if (savedState is not null && bool.TryParse(savedState, out var isOn))
+        {
+            node.ApplySaveState(isOn);
+        }
+
+        _placedMachines[MachineType.Switch] = (edgeA, edgeB, node);
+    }
+
+    /// <summary>Same shape as <see cref="InstallBattery"/>/<see cref="InstallSwitch"/> — the
+    /// Recharge Station has no extra state of its own, so <paramref name="savedState"/> is unused
+    /// (kept for a uniform three-way call signature, see ApplyBuildState/SeedDefaultShipLayout).</summary>
+    private void InstallRechargeStation(CellCoord edgeA, CellCoord edgeB, string? savedState)
+    {
+        var nearTile = new Vector2I(edgeA.X, edgeA.Y);
+        var (position, rotation) = WallMountTransform(edgeA, edgeB, nearTile, RechargeStationHeight, RechargeStationRoomOffset);
+
+        var node = new RechargeStationVerbTarget { ShipSimRef = ShipSimRef };
+        AddChild(node);
+        node.Position = position;
+        node.RotationDegrees = rotation;
+
+        var mesh = new MeshInstance3D { Mesh = RechargeStationMesh };
+        mesh.SetSurfaceOverrideMaterial(0, RechargeStationMaterial);
+        node.AddChild(mesh);
+
+        node.AddChild(new CollisionShape3D { Shape = RechargeStationShape });
+
+        ShipSimRef!.InstallRechargeStation(edgeA, FixtureSurface.WallInner);
+
+        _placedMachines[MachineType.RechargeStation] = (edgeA, edgeB, node);
+    }
+
+    private void RemoveMachine(MachineType type)
+    {
+        if (!_placedMachines.Remove(type, out var placed))
+        {
+            return;
+        }
+
+        placed.Node.QueueFree();
+
+        switch (type)
+        {
+            case MachineType.Battery:
+                ShipSimRef?.RemoveBattery();
+                break;
+            case MachineType.Switch:
+                ShipSimRef?.RemoveSwitch();
+                break;
+            case MachineType.RechargeStation:
+                ShipSimRef?.RemoveRechargeStation();
+                break;
+        }
+    }
+
+    /// <summary>The machine's own extra state to round-trip through a save (battery charge,
+    /// switch on/off) — null for a stateless machine (Recharge Station) or an unrecognized type.</summary>
+    private static string? MachineStateOf(MachineType type, Node3D node) => type switch
+    {
+        MachineType.Battery => ((BatteryVerbTarget)node).GetSaveState(),
+        MachineType.Switch => ((ToggleLightVerbTarget)node).GetSaveState().ToString(),
+        _ => null,
+    };
+
+    private static string ItemIdFor(MachineType type) => type switch
+    {
+        MachineType.Battery => "battery",
+        MachineType.Switch => "switch",
+        MachineType.RechargeStation => "recharge_station",
+        _ => throw new System.ArgumentOutOfRangeException(nameof(type)),
+    };
+
+    // Placeholder/tunable — roughly matches each machine's relative buy price (see
+    // StationConsoleVerbTarget.Prices).
+    private static int ScrapYieldFor(MachineType type) => type switch
+    {
+        MachineType.Battery => 4,
+        MachineType.Switch => 1,
+        MachineType.RechargeStation => 3,
+        _ => 1,
+    };
 
     /// <summary>Ghost shape/position depends on both where you're aiming AND which install verb
     /// is currently highlighted — e.g. "install a conduit" and "build a floor panel" are
@@ -1139,8 +1527,21 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             }
         }
 
+        foreach (var (type, placed) in _placedMachines)
+        {
+            data.Machines.Add(new MachineCoord(ItemIdFor(type), placed.EdgeA.X, placed.EdgeA.Y, placed.EdgeB.X, placed.EdgeB.Y, MachineStateOf(type, placed.Node)));
+        }
+
         return data;
     }
+
+    private static MachineType? MachineTypeFromItemId(string itemId) => itemId switch
+    {
+        "battery" => MachineType.Battery,
+        "switch" => MachineType.Switch,
+        "recharge_station" => MachineType.RechargeStation,
+        _ => null,
+    };
 
     /// <summary>Replays a save's tiles/edges through the same helpers Install/BuildWall use —
     /// already inventory-free at this level (the verb/cost logic lives in ExecuteVerb, never
@@ -1192,6 +1593,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             ShipSimRef!.Deck.BreachHull(new CellCoord(tile.X, tile.Y), StructuralSurface.Ceiling);
             RefreshCeilingPanelVisual(new Vector2I(tile.X, tile.Y));
         }
+
+        foreach (var machine in state.Machines)
+        {
+            if (MachineTypeFromItemId(machine.Type) is not { } type)
+            {
+                GD.PushWarning($"[ShipBuildTarget] Save references unknown machine type '{machine.Type}' — skipping.");
+                continue;
+            }
+
+            InstallMachine(type, new CellCoord(machine.EdgeAX, machine.EdgeAY), new CellCoord(machine.EdgeBX, machine.EdgeBY), machine.State);
+        }
     }
 
     private void ClearAllBuildState()
@@ -1228,6 +1640,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         {
             ShipSimRef?.Deck.BreachHull(cell, StructuralSurface.Ceiling);
             RefreshCeilingPanelVisual(new Vector2I(cell.X, cell.Y));
+        }
+
+        foreach (var type in _placedMachines.Keys.ToList())
+        {
+            RemoveMachine(type);
         }
     }
 }
