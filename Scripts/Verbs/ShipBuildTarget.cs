@@ -60,6 +60,16 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private const float WallCenterHeight = 1.5f;
     private const float FloorConduitHeight = 0.2f;
 
+    // A wall face gets one conduit slot per tile-height's worth of its own height, stacked
+    // vertically — a taller/shorter wall (if WallHeight ever changes) gets more/fewer slots
+    // automatically rather than a hand-picked fixed count. WallHeight matches
+    // WallSegmentShape/WallSegmentMesh's authored Y size (see World.tscn), the same
+    // hand-kept-in-sync convention WallCenterHeight already uses for that same mesh.
+    private const float WallHeight = 3f;
+    private const float TileSize = 1f;
+    private static readonly int WallSlotCount = Mathf.RoundToInt(WallHeight / TileSize);
+    private static readonly float WallSlotHeight = WallHeight / WallSlotCount;
+
     // Match the existing (unsplit, collision-only) FloorShape/CeilingShape colliders' actual
     // top/bottom surfaces exactly, so the panel mesh sits flush with where the player's feet and
     // the ceiling's underside really are, instead of at the conduit's own floating mount height
@@ -110,12 +120,14 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     }
 
     /// <summary>One tile can carry several conduits at once — one floor-mounted (WallNeighbor
-    /// null) plus up to one per bordering wall (WallNeighbor = the cell across that specific
-    /// edge). They're deliberately small boxes rather than one big one, so a busy junction tile
-    /// can hold multiple distinct wire runs (e.g. a corner turn) without them blocking each
-    /// other — Scavengineers.Sim doesn't care: same tile, or a neighbor exactly one tile away,
-    /// both already connect via PowerSystem's adjacency rule regardless of mount surface.</summary>
-    private readonly record struct ConduitSlot(Vector2I Tile, CellCoord? WallNeighbor)
+    /// null) plus up to <see cref="WallSlotCount"/> per bordering wall (WallNeighbor = the cell
+    /// across that specific edge, WallSlot = which height band on that wall face). They're
+    /// deliberately small boxes rather than one big one, so a busy junction tile can hold multiple
+    /// distinct wire runs (e.g. a corner turn, or several stacked by height) without them blocking
+    /// each other — Scavengineers.Sim doesn't care: same tile, or a neighbor exactly one tile away,
+    /// both already connect via PowerSystem's adjacency rule regardless of mount surface or height.
+    /// WallSlot is meaningless (always the default) for a floor-mounted slot.</summary>
+    private readonly record struct ConduitSlot(Vector2I Tile, CellCoord? WallNeighbor, int WallSlot = 0)
     {
         public bool OnWall => WallNeighbor is not null;
     }
@@ -222,6 +234,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private Vector2I _aimedTile;
     private CellCoord _edgeA;
     private CellCoord _edgeB;
+    private int _aimedWallSlot;
 
     private PendingAction _pendingAction;
     private ConduitSlot _pendingSlot;
@@ -382,6 +395,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 _edgeA = near;
                 _edgeB = far;
                 _aimedTile = new Vector2I(near.X, near.Y);
+                _aimedWallSlot = Mathf.Clamp(Mathf.FloorToInt(local.Y / WallSlotHeight), 0, WallSlotCount - 1);
 
                 if (IsExcludedColumn(_edgeA, _edgeB))
                 {
@@ -497,7 +511,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     // afterwards), only fresh installation requires a real wall to exist first.
     private Verb? EdgeConduitVerb(bool wallPresent)
     {
-        var slot = new ConduitSlot(new Vector2I(_edgeA.X, _edgeA.Y), _edgeB);
+        var slot = new ConduitSlot(new Vector2I(_edgeA.X, _edgeA.Y), _edgeB, _aimedWallSlot);
         if (_placedConduits.ContainsKey(slot))
         {
             return RemoveConduitVerb;
@@ -544,7 +558,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         // Tile aim -> floor-mounted at the aimed tile. Edge aim -> wall-mounted at the near-side
         // tile (_edgeA), same slot EdgeConduitVerb already checked to decide Install vs Remove.
         var slot = _aimKind == AimKind.Edge
-            ? new ConduitSlot(new Vector2I(_edgeA.X, _edgeA.Y), _edgeB)
+            ? new ConduitSlot(new Vector2I(_edgeA.X, _edgeA.Y), _edgeB, _aimedWallSlot)
             : new ConduitSlot(_aimedTile, null);
 
         var alreadyPlaced = _placedConduits.ContainsKey(slot);
@@ -816,7 +830,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
         var container = new Node3D();
         AddChild(container);
-        var (position, loneRotation) = WallConduitTransform(edgeA, wallNeighbor, tile);
+        var (position, loneRotation) = WallConduitTransform(edgeA, wallNeighbor, tile, slot.WallSlot);
         container.Position = position;
 
         var directionToWall = new Vector2I(wallNeighbor.X - tile.X, wallNeighbor.Y - tile.Y);
@@ -830,7 +844,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         {
             var neighborTile = tile + offset;
             var neighborWallNeighbor = new CellCoord(neighborTile.X + directionToWall.X, neighborTile.Y + directionToWall.Y);
-            if (!_placedConduits.ContainsKey(new ConduitSlot(neighborTile, neighborWallNeighbor)))
+            // Same height slot only — a run only reads as continuous between wires mounted at the
+            // same band on adjacent wall tiles, not just anything else on that wall.
+            if (!_placedConduits.ContainsKey(new ConduitSlot(neighborTile, neighborWallNeighbor, slot.WallSlot)))
             {
                 continue;
             }
@@ -928,7 +944,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             {
                 var neighborTile = slot.Tile + offset;
                 var neighborWallNeighbor = new CellCoord(neighborTile.X + direction.X, neighborTile.Y + direction.Y);
-                RefreshWallConduitVisual(new ConduitSlot(neighborTile, neighborWallNeighbor));
+                RefreshWallConduitVisual(new ConduitSlot(neighborTile, neighborWallNeighbor, slot.WallSlot));
             }
         }
 
@@ -942,12 +958,20 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
     }
 
+    /// <summary>The world/local height of a wall conduit's given height slot, 0-indexed bottom to
+    /// top — slot count is derived from <see cref="WallHeight"/>, not fixed, so this stays correct
+    /// if that ever changes. Slot 1 of today's 3 lands exactly on <see cref="WallCenterHeight"/>,
+    /// matching where the single-slot system used to always place its one conduit.</summary>
+    private static float SlotHeight(int slot) => (slot + 0.5f) * WallSlotHeight;
+
     /// <summary>Same edge position/rotation a wall segment would use, nudged a few centimeters
-    /// off the wall's centerline toward whichever tile the conduit belongs to — reads as
-    /// mounted on that tile's wall face instead of embedded in the wall itself.</summary>
-    private (Vector3 Position, Vector3 RotationDegrees) WallConduitTransform(CellCoord edgeA, CellCoord edgeB, Vector2I nearTile)
+    /// off the wall's centerline toward whichever tile the conduit belongs to (reads as mounted on
+    /// that tile's wall face instead of embedded in the wall itself) and raised/lowered to the
+    /// given height slot instead of the wall's fixed center.</summary>
+    private (Vector3 Position, Vector3 RotationDegrees) WallConduitTransform(CellCoord edgeA, CellCoord edgeB, Vector2I nearTile, int slot)
     {
         var (position, rotationDegrees) = EdgeTransform(edgeA, edgeB);
+        position.Y = SlotHeight(slot);
 
         var midX = (edgeA.X + edgeB.X) / 2f;
         var midY = (edgeA.Y + edgeB.Y) / 2f;
@@ -1029,7 +1053,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             {
                 _ghost!.Visible = true;
                 _ghost.Mesh = WallConduitMesh;
-                var (position, rotationDegrees) = WallConduitTransform(_edgeA, _edgeB, new Vector2I(_edgeA.X, _edgeA.Y));
+                var (position, rotationDegrees) = WallConduitTransform(_edgeA, _edgeB, new Vector2I(_edgeA.X, _edgeA.Y), _aimedWallSlot);
                 _ghost.Position = position;
                 _ghost.RotationDegrees = rotationDegrees;
                 break;
@@ -1075,7 +1099,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     }
 
     private static string ConduitFixtureId(ConduitSlot slot) => slot.WallNeighbor is { } neighbor
-        ? $"player_conduit_{slot.Tile.X}_{slot.Tile.Y}_wall_{neighbor.X}_{neighbor.Y}"
+        ? $"player_conduit_{slot.Tile.X}_{slot.Tile.Y}_wall_{neighbor.X}_{neighbor.Y}_slot{slot.WallSlot}"
         : $"player_conduit_{slot.Tile.X}_{slot.Tile.Y}_floor";
 
     public BuildTargetSaveData CaptureBuildState()
@@ -1086,7 +1110,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         {
             if (slot.WallNeighbor is { } neighbor)
             {
-                data.WallConduits.Add(new WallConduitCoord(slot.Tile.X, slot.Tile.Y, neighbor.X, neighbor.Y));
+                data.WallConduits.Add(new WallConduitCoord(slot.Tile.X, slot.Tile.Y, neighbor.X, neighbor.Y, slot.WallSlot));
             }
             else
             {
@@ -1137,7 +1161,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         {
             var tile = new Vector2I(wallConduit.TileX, wallConduit.TileY);
             var neighbor = new CellCoord(wallConduit.NeighborX, wallConduit.NeighborY);
-            InstallConduit(new ConduitSlot(tile, neighbor));
+            InstallConduit(new ConduitSlot(tile, neighbor, wallConduit.Slot));
         }
 
         foreach (var edge in state.Walls)
