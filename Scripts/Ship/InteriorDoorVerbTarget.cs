@@ -23,6 +23,9 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
     private static readonly Verb OpenVerb = new("open_door", "VERB_OPEN_DOOR", DurationSeconds: 0.2f);
     private static readonly Verb CloseVerb = new("close_door", "VERB_CLOSE_DOOR", DurationSeconds: 0.2f);
 
+    // Placeholder/tunable, matching SuitResources's drain-constant convention.
+    private const float BatteryDrainPerSecond = 0.03f;
+
     // The room-1/room-2 doorway is always these 4 tiles, per ShipSim's fixed grid (Room 1 =
     // i 0-5, Room 2 = i 6-11, doorway at j=2,3).
     private static readonly (CellCoord A, CellCoord B) Edge1 = (new CellCoord(5, 2), new CellCoord(6, 2));
@@ -51,7 +54,10 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
 
     public bool IsOpen => _isOpen;
 
-    public IReadOnlyList<Verb> AvailableVerbs => [IsOpen ? CloseVerb : OpenVerb];
+    public IReadOnlyList<Verb> AvailableVerbs =>
+        ShipSimRef is not null && ShipSimRef.IsPowered(ShipSim.InteriorDoorFixtureId)
+            ? [IsOpen ? CloseVerb : OpenVerb]
+            : [];
 
     public string? DisplayNameKey => "OBJECT_DOOR";
 
@@ -75,6 +81,14 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
         if (SlabCollision is not null)
         {
             SlabCollision.Disabled = _isOpen;
+        }
+    }
+
+    public override void _PhysicsProcess(double delta)
+    {
+        if (_cycling)
+        {
+            ShipSimRef?.DrainBattery(BatteryDrainPerSecond * (float)delta);
         }
     }
 

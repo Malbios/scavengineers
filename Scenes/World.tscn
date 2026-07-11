@@ -447,9 +447,10 @@ shape = SubResource("RechargeStationShape")
 mesh = SubResource("RechargeStationMesh")
 surface_material_override/0 = SubResource("RechargeStationMaterial")
 
-[node name="TravelConsole" type="StaticBody3D" parent="HomeShip" node_paths=PackedStringArray("StationAirlock", "DerelictAirlock") groups=["saveable"]]
+[node name="TravelConsole" type="StaticBody3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "StationAirlock", "DerelictAirlock") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 1, -2.7)
 script = ExtResource("21")
+ShipSimRef = NodePath("../ShipSim")
 StationAirlock = NodePath("../../StationAirlock")
 DerelictAirlock = NodePath("../../DerelictAirlock")
 SaveId = "travel_console"
@@ -809,6 +810,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 1.5, -0.8)
 script = ExtResource("15")
 ShipARef = NodePath("../HomeShip/ShipSim")
 ShipBRef = NodePath("../Derelict/ShipSim")
+PowerFixtureId = "derelict_airlock_power"
 TileA = Vector2i(11, 2)
 TileB = Vector2i(0, 2)
 SlabMesh = NodePath("SlabMesh")
@@ -981,6 +983,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 1.5, -0.8)
 script = ExtResource("15")
 ShipARef = NodePath("../HomeShip/ShipSim")
 ShipBRef = NodePath("../Station/ShipSim")
+PowerFixtureId = "station_airlock_power"
 TileA = Vector2i(0, 2)
 TileB = Vector2i(11, 2)
 SlabMesh = NodePath("SlabMesh")

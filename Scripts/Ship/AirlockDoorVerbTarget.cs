@@ -30,11 +30,21 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     private static readonly Verb OpenVerb = new("open_airlock", "VERB_OPEN_AIRLOCK", DurationSeconds: 0.2f);
     private static readonly Verb CloseVerb = new("close_airlock", "VERB_CLOSE_AIRLOCK", DurationSeconds: 0.2f);
 
+    // Placeholder/tunable, matching SuitResources's drain-constant convention.
+    private const float BatteryDrainPerSecond = 0.05f;
+
     [Export]
     public ShipSim? ShipARef { get; set; }
 
     [Export]
     public ShipSim? ShipBRef { get; set; }
+
+    /// <summary>Which of ShipARef's power fixtures this specific airlock instance is wired to —
+    /// distinct per instance (the Station and Derelict airlocks share this one script). Always
+    /// checked against ShipARef, since that's the Home Ship for both — ShipBRef (Station/
+    /// Derelict) never has a battery of its own.</summary>
+    [Export]
+    public string PowerFixtureId { get; set; } = "";
 
     /// <summary>Which tile on each ship's grid the airlock connects at — the tile nearest the
     /// corridor on that ship's side (now that each ship is a real grid, not a single cell).</summary>
@@ -88,7 +98,10 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
 
     public bool IsOpen => _isOpen;
 
-    public IReadOnlyList<Verb> AvailableVerbs => _bridge is null ? [] : [IsOpen ? CloseVerb : OpenVerb];
+    public IReadOnlyList<Verb> AvailableVerbs =>
+        _bridge is null || ShipARef is null || !ShipARef.IsPowered(PowerFixtureId)
+            ? []
+            : [IsOpen ? CloseVerb : OpenVerb];
 
     public string? DisplayNameKey => "OBJECT_AIRLOCK";
 
@@ -111,7 +124,15 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
         _doorMaterial = SlabMesh?.GetSurfaceOverrideMaterial(0);
     }
 
-    public override void _PhysicsProcess(double delta) => _bridge?.Tick(delta);
+    public override void _PhysicsProcess(double delta)
+    {
+        _bridge?.Tick(delta);
+
+        if (_cycling)
+        {
+            ShipARef?.DrainBattery(BatteryDrainPerSecond * (float)delta);
+        }
+    }
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {

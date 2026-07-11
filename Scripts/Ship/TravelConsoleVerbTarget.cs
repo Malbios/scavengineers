@@ -22,6 +22,12 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     // Placeholder/tunable — dropped to near-instant for testing, was 4s for "a real beat."
     private static readonly Verb TravelVerb = new("travel", "VERB_TRAVEL", DurationSeconds: 0.2f);
 
+    // Placeholder/tunable, matching SuitResources's drain-constant convention.
+    private const float BatteryDrainPerSecond = 0.05f;
+
+    [Export]
+    public ShipSim? ShipSimRef { get; set; }
+
     [Export]
     public AirlockDoorVerbTarget? StationAirlock { get; set; }
 
@@ -35,7 +41,8 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     private bool _traveling;
     private Location _currentLocation = Location.Station;
 
-    public IReadOnlyList<Verb> AvailableVerbs { get; } = [TravelVerb];
+    public IReadOnlyList<Verb> AvailableVerbs =>
+        ShipSimRef is not null && ShipSimRef.IsPowered(ShipSim.TravelConsoleFixtureId) ? [TravelVerb] : [];
 
     public string? DisplayNameKey => "OBJECT_SHIP_CONSOLE";
 
@@ -52,6 +59,14 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         // tree that haven't built their Deck yet at this exact point in _Ready() order (see
         // ShipSim's own deferred vacuum seeding for the same reason).
         CallDeferred(nameof(ApplyLocationToAirlocks));
+    }
+
+    public override void _PhysicsProcess(double delta)
+    {
+        if (_traveling)
+        {
+            ShipSimRef?.DrainBattery(BatteryDrainPerSecond * (float)delta);
+        }
     }
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
