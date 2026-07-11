@@ -24,6 +24,12 @@ public partial class ToggleLightVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     [Export]
     public ShipSim? ShipSimRef { get; set; }
 
+    /// <summary>Set by ShipBuildTarget when it spawns this instance — see BatteryVerbTarget's own
+    /// BuildTarget for why this is needed (Uninstall/Scrap reachable while aiming at the switch's
+    /// own box, not just bare wall space next to it).</summary>
+    [Export]
+    public ShipBuildTarget? BuildTarget { get; set; }
+
     [Export]
     public string SaveId { get; set; } = "";
 
@@ -32,7 +38,8 @@ public partial class ToggleLightVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     // this change, for a switch that's still adjacent enough to the battery not to need a wire.
     private bool _switchOn = true;
 
-    public IReadOnlyList<Verb> AvailableVerbs { get; } = [ToggleVerb];
+    public IReadOnlyList<Verb> AvailableVerbs =>
+        [ToggleVerb, .. BuildTarget?.MachineRemovalVerbs(ShipBuildTarget.MachineType.Switch) ?? []];
 
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 
@@ -42,14 +49,15 @@ public partial class ToggleLightVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
-        if (verb.Id != ToggleVerb.Id)
+        if (verb.Id == ToggleVerb.Id)
         {
+            _switchOn = !_switchOn;
+            ShipSimRef?.SetSwitchOpen(!_switchOn);
+            UpdateLightVisibility();
             return;
         }
 
-        _switchOn = !_switchOn;
-        ShipSimRef?.SetSwitchOpen(!_switchOn);
-        UpdateLightVisibility();
+        BuildTarget?.ExecuteMachineRemoval(ShipBuildTarget.MachineType.Switch, verb, inventory);
     }
 
     public void CancelVerb()

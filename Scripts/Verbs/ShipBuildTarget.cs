@@ -153,7 +153,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     private enum AimKind { None, Tile, Ceiling, Edge }
 
-    private enum MachineType { Battery, Switch, RechargeStation }
+    // Internal, not private: BatteryVerbTarget/ToggleLightVerbTarget/RechargeStationVerbTarget
+    // (own scripts, own collider) reference it to ask for their own removal verbs — see
+    // MachineRemovalVerbs/ExecuteMachineRemoval below.
+    internal enum MachineType { Battery, Switch, RechargeStation }
 
     private enum PendingAction
     {
@@ -718,6 +721,50 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         _cycleTimer!.Start();
     }
 
+    /// <summary>Uninstall/Scrap for an already-installed machine, exposed so its own VerbTarget
+    /// script (BatteryVerbTarget etc.) can merge them into its own AvailableVerbs — aiming
+    /// directly at the machine's own box hits *its* collider, not this edge, so without this it
+    /// has no way to offer removal at all alongside its native verb (Recharge/Toggle/...).
+    /// Empty if that type isn't currently installed (shouldn't happen — a machine only ever asks
+    /// about its own type while it exists — but a defensive empty list beats a throw).</summary>
+    internal IReadOnlyList<Verb> MachineRemovalVerbs(MachineType type) =>
+        _placedMachines.ContainsKey(type) ? [UninstallVerbFor(type), ScrapVerbFor(type)] : [];
+
+    /// <summary>Counterpart to <see cref="MachineRemovalVerbs"/> — a machine's own ExecuteVerb
+    /// delegates here for any verb id it doesn't recognize as its own. Looks the edge up from
+    /// _placedMachines directly rather than this body's own _edgeA/_edgeB (which reflect whatever
+    /// *this* target was last aimed at, not necessarily this machine — the player is aiming at
+    /// the machine's own collider when this runs, not this one's).</summary>
+    internal void ExecuteMachineRemoval(MachineType type, Verb verb, PlayerInventory inventory)
+    {
+        if (_cycling || !_placedMachines.TryGetValue(type, out var placed))
+        {
+            return;
+        }
+
+        PendingAction action;
+        if (verb.Id == UninstallVerbFor(type).Id)
+        {
+            action = PendingAction.UninstallMachine;
+        }
+        else if (verb.Id == ScrapVerbFor(type).Id)
+        {
+            action = PendingAction.ScrapMachine;
+        }
+        else
+        {
+            return;
+        }
+
+        _pendingAction = action;
+        _pendingMachineType = type;
+        _pendingEdgeA = placed.EdgeA;
+        _pendingEdgeB = placed.EdgeB;
+        _pendingInventory = inventory;
+        _cycling = true;
+        _cycleTimer!.Start();
+    }
+
     private void InstallMachine(MachineType type, CellCoord edgeA, CellCoord edgeB, string? savedState)
     {
         switch (type)
@@ -1258,7 +1305,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         var nearTile = new Vector2I(edgeA.X, edgeA.Y);
         var (position, rotation) = WallMountTransform(edgeA, edgeB, nearTile, BatteryHeight, BatteryRoomOffset);
 
-        var node = new BatteryVerbTarget { ShipSimRef = ShipSimRef };
+        var node = new BatteryVerbTarget { ShipSimRef = ShipSimRef, BuildTarget = this };
         AddChild(node);
         node.Position = position;
         node.RotationDegrees = rotation;
@@ -1303,7 +1350,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         var nearTile = new Vector2I(edgeA.X, edgeA.Y);
         var (position, rotation) = WallMountTransform(edgeA, edgeB, nearTile, SwitchHeight, SwitchRoomOffset);
 
-        var node = new ToggleLightVerbTarget { ShipSimRef = ShipSimRef, TargetLight = RoomLight };
+        var node = new ToggleLightVerbTarget { ShipSimRef = ShipSimRef, TargetLight = RoomLight, BuildTarget = this };
         AddChild(node);
         node.Position = position;
         node.RotationDegrees = rotation;
@@ -1332,7 +1379,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         var nearTile = new Vector2I(edgeA.X, edgeA.Y);
         var (position, rotation) = WallMountTransform(edgeA, edgeB, nearTile, RechargeStationHeight, RechargeStationRoomOffset);
 
-        var node = new RechargeStationVerbTarget { ShipSimRef = ShipSimRef };
+        var node = new RechargeStationVerbTarget { ShipSimRef = ShipSimRef, BuildTarget = this };
         AddChild(node);
         node.Position = position;
         node.RotationDegrees = rotation;

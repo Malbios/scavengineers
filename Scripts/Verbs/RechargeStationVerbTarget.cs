@@ -18,10 +18,18 @@ public partial class RechargeStationVerbTarget : StaticBody3D, IVerbTarget
     [Export]
     public ShipSim? ShipSimRef { get; set; }
 
+    /// <summary>Set by ShipBuildTarget when it spawns this instance — see BatteryVerbTarget's own
+    /// BuildTarget for why this is needed (Uninstall/Scrap reachable while aiming at the station's
+    /// own box, not just bare wall space next to it — including while it's unpowered, since
+    /// Recharge alone would otherwise vanish entirely and leave nothing to aim at).</summary>
+    [Export]
+    public ShipBuildTarget? BuildTarget { get; set; }
+
     public IReadOnlyList<Verb> AvailableVerbs =>
-        ShipSimRef is not null && ShipSimRef.IsPowered(ShipSim.RechargeFixtureId)
-            ? [RechargeVerb]
-            : [];
+        [
+            .. ShipSimRef is not null && ShipSimRef.IsPowered(ShipSim.RechargeFixtureId) ? new[] { RechargeVerb } : [],
+            .. BuildTarget?.MachineRemovalVerbs(ShipBuildTarget.MachineType.RechargeStation) ?? [],
+        ];
 
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 
@@ -29,15 +37,17 @@ public partial class RechargeStationVerbTarget : StaticBody3D, IVerbTarget
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
-        if (verb.Id != RechargeVerb.Id)
+        if (verb.Id == RechargeVerb.Id)
         {
+            if (GetTree().GetFirstNodeInGroup("player") is PlayerScript player)
+            {
+                player.RefillSuitResources();
+            }
+
             return;
         }
 
-        if (GetTree().GetFirstNodeInGroup("player") is PlayerScript player)
-        {
-            player.RefillSuitResources();
-        }
+        BuildTarget?.ExecuteMachineRemoval(ShipBuildTarget.MachineType.RechargeStation, verb, inventory);
     }
 
     public void CancelVerb()

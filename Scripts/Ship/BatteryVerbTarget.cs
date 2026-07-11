@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Godot;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
@@ -24,6 +25,13 @@ public partial class BatteryVerbTarget : StaticBody3D, IVerbTarget, IStateSaveab
     [Export]
     public ShipSim? ShipSimRef { get; set; }
 
+    /// <summary>Set by ShipBuildTarget when it spawns this instance — this is how Uninstall/Scrap
+    /// (owned by ShipBuildTarget, since installing/removing a machine is really a wall-mount
+    /// action) reach the player while aiming directly at the battery's own box, not just at bare
+    /// wall space next to it.</summary>
+    [Export]
+    public ShipBuildTarget? BuildTarget { get; set; }
+
     [Export]
     public string SaveId { get; set; } = "";
 
@@ -32,20 +40,24 @@ public partial class BatteryVerbTarget : StaticBody3D, IVerbTarget, IStateSaveab
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 
     // Hidden once already full — mirrors SellVerbs only showing while there's something to
-    // sell, rather than always offering a no-op top-off.
+    // sell, rather than always offering a no-op top-off. Uninstall/Scrap always tag along
+    // regardless of charge — you can remove a full battery just as easily as an empty one.
     public IReadOnlyList<Verb> AvailableVerbs =>
-        ShipSimRef is not null && ShipSimRef.BatteryChargeFraction < 1f
-            ? [RechargeVerb with { DisplaySuffix = $"{ShipSimRef.BatteryChargeFraction * 100:F0}%" }]
-            : [];
+        (ShipSimRef is not null && ShipSimRef.BatteryChargeFraction < 1f
+            ? new List<Verb> { RechargeVerb with { DisplaySuffix = $"{ShipSimRef.BatteryChargeFraction * 100:F0}%" } }
+            : [])
+        .Concat(BuildTarget?.MachineRemovalVerbs(ShipBuildTarget.MachineType.Battery) ?? [])
+        .ToList();
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
-        if (verb.Id != RechargeVerb.Id)
+        if (verb.Id == RechargeVerb.Id)
         {
+            ShipSimRef?.RechargeBattery(ShipSim.PowerCellRechargeAmount);
             return;
         }
 
-        ShipSimRef?.RechargeBattery(ShipSim.PowerCellRechargeAmount);
+        BuildTarget?.ExecuteMachineRemoval(ShipBuildTarget.MachineType.Battery, verb, inventory);
     }
 
     public void CancelVerb()
