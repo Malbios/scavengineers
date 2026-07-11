@@ -337,6 +337,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
         _aimedTile = new Vector2I(i, j);
 
+        // The aimed tile itself must be a real cell — once a wall is gone the player can stand
+        // in the gap and aim past the ship's own footprint, and (i, j) here becomes e.g. (1, -1).
+        // Every downstream verb (floor/ceiling/wall breach) trusts this tile blindly, so refusing
+        // to resolve to Tile/Edge at all here is the one place that has to catch it.
+        if (ShipSimRef is null || !ShipSimRef.Deck.Cells.Contains(new CellCoord(i, j)))
+        {
+            _aimKind = AimKind.None;
+            UpdateGhostTransform();
+            return;
+        }
+
         if (Mathf.Min(distX, distZ) < EdgeMargin)
         {
             _aimKind = AimKind.Edge;
@@ -373,8 +384,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     public void SetCeilingAimPoint(Vector3 worldPoint)
     {
         var local = (ShipRoot ?? GetParent<Node3D>()).ToLocal(worldPoint);
-        _aimedTile = new Vector2I(Mathf.FloorToInt(local.X + 3), Mathf.FloorToInt(local.Z + 3));
-        _aimKind = AimKind.Ceiling;
+        var tile = new CellCoord(Mathf.FloorToInt(local.X + 3), Mathf.FloorToInt(local.Z + 3));
+        _aimedTile = new Vector2I(tile.X, tile.Y);
+        _aimKind = ShipSimRef is not null && ShipSimRef.Deck.Cells.Contains(tile) ? AimKind.Ceiling : AimKind.None;
         UpdateGhostTransform();
     }
 

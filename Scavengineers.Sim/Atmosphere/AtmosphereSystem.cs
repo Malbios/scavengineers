@@ -39,7 +39,10 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
         {
             foreach (var breached in _deck.HullBreaches)
             {
-                yield return new AtmosphereNode(breached);
+                if (_deck.Cells.Contains(breached))
+                {
+                    yield return new AtmosphereNode(breached);
+                }
             }
             yield break;
         }
