@@ -59,12 +59,14 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -100.0
+offset_left = 0.0
 offset_top = -35.0
-offset_right = 100.0
+offset_right = 0.0
 offset_bottom = -13.0
+grow_horizontal = 2
 theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 1)
 theme_override_font_sizes/font_size = 13
+theme_override_styles/normal = SubResource("HudLabelBackground")
 horizontal_alignment = 1
 
 [node name="VerbLabel" type="Label" parent="HUD" unique_id=143274282]
@@ -74,10 +76,12 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -100.0
+offset_left = 0.0
 offset_top = 12.0
-offset_right = 100.0
+offset_right = 0.0
 offset_bottom = 36.0
+grow_horizontal = 2
+theme_override_styles/normal = SubResource("HudLabelBackground")
 horizontal_alignment = 1
 
 [node name="VerbProgressBar" type="ProgressBar" parent="HUD" unique_id=1093955890]
@@ -97,14 +101,12 @@ show_percentage = false
 [node name="InventoryLabel" type="Label" parent="HUD" unique_id=1011568172]
 offset_left = 16.0
 offset_top = 16.0
-offset_right = 216.0
-offset_bottom = 96.0
+theme_override_styles/normal = SubResource("HudLabelBackground")
 
 [node name="HeldItemLabel" type="Label" parent="HUD"]
 offset_left = 16.0
 offset_top = 100.0
-offset_right = 216.0
-offset_bottom = 124.0
+theme_override_styles/normal = SubResource("HudLabelBackground")
 
 [node name="CreditsLabel" type="Label" parent="HUD"]
 offset_left = 16.0
@@ -124,24 +126,32 @@ mouse_filter = 2
 
 [node name="O2Label" type="Label" parent="HUD/ResourcesPanel" unique_id=1009985224]
 layout_mode = 2
+size_flags_horizontal = 0
+theme_override_styles/normal = SubResource("HudLabelBackground")
 text = "O2"
 
 [node name="O2Bar" type="ProgressBar" parent="HUD/ResourcesPanel" unique_id=1829003878]
 custom_minimum_size = Vector2(0, 16)
 layout_mode = 2
+theme_override_styles/background = SubResource("HudLabelBackground")
 value = 100.0
 show_percentage = false
 
 [node name="PowerLabel" type="Label" parent="HUD/ResourcesPanel" unique_id=1180030098]
 layout_mode = 2
+size_flags_horizontal = 0
+theme_override_styles/normal = SubResource("HudLabelBackground")
 text = "PWR"
 
 [node name="PowerBar" type="ProgressBar" parent="HUD/ResourcesPanel" unique_id=1991756466]
 custom_minimum_size = Vector2(0, 16)
 layout_mode = 2
+theme_override_styles/background = SubResource("HudLabelBackground")
 value = 100.0
 show_percentage = false
 
 [node name="RoomO2Label" type="Label" parent="HUD/ResourcesPanel" unique_id=1699853416]
 visible = false
 layout_mode = 2
+size_flags_horizontal = 0
+theme_override_styles/normal = SubResource("HudLabelBackground")

@@ -460,7 +460,7 @@ public partial class Player : CharacterBody3D
 
         if (_inventory.Counts.Count == 0)
         {
-            _inventoryLabel!.Text = "";
+            _inventoryLabel!.Visible = false;
             return;
         }
 
@@ -471,5 +471,6 @@ public partial class Player : CharacterBody3D
         }
 
         _inventoryLabel!.Text = string.Join("\n", lines);
+        _inventoryLabel.Visible = true;
     }
 }
