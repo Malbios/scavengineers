@@ -555,8 +555,14 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         UpdateGhostTransform();
     }
 
+    // Only the two doorway edges (matching HomeShipDoorwayRows) are InteriorDoorVerbTarget's to
+    // own — the rest of this column is a real, solid wall (MidWallA/B) that this generic tool
+    // must still manage, same as any other interior wall. Checking a.Y (== b.Y for this edge
+    // shape, a column boundary between same-row cells) previously wasn't done at all, which
+    // excluded the *entire* column from wall/conduit targeting, not just its two doorway rows.
     private bool IsExcludedColumn(CellCoord a, CellCoord b) =>
         ExcludedEdgeColumn >= 0 &&
+        HomeShipDoorwayRows.Contains(a.Y) &&
         ((a.X == ExcludedEdgeColumn - 1 && b.X == ExcludedEdgeColumn) ||
          (b.X == ExcludedEdgeColumn - 1 && a.X == ExcludedEdgeColumn));
 
