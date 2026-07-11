@@ -28,6 +28,9 @@ VERB_SCRAP,Scrap,Verschrotten
 VERB_BUY_SCRAP_METAL,Buy Scrap Metal,Schrott kaufen
 VERB_BUY_SPARE_PARTS,Buy Spare Parts,Ersatzteile kaufen
 VERB_BUY_WALL_PANEL,Buy Wall Panel,Wandpaneel kaufen
-VERB_SELL,Sell All,Alles verkaufen
+VERB_SELL_SCRAP_METAL,Sell Scrap Metal,Schrott verkaufen
+VERB_SELL_SPARE_PARTS,Sell Spare Parts,Ersatzteile verkaufen
+VERB_SELL_WALL_PANEL,Sell Wall Panel,Wandpaneel verkaufen
 OBJECT_SHIP_CONSOLE,Ship Console,Schiffskonsole
 OBJECT_TRADE_CONSOLE,Trade Console,Handelskonsole
+HUD_CREDITS,Credits,Credits

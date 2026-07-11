@@ -8,19 +8,35 @@ using PlayerScript = Scavengineers.Scripts.Player.Player;
 namespace Scavengineers.Scripts.Ship;
 
 /// <summary>
-/// A stub trade console — no economy yet, just item sinks/sources so the "return with loot"
-/// beat has somewhere to go. One Buy verb per item in <see cref="PlayerScript.HotbarItems"/>
+/// The Station's trade console. One Buy verb per item in <see cref="PlayerScript.HotbarItems"/>
 /// (cycled via the same scroll-wheel verb selection every multi-verb target already uses, e.g.
-/// DamagedConduitVerbTarget's Repair/Scrap), each granting 1 of that item for free. Sell empties
-/// the whole inventory. Neither costs/grants currency yet.
+/// DamagedConduitVerbTarget's Repair/Scrap), shown only while affordable and spending credits;
+/// one Sell verb per item you actually hold, granting credits for 1 unit at a time rather than
+/// dumping the whole inventory at once. Buy is always pricier than Sell so there's no trivial
+/// buy-then-sell arbitrage loop.
 /// </summary>
 public partial class StationConsoleVerbTarget : StaticBody3D, IVerbTarget
 {
+    private static readonly Dictionary<string, (int Buy, int Sell)> Prices = new()
+    {
+        ["scrap_metal"] = (5, 2),
+        ["spare_parts"] = (15, 6),
+        ["wall_panel"] = (10, 4),
+    };
+
     private static readonly IReadOnlyList<Verb> BuyVerbs = PlayerScript.HotbarItems
-        .Select(itemId => new Verb($"buy_{itemId}", $"VERB_BUY_{itemId.ToUpperInvariant()}", DurationSeconds: 0f))
+        .Select(itemId => new Verb($"buy_{itemId}", $"VERB_BUY_{itemId.ToUpperInvariant()}", DurationSeconds: 0f)
+        {
+            DisplaySuffix = $"{Prices[itemId].Buy}cr",
+        })
         .ToList();
 
-    private static readonly Verb SellVerb = new("sell", "VERB_SELL", DurationSeconds: 0f);
+    private static readonly IReadOnlyList<Verb> SellVerbs = PlayerScript.HotbarItems
+        .Select(itemId => new Verb($"sell_{itemId}", $"VERB_SELL_{itemId.ToUpperInvariant()}", DurationSeconds: 0f)
+        {
+            DisplaySuffix = $"{Prices[itemId].Sell}cr",
+        })
+        .ToList();
 
     public string? DisplayNameKey => "OBJECT_TRADE_CONSOLE";
 
@@ -30,12 +46,18 @@ public partial class StationConsoleVerbTarget : StaticBody3D, IVerbTarget
     {
         get
         {
-            var verbs = new List<Verb>(BuyVerbs);
-
-            if (GetPlayer() is { Inventory.Counts.Count: > 0 })
+            var player = GetPlayer();
+            if (player is null)
             {
-                verbs.Add(SellVerb);
+                return [];
             }
+
+            var verbs = new List<Verb>();
+
+            // Buy always shows, even unaffordable — Disabled (rendered red by Player's HUD)
+            // signals "not possible right now" instead of hiding the option entirely.
+            verbs.AddRange(BuyVerbs.Select(v => v with { Disabled = player.Credits < Prices[ItemIdOf(v)].Buy }));
+            verbs.AddRange(SellVerbs.Where(v => player.Inventory.Has(ItemIdOf(v), 1)));
 
             return verbs;
         }
@@ -43,21 +65,38 @@ public partial class StationConsoleVerbTarget : StaticBody3D, IVerbTarget
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
-        if (verb.Id == SellVerb.Id)
+        var player = GetPlayer();
+        if (player is null)
         {
-            inventory.Clear();
             return;
         }
 
-        if (BuyVerbs.FirstOrDefault(v => v.Id == verb.Id) is { } buyVerb)
+        if (SellVerbs.Any(v => v.Id == verb.Id))
         {
-            inventory.Add(buyVerb.Id["buy_".Length..], 1);
+            var itemId = ItemIdOf(verb);
+            if (inventory.TryRemove(itemId, 1))
+            {
+                player.AddCredits(Prices[itemId].Sell);
+            }
+
+            return;
+        }
+
+        if (BuyVerbs.Any(v => v.Id == verb.Id))
+        {
+            var itemId = ItemIdOf(verb);
+            if (player.TrySpendCredits(Prices[itemId].Buy))
+            {
+                inventory.Add(itemId, 1);
+            }
         }
     }
 
     public void CancelVerb()
     {
     }
+
+    private static string ItemIdOf(Verb verb) => verb.Id[(verb.Id.IndexOf('_') + 1)..];
 
     // Resolved fresh on every access rather than cached in _Ready — Player's own _Ready (which
     // adds it to the "player" group) can run after this node's, depending on scene tree order,

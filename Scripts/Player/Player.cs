@@ -41,6 +41,7 @@ public partial class Player : CharacterBody3D
     private Label? _roomO2Label;
     private Label? _inventoryLabel;
     private Label? _heldItemLabel;
+    private Label? _creditsLabel;
     private readonly SuitResources _suitResources = new();
     private readonly PlayerInventory _inventory = new();
     private float _pitch;
@@ -59,6 +60,26 @@ public partial class Player : CharacterBody3D
     public string? HeldItemId => _heldItemId;
 
     public PlayerInventory Inventory => _inventory;
+
+    // Placeholder starting stipend — tunable. Not modeled as an ItemRequirement (those pull
+    // from PlayerInventory, a different resource) — StationConsoleVerbTarget checks/spends
+    // this directly via the Player reference it already resolves.
+    private int _credits = 20;
+
+    public int Credits => _credits;
+
+    public void AddCredits(int amount) => _credits += amount;
+
+    public bool TrySpendCredits(int amount)
+    {
+        if (_credits < amount)
+        {
+            return false;
+        }
+
+        _credits -= amount;
+        return true;
+    }
 
     /// <summary>The build target whose ghost we last turned on — tracked so we can turn it back
     /// off the moment the player looks somewhere else (SetGhostVisible is only ever called on
@@ -95,6 +116,7 @@ public partial class Player : CharacterBody3D
         _roomO2Label = GetNode<Label>("HUD/ResourcesPanel/RoomO2Label");
         _inventoryLabel = GetNode<Label>("HUD/InventoryLabel");
         _heldItemLabel = GetNode<Label>("HUD/HeldItemLabel");
+        _creditsLabel = GetNode<Label>("HUD/CreditsLabel");
         CaptureMouse();
         // Setting MouseMode here alone is unreliable if the window doesn't yet have OS
         // input focus at this exact point in startup — reapply whenever focus is (re)gained.
@@ -270,6 +292,10 @@ public partial class Player : CharacterBody3D
         }
 
         var verb = verbs[_selectedVerbIndex % verbs.Count];
+        if (verb.Disabled)
+        {
+            return;
+        }
 
         foreach (var requirement in verb.Requirements)
         {
@@ -362,11 +388,12 @@ public partial class Player : CharacterBody3D
         {
             var progress = target!.CurrentVerbProgress;
 
+            var label = verb.DisplaySuffix is { } suffix ? $"{Tr(verb.LocalizationKey)} ({suffix})" : Tr(verb.LocalizationKey);
             _verbLabel!.Text = verbs is { Count: > 1 }
-                ? $"{Tr(verb.LocalizationKey)} ({_selectedVerbIndex % verbs.Count + 1}/{verbs.Count})"
-                : Tr(verb.LocalizationKey);
+                ? $"{label} ({_selectedVerbIndex % verbs.Count + 1}/{verbs.Count})"
+                : label;
             _verbLabel.Visible = true;
-            _verbLabel.Modulate = Colors.White;
+            _verbLabel.Modulate = verb.Disabled ? Colors.Red : Colors.White;
 
             _verbProgressBar!.Visible = progress is not null;
             if (progress is not null)
@@ -395,6 +422,7 @@ public partial class Player : CharacterBody3D
             O2Percent = _suitResources.O2Percent,
             PowerPercent = _suitResources.PowerPercent,
             Inventory = new Dictionary<string, int>(_inventory.Counts),
+            Credits = _credits,
         };
     }
 
@@ -416,12 +444,16 @@ public partial class Player : CharacterBody3D
         {
             _inventory.Add(itemId, count);
         }
+
+        _credits = data.Credits;
     }
 
     public void RefillSuitResources() => _suitResources.RestoreFrom(100f, 100f);
 
     private void UpdateInventoryHud()
     {
+        _creditsLabel!.Text = Tr("HUD_CREDITS") + $": {_credits}";
+
         _heldItemLabel!.Text = _heldItemId is { } heldItemId
             ? Tr("HUD_HOLDING") + ": " + Tr("ITEM_" + heldItemId.ToUpperInvariant())
             : Tr("HUD_HOLDING_EMPTY");

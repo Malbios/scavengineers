@@ -49,4 +49,6 @@ public sealed class PlayerSaveData
     public float PowerPercent { get; set; }
 
     public Dictionary<string, int> Inventory { get; set; } = new();
+
+    public int Credits { get; set; }
 }
