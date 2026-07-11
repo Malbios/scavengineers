@@ -28,19 +28,20 @@ public partial class ShipSim : Node
     private const int RoomSplitIndex = 6;
     private static readonly int[] DoorwayRows = [2, 3];
 
-    private static readonly CellCoord BatteryCell = new(5, 0);
+    // Tile matches the Battery node's real scene position (local x=1.5,z=-2.9 ->
+    // i=floor(1.5+3)=4, j=floor(-2.9+3)=0) — every fixture here uses that same
+    // i=floor(localX+3), j=floor(localZ+3) mapping, so the player's wiring aim always lines
+    // up with where the sim actually thinks the device is.
+    private static readonly CellCoord BatteryCell = new(4, 0);
     private static readonly CellCoord SwitchCell = new(5, 0);
     private static readonly CellCoord RechargeCell = new(9, 0);
 
-    // Bridges the real 4-tile gap between the switch and the recharge station now that
-    // fixtures sit at their actual scene positions instead of assumed-adjacent placeholders
-    // (docs/project-plan.md Appendix A7 — conduits physically route power between fixtures).
-    private static readonly CellCoord[] ConduitCells = [new(6, 0), new(7, 0), new(8, 0)];
-
-    // Devices the player must wire up themselves via ShipBuildTarget's free-form conduit
-    // placement — deliberately not pre-connected, unlike the Switch/conduit/RechargeStation
-    // chain above. Tiles match each device's real scene position (docs/architecture's
-    // i=floor(localX+3), j=floor(localZ+3) mapping, same as every other fixture here).
+    // Every device below (Switch, RechargeStation, and the 4 further down) is added unwired —
+    // the player must run their own conduits via ShipBuildTarget's free-form placement to
+    // connect any of them to the battery. The only "free" connection is Battery-to-Switch,
+    // since they sit on Manhattan-adjacent tiles (mounted right next to each other on the same
+    // wall) — PowerSystem already treats directly-adjacent fixtures as touching, no conduit
+    // segment needed, same rule the Derelict's fire hazard relies on for its own adjacent pair.
     private static readonly CellCoord TravelConsoleCell = new(0, 0);
     private static readonly CellCoord InteriorDoorCell = new(5, 2);
     private static readonly CellCoord StationAirlockCell = new(0, 2);
@@ -148,16 +149,10 @@ public partial class ShipSim : Node
             _battery = new BatteryFixture(BatteryFixtureId, BatteryCell, FixtureSurface.WallInner) { Condition = 1f };
             Deck.AddFixture(_battery);
             Deck.AddFixture(new SwitchFixture(SwitchFixtureId, SwitchCell, FixtureSurface.WallInner));
-
-            for (var i = 0; i < ConduitCells.Length; i++)
-            {
-                Deck.AddFixture(new ConduitFixture($"conduit_{i}", ConduitCells[i], FixtureSurface.FloorUnderside));
-            }
-
             Deck.AddFixture(new MachineFixture(RechargeFixtureId, RechargeCell, FixtureSurface.WallInner));
 
-            // Left unwired deliberately — the player must run their own conduits from the
-            // battery, same as the old Computer demo device did.
+            // None of the below are pre-connected — the player must run their own conduits
+            // from the battery to every one of them via ShipBuildTarget's free-form placement.
             Deck.AddFixture(new MachineFixture(TravelConsoleFixtureId, TravelConsoleCell, FixtureSurface.WallInner));
             Deck.AddFixture(new MachineFixture(InteriorDoorFixtureId, InteriorDoorCell, FixtureSurface.FloorUnderside));
             Deck.AddFixture(new MachineFixture(StationAirlockFixtureId, StationAirlockCell, FixtureSurface.FloorUnderside));
