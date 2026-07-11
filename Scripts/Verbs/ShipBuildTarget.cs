@@ -87,7 +87,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private const float EdgeMargin = 0.25f;
 
     private const float WallCenterHeight = 1.5f;
-    private const float FloorConduitHeight = 0.2f;
+
+    // Half the conduit mesh's own 0.05 thickness above the floor's actual top surface (Y=0,
+    // matching FloorPanelHeight's own surface-alignment note below) — resting flush on the
+    // floor instead of the old 0.2 (visibly floating ~17.5cm above it).
+    private const float FloorConduitHeight = 0.025f;
 
     // A wall face gets one conduit slot per tile-height's worth of its own height, stacked
     // vertically — a taller/shorter wall (if WallHeight ever changes) gets more/fewer slots
@@ -101,7 +105,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     // Match the existing (unsplit, collision-only) FloorShape/CeilingShape colliders' actual
     // top/bottom surfaces exactly, so the panel mesh sits flush with where the player's feet and
-    // the ceiling's underside really are, instead of at the conduit's own floating mount height
+    // the ceiling's underside really are, instead of at the conduit's own mount height
     // (FloorConduitHeight) — sharing that height with conduits is what caused the panels to
     // z-fight with them.
     private const float FloorPanelHeight = -0.025f;
