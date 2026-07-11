@@ -37,6 +37,16 @@ public static class ItemCatalog
             ? new Color(hex)
             : DefaultColor;
 
+    /// <summary>How much Player.UseHeldItem's Eat restores when this item is consumed — 0 (the
+    /// default) for a non-food item, same safe-fallback spirit as <see cref="MaxStackSize"/>.</summary>
+    public static float HungerRestore(string itemId) =>
+        Items.TryGetValue(itemId, out var item) ? item.HungerRestore : 0f;
+
+    /// <summary>How much Player.UseHeldItem's Drink restores when this item is consumed — 0 (the
+    /// default) for a non-drink item.</summary>
+    public static float ThirstRestore(string itemId) =>
+        Items.TryGetValue(itemId, out var item) ? item.ThirstRestore : 0f;
+
     private static Dictionary<string, ItemDefinition> Items => _items ??= Load();
 
     /// <summary>Test-only seam: lets Scavengineers.Scripts.Tests seed the catalog directly,
@@ -70,5 +80,11 @@ public static class ItemCatalog
 
         [JsonPropertyName("color")]
         public string? Color { get; set; }
+
+        [JsonPropertyName("hungerRestore")]
+        public float HungerRestore { get; set; }
+
+        [JsonPropertyName("thirstRestore")]
+        public float ThirstRestore { get; set; }
     }
 }

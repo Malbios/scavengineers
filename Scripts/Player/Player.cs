@@ -47,8 +47,13 @@ public partial class Player : CharacterBody3D
     private Control? _backpackGrid;
     private readonly List<InventorySlotUI> _backpackSlotUIs = new();
     private readonly SuitResources _suitResources = new();
+    private readonly PlayerNeeds _needs = new();
     private readonly PlayerInventory _inventory = new();
     private float _pitch;
+
+    private ProgressBar? _hungerBar;
+    private ProgressBar? _thirstBar;
+    private ProgressBar? _energyBar;
 
     /// <summary>The generic dropped-item visual (same box mesh + per-item material-override
     /// pattern InventoryOverflow.DropAt and ShipBuildTarget's own refunds already use) — reused
@@ -69,12 +74,14 @@ public partial class Player : CharacterBody3D
     /// mid-drag.</summary>
     private bool _inventoryOpen;
 
-    /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-8) —
+    /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-9, 0) —
     /// also reused by StationConsoleVerbTarget as the set of things Buy can offer, since there's
     /// no separate item-definition data yet. "backpack" is an ordinary holdable/purchasable item
     /// right up until it's actually equipped via drag-and-drop onto the Back slot (see
-    /// TryEquipBackpackFromHand) — no dedicated verb needed to buy or hold one.</summary>
-    public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell", "battery", "switch", "recharge_station", "backpack"];
+    /// TryEquipBackpackFromHand) — no dedicated verb needed to buy or hold one. "ration_bar"/
+    /// "water_bottle" are likewise ordinary holdable items until F consumes whichever's held
+    /// (see UseHeldItem) — no dedicated equip path either.</summary>
+    public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell", "battery", "switch", "recharge_station", "backpack", "ration_bar", "water_bottle"];
 
     private enum Hand { Left, Right }
 
@@ -141,6 +148,9 @@ public partial class Player : CharacterBody3D
         _verbProgressBar = GetNode<ProgressBar>("HUD/VerbProgressBar");
         _o2Bar = GetNode<ProgressBar>("HUD/ResourcesPanel/O2Bar");
         _powerBar = GetNode<ProgressBar>("HUD/ResourcesPanel/PowerBar");
+        _hungerBar = GetNode<ProgressBar>("HUD/ResourcesPanel/HungerBar");
+        _thirstBar = GetNode<ProgressBar>("HUD/ResourcesPanel/ThirstBar");
+        _energyBar = GetNode<ProgressBar>("HUD/ResourcesPanel/EnergyBar");
         _roomO2Label = GetNode<Label>("HUD/ResourcesPanel/RoomO2Label");
         _leftHandLabel = GetNode<Label>("HUD/LeftHandLabel");
         _rightHandLabel = GetNode<Label>("HUD/RightHandLabel");
@@ -173,6 +183,8 @@ public partial class Player : CharacterBody3D
         _inventory.Add("backpack", 1);
         _inventory.EquipBackpackFromHand();
         _inventory.Add("scrap_metal", 50);
+        _inventory.Add("ration_bar", 3);
+        _inventory.Add("water_bottle", 3);
 
         CaptureMouse();
         // Setting MouseMode here alone is unreliable if the window doesn't yet have OS
@@ -245,6 +257,10 @@ public partial class Player : CharacterBody3D
                 Input.MouseMode = Input.MouseModeEnum.Visible;
             }
         }
+        else if (@event is InputEventKey { Keycode: Key.F, Pressed: true } && !IsBusy && !_inventoryOpen)
+        {
+            UseHeldItem();
+        }
         else if (@event is InputEventKey { Pressed: true } hotbarKey && !IsBusy)
         {
             var index = hotbarKey.Keycode switch
@@ -257,6 +273,8 @@ public partial class Player : CharacterBody3D
                 Key.Key6 => 5,
                 Key.Key7 => 6,
                 Key.Key8 => 7,
+                Key.Key9 => 8,
+                Key.Key0 => 9,
                 _ => -1,
             };
 
@@ -265,6 +283,36 @@ public partial class Player : CharacterBody3D
                 ToggleHeldItem(HotbarItems[index]);
             }
         }
+    }
+
+    /// <summary>Eats/drinks whatever's held (left hand first, then right) — a direct hotbar-style
+    /// action, not a raycast-targeted verb, since there's no world object involved. A no-op if
+    /// neither hand holds a consumable (ItemCatalog.HungerRestore/ThirstRestore both 0).</summary>
+    private void UseHeldItem() =>
+        _ = TryConsumeHand(PlayerInventory.LeftHandSlotIndex) || TryConsumeHand(PlayerInventory.RightHandSlotIndex);
+
+    private bool TryConsumeHand(int handIndex)
+    {
+        if (_inventory.Hands.Slots[handIndex]?.ItemId is not { } itemId)
+        {
+            return false;
+        }
+
+        var hunger = ItemCatalog.HungerRestore(itemId);
+        var thirst = ItemCatalog.ThirstRestore(itemId);
+        if (hunger <= 0 && thirst <= 0)
+        {
+            return false;
+        }
+
+        if (!_inventory.TryRemoveFromHand(handIndex, 1))
+        {
+            return false;
+        }
+
+        _needs.Eat(hunger);
+        _needs.Drink(thirst);
+        return true;
     }
 
     /// <summary>Hotbar-key toggle, extended from a single held-item slot to two hands: already
@@ -462,6 +510,11 @@ public partial class Player : CharacterBody3D
         _o2Bar!.Value = _suitResources.O2Percent;
         _powerBar!.Value = _suitResources.PowerPercent;
 
+        _needs.Tick(delta);
+        _hungerBar!.Value = _needs.HungerPercent;
+        _thirstBar!.Value = _needs.ThirstPercent;
+        _energyBar!.Value = _needs.EnergyPercent;
+
         if (roomVolume is not null)
         {
             _roomO2Label!.Visible = true;
@@ -645,6 +698,9 @@ public partial class Player : CharacterBody3D
             Pitch = _pitch,
             O2Percent = _suitResources.O2Percent,
             PowerPercent = _suitResources.PowerPercent,
+            HungerPercent = _needs.HungerPercent,
+            ThirstPercent = _needs.ThirstPercent,
+            EnergyPercent = _needs.EnergyPercent,
             Inventory = new Dictionary<string, int>(_inventory.Hands.Counts),
             Credits = _credits,
             BackpackItemId = _inventory.Backpack?.ItemId,
@@ -666,6 +722,7 @@ public partial class Player : CharacterBody3D
         }
 
         _suitResources.RestoreFrom(data.O2Percent, data.PowerPercent);
+        _needs.RestoreFrom(data.HungerPercent, data.ThirstPercent, data.EnergyPercent);
 
         _inventory.Clear();
         foreach (var (itemId, count) in data.Inventory)
@@ -691,6 +748,9 @@ public partial class Player : CharacterBody3D
     }
 
     public void RefillSuitResources() => _suitResources.RestoreFrom(100f, 100f);
+
+    /// <summary>The Bunk's Sleep-completion hook — a full night's rest.</summary>
+    public void RestEnergy() => _needs.Rest(100f);
 
     private void UpdateInventoryHud()
     {

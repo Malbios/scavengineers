@@ -155,6 +155,23 @@ public sealed class PlayerInventory
         return leftover == 0;
     }
 
+    /// <summary>Removes up to `count` from that *specific* hand slot only — unlike the aggregate
+    /// <see cref="TryRemove"/>, which could silently drain from the backpack instead and leave
+    /// the hand's displayed count unchanged. Used by consuming a held item (see Player.UseHeldItem),
+    /// where "what you see in your hand is what gets used" matters. Returns false (no-op) if the
+    /// hand doesn't hold at least `count`.</summary>
+    public bool TryRemoveFromHand(int handIndex, int count = 1)
+    {
+        if (_hands.Slots[handIndex] is not { } occupied || occupied.Count < count)
+        {
+            return false;
+        }
+
+        var remaining = occupied.Count - count;
+        _hands.SetSlot(handIndex, remaining > 0 ? (occupied.ItemId, remaining) : null);
+        return true;
+    }
+
     /// <summary>Equips a worn backpack by consuming one "backpack" item from a hand (wherever it
     /// currently sits) and attaching a freshly-emptied <see cref="SlotContainer"/> as
     /// <see cref="Backpack"/>. Fails (no-op) if a backpack is already worn, or no hand currently

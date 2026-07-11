@@ -64,3 +64,11 @@ VERB_SELL_RECHARGE_STATION,Sell Recharge Station,Ladestation verkaufen
 ITEM_BACKPACK,Backpack,Rucksack
 VERB_BUY_BACKPACK,Buy Backpack,Rucksack kaufen
 VERB_SELL_BACKPACK,Sell Backpack,Rucksack verkaufen
+ITEM_RATION_BAR,Ration Bar,Nahrungsriegel
+VERB_BUY_RATION_BAR,Buy Ration Bar,Nahrungsriegel kaufen
+VERB_SELL_RATION_BAR,Sell Ration Bar,Nahrungsriegel verkaufen
+ITEM_WATER_BOTTLE,Water Bottle,Wasserflasche
+VERB_BUY_WATER_BOTTLE,Buy Water Bottle,Wasserflasche kaufen
+VERB_SELL_WATER_BOTTLE,Sell Water Bottle,Wasserflasche verkaufen
+VERB_SLEEP,Sleep,Schlafen
+OBJECT_BUNK,Bunk,Schlafkoje

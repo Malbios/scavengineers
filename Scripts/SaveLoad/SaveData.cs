@@ -97,6 +97,15 @@ public sealed class PlayerSaveData
 
     public float PowerPercent { get; set; }
 
+    /// <summary>Defaulted to 100f, not 0 — an old save missing this field (System.Text.Json
+    /// only overwrites properties actually present in the JSON) loads as "fully rested" rather
+    /// than instantly starving.</summary>
+    public float HungerPercent { get; set; } = 100f;
+
+    public float ThirstPercent { get; set; } = 100f;
+
+    public float EnergyPercent { get; set; } = 100f;
+
     public Dictionary<string, int> Inventory { get; set; } = new();
 
     public int Credits { get; set; }
