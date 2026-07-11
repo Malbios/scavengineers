@@ -564,14 +564,23 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         if (hasFloorCompanion)
         {
             // A real connector reaching the floor conduit's own tile-center hub — measured
-            // directly against that hub's actual position rather than an assumed fixed offset,
-            // so it can't end up floating short of (or past) where the floor conduit really is.
+            // directly against that hub's actual position rather than an assumed fixed offset.
+            // Routed down the wall/corner FIRST (staying at the wall's own horizontal position,
+            // no reach yet) and only jogging out to the floor conduit's hub once it's already at
+            // floor height — a real wire runs down a corner then along the floor, it doesn't
+            // jut straight out into open air at wall height and drop through nothing.
             hasArm = true;
 
             var floorHubLocal = ToLocal(TileCenterWorld(tile));
             var delta = floorHubLocal - container.Position;
             var horizontalDelta = new Vector3(delta.X, 0, delta.Z);
             var horizontalDistance = horizontalDelta.Length();
+
+            var drop = new MeshInstance3D { Mesh = ConduitDropMesh };
+            drop.SetSurfaceOverrideMaterial(0, ConduitMaterial);
+            drop.Scale = new Vector3(1, Mathf.Abs(delta.Y) / WallToFloorDropHeight, 1);
+            drop.Position = new Vector3(0, delta.Y / 2f, 0);
+            container.AddChild(drop);
 
             if (horizontalDistance > 0.01f)
             {
@@ -580,16 +589,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 var reachOut = new MeshInstance3D { Mesh = ConduitArmMesh };
                 reachOut.SetSurfaceOverrideMaterial(0, ConduitMaterial);
                 reachOut.Scale = new Vector3(1, 1, horizontalDistance / 0.5f);
-                reachOut.Position = horizontalDelta / 2f;
+                reachOut.Position = new Vector3(horizontalDelta.X / 2f, delta.Y, horizontalDelta.Z / 2f);
                 reachOut.RotationDegrees = Mathf.Abs(delta.X) > Mathf.Abs(delta.Z) ? new Vector3(0, 90, 0) : Vector3.Zero;
                 container.AddChild(reachOut);
             }
-
-            var drop = new MeshInstance3D { Mesh = ConduitDropMesh };
-            drop.SetSurfaceOverrideMaterial(0, ConduitMaterial);
-            drop.Scale = new Vector3(1, Mathf.Abs(delta.Y) / WallToFloorDropHeight, 1);
-            drop.Position = new Vector3(horizontalDelta.X, delta.Y / 2f, horizontalDelta.Z);
-            container.AddChild(drop);
         }
         else if (hasOtherWallCompanion)
         {
