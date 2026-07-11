@@ -20,6 +20,11 @@ public sealed class PlayerInventory
 
     private readonly (string ItemId, int Count)?[] _slots = new (string, int)?[BaseSlotCount];
 
+    /// <summary>The raw per-slot view the inventory panel UI reads (see InventorySlotUI) — index
+    /// identity matters here (which physical slot holds what), unlike <see cref="Counts"/>'s
+    /// aggregated view for the plain-text HUD summary.</summary>
+    public IReadOnlyList<(string ItemId, int Count)?> Slots => _slots;
+
     public IReadOnlyDictionary<string, int> Counts =>
         _slots.Where(s => s is not null)
             .GroupBy(s => s!.Value.ItemId)
@@ -76,6 +81,48 @@ public sealed class PlayerInventory
         }
 
         return count - remaining;
+    }
+
+    /// <summary>Moves slot `from` onto slot `to` — the inventory panel UI's drag-and-drop
+    /// mutation (see InventorySlotUI). Different items swap; the same item tops `to` up from
+    /// `from` up to that item's stack limit, leaving any remainder in `from` (same "partial fit"
+    /// spirit as <see cref="Add"/>). A no-op for an out-of-range index, `from == to`, an empty
+    /// `from`, or a same-item `to` that's already full.</summary>
+    public void MoveSlot(int from, int to)
+    {
+        if (from == to || from < 0 || from >= _slots.Length || to < 0 || to >= _slots.Length)
+        {
+            return;
+        }
+
+        if (_slots[from] is not { } source)
+        {
+            return;
+        }
+
+        if (_slots[to] is not { } dest)
+        {
+            _slots[to] = source;
+            _slots[from] = null;
+            return;
+        }
+
+        if (dest.ItemId != source.ItemId)
+        {
+            (_slots[from], _slots[to]) = (_slots[to], _slots[from]);
+            return;
+        }
+
+        var room = ItemCatalog.MaxStackSize(source.ItemId) - dest.Count;
+        if (room <= 0)
+        {
+            return;
+        }
+
+        var moved = Math.Min(room, source.Count);
+        _slots[to] = (dest.ItemId, dest.Count + moved);
+        var remaining = source.Count - moved;
+        _slots[from] = remaining > 0 ? (source.ItemId, remaining) : null;
     }
 
     public void Clear()

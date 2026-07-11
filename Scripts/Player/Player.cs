@@ -42,9 +42,16 @@ public partial class Player : CharacterBody3D
     private Label? _inventoryLabel;
     private Label? _heldItemLabel;
     private Label? _creditsLabel;
+    private Control? _inventoryPanel;
     private readonly SuitResources _suitResources = new();
     private readonly PlayerInventory _inventory = new();
     private float _pitch;
+
+    /// <summary>Whether the mouse-driven inventory panel (Tab) is currently open — while true,
+    /// look/Interact/verb-cycling/mouse-recapture are all suppressed so clicking and dragging in
+    /// the panel doesn't also fire world interactions or yank the mouse back into captured mode
+    /// mid-drag.</summary>
+    private bool _inventoryOpen;
 
     /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-7) —
     /// also reused by StationConsoleVerbTarget as the set of things Buy can offer, since there's
@@ -117,6 +124,15 @@ public partial class Player : CharacterBody3D
         _inventoryLabel = GetNode<Label>("HUD/InventoryLabel");
         _heldItemLabel = GetNode<Label>("HUD/HeldItemLabel");
         _creditsLabel = GetNode<Label>("HUD/CreditsLabel");
+        _inventoryPanel = GetNode<Control>("HUD/InventoryPanel");
+
+        foreach (var child in GetNode("HUD/InventoryPanel/Grid").GetChildren())
+        {
+            if (child is InventorySlotUI slot)
+            {
+                slot.Inventory = _inventory;
+            }
+        }
 
         // Placeholder/tunable starting stipend for testing the free-form conduit wiring
         // extensively — same "don't wait on it" spirit as the near-instant verb durations.
@@ -133,7 +149,7 @@ public partial class Player : CharacterBody3D
 
     public override void _Input(InputEvent @event)
     {
-        if (@event is InputEventMouseMotion mouseMotion && Input.MouseMode == Input.MouseModeEnum.Captured && !IsBusy)
+        if (@event is InputEventMouseMotion mouseMotion && Input.MouseMode == Input.MouseModeEnum.Captured && !IsBusy && !_inventoryOpen)
         {
             RotateY(-mouseMotion.Relative.X * MouseSensitivity);
 
@@ -143,15 +159,15 @@ public partial class Player : CharacterBody3D
                 _head.Rotation = new Vector3(_pitch, 0, 0);
             }
         }
-        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Right, Pressed: true } && !IsBusy)
+        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Right, Pressed: true } && !IsBusy && !_inventoryOpen)
         {
             Interact();
         }
-        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.WheelUp, Pressed: true } && !IsBusy)
+        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.WheelUp, Pressed: true } && !IsBusy && !_inventoryOpen)
         {
             CycleSelectedVerb(1);
         }
-        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.WheelDown, Pressed: true } && !IsBusy)
+        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.WheelDown, Pressed: true } && !IsBusy && !_inventoryOpen)
         {
             CycleSelectedVerb(-1);
         }
@@ -168,13 +184,31 @@ public partial class Player : CharacterBody3D
             _busyVerb = null;
         }
         else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true }
-                 && Input.MouseMode != Input.MouseModeEnum.Captured)
+                 && Input.MouseMode != Input.MouseModeEnum.Captured && !_inventoryOpen)
         {
             CaptureMouse();
         }
+        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy)
+        {
+            if (_inventoryOpen)
+            {
+                CloseInventory();
+            }
+            else
+            {
+                OpenInventory();
+            }
+        }
         else if (@event is InputEventKey { Keycode: Key.Escape, Pressed: true })
         {
-            Input.MouseMode = Input.MouseModeEnum.Visible;
+            if (_inventoryOpen)
+            {
+                CloseInventory();
+            }
+            else
+            {
+                Input.MouseMode = Input.MouseModeEnum.Visible;
+            }
         }
         else if (@event is InputEventKey { Pressed: true } hotbarKey && !IsBusy)
         {
@@ -202,6 +236,28 @@ public partial class Player : CharacterBody3D
     // scene change). A static method's connection has no instance to track, so travelling
     // between scenes would try to reconnect the exact same callable and hit "already connected."
     private void CaptureMouse() => Input.MouseMode = Input.MouseModeEnum.Captured;
+
+    private void OpenInventory()
+    {
+        _inventoryOpen = true;
+        if (_inventoryPanel is not null)
+        {
+            _inventoryPanel.Visible = true;
+        }
+
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+    }
+
+    private void CloseInventory()
+    {
+        _inventoryOpen = false;
+        if (_inventoryPanel is not null)
+        {
+            _inventoryPanel.Visible = false;
+        }
+
+        CaptureMouse();
+    }
 
     public override void _PhysicsProcess(double delta)
     {

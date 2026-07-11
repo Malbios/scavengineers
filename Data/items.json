@@ -1,9 +1,9 @@
 [
-  { "id": "scrap_metal", "maxStackSize": 50 },
-  { "id": "spare_parts", "maxStackSize": 20 },
-  { "id": "wall_panel", "maxStackSize": 20 },
-  { "id": "power_cell", "maxStackSize": 10 },
-  { "id": "battery", "maxStackSize": 1 },
-  { "id": "switch", "maxStackSize": 5 },
-  { "id": "recharge_station", "maxStackSize": 1 }
+  { "id": "scrap_metal", "maxStackSize": 50, "color": "#8C8C99" },
+  { "id": "spare_parts", "maxStackSize": 20, "color": "#D9B326" },
+  { "id": "wall_panel", "maxStackSize": 20, "color": "#598CBF" },
+  { "id": "power_cell", "maxStackSize": 10, "color": "#33B3E6" },
+  { "id": "battery", "maxStackSize": 1, "color": "#E6990D" },
+  { "id": "switch", "maxStackSize": 5, "color": "#E6261A" },
+  { "id": "recharge_station", "maxStackSize": 1, "color": "#1ACCB3" }
 ]

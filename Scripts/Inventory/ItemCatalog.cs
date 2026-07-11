@@ -17,6 +17,7 @@ public static class ItemCatalog
 {
     private const string ResourcePath = "res://Data/items.json";
     private const int DefaultMaxStackSize = 1;
+    private static readonly Color DefaultColor = new(0.6f, 0.6f, 0.6f);
 
     private static Dictionary<string, ItemDefinition>? _items;
 
@@ -25,6 +26,15 @@ public static class ItemCatalog
     /// save-schema doc's "missing-ID fallback is a placeholder + log, never a crash."</summary>
     public static int MaxStackSize(string itemId) =>
         Items.TryGetValue(itemId, out var item) ? item.MaxStackSize : DefaultMaxStackSize;
+
+    /// <summary>Used only by the inventory panel UI's slot icons (see InventorySlotUI) — a
+    /// second, independent consumer of per-item color, deliberately not a retrofit of the
+    /// existing hand-authored 3D pickup materials in World.tscn. Neutral gray fallback for an
+    /// unknown/colorless id.</summary>
+    public static Color Color(string itemId) =>
+        Items.TryGetValue(itemId, out var item) && item.Color is { } hex && !string.IsNullOrEmpty(hex)
+            ? new Color(hex)
+            : DefaultColor;
 
     private static Dictionary<string, ItemDefinition> Items => _items ??= Load();
 
@@ -48,5 +58,8 @@ public static class ItemCatalog
 
         [JsonPropertyName("maxStackSize")]
         public int MaxStackSize { get; set; } = DefaultMaxStackSize;
+
+        [JsonPropertyName("color")]
+        public string? Color { get; set; }
     }
 }
