@@ -26,6 +26,10 @@ public partial class Player : CharacterBody3D
     private const float ZeroGDrag = 2f; // passive deceleration per second, always applied
     private const float ZeroGMaxSpeed = 3.5f;
 
+    // How close a wall/floor/ceiling/device has to be for zero-g thrust to work at all — no
+    // jetpack yet, so control only comes from pushing off something within reach.
+    private const float ZeroGControlRadius = 1.2f;
+
     /// <summary>Which ship (and which of its tiles) currently governs the player's ambient O2
     /// reading — set at runtime by whichever <see cref="Scavengineers.Scripts.Ship.ShipAtmosphereZone"/>
     /// the player is standing in. Both ships (and both of a ship's rooms) are loaded and
@@ -513,7 +517,10 @@ public partial class Player : CharacterBody3D
                     thrust += Vector3.Down;
                 }
 
-                if (thrust != Vector3.Zero)
+                // No jetpack yet — without one, real EVA control only comes from pushing off a
+                // nearby surface, not thrusting freely through open space. Once launched, you
+                // drift (drag still applies above) until you reach something else to push off.
+                if (thrust != Vector3.Zero && IsNearSurface())
                 {
                     velocity += thrust.Normalized() * ZeroGThrustAcceleration * (float)delta;
                 }
@@ -598,6 +605,25 @@ public partial class Player : CharacterBody3D
         }
 
         UpdateVerbHud();
+    }
+
+    /// <summary>Whether any solid geometry (wall, floor, ceiling, device — anything with a
+    /// collider) is within <see cref="ZeroGControlRadius"/> — the zero-g "is there something to
+    /// push off of" check. A single sphere overlap query, cheap enough to run only when the
+    /// player is actually trying to thrust (see the zero-g branch of _PhysicsProcess).</summary>
+    private bool IsNearSurface()
+    {
+        var spaceState = GetWorld3D().DirectSpaceState;
+        var query = new PhysicsShapeQueryParameters3D
+        {
+            Shape = new SphereShape3D { Radius = ZeroGControlRadius },
+            Transform = new Transform3D(Basis.Identity, GlobalPosition),
+            Exclude = new Godot.Collections.Array<Rid> { GetRid() },
+            CollideWithAreas = false,
+            CollideWithBodies = true,
+        };
+
+        return spaceState.IntersectShape(query, maxResults: 1).Count > 0;
     }
 
     private IVerbTarget? GetCurrentVerbTarget()
