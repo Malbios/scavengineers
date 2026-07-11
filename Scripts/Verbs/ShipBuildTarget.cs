@@ -41,12 +41,13 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private const float WallCenterHeight = 1.5f;
     private const float FloorConduitHeight = 0.2f;
 
-    // Both fixed compile-time constants, so a wall-to-floor drop connector's shape never varies
-    // per tile: every tile is the same size, so a wall conduit's mount point and a floor
-    // conduit's tile-center are always this same fixed distance apart (see BuildWallConduitVisual).
+    // ConduitDropMesh's own authored length (see World.tscn) — BuildWallConduitVisual scales a
+    // fresh instance of it to whatever the *actual* measured gap to the floor conduit turns out
+    // to be, rather than assuming a fixed distance (an earlier version did that and got it
+    // wrong — computing the real delta between the two anchor points is the only version that
+    // can't silently drift out of sync with the actual geometry).
     private const float WallToFloorDropHeight = WallCenterHeight - FloorConduitHeight;
     private const float WallMountRoomOffset = 0.15f; // matches WallConduitTransform's own push
-    private const float WallToFloorHorizontalReach = 0.5f - WallMountRoomOffset;
 
     // The 4 cardinal neighbor tiles a floor conduit checks for its connection-aware shape (see
     // BuildFloorConduitVisual) — AlongX says whether that direction's arm needs the 90-degree
@@ -562,23 +563,32 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
         if (hasFloorCompanion)
         {
-            // A real connector reaching the floor conduit's own tile-center hub, not just a
-            // gesture toward it — both legs are fixed lengths (WallToFloorHorizontalReach,
-            // WallToFloorDropHeight) since every tile is the same size, so this shape never
-            // needs to vary per tile.
+            // A real connector reaching the floor conduit's own tile-center hub — measured
+            // directly against that hub's actual position rather than an assumed fixed offset,
+            // so it can't end up floating short of (or past) where the floor conduit really is.
             hasArm = true;
-            var intoRoom = new Vector2I(-directionToWall.X, -directionToWall.Y);
 
-            var reachOut = new MeshInstance3D { Mesh = ConduitArmMesh };
-            reachOut.SetSurfaceOverrideMaterial(0, ConduitMaterial);
-            reachOut.Scale = new Vector3(1, 1, WallToFloorHorizontalReach / 0.5f);
-            reachOut.Position = new Vector3(intoRoom.X * WallToFloorHorizontalReach / 2f, 0, intoRoom.Y * WallToFloorHorizontalReach / 2f);
-            reachOut.RotationDegrees = intoRoom.X != 0 ? new Vector3(0, 90, 0) : Vector3.Zero;
-            container.AddChild(reachOut);
+            var floorHubLocal = ToLocal(TileCenterWorld(tile));
+            var delta = floorHubLocal - container.Position;
+            var horizontalDelta = new Vector3(delta.X, 0, delta.Z);
+            var horizontalDistance = horizontalDelta.Length();
+
+            if (horizontalDistance > 0.01f)
+            {
+                // ConduitArmMesh's own authored length is 0.5 — scale it to whatever the real
+                // horizontal distance is instead of assuming it's always exactly one value.
+                var reachOut = new MeshInstance3D { Mesh = ConduitArmMesh };
+                reachOut.SetSurfaceOverrideMaterial(0, ConduitMaterial);
+                reachOut.Scale = new Vector3(1, 1, horizontalDistance / 0.5f);
+                reachOut.Position = horizontalDelta / 2f;
+                reachOut.RotationDegrees = Mathf.Abs(delta.X) > Mathf.Abs(delta.Z) ? new Vector3(0, 90, 0) : Vector3.Zero;
+                container.AddChild(reachOut);
+            }
 
             var drop = new MeshInstance3D { Mesh = ConduitDropMesh };
             drop.SetSurfaceOverrideMaterial(0, ConduitMaterial);
-            drop.Position = new Vector3(intoRoom.X * WallToFloorHorizontalReach, -WallToFloorDropHeight / 2f, intoRoom.Y * WallToFloorHorizontalReach);
+            drop.Scale = new Vector3(1, Mathf.Abs(delta.Y) / WallToFloorDropHeight, 1);
+            drop.Position = new Vector3(horizontalDelta.X, delta.Y / 2f, horizontalDelta.Z);
             container.AddChild(drop);
         }
         else if (hasOtherWallCompanion)
