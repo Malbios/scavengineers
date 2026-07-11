@@ -104,14 +104,19 @@ offset_left = 16.0
 offset_top = 16.0
 theme_override_styles/normal = SubResource("HudLabelBackground")
 
-[node name="HeldItemLabel" type="Label" parent="HUD"]
+[node name="LeftHandLabel" type="Label" parent="HUD"]
 offset_left = 16.0
 offset_top = 100.0
 theme_override_styles/normal = SubResource("HudLabelBackground")
 
-[node name="CreditsLabel" type="Label" parent="HUD"]
+[node name="RightHandLabel" type="Label" parent="HUD"]
 offset_left = 16.0
 offset_top = 128.0
+theme_override_styles/normal = SubResource("HudLabelBackground")
+
+[node name="CreditsLabel" type="Label" parent="HUD"]
+offset_left = 16.0
+offset_top = 156.0
 theme_override_styles/normal = SubResource("HudLabelBackground")
 
 [node name="InventoryTooltip" type="Label" parent="HUD"]
@@ -129,34 +134,38 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -84.0
-offset_top = -64.0
+offset_top = -95.0
 offset_right = 84.0
-offset_bottom = 64.0
+offset_bottom = 95.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Grid" type="GridContainer" parent="HUD/InventoryPanel"]
+[node name="Layout" type="VBoxContainer" parent="HUD/InventoryPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Grid" type="GridContainer" parent="HUD/InventoryPanel/Layout"]
 layout_mode = 2
 columns = 3
 theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 8
 
-[node name="Slot0" type="Control" parent="HUD/InventoryPanel/Grid" node_paths=PackedStringArray("Tooltip")]
+[node name="Slot0" type="Control" parent="HUD/InventoryPanel/Layout/Grid" node_paths=PackedStringArray("Tooltip")]
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 script = ExtResource("3")
 SlotIndex = 0
-Tooltip = NodePath("../../../InventoryTooltip")
+Tooltip = NodePath("../../../../InventoryTooltip")
 
-[node name="Background" type="Panel" parent="HUD/InventoryPanel/Grid/Slot0"]
+[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/Grid/Slot0"]
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Grid/Slot0"]
+[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/Grid/Slot0"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -168,7 +177,7 @@ offset_bottom = -6.0
 mouse_filter = 2
 color = Color(0.6, 0.6, 0.6, 1)
 
-[node name="Count" type="Label" parent="HUD/InventoryPanel/Grid/Slot0"]
+[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/Grid/Slot0"]
 visible = false
 layout_mode = 1
 anchor_left = 1.0
@@ -180,21 +189,21 @@ offset_top = -18.0
 mouse_filter = 2
 horizontal_alignment = 2
 
-[node name="Slot1" type="Control" parent="HUD/InventoryPanel/Grid" node_paths=PackedStringArray("Tooltip")]
+[node name="Slot1" type="Control" parent="HUD/InventoryPanel/Layout/Grid" node_paths=PackedStringArray("Tooltip")]
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 script = ExtResource("3")
 SlotIndex = 1
-Tooltip = NodePath("../../../InventoryTooltip")
+Tooltip = NodePath("../../../../InventoryTooltip")
 
-[node name="Background" type="Panel" parent="HUD/InventoryPanel/Grid/Slot1"]
+[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/Grid/Slot1"]
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Grid/Slot1"]
+[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/Grid/Slot1"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -206,7 +215,7 @@ offset_bottom = -6.0
 mouse_filter = 2
 color = Color(0.6, 0.6, 0.6, 1)
 
-[node name="Count" type="Label" parent="HUD/InventoryPanel/Grid/Slot1"]
+[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/Grid/Slot1"]
 visible = false
 layout_mode = 1
 anchor_left = 1.0
@@ -218,21 +227,21 @@ offset_top = -18.0
 mouse_filter = 2
 horizontal_alignment = 2
 
-[node name="Slot2" type="Control" parent="HUD/InventoryPanel/Grid" node_paths=PackedStringArray("Tooltip")]
+[node name="Slot2" type="Control" parent="HUD/InventoryPanel/Layout/Grid" node_paths=PackedStringArray("Tooltip")]
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 script = ExtResource("3")
 SlotIndex = 2
-Tooltip = NodePath("../../../InventoryTooltip")
+Tooltip = NodePath("../../../../InventoryTooltip")
 
-[node name="Background" type="Panel" parent="HUD/InventoryPanel/Grid/Slot2"]
+[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/Grid/Slot2"]
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Grid/Slot2"]
+[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/Grid/Slot2"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -244,7 +253,7 @@ offset_bottom = -6.0
 mouse_filter = 2
 color = Color(0.6, 0.6, 0.6, 1)
 
-[node name="Count" type="Label" parent="HUD/InventoryPanel/Grid/Slot2"]
+[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/Grid/Slot2"]
 visible = false
 layout_mode = 1
 anchor_left = 1.0
@@ -256,21 +265,21 @@ offset_top = -18.0
 mouse_filter = 2
 horizontal_alignment = 2
 
-[node name="Slot3" type="Control" parent="HUD/InventoryPanel/Grid" node_paths=PackedStringArray("Tooltip")]
+[node name="Slot3" type="Control" parent="HUD/InventoryPanel/Layout/Grid" node_paths=PackedStringArray("Tooltip")]
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 script = ExtResource("3")
 SlotIndex = 3
-Tooltip = NodePath("../../../InventoryTooltip")
+Tooltip = NodePath("../../../../InventoryTooltip")
 
-[node name="Background" type="Panel" parent="HUD/InventoryPanel/Grid/Slot3"]
+[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/Grid/Slot3"]
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Grid/Slot3"]
+[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/Grid/Slot3"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -282,7 +291,7 @@ offset_bottom = -6.0
 mouse_filter = 2
 color = Color(0.6, 0.6, 0.6, 1)
 
-[node name="Count" type="Label" parent="HUD/InventoryPanel/Grid/Slot3"]
+[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/Grid/Slot3"]
 visible = false
 layout_mode = 1
 anchor_left = 1.0
@@ -294,21 +303,21 @@ offset_top = -18.0
 mouse_filter = 2
 horizontal_alignment = 2
 
-[node name="Slot4" type="Control" parent="HUD/InventoryPanel/Grid" node_paths=PackedStringArray("Tooltip")]
+[node name="Slot4" type="Control" parent="HUD/InventoryPanel/Layout/Grid" node_paths=PackedStringArray("Tooltip")]
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 script = ExtResource("3")
 SlotIndex = 4
-Tooltip = NodePath("../../../InventoryTooltip")
+Tooltip = NodePath("../../../../InventoryTooltip")
 
-[node name="Background" type="Panel" parent="HUD/InventoryPanel/Grid/Slot4"]
+[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/Grid/Slot4"]
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Grid/Slot4"]
+[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/Grid/Slot4"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -320,7 +329,7 @@ offset_bottom = -6.0
 mouse_filter = 2
 color = Color(0.6, 0.6, 0.6, 1)
 
-[node name="Count" type="Label" parent="HUD/InventoryPanel/Grid/Slot4"]
+[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/Grid/Slot4"]
 visible = false
 layout_mode = 1
 anchor_left = 1.0
@@ -332,21 +341,21 @@ offset_top = -18.0
 mouse_filter = 2
 horizontal_alignment = 2
 
-[node name="Slot5" type="Control" parent="HUD/InventoryPanel/Grid" node_paths=PackedStringArray("Tooltip")]
+[node name="Slot5" type="Control" parent="HUD/InventoryPanel/Layout/Grid" node_paths=PackedStringArray("Tooltip")]
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 script = ExtResource("3")
 SlotIndex = 5
-Tooltip = NodePath("../../../InventoryTooltip")
+Tooltip = NodePath("../../../../InventoryTooltip")
 
-[node name="Background" type="Panel" parent="HUD/InventoryPanel/Grid/Slot5"]
+[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/Grid/Slot5"]
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Grid/Slot5"]
+[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/Grid/Slot5"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -358,7 +367,91 @@ offset_bottom = -6.0
 mouse_filter = 2
 color = Color(0.6, 0.6, 0.6, 1)
 
-[node name="Count" type="Label" parent="HUD/InventoryPanel/Grid/Slot5"]
+[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/Grid/Slot5"]
+visible = false
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -22.0
+offset_top = -18.0
+mouse_filter = 2
+horizontal_alignment = 2
+
+[node name="HandsSeparator" type="HSeparator" parent="HUD/InventoryPanel/Layout"]
+layout_mode = 2
+
+[node name="Hands" type="HBoxContainer" parent="HUD/InventoryPanel/Layout"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 8
+
+[node name="LeftHand" type="Control" parent="HUD/InventoryPanel/Layout/Hands" node_paths=PackedStringArray("Tooltip")]
+custom_minimum_size = Vector2(48, 48)
+layout_mode = 2
+script = ExtResource("3")
+SlotIndex = 6
+Tooltip = NodePath("../../../../InventoryTooltip")
+
+[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/Hands/LeftHand"]
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("HudLabelBackground")
+
+[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/Hands/LeftHand"]
+visible = false
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 6.0
+offset_top = 6.0
+offset_right = -6.0
+offset_bottom = -6.0
+mouse_filter = 2
+color = Color(0.6, 0.6, 0.6, 1)
+
+[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/Hands/LeftHand"]
+visible = false
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -22.0
+offset_top = -18.0
+mouse_filter = 2
+horizontal_alignment = 2
+
+[node name="RightHand" type="Control" parent="HUD/InventoryPanel/Layout/Hands" node_paths=PackedStringArray("Tooltip")]
+custom_minimum_size = Vector2(48, 48)
+layout_mode = 2
+script = ExtResource("3")
+SlotIndex = 7
+Tooltip = NodePath("../../../../InventoryTooltip")
+
+[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/Hands/RightHand"]
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("HudLabelBackground")
+
+[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/Hands/RightHand"]
+visible = false
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 6.0
+offset_top = 6.0
+offset_right = -6.0
+offset_bottom = -6.0
+mouse_filter = 2
+color = Color(0.6, 0.6, 0.6, 1)
+
+[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/Hands/RightHand"]
 visible = false
 layout_mode = 1
 anchor_left = 1.0

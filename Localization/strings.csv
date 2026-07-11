@@ -18,8 +18,9 @@ OBJECT_DOOR,Door,Tür
 OBJECT_DAMAGED_CONDUIT,Damaged Conduit,Beschädigte Leitung
 VERB_INSTALL_CONDUIT,Install Conduit,Leitung verlegen
 VERB_REMOVE_CONDUIT,Remove Conduit,Leitung entfernen
-HUD_HOLDING,Holding,Hält
 HUD_HOLDING_EMPTY,Empty-handed,Leere Hände
+HUD_LEFT_HAND,Left Hand,Linke Hand
+HUD_RIGHT_HAND,Right Hand,Rechte Hand
 ITEM_WALL_PANEL,Wall Panel,Wandpaneel
 VERB_BUILD_WALL,Build Wall,Wand bauen
 VERB_REMOVE_WALL,Remove Wall,Wand entfernen

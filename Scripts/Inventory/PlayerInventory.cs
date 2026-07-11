@@ -18,7 +18,15 @@ public sealed class PlayerInventory
     // on this one.
     private const int BaseSlotCount = 6;
 
-    private readonly (string ItemId, int Count)?[] _slots = new (string, int)?[BaseSlotCount];
+    // Hands are real slots (not a separate reference like the old _heldItemId), reserved at the
+    // end of the array — Has/CountOf/Add/TryRemove/HasRoomFor all iterate _slots generically by
+    // index already, so they automatically include whatever's in a hand in every capacity/count
+    // calculation with no special-casing.
+    public const int HandCount = 2;
+    public const int LeftHandSlotIndex = BaseSlotCount;
+    public const int RightHandSlotIndex = BaseSlotCount + 1;
+
+    private readonly (string ItemId, int Count)?[] _slots = new (string, int)?[BaseSlotCount + HandCount];
 
     /// <summary>The raw per-slot view the inventory panel UI reads (see InventorySlotUI) — index
     /// identity matters here (which physical slot holds what), unlike <see cref="Counts"/>'s
@@ -43,13 +51,54 @@ public sealed class PlayerInventory
     /// (<see cref="ItemCatalog.MaxStackSize"/>) and the number of free slots — returns how much
     /// actually fit (0..count). A caller whose item has nowhere else to fall back to (a refund,
     /// a purchase) must handle a partial result itself; see InventoryOverflow.</summary>
-    public int Add(string itemId, int count = 1)
+    public int Add(string itemId, int count = 1) => AddWithinRange(itemId, count, 0, _slots.Length);
+
+    /// <summary>Moves item `itemId` from the first body slot (pockets only, never the *other*
+    /// hand) that has it into `handIndex` — equipping it. <see cref="MoveSlot"/> already swaps if
+    /// `handIndex` is occupied by something else, which is what makes "replace whichever hand was
+    /// filled most recently" trivial: call this again on that same hand, and its old contents
+    /// land wherever the new item's body slot used to be. Returns false (no-op) if the body
+    /// doesn't currently hold this item at all.</summary>
+    public bool EquipFromBody(string itemId, int handIndex)
+    {
+        for (var i = 0; i < BaseSlotCount; i++)
+        {
+            if (_slots[i]?.ItemId == itemId)
+            {
+                MoveSlot(i, handIndex);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>The explicit toggle-off case — pressing the hotbar key for whatever's already in
+    /// a hand, with no swap target involved. Moves the hand's contents back into the body
+    /// (pockets only, never spilling into the *other* hand), leaving any leftover that didn't fit
+    /// right back in the hand (same "nothing vanishes" partial-fit spirit as <see cref="Add"/>) —
+    /// a completely full body means the hand keeps everything and this returns false.</summary>
+    public bool UnequipToBody(int handIndex)
+    {
+        if (_slots[handIndex] is not { } occupied)
+        {
+            return true;
+        }
+
+        _slots[handIndex] = null;
+        var added = AddWithinRange(occupied.ItemId, occupied.Count, 0, BaseSlotCount);
+        var leftover = occupied.Count - added;
+        _slots[handIndex] = leftover > 0 ? (occupied.ItemId, leftover) : null;
+        return leftover == 0;
+    }
+
+    private int AddWithinRange(string itemId, int count, int startInclusive, int endExclusive)
     {
         var remaining = count;
         var maxStack = ItemCatalog.MaxStackSize(itemId);
 
         // Top up existing stacks of the same item first.
-        for (var i = 0; i < _slots.Length && remaining > 0; i++)
+        for (var i = startInclusive; i < endExclusive && remaining > 0; i++)
         {
             if (_slots[i] is not { } slot || slot.ItemId != itemId)
             {
@@ -68,7 +117,7 @@ public sealed class PlayerInventory
         }
 
         // Then spill into empty slots.
-        for (var i = 0; i < _slots.Length && remaining > 0; i++)
+        for (var i = startInclusive; i < endExclusive && remaining > 0; i++)
         {
             if (_slots[i] is not null)
             {

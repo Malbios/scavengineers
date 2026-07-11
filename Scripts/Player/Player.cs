@@ -40,7 +40,8 @@ public partial class Player : CharacterBody3D
     private ProgressBar? _powerBar;
     private Label? _roomO2Label;
     private Label? _inventoryLabel;
-    private Label? _heldItemLabel;
+    private Label? _leftHandLabel;
+    private Label? _rightHandLabel;
     private Label? _creditsLabel;
     private Control? _inventoryPanel;
     private readonly SuitResources _suitResources = new();
@@ -58,13 +59,16 @@ public partial class Player : CharacterBody3D
     /// no separate item-definition data yet.</summary>
     public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell", "battery", "switch", "recharge_station"];
 
-    /// <summary>A real "what's in my hand" slot, independent of how much of that item the
-    /// PlayerInventory actually holds — a verb needing an item is only affordable while this
-    /// matches its Requirement's ItemId AND the inventory has enough of it (see IsAffordable).</summary>
+    private enum Hand { Left, Right }
 
-    private string? _heldItemId;
+    /// <summary>Which hand was filled most recently — the only piece of state hands need beyond
+    /// PlayerInventory's own slots, since "which hand to replace when both are full" can't be
+    /// derived from the slots themselves.</summary>
+    private Hand? _lastFilledHand;
 
-    public string? HeldItemId => _heldItemId;
+    public string? LeftHandItemId => _inventory.Slots[PlayerInventory.LeftHandSlotIndex]?.ItemId;
+
+    public string? RightHandItemId => _inventory.Slots[PlayerInventory.RightHandSlotIndex]?.ItemId;
 
     public PlayerInventory Inventory => _inventory;
 
@@ -122,11 +126,20 @@ public partial class Player : CharacterBody3D
         _powerBar = GetNode<ProgressBar>("HUD/ResourcesPanel/PowerBar");
         _roomO2Label = GetNode<Label>("HUD/ResourcesPanel/RoomO2Label");
         _inventoryLabel = GetNode<Label>("HUD/InventoryLabel");
-        _heldItemLabel = GetNode<Label>("HUD/HeldItemLabel");
+        _leftHandLabel = GetNode<Label>("HUD/LeftHandLabel");
+        _rightHandLabel = GetNode<Label>("HUD/RightHandLabel");
         _creditsLabel = GetNode<Label>("HUD/CreditsLabel");
         _inventoryPanel = GetNode<Control>("HUD/InventoryPanel");
 
-        foreach (var child in GetNode("HUD/InventoryPanel/Grid").GetChildren())
+        foreach (var child in GetNode("HUD/InventoryPanel/Layout/Grid").GetChildren())
+        {
+            if (child is InventorySlotUI slot)
+            {
+                slot.Inventory = _inventory;
+            }
+        }
+
+        foreach (var child in GetNode("HUD/InventoryPanel/Layout/Hands").GetChildren())
         {
             if (child is InventorySlotUI slot)
             {
@@ -226,9 +239,49 @@ public partial class Player : CharacterBody3D
 
             if (index >= 0 && index < HotbarItems.Length && _inventory.Has(HotbarItems[index], 1))
             {
-                _heldItemId = _heldItemId == HotbarItems[index] ? null : HotbarItems[index];
+                ToggleHeldItem(HotbarItems[index]);
             }
         }
+    }
+
+    /// <summary>Hotbar-key toggle, extended from a single held-item slot to two hands: already
+    /// held in a hand -> unequip that hand (toggle off, same as today's single-hand behavior).
+    /// Otherwise -> fill whichever hand is empty, or if both are full, replace whichever was
+    /// filled most recently (EquipFromBody's own MoveSlot already swaps the displaced hand
+    /// contents back into the body slot the new item came from, so no separate unequip step is
+    /// needed for the replace case).</summary>
+    private void ToggleHeldItem(string itemId)
+    {
+        if (LeftHandItemId == itemId)
+        {
+            _inventory.UnequipToBody(PlayerInventory.LeftHandSlotIndex);
+            return;
+        }
+
+        if (RightHandItemId == itemId)
+        {
+            _inventory.UnequipToBody(PlayerInventory.RightHandSlotIndex);
+            return;
+        }
+
+        if (LeftHandItemId is null)
+        {
+            _inventory.EquipFromBody(itemId, PlayerInventory.LeftHandSlotIndex);
+            _lastFilledHand = Hand.Left;
+            return;
+        }
+
+        if (RightHandItemId is null)
+        {
+            _inventory.EquipFromBody(itemId, PlayerInventory.RightHandSlotIndex);
+            _lastFilledHand = Hand.Right;
+            return;
+        }
+
+        var targetHand = _lastFilledHand ?? Hand.Left;
+        var targetHandIndex = targetHand == Hand.Left ? PlayerInventory.LeftHandSlotIndex : PlayerInventory.RightHandSlotIndex;
+        _inventory.EquipFromBody(itemId, targetHandIndex);
+        _lastFilledHand = targetHand;
     }
 
     // Instance method, not static: the FocusEntered connection below is then tied to this
@@ -400,25 +453,20 @@ public partial class Player : CharacterBody3D
     }
 
     /// <summary>A verb with no item Requirements is always affordable. One that does have
-    /// Requirements needs the player to actually be holding that exact item (see _heldItemId)
-    /// with enough of it in the inventory — this is the single place every item-gated verb
-    /// (repair hull breach, repair damaged conduit, install conduit, ...) is gated, so a target
-    /// never needs its own affordability logic.</summary>
+    /// Requirements needs the player to actually be holding that exact item in either hand
+    /// (real PlayerInventory slots — see LeftHandItemId/RightHandItemId) with enough of it in
+    /// the inventory — this is the single place every item-gated verb (repair hull breach,
+    /// repair damaged conduit, install conduit, ...) is gated, so a target never needs its own
+    /// affordability logic.</summary>
     private bool IsAffordable(Verb verb) =>
         verb.Requirements.Count == 0 ||
-        verb.Requirements.All(r => r.ItemId == _heldItemId && _inventory.Has(r.ItemId, r.Count));
+        verb.Requirements.All(r => (r.ItemId == LeftHandItemId || r.ItemId == RightHandItemId) && _inventory.Has(r.ItemId, r.Count));
 
     private void UpdateVerbHud()
     {
-        // Whatever just consumed the last of the held item (installing the final wall panel,
-        // selling it, ...) doesn't know about _heldItemId — this is the one place that catches
-        // it dropping to zero and clears the selection, instead of the HUD claiming you're still
-        // holding something you no longer have any of.
-        if (_heldItemId is { } heldItemId && !_inventory.Has(heldItemId, 1))
-        {
-            _heldItemId = null;
-        }
-
+        // No depletion check needed here anymore: a hand is a real PlayerInventory slot now, so
+        // TryRemove draining it to 0 already clears it back to null on its own (see
+        // PlayerInventory.TryRemove) — nothing to poll for.
         var target = GetCurrentVerbTarget();
 
         if (target != _lastTarget)
@@ -527,9 +575,13 @@ public partial class Player : CharacterBody3D
     {
         _creditsLabel!.Text = Tr("HUD_CREDITS") + $": {_credits}";
 
-        _heldItemLabel!.Text = _heldItemId is { } heldItemId
-            ? Tr("HUD_HOLDING") + ": " + Tr("ITEM_" + heldItemId.ToUpperInvariant())
-            : Tr("HUD_HOLDING_EMPTY");
+        _leftHandLabel!.Text = Tr("HUD_LEFT_HAND") + ": " + (LeftHandItemId is { } leftItem
+            ? Tr("ITEM_" + leftItem.ToUpperInvariant())
+            : Tr("HUD_HOLDING_EMPTY"));
+
+        _rightHandLabel!.Text = Tr("HUD_RIGHT_HAND") + ": " + (RightHandItemId is { } rightItem
+            ? Tr("ITEM_" + rightItem.ToUpperInvariant())
+            : Tr("HUD_HOLDING_EMPTY"));
 
         if (_inventory.Counts.Count == 0)
         {
