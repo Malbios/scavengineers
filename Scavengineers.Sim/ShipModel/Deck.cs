@@ -1,6 +1,17 @@
+using System.Linq;
 using Scavengineers.Sim.Grid;
 
 namespace Scavengineers.Sim.ShipModel;
+
+/// <summary>Which structural surface of a cell a breach came from — a cell can be open from
+/// more than one independent cause at once (e.g. floor AND ceiling both missing), so this is
+/// tracked per-reason rather than as a single flag; repairing one must not clear the others.</summary>
+public enum StructuralSurface
+{
+    Floor,
+    Ceiling,
+    Wall,
+}
 
 /// <summary>
 /// The shared structural tier (Tier 1 + Tier 2 per docs/architecture/ship-model.md) that
@@ -11,7 +22,7 @@ public sealed class Deck
 {
     private readonly HashSet<CellCoord> _cells = [];
     private readonly HashSet<(CellCoord, CellCoord)> _sealedEdges = [];
-    private readonly HashSet<CellCoord> _hullBreaches = [];
+    private readonly HashSet<(CellCoord Cell, StructuralSurface Surface)> _breaches = [];
     private readonly HashSet<CellCoord> _fires = [];
     private readonly List<Fixture> _fixtures = [];
 
@@ -19,7 +30,7 @@ public sealed class Deck
 
     public IReadOnlyList<Fixture> Fixtures => _fixtures;
 
-    public IReadOnlySet<CellCoord> HullBreaches => _hullBreaches;
+    public IReadOnlySet<CellCoord> HullBreaches => _breaches.Select(b => b.Cell).ToHashSet();
 
     public IReadOnlySet<CellCoord> Fires => _fires;
 
@@ -31,11 +42,18 @@ public sealed class Deck
 
     public bool IsEdgeSealed(CellCoord a, CellCoord b) => _sealedEdges.Contains(Normalize(a, b));
 
-    public void BreachHull(CellCoord cell) => _hullBreaches.Add(cell);
+    /// <summary>Defaults to <see cref="StructuralSurface.Wall"/> so every pre-existing caller
+    /// (hull breaches, airlock venting) keeps compiling unchanged — only floor/ceiling callers
+    /// need to name their reason explicitly.</summary>
+    public void BreachHull(CellCoord cell, StructuralSurface surface = StructuralSurface.Wall) =>
+        _breaches.Add((cell, surface));
 
-    public void RepairHull(CellCoord cell) => _hullBreaches.Remove(cell);
+    public void RepairHull(CellCoord cell, StructuralSurface surface = StructuralSurface.Wall) =>
+        _breaches.Remove((cell, surface));
 
-    public bool IsHullBreached(CellCoord cell) => _hullBreaches.Contains(cell);
+    public bool IsHullBreached(CellCoord cell) => _breaches.Any(b => b.Cell == cell);
+
+    public bool IsHullBreached(CellCoord cell, StructuralSurface surface) => _breaches.Contains((cell, surface));
 
     public void IgniteFire(CellCoord cell) => _fires.Add(cell);
 

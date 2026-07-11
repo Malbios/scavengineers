@@ -49,6 +49,25 @@ public class DeckTests
     }
 
     [Fact]
+    public void RepairingOneBreachReason_LeavesAnotherReasonOnTheSameCellStillBreached()
+    {
+        var deck = new Deck();
+        var cell = new CellCoord(0, 0);
+
+        deck.BreachHull(cell, StructuralSurface.Floor);
+        deck.BreachHull(cell, StructuralSurface.Ceiling);
+
+        deck.RepairHull(cell, StructuralSurface.Floor);
+
+        Assert.False(deck.IsHullBreached(cell, StructuralSurface.Floor));
+        Assert.True(deck.IsHullBreached(cell, StructuralSurface.Ceiling));
+        Assert.True(deck.IsHullBreached(cell));
+
+        deck.RepairHull(cell, StructuralSurface.Ceiling);
+        Assert.False(deck.IsHullBreached(cell));
+    }
+
+    [Fact]
     public void AddFixture_IsRetrievableFromFixturesList()
     {
         var deck = new Deck();
