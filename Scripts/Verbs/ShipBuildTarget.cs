@@ -98,6 +98,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private Timer? _cycleTimer;
     private MeshInstance3D? _ghost;
     private bool _cycling;
+    private Verb? _previewVerb;
 
     private AimKind _aimKind;
     private Vector2I _aimedTile;
@@ -177,9 +178,15 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         UpdateGhostTransform();
     }
 
-    /// <summary>Shows/hides the translucent preview at the current aim point — Player calls
-    /// this once it knows whether Install is actually the active, affordable verb here.</summary>
-    public void SetGhostVisible(bool visible) => _ghost!.Visible = visible;
+    /// <summary>Which install verb (if any) is currently highlighted — Player calls this every
+    /// frame once it knows the active, affordable verb here. Drives both the ghost's visibility
+    /// and its shape, since "install a conduit" and "build a wall" need different previews at
+    /// the same aim point (see <see cref="UpdateGhostTransform"/>).</summary>
+    public void SetPreviewVerb(Verb? verb)
+    {
+        _previewVerb = verb;
+        UpdateGhostTransform();
+    }
 
     private bool IsExcludedColumn(CellCoord a, CellCoord b) =>
         ExcludedEdgeColumn >= 0 &&
@@ -201,24 +208,37 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             case AimKind.Edge when !ShipSimRef.Deck.Cells.Contains(_edgeB):
             {
                 // Boundary edge — the wall action only ever repairs an existing breach, never
-                // creates one; a wall-mounted conduit is offered regardless of breach state
-                // (plenty of hull-adjacent walls never get breached but still carry wiring).
+                // creates one. A wall-mounted conduit needs an actual hull wall to mount on, so
+                // it's only offered while that hull is intact — a breach means open vacuum
+                // there, not a wall, so mounting a "wire" in that gap would float mid-air.
+                var breached = ShipSimRef.Deck.IsHullBreached(_edgeA);
                 var verbs = new List<Verb>();
-                if (ShipSimRef.Deck.IsHullBreached(_edgeA))
+                if (breached)
                 {
                     verbs.Add(InstallWallVerb);
                 }
 
-                verbs.Add(EdgeConduitVerb());
+                if (EdgeConduitVerb(wallPresent: !breached) is { } boundaryConduitVerb)
+                {
+                    verbs.Add(boundaryConduitVerb);
+                }
+
                 return verbs;
             }
 
             case AimKind.Edge:
-                return
-                [
-                    ShipSimRef.Deck.IsEdgeSealed(_edgeA, _edgeB) ? RemoveWallVerb : InstallWallVerb,
-                    EdgeConduitVerb(),
-                ];
+            {
+                // Interior edge — same "needs a real wall" rule: an open (unbuilt) doorway-less
+                // gap between rooms has nothing to mount a conduit on until a wall goes up.
+                var sealed_ = ShipSimRef.Deck.IsEdgeSealed(_edgeA, _edgeB);
+                var verbs = new List<Verb> { sealed_ ? RemoveWallVerb : InstallWallVerb };
+                if (EdgeConduitVerb(wallPresent: sealed_) is { } interiorConduitVerb)
+                {
+                    verbs.Add(interiorConduitVerb);
+                }
+
+                return verbs;
+            }
 
             default:
                 return [];
@@ -227,9 +247,20 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     // Cycled alongside the wall verb via the same multi-verb scroll selection every other
     // multi-verb target already uses — aiming at an edge can mean "the wall itself" or "a
-    // conduit mounted on it," two different objects sharing one aim point.
-    private Verb EdgeConduitVerb() =>
-        _placedConduits.ContainsKey(new Vector2I(_edgeA.X, _edgeA.Y)) ? RemoveConduitVerb : InstallConduitVerb;
+    // conduit mounted on it," two different objects sharing one aim point. Null when nothing
+    // is already placed AND there's no wall to mount a new one on — removal of an already-
+    // placed conduit is always offered regardless (e.g. if the wall behind it got breached
+    // afterwards), only fresh installation requires a real wall to exist first.
+    private Verb? EdgeConduitVerb(bool wallPresent)
+    {
+        var tile = new Vector2I(_edgeA.X, _edgeA.Y);
+        if (_placedConduits.ContainsKey(tile))
+        {
+            return RemoveConduitVerb;
+        }
+
+        return wallPresent ? InstallConduitVerb : null;
+    }
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
@@ -432,20 +463,49 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
     }
 
+    /// <summary>Ghost shape/position depends on both where you're aiming AND which of the
+    /// (possibly two, on an edge) install verbs is currently highlighted — "install a conduit"
+    /// and "build a wall" are different objects at the same aim point, so previewing the wrong
+    /// one's shape would be actively misleading, not just imprecise.</summary>
     private void UpdateGhostTransform()
     {
+        if (_previewVerb != InstallConduitVerb && _previewVerb != InstallWallVerb)
+        {
+            _ghost!.Visible = false;
+            return;
+        }
+
         switch (_aimKind)
         {
             case AimKind.Tile:
-                _ghost!.Mesh = ConduitMesh;
+                _ghost!.Visible = true;
+                _ghost.Mesh = ConduitMesh;
                 _ghost.RotationDegrees = Vector3.Zero;
                 _ghost.Position = ToLocal(TileCenterWorld(_aimedTile));
                 break;
+
+            case AimKind.Edge when _previewVerb == InstallConduitVerb:
+            {
+                _ghost!.Visible = true;
+                _ghost.Mesh = WallConduitMesh;
+                var (position, rotationDegrees) = WallConduitTransform(_edgeA, _edgeB, new Vector2I(_edgeA.X, _edgeA.Y));
+                _ghost.Position = position;
+                _ghost.RotationDegrees = rotationDegrees;
+                break;
+            }
+
             case AimKind.Edge:
-                _ghost!.Mesh = WallSegmentMesh;
+            {
+                _ghost!.Visible = true;
+                _ghost.Mesh = WallSegmentMesh;
                 var (position, rotationDegrees) = EdgeTransform(_edgeA, _edgeB);
                 _ghost.Position = position;
                 _ghost.RotationDegrees = rotationDegrees;
+                break;
+            }
+
+            default:
+                _ghost!.Visible = false;
                 break;
         }
     }

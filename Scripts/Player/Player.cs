@@ -371,11 +371,10 @@ public partial class Player : CharacterBody3D
         var buildTarget = target as ShipBuildTarget;
         if (_activeBuildTarget is not null && _activeBuildTarget != buildTarget)
         {
-            _activeBuildTarget.SetGhostVisible(false);
+            _activeBuildTarget.SetPreviewVerb(null);
         }
 
-        var isInstallVerb = verb == ShipBuildTarget.InstallConduitVerb || verb == ShipBuildTarget.InstallWallVerb;
-        buildTarget?.SetGhostVisible(isInstallVerb);
+        buildTarget?.SetPreviewVerb(verb);
         _activeBuildTarget = buildTarget;
 
         // The name label identifies whatever you're looking at, independent of whether you can
