@@ -24,8 +24,9 @@ public sealed class BuildTargetSaveData
     public List<TileCoord> Conduits { get; set; } = new();
 
     /// <summary>Wall-mounted conduits — same tile-addressed fixture as <see cref="Conduits"/>,
-    /// just rendered against a specific wall face instead of the floor, so the edge it's
-    /// mounted on is saved too (needed to reconstruct the right visual on load).</summary>
+    /// just rendered against a specific wall face instead of the floor, so which neighbor cell
+    /// (i.e. which of up to 4 walls) it's mounted against is saved too (needed to reconstruct
+    /// the right visual on load, and a tile can carry more than one of these at once).</summary>
     public List<WallConduitCoord> WallConduits { get; set; } = new();
 
     /// <summary>Covers both player-built interior partitions and repaired hull breaches — both
@@ -37,7 +38,7 @@ public readonly record struct TileCoord(int X, int Y);
 
 public readonly record struct EdgeCoord(int AX, int AY, int BX, int BY);
 
-public readonly record struct WallConduitCoord(int TileX, int TileY, int EdgeAX, int EdgeAY, int EdgeBX, int EdgeBY);
+public readonly record struct WallConduitCoord(int TileX, int TileY, int NeighborX, int NeighborY);
 
 public sealed class PlayerSaveData
 {

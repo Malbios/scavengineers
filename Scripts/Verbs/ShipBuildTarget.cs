@@ -11,10 +11,10 @@ namespace Scavengineers.Scripts.Verbs;
 /// <summary>
 /// Turns a ship's whole Floor into a free-form build target — any tile or edge the player is
 /// aiming at (fed in via <see cref="SetAimPoint"/>, computed from the interact ray's hit point)
-/// can have a conduit (tile) or a wall segment (edge) installed/removed. Reuses PowerSystem's
-/// existing adjacency rule for conduits and Deck.SealEdge/UnsealEdge for walls — the exact same
-/// primitive InteriorDoorVerbTarget already uses at its two fixed edges — so no Scavengineers.Sim
-/// changes are needed, just deciding which edge/tile the player means.
+/// can have a conduit (tile or wall) or a wall segment (edge) installed/removed. Reuses
+/// PowerSystem's existing adjacency rule for conduits and Deck.SealEdge/UnsealEdge for walls —
+/// the exact same primitive InteriorDoorVerbTarget already uses at its two fixed edges — so no
+/// Scavengineers.Sim changes are needed, just deciding which edge/tile the player means.
 /// </summary>
 public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSaveable
 {
@@ -42,6 +42,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private enum AimKind { None, Tile, Edge }
 
     private enum PendingAction { InstallConduit, RemoveConduit, BuildWall, RepairHullWall, RemoveWall }
+
+    /// <summary>One tile can carry several conduits at once — one floor-mounted (WallNeighbor
+    /// null) plus up to one per bordering wall (WallNeighbor = the cell across that specific
+    /// edge). They're deliberately small boxes rather than one big one, so a busy junction tile
+    /// can hold multiple distinct wire runs (e.g. a corner turn) without them blocking each
+    /// other — Scavengineers.Sim doesn't care: same tile, or a neighbor exactly one tile away,
+    /// both already connect via PowerSystem's adjacency rule regardless of mount surface.</summary>
+    private readonly record struct ConduitSlot(Vector2I Tile, CellCoord? WallNeighbor)
+    {
+        public bool OnWall => WallNeighbor is not null;
+    }
 
     [Export]
     public ShipSim? ShipSimRef { get; set; }
@@ -85,14 +96,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public string SaveId { get; set; } = "";
 
-    private readonly Dictionary<Vector2I, MeshInstance3D> _placedConduits = new();
-
-    /// <summary>Which tiles' conduits are wall-mounted, and the edge they're mounted against —
-    /// only the wall-mounted subset of <see cref="_placedConduits"/> has an entry here, purely
-    /// so save/load can reconstruct the right visual (Scavengineers.Sim's connectivity doesn't
-    /// care which surface a conduit sits on, only its tile).</summary>
-    private readonly Dictionary<Vector2I, (CellCoord A, CellCoord B)> _wallConduitEdges = new();
-
+    private readonly Dictionary<ConduitSlot, MeshInstance3D> _placedConduits = new();
     private readonly Dictionary<(CellCoord, CellCoord), (MeshInstance3D Mesh, CollisionShape3D Collision)> _placedWalls = new();
 
     private Timer? _cycleTimer;
@@ -106,8 +110,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private CellCoord _edgeB;
 
     private PendingAction _pendingAction;
-    private Vector2I _pendingTile;
-    private (CellCoord A, CellCoord B)? _pendingWallEdge;
+    private ConduitSlot _pendingSlot;
     private CellCoord _pendingEdgeA;
     private CellCoord _pendingEdgeB;
     private PlayerInventory? _pendingInventory;
@@ -203,7 +206,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         switch (_aimKind)
         {
             case AimKind.Tile:
-                return [_placedConduits.ContainsKey(_aimedTile) ? RemoveConduitVerb : InstallConduitVerb];
+                return [_placedConduits.ContainsKey(new ConduitSlot(_aimedTile, null)) ? RemoveConduitVerb : InstallConduitVerb];
 
             case AimKind.Edge when !ShipSimRef.Deck.Cells.Contains(_edgeB):
             {
@@ -253,8 +256,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     // afterwards), only fresh installation requires a real wall to exist first.
     private Verb? EdgeConduitVerb(bool wallPresent)
     {
-        var tile = new Vector2I(_edgeA.X, _edgeA.Y);
-        if (_placedConduits.ContainsKey(tile))
+        var slot = new ConduitSlot(new Vector2I(_edgeA.X, _edgeA.Y), _edgeB);
+        if (_placedConduits.ContainsKey(slot))
         {
             return RemoveConduitVerb;
         }
@@ -284,20 +287,19 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private void ExecuteConduitVerb(Verb verb, PlayerInventory inventory)
     {
         // Tile aim -> floor-mounted at the aimed tile. Edge aim -> wall-mounted at the near-side
-        // tile (_edgeA), same tile EdgeConduitVerb already checked to decide Install vs Remove.
-        var onWall = _aimKind == AimKind.Edge;
-        var tile = onWall ? new Vector2I(_edgeA.X, _edgeA.Y) : _aimedTile;
-        var wallEdge = onWall ? ((CellCoord, CellCoord)?)(_edgeA, _edgeB) : null;
+        // tile (_edgeA), same slot EdgeConduitVerb already checked to decide Install vs Remove.
+        var slot = _aimKind == AimKind.Edge
+            ? new ConduitSlot(new Vector2I(_edgeA.X, _edgeA.Y), _edgeB)
+            : new ConduitSlot(_aimedTile, null);
 
-        var alreadyPlaced = _placedConduits.ContainsKey(tile);
+        var alreadyPlaced = _placedConduits.ContainsKey(slot);
         if ((verb.Id == InstallConduitVerb.Id) == alreadyPlaced)
         {
-            return; // Install only valid on an empty tile, Remove only on an already-wired one.
+            return; // Install only valid on an empty slot, Remove only on an already-wired one.
         }
 
         _pendingAction = verb.Id == InstallConduitVerb.Id ? PendingAction.InstallConduit : PendingAction.RemoveConduit;
-        _pendingTile = tile;
-        _pendingWallEdge = wallEdge;
+        _pendingSlot = slot;
         _pendingInventory = inventory;
         _cycling = true;
         _cycleTimer!.Start();
@@ -359,11 +361,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         switch (_pendingAction)
         {
             case PendingAction.InstallConduit:
-                InstallConduit(_pendingTile, _pendingWallEdge);
-                _pendingWallEdge = null;
+                InstallConduit(_pendingSlot);
                 break;
             case PendingAction.RemoveConduit:
-                RemoveConduit(_pendingTile);
+                RemoveConduit(_pendingSlot);
                 inventory?.Add("scrap_metal", 1);
                 break;
             case PendingAction.BuildWall:
@@ -382,37 +383,35 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
     }
 
-    private void InstallConduit(Vector2I tile, (CellCoord A, CellCoord B)? wallEdge = null)
+    private void InstallConduit(ConduitSlot slot)
     {
-        var onWall = wallEdge is not null;
-        var surface = onWall ? FixtureSurface.WallInner : FixtureSurface.FloorUnderside;
-        ShipSimRef?.Deck.AddFixture(new ConduitFixture(ConduitFixtureId(tile), new CellCoord(tile.X, tile.Y), surface));
+        var surface = slot.OnWall ? FixtureSurface.WallInner : FixtureSurface.FloorUnderside;
+        ShipSimRef?.Deck.AddFixture(new ConduitFixture(ConduitFixtureId(slot), new CellCoord(slot.Tile.X, slot.Tile.Y), surface));
 
-        var visual = new MeshInstance3D { Mesh = onWall ? WallConduitMesh : ConduitMesh };
+        var visual = new MeshInstance3D { Mesh = slot.OnWall ? WallConduitMesh : ConduitMesh };
         visual.SetSurfaceOverrideMaterial(0, ConduitMaterial);
         AddChild(visual);
 
-        if (wallEdge is { } edge)
+        if (slot.WallNeighbor is { } neighbor)
         {
-            var (position, rotationDegrees) = WallConduitTransform(edge.A, edge.B, tile);
+            var edgeA = new CellCoord(slot.Tile.X, slot.Tile.Y);
+            var (position, rotationDegrees) = WallConduitTransform(edgeA, neighbor, slot.Tile);
             visual.Position = position;
             visual.RotationDegrees = rotationDegrees;
-            _wallConduitEdges[tile] = edge;
         }
         else
         {
-            visual.Position = ToLocal(TileCenterWorld(tile));
+            visual.Position = ToLocal(TileCenterWorld(slot.Tile));
         }
 
-        _placedConduits[tile] = visual;
+        _placedConduits[slot] = visual;
     }
 
-    private void RemoveConduit(Vector2I tile)
+    private void RemoveConduit(ConduitSlot slot)
     {
-        ShipSimRef?.Deck.RemoveFixture(ConduitFixtureId(tile));
-        _wallConduitEdges.Remove(tile);
+        ShipSimRef?.Deck.RemoveFixture(ConduitFixtureId(slot));
 
-        if (_placedConduits.Remove(tile, out var visual))
+        if (_placedConduits.Remove(slot, out var visual))
         {
             visual.QueueFree();
         }
@@ -533,21 +532,23 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         return (ShipRoot ?? GetParent<Node3D>()).ToGlobal(shipLocal);
     }
 
-    private static string ConduitFixtureId(Vector2I tile) => $"player_conduit_{tile.X}_{tile.Y}";
+    private static string ConduitFixtureId(ConduitSlot slot) => slot.WallNeighbor is { } neighbor
+        ? $"player_conduit_{slot.Tile.X}_{slot.Tile.Y}_wall_{neighbor.X}_{neighbor.Y}"
+        : $"player_conduit_{slot.Tile.X}_{slot.Tile.Y}_floor";
 
     public BuildTargetSaveData CaptureBuildState()
     {
         var data = new BuildTargetSaveData();
 
-        foreach (var tile in _placedConduits.Keys)
+        foreach (var slot in _placedConduits.Keys)
         {
-            if (_wallConduitEdges.TryGetValue(tile, out var edge))
+            if (slot.WallNeighbor is { } neighbor)
             {
-                data.WallConduits.Add(new WallConduitCoord(tile.X, tile.Y, edge.A.X, edge.A.Y, edge.B.X, edge.B.Y));
+                data.WallConduits.Add(new WallConduitCoord(slot.Tile.X, slot.Tile.Y, neighbor.X, neighbor.Y));
             }
             else
             {
-                data.Conduits.Add(new TileCoord(tile.X, tile.Y));
+                data.Conduits.Add(new TileCoord(slot.Tile.X, slot.Tile.Y));
             }
         }
 
@@ -566,15 +567,14 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     {
         foreach (var tile in state.Conduits)
         {
-            InstallConduit(new Vector2I(tile.X, tile.Y));
+            InstallConduit(new ConduitSlot(new Vector2I(tile.X, tile.Y), null));
         }
 
         foreach (var wallConduit in state.WallConduits)
         {
             var tile = new Vector2I(wallConduit.TileX, wallConduit.TileY);
-            var edgeA = new CellCoord(wallConduit.EdgeAX, wallConduit.EdgeAY);
-            var edgeB = new CellCoord(wallConduit.EdgeBX, wallConduit.EdgeBY);
-            InstallConduit(tile, (edgeA, edgeB));
+            var neighbor = new CellCoord(wallConduit.NeighborX, wallConduit.NeighborY);
+            InstallConduit(new ConduitSlot(tile, neighbor));
         }
 
         foreach (var edge in state.Walls)
