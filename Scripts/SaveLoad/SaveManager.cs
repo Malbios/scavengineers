@@ -58,6 +58,11 @@ public partial class SaveManager : Node
             data.BuildTargets[buildSaveable.SaveId] = buildSaveable.CaptureBuildState();
         }
 
+        foreach (var stateSaveable in FindStateSaveables())
+        {
+            data.ObjectStringStates[stateSaveable.SaveId] = stateSaveable.GetSaveState();
+        }
+
         File.WriteAllText(SavePath, JsonSerializer.Serialize(data));
         GD.Print($"[SaveManager] Saved to {SavePath}");
     }
@@ -123,6 +128,14 @@ public partial class SaveManager : Node
             }
         }
 
+        foreach (var stateSaveable in FindStateSaveables())
+        {
+            if (data.ObjectStringStates.TryGetValue(stateSaveable.SaveId, out var state))
+            {
+                stateSaveable.ApplySaveState(state);
+            }
+        }
+
         GD.Print("[SaveManager] Loaded.");
     }
 
@@ -148,6 +161,20 @@ public partial class SaveManager : Node
             if (node is IBuildTargetSaveable buildSaveable)
             {
                 result.Add(buildSaveable);
+            }
+        }
+
+        return result;
+    }
+
+    private List<IStateSaveable> FindStateSaveables()
+    {
+        var result = new List<IStateSaveable>();
+        foreach (var node in GetTree().GetNodesInGroup("saveable"))
+        {
+            if (node is IStateSaveable stateSaveable)
+            {
+                result.Add(stateSaveable);
             }
         }
 

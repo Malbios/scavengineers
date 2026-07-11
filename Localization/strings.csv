@@ -24,3 +24,4 @@ HUD_HOLDING_EMPTY,Empty-handed,Leere Hände
 ITEM_WALL_PANEL,Wall Panel,Wandpaneel
 VERB_BUILD_WALL,Build Wall,Wand bauen
 VERB_REMOVE_WALL,Remove Wall,Wand entfernen
+VERB_SCRAP,Scrap,Verschrotten

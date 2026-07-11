@@ -67,6 +67,13 @@ public partial class Player : CharacterBody3D
     /// Naturally finishing does NOT refund; only an explicit cancel does.</summary>
     private Verb? _busyVerb;
 
+    /// <summary>Which of the current target's affordable verbs is highlighted — cycled by the
+    /// scroll wheel, executed by right-click. Reset to 0 whenever the aimed target changes so
+    /// a stale selection from a different object never carries over.</summary>
+    private int _selectedVerbIndex;
+
+    private IVerbTarget? _lastTarget;
+
     private bool IsBusy => _busyTarget is not null;
 
     public override void _Ready()
@@ -111,6 +118,14 @@ public partial class Player : CharacterBody3D
         {
             Interact();
         }
+        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.WheelUp, Pressed: true } && !IsBusy)
+        {
+            CycleSelectedVerb(1);
+        }
+        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.WheelDown, Pressed: true } && !IsBusy)
+        {
+            CycleSelectedVerb(-1);
+        }
         else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } && IsBusy)
         {
             _busyTarget!.CancelVerb();
@@ -142,7 +157,7 @@ public partial class Player : CharacterBody3D
                 _ => -1,
             };
 
-            if (index >= 0 && index < HotbarItems.Length)
+            if (index >= 0 && index < HotbarItems.Length && _inventory.Has(HotbarItems[index], 1))
             {
                 _heldItemId = _heldItemId == HotbarItems[index] ? null : HotbarItems[index];
             }
@@ -222,13 +237,21 @@ public partial class Player : CharacterBody3D
             return null;
         }
 
-        if (_interactRay.GetCollider() is ShipBuildTarget floorTarget)
+        var collider = _interactRay.GetCollider();
+
+        if (collider is ShipBuildAimForwarder { BuildTarget: { } forwardedTarget })
+        {
+            forwardedTarget.SetAimPoint(_interactRay.GetCollisionPoint());
+            return forwardedTarget;
+        }
+
+        if (collider is ShipBuildTarget floorTarget)
         {
             floorTarget.SetAimPoint(_interactRay.GetCollisionPoint());
             return floorTarget;
         }
 
-        return _interactRay.GetCollider() as IVerbTarget;
+        return collider as IVerbTarget;
     }
 
     private void Interact()
@@ -239,11 +262,13 @@ public partial class Player : CharacterBody3D
         }
 
         var target = GetCurrentVerbTarget();
-        var verb = target?.AvailableVerbs.FirstOrDefault(IsAffordable);
-        if (target is null || verb is null)
+        var verbs = target?.AvailableVerbs.Where(IsAffordable).ToList();
+        if (target is null || verbs is null || verbs.Count == 0)
         {
             return;
         }
+
+        var verb = verbs[_selectedVerbIndex % verbs.Count];
 
         foreach (var requirement in verb.Requirements)
         {
@@ -259,6 +284,20 @@ public partial class Player : CharacterBody3D
         }
     }
 
+    /// <summary>Scrolling cycles which of the current target's affordable verbs is highlighted
+    /// (e.g. Repair vs Scrap on a damaged conduit) — right-click executes whichever is
+    /// currently selected. A no-op for the common case of a target with 0 or 1 verbs.</summary>
+    private void CycleSelectedVerb(int direction)
+    {
+        var count = GetCurrentVerbTarget()?.AvailableVerbs.Count(IsAffordable) ?? 0;
+        if (count == 0)
+        {
+            return;
+        }
+
+        _selectedVerbIndex = ((_selectedVerbIndex + direction) % count + count) % count;
+    }
+
     /// <summary>A verb with no item Requirements is always affordable. One that does have
     /// Requirements needs the player to actually be holding that exact item (see _heldItemId)
     /// with enough of it in the inventory — this is the single place every item-gated verb
@@ -272,10 +311,19 @@ public partial class Player : CharacterBody3D
     {
         var target = GetCurrentVerbTarget();
 
+        if (target != _lastTarget)
+        {
+            _selectedVerbIndex = 0;
+            _lastTarget = target;
+        }
+
         // A verb already in progress on this exact target keeps showing/counting down as-is —
         // its Requirements were already deducted to start it, so re-checking affordability here
         // would hide the HUD partway through an already-succeeding action.
-        var verb = IsBusy && _busyTarget == target ? _busyVerb : target?.AvailableVerbs.FirstOrDefault(IsAffordable);
+        var verbs = target?.AvailableVerbs.Where(IsAffordable).ToList();
+        var verb = IsBusy && _busyTarget == target
+            ? _busyVerb
+            : verbs is { Count: > 0 } ? verbs[_selectedVerbIndex % verbs.Count] : null;
 
         var buildTarget = target as ShipBuildTarget;
         if (_activeBuildTarget is not null && _activeBuildTarget != buildTarget)
@@ -304,7 +352,9 @@ public partial class Player : CharacterBody3D
         {
             var progress = target!.CurrentVerbProgress;
 
-            _verbLabel!.Text = Tr(verb.LocalizationKey);
+            _verbLabel!.Text = verbs is { Count: > 1 }
+                ? $"{Tr(verb.LocalizationKey)} ({_selectedVerbIndex % verbs.Count + 1}/{verbs.Count})"
+                : Tr(verb.LocalizationKey);
             _verbLabel.Visible = true;
             _verbLabel.Modulate = Colors.White;
 

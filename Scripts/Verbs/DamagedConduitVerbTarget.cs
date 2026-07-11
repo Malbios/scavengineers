@@ -11,23 +11,30 @@ namespace Scavengineers.Scripts.Verbs;
 /// <summary>
 /// The conduit fire hazard's repair point (docs/project-plan.md Appendix A7 — powered +
 /// damaged + O2 present sparks and burns; ShipSim's FireSystem already handles ignition/
-/// burning/self-extinguishing). Repairing here just restores the fixture's Condition, which
-/// stops FireSystem from ever igniting it again — it doesn't need to touch Deck.Fires itself,
-/// since a fixed conduit simply stops meeting the "damaged" precondition on the next tick.
+/// burning/self-extinguishing). Repair restores the fixture's Condition, which stops
+/// FireSystem from ever igniting it again. Scrap rips it out of the power circuit entirely
+/// instead — a real tradeoff between the two, not just one verb.
 /// </summary>
-public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, ISaveable
+public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, IStateSaveable
 {
+    private enum ConduitState { Damaged, Repaired, Scrapped }
+
     // Placeholder/tunable — kept short for fast testing.
     private static readonly Verb RepairVerb = new("repair", "VERB_REPAIR", DurationSeconds: 1f)
     {
         Requirements = [new ItemRequirement("spare_parts", 1)],
     };
 
+    private static readonly Verb ScrapVerb = new("scrap", "VERB_SCRAP", DurationSeconds: 1f);
+
     [Export]
     public ShipSim? ShipSimRef { get; set; }
 
     [Export]
     public MeshInstance3D? Mesh { get; set; }
+
+    [Export]
+    public CollisionShape3D? Collider { get; set; }
 
     [Export]
     public Material? RepairingMaterial { get; set; }
@@ -43,32 +50,35 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, ISave
     [Export]
     public string SaveId { get; set; } = "";
 
-    private Timer? _repairTimer;
-    private bool _repairInProgress;
-    private bool _repaired;
+    private Timer? _actionTimer;
+    private bool _actionInProgress;
+    private ConduitState _pendingState;
+    private ConduitState _state = ConduitState.Damaged;
     private bool _wasBurning;
     private Material? _idleMaterial;
+    private PlayerInventory? _pendingInventory;
 
-    public IReadOnlyList<Verb> AvailableVerbs => _repaired ? [] : [RepairVerb];
+    public IReadOnlyList<Verb> AvailableVerbs => _state == ConduitState.Damaged ? [RepairVerb, ScrapVerb] : [];
 
     public string? DisplayNameKey => "OBJECT_DAMAGED_CONDUIT";
 
     public float? CurrentVerbProgress =>
-        _repairInProgress ? 1f - (float)(_repairTimer!.TimeLeft / _repairTimer.WaitTime) : null;
+        _actionInProgress ? 1f - (float)(_actionTimer!.TimeLeft / _actionTimer.WaitTime) : null;
 
     public override void _Ready()
     {
-        _repairTimer = new Timer { OneShot = true, WaitTime = RepairVerb.DurationSeconds };
-        AddChild(_repairTimer);
-        _repairTimer.Timeout += OnRepairComplete;
+        _actionTimer = new Timer { OneShot = true, WaitTime = RepairVerb.DurationSeconds };
+        AddChild(_actionTimer);
+        _actionTimer.Timeout += OnActionComplete;
 
         _idleMaterial = Mesh?.GetSurfaceOverrideMaterial(0);
     }
 
     public override void _PhysicsProcess(double delta)
     {
-        // Repairing/repaired already own the mesh material for the moment — don't fight them.
-        if (_repairInProgress || _repaired)
+        // An action in progress or already-resolved state owns the mesh material for the
+        // moment — don't fight it.
+        if (_actionInProgress || _state != ConduitState.Damaged)
         {
             return;
         }
@@ -85,13 +95,15 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, ISave
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
-        if (verb.Id != RepairVerb.Id || _repairInProgress || _repaired)
+        if (_actionInProgress || _state != ConduitState.Damaged || (verb.Id != RepairVerb.Id && verb.Id != ScrapVerb.Id))
         {
             return;
         }
 
-        _repairInProgress = true;
-        _repairTimer!.Start();
+        _pendingState = verb.Id == RepairVerb.Id ? ConduitState.Repaired : ConduitState.Scrapped;
+        _pendingInventory = inventory;
+        _actionInProgress = true;
+        _actionTimer!.Start();
 
         if (Mesh is not null && RepairingMaterial is not null)
         {
@@ -99,43 +111,84 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, ISave
         }
     }
 
-    private void OnRepairComplete()
+    private void OnActionComplete()
     {
-        _repairInProgress = false;
-        SetRepaired(true);
+        _actionInProgress = false;
+        var inventory = _pendingInventory;
+        _pendingInventory = null;
+
+        SetState(_pendingState);
+
+        if (_pendingState == ConduitState.Scrapped)
+        {
+            inventory?.Add("scrap_metal", 1);
+        }
     }
 
     public void CancelVerb()
     {
-        if (!_repairInProgress)
+        if (!_actionInProgress)
         {
             return;
         }
 
-        _repairInProgress = false;
-        _repairTimer!.Stop();
+        _actionInProgress = false;
+        _pendingInventory = null;
+        _actionTimer!.Stop();
         Mesh?.SetSurfaceOverrideMaterial(0, _idleMaterial);
     }
 
-    public bool GetSaveState() => _repaired;
-
-    public void ApplySaveState(bool state) => SetRepaired(state);
-
-    private void SetRepaired(bool repaired)
+    public string GetSaveState() => _state switch
     {
-        _repaired = repaired;
+        ConduitState.Repaired => "repaired",
+        ConduitState.Scrapped => "scrapped",
+        _ => "damaged",
+    };
 
+    public void ApplySaveState(string state) => SetState(state switch
+    {
+        "repaired" => ConduitState.Repaired,
+        "scrapped" => ConduitState.Scrapped,
+        _ => ConduitState.Damaged,
+    });
+
+    private void SetState(ConduitState state)
+    {
+        _state = state;
+
+        switch (state)
+        {
+            case ConduitState.Repaired:
+                if (FindConduitFixture() is { } repairedConduit)
+                {
+                    repairedConduit.Condition = 1f;
+                }
+
+                ExtinguishIfBurning();
+                Mesh?.SetSurfaceOverrideMaterial(0, RepairedMaterial);
+                break;
+
+            case ConduitState.Scrapped:
+                // Extinguish before removing the fixture — ExtinguishIfBurning looks the
+                // fixture up by id to find its tile, which no longer resolves once gone.
+                ExtinguishIfBurning();
+                ShipSimRef?.Deck.RemoveFixture(ShipSim.DamagedConduitFixtureId);
+                Visible = false;
+                if (Collider is not null)
+                {
+                    Collider.Disabled = true;
+                }
+
+                break;
+        }
+    }
+
+    private void ExtinguishIfBurning()
+    {
         if (FindConduitFixture() is { } conduit)
         {
-            conduit.Condition = repaired ? 1f : 0.1f;
-
-            if (repaired)
-            {
-                ShipSimRef?.Deck.ExtinguishFire(conduit.Tile);
-            }
+            ShipSimRef?.Deck.ExtinguishFire(conduit.Tile);
         }
-
-        Mesh?.SetSurfaceOverrideMaterial(0, repaired ? RepairedMaterial : _idleMaterial);
     }
 
     private ConduitFixture? FindConduitFixture() =>

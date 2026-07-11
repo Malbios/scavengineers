@@ -11,6 +11,8 @@ public sealed class SaveData
     public Dictionary<string, bool> ObjectStates { get; set; } = new();
 
     public Dictionary<string, BuildTargetSaveData> BuildTargets { get; set; } = new();
+
+    public Dictionary<string, string> ObjectStringStates { get; set; } = new();
 }
 
 /// <summary>Everything a ShipBuildTarget places dynamically — no fixed scene node to hang the
