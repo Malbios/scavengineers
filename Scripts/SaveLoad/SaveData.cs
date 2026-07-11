@@ -23,6 +23,11 @@ public sealed class BuildTargetSaveData
 {
     public List<TileCoord> Conduits { get; set; } = new();
 
+    /// <summary>Wall-mounted conduits — same tile-addressed fixture as <see cref="Conduits"/>,
+    /// just rendered against a specific wall face instead of the floor, so the edge it's
+    /// mounted on is saved too (needed to reconstruct the right visual on load).</summary>
+    public List<WallConduitCoord> WallConduits { get; set; } = new();
+
     /// <summary>Covers both player-built interior partitions and repaired hull breaches — both
     /// already land in ShipBuildTarget's own _placedWalls dictionary today.</summary>
     public List<EdgeCoord> Walls { get; set; } = new();
@@ -31,6 +36,8 @@ public sealed class BuildTargetSaveData
 public readonly record struct TileCoord(int X, int Y);
 
 public readonly record struct EdgeCoord(int AX, int AY, int BX, int BY);
+
+public readonly record struct WallConduitCoord(int TileX, int TileY, int EdgeAX, int EdgeAY, int EdgeBX, int EdgeBY);
 
 public sealed class PlayerSaveData
 {
