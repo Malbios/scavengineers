@@ -21,6 +21,7 @@
 [ext_resource type="Script" path="res://Scripts/Verbs/ShipBuildAimForwarder.cs" id="20"]
 [ext_resource type="Script" path="res://Scripts/Ship/TravelConsoleVerbTarget.cs" id="21"]
 [ext_resource type="Script" path="res://Scripts/Ship/StationConsoleVerbTarget.cs" id="22"]
+[ext_resource type="Script" path="res://Scripts/Ship/BatteryVerbTarget.cs" id="23"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 2
@@ -74,6 +75,15 @@ size = Vector3(0.5, 0.8, 0.4)
 
 [sub_resource type="StandardMaterial3D" id="RechargeStationMaterial"]
 albedo_color = Color(0.1, 0.8, 0.7, 1)
+
+[sub_resource type="BoxShape3D" id="BatteryShape"]
+size = Vector3(0.6, 0.9, 0.4)
+
+[sub_resource type="BoxMesh" id="BatteryMesh"]
+size = Vector3(0.6, 0.9, 0.4)
+
+[sub_resource type="StandardMaterial3D" id="BatteryMaterial"]
+albedo_color = Color(0.9, 0.6, 0.05, 1)
 
 [sub_resource type="BoxShape3D" id="PickupItemShape"]
 size = Vector3(0.3, 0.3, 0.3)
@@ -399,6 +409,31 @@ shape = SubResource("SwitchShape")
 [node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/LightSwitch" unique_id=1367835528]
 mesh = SubResource("SwitchMesh")
 surface_material_override/0 = SubResource("SwitchMaterial")
+
+[node name="Battery" type="StaticBody3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef") groups=["saveable"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1, -2.9)
+script = ExtResource("23")
+ShipSimRef = NodePath("../ShipSim")
+SaveId = "home_ship_battery"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/Battery"]
+shape = SubResource("BatteryShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/Battery"]
+mesh = SubResource("BatteryMesh")
+surface_material_override/0 = SubResource("BatteryMaterial")
+
+[node name="IndicatorLight" type="OmniLight3D" parent="HomeShip/Battery"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+light_color = Color(0.95, 0.75, 0.1, 1)
+omni_range = 2.0
+visible = false
+
+[node name="PoweredDeviceIndicator" type="Node" parent="HomeShip/Battery" node_paths=PackedStringArray("ShipSimRef", "IndicatorLight")]
+script = ExtResource("19")
+ShipSimRef = NodePath("../../ShipSim")
+FixtureId = "battery"
+IndicatorLight = NodePath("../IndicatorLight")
 
 [node name="RechargeStation" type="StaticBody3D" parent="HomeShip" unique_id=1419214516 node_paths=PackedStringArray("ShipSimRef")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.5, -2.7)

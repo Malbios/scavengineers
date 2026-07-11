@@ -22,6 +22,7 @@ public partial class StationConsoleVerbTarget : StaticBody3D, IVerbTarget
         ["scrap_metal"] = (5, 2),
         ["spare_parts"] = (15, 6),
         ["wall_panel"] = (10, 4),
+        ["power_cell"] = (12, 5),
     };
 
     private static readonly IReadOnlyList<Verb> BuyVerbs = PlayerScript.HotbarItems

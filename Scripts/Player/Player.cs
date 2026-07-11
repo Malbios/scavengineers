@@ -49,7 +49,7 @@ public partial class Player : CharacterBody3D
     /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-3) —
     /// also reused by StationConsoleVerbTarget as the set of things Buy can offer, since there's
     /// no separate item-definition data yet.</summary>
-    public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel"];
+    public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell"];
 
     /// <summary>A real "what's in my hand" slot, independent of how much of that item the
     /// PlayerInventory actually holds — a verb needing an item is only affordable while this
@@ -177,6 +177,7 @@ public partial class Player : CharacterBody3D
                 Key.Key1 => 0,
                 Key.Key2 => 1,
                 Key.Key3 => 2,
+                Key.Key4 => 3,
                 _ => -1,
             };
 

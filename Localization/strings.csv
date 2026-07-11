@@ -33,3 +33,8 @@ VERB_SELL_WALL_PANEL,Sell Wall Panel,Wandpaneel verkaufen
 OBJECT_SHIP_CONSOLE,Ship Console,Schiffskonsole
 OBJECT_TRADE_CONSOLE,Trade Console,Handelskonsole
 HUD_CREDITS,Credits,Credits
+ITEM_POWER_CELL,Power Cell,Energiezelle
+VERB_BUY_POWER_CELL,Buy Power Cell,Energiezelle kaufen
+VERB_SELL_POWER_CELL,Sell Power Cell,Energiezelle verkaufen
+VERB_RECHARGE_BATTERY,Recharge Battery,Batterie aufladen
+OBJECT_BATTERY,Battery,Batterie
