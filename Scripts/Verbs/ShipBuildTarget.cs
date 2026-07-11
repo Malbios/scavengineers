@@ -79,18 +79,19 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public Mesh? ConduitMesh { get; set; }
 
-    /// <summary>One arm segment, reused once per connected cardinal direction to build a floor
-    /// conduit's straight/corner/T/cross shape — thin and short enough that several fit on one
-    /// tile without visually merging into a blob (docs/project-plan.md's "small boxes" note).
+    /// <summary>One arm segment, reused once per connection to build a conduit's straight/corner/
+    /// T/cross shape (floor conduits, see <see cref="BuildFloorConduitVisual"/>) or its along-
+    /// wall/into-the-room stubs (wall conduits, see <see cref="BuildWallConduitVisual"/>) — thin
+    /// and short enough that several fit on one tile without visually merging into a blob.
     /// Authored long-axis Z (north/south); rotated 90 degrees for east/west arms.</summary>
     [Export]
     public Mesh? ConduitArmMesh { get; set; }
 
     /// <summary>Distinct shape from <see cref="ConduitMesh"/> — thin front-to-back rather than
     /// thin top-to-bottom, so it reads as mounted flush against a wall face instead of lying on
-    /// the floor. Same <see cref="ConduitMaterial"/> either way. Wall-mounted conduits don't get
-    /// the connection-aware arm treatment yet — every wall orientation would need its own corner
-    /// geometry, real scope beyond this pass — so they stay a single fixed box for now.</summary>
+    /// the floor. Same <see cref="ConduitMaterial"/> either way. Shown only for a wall conduit
+    /// with no connections at all (see <see cref="BuildWallConduitVisual"/>) — connected ones use
+    /// <see cref="ConduitArmMesh"/> instead, same as floor conduits.</summary>
     [Export]
     public Mesh? WallConduitMesh { get; set; }
 
@@ -411,27 +412,13 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         var surface = slot.OnWall ? FixtureSurface.WallInner : FixtureSurface.FloorUnderside;
         ShipSimRef?.Deck.AddFixture(new ConduitFixture(ConduitFixtureId(slot), new CellCoord(slot.Tile.X, slot.Tile.Y), surface));
 
-        if (slot.OnWall)
-        {
-            var mesh = new MeshInstance3D { Mesh = WallConduitMesh };
-            mesh.SetSurfaceOverrideMaterial(0, ConduitMaterial);
-            AddChild(mesh);
+        _placedConduits[slot] = slot.OnWall ? BuildWallConduitVisual(slot) : BuildFloorConduitVisual(slot.Tile);
 
-            var edgeA = new CellCoord(slot.Tile.X, slot.Tile.Y);
-            var (position, rotationDegrees) = WallConduitTransform(edgeA, slot.WallNeighbor!.Value, slot.Tile);
-            mesh.Position = position;
-            mesh.RotationDegrees = rotationDegrees;
-            _placedConduits[slot] = mesh;
-        }
-        else
-        {
-            _placedConduits[slot] = BuildFloorConduitVisual(slot.Tile);
-        }
-
-        // A newly wired tile can turn a neighboring floor conduit's dead-end stub into a
-        // straight/corner/T piece (or grow this one's own arms toward neighbors that already
-        // existed) — refresh everyone whose shape could have just changed.
+        // A newly wired tile can turn a neighboring conduit's dead-end stub into a straight/
+        // corner/T piece (or grow this one's own arms toward neighbors that already existed) —
+        // refresh everyone whose shape could have just changed.
         RefreshFloorConduitVisualsAround(slot.Tile);
+        RefreshWallConduitVisualsAround(slot);
     }
 
     private void RemoveConduit(ConduitSlot slot)
@@ -444,6 +431,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
 
         RefreshFloorConduitVisualsAround(slot.Tile);
+        RefreshWallConduitVisualsAround(slot);
     }
 
     /// <summary>Builds a floor conduit's shape from whichever of its 4 cardinal neighbor tiles
@@ -507,6 +495,111 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         foreach (var (offset, _) in CardinalDirections)
         {
             RefreshFloorConduitVisual(tile + offset);
+        }
+    }
+
+    /// <summary>Same idea as <see cref="BuildFloorConduitVisual"/>, adapted to a wall mount's two
+    /// relevant relationships instead of 4 cardinal tiles: another conduit further along the
+    /// *same* wall (an along-wall arm, reused ConduitArmMesh again) or any other conduit sharing
+    /// this tile — a different wall, or a floor conduit — which only ever gets a short inward
+    /// stub pointing into the room, not a precise arm reaching all the way to it (that would mean
+    /// wrapping a corner or dropping to floor height, real extra geometry this pass skips). Zero
+    /// of either falls back to the plain lone wall-conduit box.</summary>
+    private Node3D BuildWallConduitVisual(ConduitSlot slot)
+    {
+        var tile = slot.Tile;
+        var wallNeighbor = slot.WallNeighbor!.Value;
+        var edgeA = new CellCoord(tile.X, tile.Y);
+
+        var container = new Node3D();
+        AddChild(container);
+        var (position, loneRotation) = WallConduitTransform(edgeA, wallNeighbor, tile);
+        container.Position = position;
+
+        var directionToWall = new Vector2I(wallNeighbor.X - tile.X, wallNeighbor.Y - tile.Y);
+        var alongWallOffsets = directionToWall.Y != 0
+            ? new[] { new Vector2I(-1, 0), new Vector2I(1, 0) }
+            : new[] { new Vector2I(0, -1), new Vector2I(0, 1) };
+
+        var hasArm = false;
+
+        foreach (var offset in alongWallOffsets)
+        {
+            var neighborTile = tile + offset;
+            var neighborWallNeighbor = new CellCoord(neighborTile.X + directionToWall.X, neighborTile.Y + directionToWall.Y);
+            if (!_placedConduits.ContainsKey(new ConduitSlot(neighborTile, neighborWallNeighbor)))
+            {
+                continue;
+            }
+
+            hasArm = true;
+            var arm = new MeshInstance3D { Mesh = ConduitArmMesh };
+            arm.SetSurfaceOverrideMaterial(0, ConduitMaterial);
+            arm.Position = new Vector3(offset.X * 0.25f, 0, offset.Y * 0.25f);
+            arm.RotationDegrees = offset.X != 0 ? new Vector3(0, 90, 0) : Vector3.Zero;
+            container.AddChild(arm);
+        }
+
+        if (_placedConduits.Keys.Any(other => other.Tile == tile && other != slot))
+        {
+            hasArm = true;
+            var intoRoom = new Vector2I(-directionToWall.X, -directionToWall.Y);
+            const float stubReach = 0.2f;
+            var stub = new MeshInstance3D { Mesh = ConduitArmMesh };
+            stub.SetSurfaceOverrideMaterial(0, ConduitMaterial);
+            stub.Position = new Vector3(intoRoom.X * stubReach, 0, intoRoom.Y * stubReach);
+            stub.RotationDegrees = intoRoom.X != 0 ? new Vector3(0, 90, 0) : Vector3.Zero;
+            container.AddChild(stub);
+        }
+
+        if (!hasArm)
+        {
+            var lone = new MeshInstance3D { Mesh = WallConduitMesh };
+            lone.SetSurfaceOverrideMaterial(0, ConduitMaterial);
+            lone.RotationDegrees = loneRotation;
+            container.AddChild(lone);
+        }
+
+        return container;
+    }
+
+    private void RefreshWallConduitVisual(ConduitSlot slot)
+    {
+        if (!_placedConduits.TryGetValue(slot, out var existing))
+        {
+            return;
+        }
+
+        existing.QueueFree();
+        _placedConduits[slot] = BuildWallConduitVisual(slot);
+    }
+
+    private void RefreshWallConduitVisualsAround(ConduitSlot slot)
+    {
+        if (slot.OnWall)
+        {
+            RefreshWallConduitVisual(slot);
+
+            var direction = new Vector2I(slot.WallNeighbor!.Value.X - slot.Tile.X, slot.WallNeighbor.Value.Y - slot.Tile.Y);
+            var alongWallOffsets = direction.Y != 0
+                ? new[] { new Vector2I(-1, 0), new Vector2I(1, 0) }
+                : new[] { new Vector2I(0, -1), new Vector2I(0, 1) };
+
+            foreach (var offset in alongWallOffsets)
+            {
+                var neighborTile = slot.Tile + offset;
+                var neighborWallNeighbor = new CellCoord(neighborTile.X + direction.X, neighborTile.Y + direction.Y);
+                RefreshWallConduitVisual(new ConduitSlot(neighborTile, neighborWallNeighbor));
+            }
+        }
+
+        // Any other wall conduit sharing this tile may have just gained or lost the same-tile
+        // companion that drives its inward "connects into the room" stub — this change (whether
+        // it's the wall conduit itself, another wall on the same tile, or a floor conduit here)
+        // is exactly that companion.
+        foreach (var other in _placedConduits.Keys.Where(s => s.OnWall && s.Tile == slot.Tile && s != slot).ToList())
+        {
+            RefreshWallConduitVisual(other);
         }
     }
 
