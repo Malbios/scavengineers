@@ -4,33 +4,31 @@ using System.Collections.Generic;
 namespace Scavengineers.Scripts.Inventory;
 
 /// <summary>
-/// Composes the player's body slots (pockets + hands) with, optionally, an equipped
-/// backpack's own separate <see cref="SlotContainer"/> (inventory arc Stage 3) — a backpack
-/// is the first non-fungible item (it carries real per-instance state, its own contents),
-/// so it's tracked as a distinct <see cref="EquippedContainer"/> rather than merged into the
-/// body slots.
+/// Composes the player's two hands with, optionally, an equipped backpack's own separate
+/// <see cref="SlotContainer"/> (inventory arc Stage 3) — a backpack is the first non-fungible
+/// item (it carries real per-instance state, its own contents), so it's tracked as a distinct
+/// <see cref="EquippedContainer"/> rather than merged into the hand slots. There is no
+/// unrealistic "pockets" storage beyond that: what you're not holding or carrying in a bag
+/// simply isn't on you.
 /// </summary>
 public sealed class PlayerInventory
 {
-    // Placeholder/tunable — "pockets" capacity with nothing else equipped.
-    private const int BaseSlotCount = 6;
-
-    // Hands are real slots (not a separate reference like the old _heldItemId), reserved at the
-    // end of the body array — Has/CountOf/Add/TryRemove/HasRoomFor all iterate the body
-    // generically by index already, so they automatically include whatever's in a hand in every
-    // capacity/count calculation with no special-casing.
+    // Hands are real slots (not a separate reference like the old _heldItemId) — Has/CountOf/
+    // Add/TryRemove/HasRoomFor all iterate them generically, and they're never auto-filled by a
+    // passive Add (see Add's own doc) — only an explicit Equip (hotbar key or drag) puts
+    // something new into an empty hand.
     public const int HandCount = 2;
-    public const int LeftHandSlotIndex = BaseSlotCount;
-    public const int RightHandSlotIndex = BaseSlotCount + 1;
+    public const int LeftHandSlotIndex = 0;
+    public const int RightHandSlotIndex = 1;
 
     // Placeholder/tunable — how many slots a worn backpack's own contents have.
     public const int BackpackSlotCount = 8;
 
-    private readonly SlotContainer _body = new(BaseSlotCount + HandCount);
+    private readonly SlotContainer _hands = new(HandCount);
 
-    /// <summary>The body's own slot container (pockets + hands) — read by InventorySlotUI/
-    /// Player.cs to wire up the body/hand slots of the inventory panel.</summary>
-    public SlotContainer Body => _body;
+    /// <summary>The two hand slots — read by InventorySlotUI/Player.cs to wire up the panel's
+    /// hand slots.</summary>
+    public SlotContainer Hands => _hands;
 
     /// <summary>An item id plus its own separate <see cref="SlotContainer"/> — the shape a
     /// worn backpack takes while equipped. The one container item type this stage supports is
@@ -40,16 +38,16 @@ public sealed class PlayerInventory
 
     public EquippedContainer? Backpack { get; private set; }
 
-    /// <summary>The raw per-slot view the inventory panel UI reads for the body/hand slots
-    /// (see InventorySlotUI) — a worn backpack's own contents are addressed separately via
-    /// <see cref="Backpack"/>.Contents, never merged in here.</summary>
-    public IReadOnlyList<(string ItemId, int Count)?> Slots => _body.Slots;
+    /// <summary>The raw per-slot view of the two hands (see InventorySlotUI) — a worn
+    /// backpack's own contents are addressed separately via <see cref="Backpack"/>.Contents,
+    /// never merged in here.</summary>
+    public IReadOnlyList<(string ItemId, int Count)?> Slots => _hands.Slots;
 
     public IReadOnlyDictionary<string, int> Counts
     {
         get
         {
-            var counts = new Dictionary<string, int>(_body.Counts);
+            var counts = new Dictionary<string, int>(_hands.Counts);
             if (Backpack is not null)
             {
                 foreach (var (itemId, count) in Backpack.Contents.Counts)
@@ -62,29 +60,34 @@ public sealed class PlayerInventory
         }
     }
 
-    public int CountOf(string itemId) => _body.CountOf(itemId) + (Backpack?.Contents.CountOf(itemId) ?? 0);
+    public int CountOf(string itemId) => _hands.CountOf(itemId) + (Backpack?.Contents.CountOf(itemId) ?? 0);
 
     public bool Has(string itemId, int count) => CountOf(itemId) >= count;
 
-    /// <summary>Whether `count` more of this item would fit right now, across the body and (if
-    /// worn) the backpack's contents, without actually adding anything.</summary>
+    /// <summary>Whether `count` more of this item would fit right now, across the worn
+    /// backpack's contents (if any) and empty/matching hands, without actually adding
+    /// anything.</summary>
     public bool HasRoomFor(string itemId, int count) =>
-        _body.RoomFor(itemId) + (Backpack?.Contents.RoomFor(itemId) ?? 0) >= count;
+        (Backpack?.Contents.RoomFor(itemId) ?? 0) + _hands.RoomFor(itemId) >= count;
 
-    /// <summary>Adds up to `count`: tops up/fills the body first, then spills any remainder into
-    /// the worn backpack's own contents (if any) — returns how much actually fit (0..count).</summary>
+    /// <summary>Adds up to `count`: tops up/fills the worn backpack's own contents first, then
+    /// falls back to a hand only if the backpack doesn't exist or doesn't have room — a passive
+    /// pickup never bumps something you're deliberately holding, and never fills an empty hand
+    /// as long as the bag can take it. Returns how much actually fit (0..count).</summary>
     public int Add(string itemId, int count = 1)
     {
-        var addedToBody = _body.Add(itemId, count);
-        var remaining = count - addedToBody;
-        if (remaining <= 0 || Backpack is null)
+        var addedToBackpack = Backpack?.Contents.Add(itemId, count) ?? 0;
+        var remaining = count - addedToBackpack;
+        if (remaining <= 0)
         {
-            return addedToBody;
+            return addedToBackpack;
         }
 
-        return addedToBody + Backpack.Contents.Add(itemId, remaining);
+        return addedToBackpack + _hands.Add(itemId, remaining);
     }
 
+    /// <summary>Removes up to `count`, preferring the backpack's bulk stock over what's actively
+    /// held in a hand — draining a hand last keeps a held item in hand as long as possible.</summary>
     public bool TryRemove(string itemId, int count = 1)
     {
         if (!Has(itemId, count))
@@ -92,48 +95,41 @@ public sealed class PlayerInventory
             return false;
         }
 
-        var fromBody = Math.Min(_body.CountOf(itemId), count);
-        if (fromBody > 0)
+        var fromBackpack = Backpack is null ? 0 : Math.Min(Backpack.Contents.CountOf(itemId), count);
+        if (fromBackpack > 0)
         {
-            _body.TryRemove(itemId, fromBody);
+            Backpack!.Contents.TryRemove(itemId, fromBackpack);
         }
 
-        var remaining = count - fromBody;
+        var remaining = count - fromBackpack;
         if (remaining > 0)
         {
-            Backpack?.Contents.TryRemove(itemId, remaining);
+            _hands.TryRemove(itemId, remaining);
         }
 
         return true;
     }
 
-    /// <summary>Moves item `itemId` from the first body slot (pockets only, never the *other*
-    /// hand) that has it into `handIndex` — equipping it, falling back to the worn backpack's own
-    /// contents if it isn't sitting in a pocket. <see cref="MoveSlot"/>/<see cref="SlotContainer.MoveBetween"/>
-    /// already swap if `handIndex` is occupied by something else, which is what makes "replace
+    /// <summary>Moves item `itemId` into `handIndex` from the worn backpack's contents —
+    /// equipping it (there's nowhere else it could be, since neither hand already holds it by
+    /// the time this is called — see Player.ToggleHeldItem). <see cref="SlotContainer.MoveBetween"/>
+    /// already swaps if `handIndex` is occupied by something else, which is what makes "replace
     /// whichever hand was filled most recently" trivial: call this again on that same hand, and
-    /// its old contents land wherever the new item came from. Returns false (no-op) if neither
-    /// the body nor the backpack currently holds this item.</summary>
-    public bool EquipFromBody(string itemId, int handIndex)
+    /// its old contents land back in the backpack. Returns false (no-op) if the backpack doesn't
+    /// currently hold this item.</summary>
+    public bool Equip(string itemId, int handIndex)
     {
-        for (var i = 0; i < BaseSlotCount; i++)
+        if (Backpack is null)
         {
-            if (_body.Slots[i]?.ItemId == itemId)
-            {
-                MoveSlot(i, handIndex);
-                return true;
-            }
+            return false;
         }
 
-        if (Backpack is not null)
+        for (var i = 0; i < Backpack.Contents.Slots.Count; i++)
         {
-            for (var i = 0; i < Backpack.Contents.Slots.Count; i++)
+            if (Backpack.Contents.Slots[i]?.ItemId == itemId)
             {
-                if (Backpack.Contents.Slots[i]?.ItemId == itemId)
-                {
-                    SlotContainer.MoveBetween(Backpack.Contents, i, _body, handIndex);
-                    return true;
-                }
+                SlotContainer.MoveBetween(Backpack.Contents, i, _hands, handIndex);
+                return true;
             }
         }
 
@@ -141,40 +137,36 @@ public sealed class PlayerInventory
     }
 
     /// <summary>The explicit toggle-off case — pressing the hotbar key for whatever's already in
-    /// a hand, with no swap target involved. Moves the hand's contents back into the body
-    /// (pockets only, never spilling into the *other* hand), leaving any leftover that didn't fit
-    /// right back in the hand (same "nothing vanishes" partial-fit spirit as <see cref="Add"/>) —
-    /// a completely full body means the hand keeps everything and this returns false.</summary>
-    public bool UnequipToBody(int handIndex)
+    /// a hand, with no swap target involved. Moves the hand's contents into the worn backpack
+    /// (if any), leaving any leftover that didn't fit right back in the hand (same "nothing
+    /// vanishes" partial-fit spirit as <see cref="Add"/>) — no backpack, or a full one, means the
+    /// hand keeps everything and this returns false.</summary>
+    public bool Unequip(int handIndex)
     {
-        if (_body.Slots[handIndex] is not { } occupied)
+        if (_hands.Slots[handIndex] is not { } occupied)
         {
             return true;
         }
 
-        _body.SetSlot(handIndex, null);
-        var added = _body.AddWithinRange(occupied.ItemId, occupied.Count, 0, BaseSlotCount);
+        _hands.SetSlot(handIndex, null);
+        var added = Backpack?.Contents.Add(occupied.ItemId, occupied.Count) ?? 0;
         var leftover = occupied.Count - added;
-        _body.SetSlot(handIndex, leftover > 0 ? (occupied.ItemId, leftover) : null);
+        _hands.SetSlot(handIndex, leftover > 0 ? (occupied.ItemId, leftover) : null);
         return leftover == 0;
     }
 
-    /// <summary>Moves slot `from` onto slot `to` within the body (pockets + hands) — the
-    /// inventory panel UI's drag-and-drop mutation for ordinary slots (see InventorySlotUI).</summary>
-    public void MoveSlot(int from, int to) => _body.MoveSlot(from, to);
-
-    /// <summary>Equips a worn backpack by consuming one "backpack" item from the body (wherever
-    /// it currently sits) and attaching a freshly-emptied <see cref="SlotContainer"/> as
-    /// <see cref="Backpack"/>. Fails (no-op) if a backpack is already worn, or the body doesn't
-    /// currently hold one.</summary>
-    public bool EquipBackpackFromBody(int slotCount = BackpackSlotCount)
+    /// <summary>Equips a worn backpack by consuming one "backpack" item from a hand (wherever it
+    /// currently sits) and attaching a freshly-emptied <see cref="SlotContainer"/> as
+    /// <see cref="Backpack"/>. Fails (no-op) if a backpack is already worn, or no hand currently
+    /// holds one.</summary>
+    public bool EquipBackpackFromHand(int slotCount = BackpackSlotCount)
     {
         if (Backpack is not null)
         {
             return false;
         }
 
-        if (!_body.TryRemove("backpack", 1))
+        if (!_hands.TryRemove("backpack", 1))
         {
             return false;
         }
@@ -188,7 +180,7 @@ public sealed class PlayerInventory
     public void ClearBackpack() => Backpack = null;
 
     /// <summary>Attaches an already-built container as the worn backpack directly, bypassing the
-    /// body-consume step in <see cref="EquipBackpackFromBody"/> — used by save/load restoration
+    /// hand-consume step in <see cref="EquipBackpackFromBody"/> — used by save/load restoration
     /// and by picking a full backpack back up off the ground (see ContainerPickupItem). Fails
     /// (no-op, returns false) if a backpack is already worn.</summary>
     public bool EquipContainerDirectly(string itemId, SlotContainer contents)
@@ -204,7 +196,7 @@ public sealed class PlayerInventory
 
     public void Clear()
     {
-        _body.Clear();
+        _hands.Clear();
         Backpack = null;
     }
 }

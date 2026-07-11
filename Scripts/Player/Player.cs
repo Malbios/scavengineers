@@ -72,7 +72,7 @@ public partial class Player : CharacterBody3D
     /// also reused by StationConsoleVerbTarget as the set of things Buy can offer, since there's
     /// no separate item-definition data yet. "backpack" is an ordinary holdable/purchasable item
     /// right up until it's actually equipped via drag-and-drop onto the Back slot (see
-    /// TryEquipBackpackFromBody) — no dedicated verb needed to buy or hold one.</summary>
+    /// TryEquipBackpackFromHand) — no dedicated verb needed to buy or hold one.</summary>
     public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell", "battery", "switch", "recharge_station", "backpack"];
 
     private enum Hand { Left, Right }
@@ -147,20 +147,11 @@ public partial class Player : CharacterBody3D
         _inventoryPanel = GetNode<Control>("HUD/InventoryPanel");
         _backpackGrid = GetNode<Control>("HUD/InventoryPanel/Layout/BackpackGrid");
 
-        foreach (var child in GetNode("HUD/InventoryPanel/Layout/Grid").GetChildren())
-        {
-            if (child is InventorySlotUI slot)
-            {
-                slot.Container = _inventory.Body;
-                slot.PlayerRef = this;
-            }
-        }
-
         foreach (var child in GetNode("HUD/InventoryPanel/Layout/EquipSlots").GetChildren())
         {
             if (child is InventorySlotUI slot)
             {
-                slot.Container = _inventory.Body;
+                slot.Container = _inventory.Hands;
                 slot.PlayerRef = this;
             }
         }
@@ -179,7 +170,7 @@ public partial class Player : CharacterBody3D
         // Overwritten by ApplyPlayerState on load, same as every other fresh-start default.
         // Backpack is equipped first so any future stipend increase spills into it correctly.
         _inventory.Add("backpack", 1);
-        _inventory.EquipBackpackFromBody();
+        _inventory.EquipBackpackFromHand();
         _inventory.Add("scrap_metal", 50);
 
         CaptureMouse();
@@ -278,67 +269,67 @@ public partial class Player : CharacterBody3D
     /// <summary>Hotbar-key toggle, extended from a single held-item slot to two hands: already
     /// held in a hand -> unequip that hand (toggle off, same as today's single-hand behavior).
     /// Otherwise -> fill whichever hand is empty, or if both are full, replace whichever was
-    /// filled most recently (EquipFromBody's own MoveSlot already swaps the displaced hand
-    /// contents back into the body slot the new item came from, so no separate unequip step is
-    /// needed for the replace case).</summary>
+    /// filled most recently (Equip's own MoveBetween already swaps the displaced hand contents
+    /// back into the backpack the new item came from, so no separate unequip step is needed for
+    /// the replace case).</summary>
     private void ToggleHeldItem(string itemId)
     {
         if (LeftHandItemId == itemId)
         {
-            _inventory.UnequipToBody(PlayerInventory.LeftHandSlotIndex);
+            _inventory.Unequip(PlayerInventory.LeftHandSlotIndex);
             return;
         }
 
         if (RightHandItemId == itemId)
         {
-            _inventory.UnequipToBody(PlayerInventory.RightHandSlotIndex);
+            _inventory.Unequip(PlayerInventory.RightHandSlotIndex);
             return;
         }
 
         if (LeftHandItemId is null)
         {
-            _inventory.EquipFromBody(itemId, PlayerInventory.LeftHandSlotIndex);
+            _inventory.Equip(itemId, PlayerInventory.LeftHandSlotIndex);
             _lastFilledHand = Hand.Left;
             return;
         }
 
         if (RightHandItemId is null)
         {
-            _inventory.EquipFromBody(itemId, PlayerInventory.RightHandSlotIndex);
+            _inventory.Equip(itemId, PlayerInventory.RightHandSlotIndex);
             _lastFilledHand = Hand.Right;
             return;
         }
 
         var targetHand = _lastFilledHand ?? Hand.Left;
         var targetHandIndex = targetHand == Hand.Left ? PlayerInventory.LeftHandSlotIndex : PlayerInventory.RightHandSlotIndex;
-        _inventory.EquipFromBody(itemId, targetHandIndex);
+        _inventory.Equip(itemId, targetHandIndex);
         _lastFilledHand = targetHand;
     }
 
     /// <summary>Called by InventorySlotUI's Back slot when something is dragged onto it — equips
-    /// a backpack only if the dragged body slot really is one (a sensible drag gesture check;
-    /// PlayerInventory.EquipBackpackFromBody doesn't care which exact slot it came from, since
+    /// a backpack only if the dragged hand slot really is one (a sensible drag gesture check;
+    /// PlayerInventory.EquipBackpackFromHand doesn't care which exact hand it came from, since
     /// the item is fungible right up until the moment it's equipped).</summary>
-    public void TryEquipBackpackFromBody(int fromSlotIndex)
+    public void TryEquipBackpackFromHand(int fromSlotIndex)
     {
-        if (fromSlotIndex < 0 || fromSlotIndex >= _inventory.Body.Slots.Count)
+        if (fromSlotIndex < 0 || fromSlotIndex >= _inventory.Hands.Slots.Count)
         {
             return;
         }
 
-        if (_inventory.Body.Slots[fromSlotIndex]?.ItemId != "backpack")
+        if (_inventory.Hands.Slots[fromSlotIndex]?.ItemId != "backpack")
         {
             return;
         }
 
-        _inventory.EquipBackpackFromBody();
+        _inventory.EquipBackpackFromHand();
     }
 
-    /// <summary>Called by an ordinary slot's InventorySlotUI when the equipped backpack itself
-    /// (the Back slot's -1 drag sentinel) is dropped onto it. An empty backpack becomes a
-    /// fungible item again if it fits (staying equipped if pockets are full — "nothing
-    /// vanishes"); a non-empty one can't fall back into an ordinary fungible slot at all, so it's
-    /// dropped in the world instead, contents intact.</summary>
+    /// <summary>Called by an ordinary hand slot's InventorySlotUI when the equipped backpack
+    /// itself (dragged from the Back slot) is dropped onto it. An empty backpack becomes a
+    /// fungible item again if a hand fits it (staying equipped if both hands are full —
+    /// "nothing vanishes"); a non-empty one can't fall back into a hand at all, so it's dropped
+    /// in the world instead, contents intact.</summary>
     public void TryUnequipBackpack()
     {
         if (_inventory.Backpack is not { } backpack)
@@ -349,7 +340,7 @@ public partial class Player : CharacterBody3D
         var isEmpty = backpack.Contents.Slots.All(s => s is null);
         if (isEmpty)
         {
-            if (_inventory.Body.Add(backpack.ItemId, 1) == 1)
+            if (_inventory.Hands.Add(backpack.ItemId, 1) == 1)
             {
                 _inventory.ClearBackpack();
             }
@@ -637,7 +628,7 @@ public partial class Player : CharacterBody3D
             Pitch = _pitch,
             O2Percent = _suitResources.O2Percent,
             PowerPercent = _suitResources.PowerPercent,
-            Inventory = new Dictionary<string, int>(_inventory.Body.Counts),
+            Inventory = new Dictionary<string, int>(_inventory.Hands.Counts),
             Credits = _credits,
             BackpackItemId = _inventory.Backpack?.ItemId,
             BackpackContents = _inventory.Backpack is { } backpack

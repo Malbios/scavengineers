@@ -31,7 +31,7 @@ public partial class InventorySlotUI : Control
     public SlotContainer? Container { get; set; }
 
     /// <summary>Wired on every slot (not just Back) — ordinary slots need it too, to react when
-    /// the equipped backpack itself is dropped onto them (see _DropData's -1 sentinel).</summary>
+    /// the equipped backpack itself is dragged from the Back slot onto them (see _DropData).</summary>
     public Player? PlayerRef { get; set; }
 
     private ColorRect? _icon;
@@ -100,7 +100,7 @@ public partial class InventorySlotUI : Control
         preview.AddChild(new ColorRect { Color = ItemCatalog.Color(slot.ItemId), Size = Size });
         SetDragPreview(preview);
 
-        // The source slot itself, not just an index — body and backpack-contents slots address
+        // The source slot itself, not just an index — hand and backpack-contents slots address
         // *different* SlotContainer instances, so a bare index alone can't say which array it
         // came from (see SlotContainer.MoveBetween).
         return this;
@@ -120,7 +120,7 @@ public partial class InventorySlotUI : Control
         {
             if (!source.IsBackSlot)
             {
-                PlayerRef.TryEquipBackpackFromBody(source.SlotIndex);
+                PlayerRef.TryEquipBackpackFromHand(source.SlotIndex);
             }
 
             return;
