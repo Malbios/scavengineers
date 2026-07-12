@@ -27,6 +27,10 @@ public class SaveDataSerializationTests
                 Credits = 20,
                 BackpackItemId = "backpack",
                 BackpackContents = new Dictionary<string, int> { ["wall_panel"] = 3 },
+                BackpackSlotCount = 24,
+                HasDrill = true,
+                DrillHasBattery = true,
+                DrillCharge = 0.68f,
             },
             ObjectStates = new Dictionary<string, bool> { ["door-1"] = true },
             ObjectStringStates = new Dictionary<string, string> { ["conduit-1"] = "repaired" },
@@ -46,7 +50,11 @@ public class SaveDataSerializationTests
         Assert.Equal(data.Version, roundTripped.Version);
         Assert.Equal(data.Player.PosX, roundTripped.Player.PosX);
         Assert.Equal(data.Player.BackpackItemId, roundTripped.Player.BackpackItemId);
+        Assert.Equal(data.Player.BackpackSlotCount, roundTripped.Player.BackpackSlotCount);
         Assert.Equal(data.Player.Inventory, roundTripped.Player.Inventory);
+        Assert.True(roundTripped.Player.HasDrill);
+        Assert.True(roundTripped.Player.DrillHasBattery);
+        Assert.Equal(data.Player.DrillCharge, roundTripped.Player.DrillCharge);
         Assert.Equal(data.ObjectStates, roundTripped.ObjectStates);
         Assert.Equal(data.ObjectStringStates, roundTripped.ObjectStringStates);
         Assert.Single(roundTripped.DroppedContainers);

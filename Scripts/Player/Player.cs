@@ -17,6 +17,9 @@ public partial class Player : CharacterBody3D
     private const float MouseSensitivity = 0.0025f;
     private const float MaxPitchRadians = Mathf.Pi / 2 - 0.05f;
 
+    // Placeholder/tunable — 25 wall/floor/ceiling actions per full battery.
+    private const float DrillChargeDrainPerUse = 0.04f;
+
     // Zero-g movement (placeholder/tunable) — triggers whenever the room's own O2 reads at or
     // below this fraction (see ShipSimRef.VolumeAt), same "vacuum" threshold spirit as
     // AtmosphereVolume.Vacuum's O2Fraction of 0, with a little slack so the switch doesn't
@@ -71,6 +74,8 @@ public partial class Player : CharacterBody3D
     private ProgressBar? _hungerBar;
     private ProgressBar? _thirstBar;
     private ProgressBar? _energyBar;
+    private Label? _drillLabel;
+    private ProgressBar? _drillBar;
 
     /// <summary>The generic dropped-item visual (same box mesh + per-item material-override
     /// pattern InventoryOverflow.DropAt and ShipBuildTarget's own refunds already use) — reused
@@ -169,6 +174,8 @@ public partial class Player : CharacterBody3D
         _thirstBar = GetNode<ProgressBar>("HUD/ResourcesPanel/ThirstBar");
         _energyBar = GetNode<ProgressBar>("HUD/ResourcesPanel/EnergyBar");
         _roomO2Label = GetNode<Label>("HUD/ResourcesPanel/RoomO2Label");
+        _drillLabel = GetNode<Label>("HUD/ResourcesPanel/DrillLabel");
+        _drillBar = GetNode<ProgressBar>("HUD/ResourcesPanel/DrillBar");
         _leftHandLabel = GetNode<Label>("HUD/LeftHandLabel");
         _rightHandLabel = GetNode<Label>("HUD/RightHandLabel");
         _creditsLabel = GetNode<Label>("HUD/CreditsLabel");
@@ -196,13 +203,16 @@ public partial class Player : CharacterBody3D
         // Placeholder/tunable starting stipend for testing the free-form conduit wiring
         // extensively — same "don't wait on it" spirit as the near-instant verb durations.
         // Overwritten by ApplyPlayerState on load, same as every other fresh-start default.
-        // Backpack is equipped first so any future stipend increase spills into it correctly.
-        _inventory.Add("backpack", 1);
-        _inventory.EquipBackpackFromHand();
+        // The debug backpack is attached first (dev convenience, not something you "found" —
+        // bypasses the normal hand-then-equip flow entirely) so the stipend below spills into
+        // its 24 slots instead of overflowing two bare hands.
+        _inventory.EquipContainerDirectly("debug_backpack", new SlotContainer(24));
         _inventory.Add("scrap_metal", 50);
         _inventory.Add("ration_bar", 3);
         _inventory.Add("water_bottle", 3);
         _inventory.Add("crowbar", 1);
+        _inventory.Add("power_drill", 1);
+        _inventory.AttachDrill(hasBattery: true, charge: 1f);
 
         CaptureMouse();
         // Setting MouseMode here alone is unreliable if the window doesn't yet have OS
@@ -610,6 +620,16 @@ public partial class Player : CharacterBody3D
             _roomO2Label!.Visible = false;
         }
 
+        // Only shown while actually holding the drill — feedback on "loses power with usage"
+        // matters mid-task, not just when the inventory panel (with the battery slot) is open.
+        var holdingDrill = LeftHandItemId == "power_drill" || RightHandItemId == "power_drill";
+        _drillLabel!.Visible = holdingDrill;
+        _drillBar!.Visible = holdingDrill;
+        if (holdingDrill)
+        {
+            _drillBar.Value = _inventory.Drill is { HasBattery: true } drill ? drill.Charge * 100 : 0;
+        }
+
         UpdateVerbHud();
     }
 
@@ -715,6 +735,11 @@ public partial class Player : CharacterBody3D
             _inventory.TryRemove(requirement.ItemId, requirement.Count);
         }
 
+        if (verb.Requirements.Any(r => r.ItemId == "power_drill"))
+        {
+            _inventory.Drill!.Charge = Mathf.Max(0f, _inventory.Drill.Charge - DrillChargeDrainPerUse);
+        }
+
         target.ExecuteVerb(verb, _inventory);
 
         if (verb.DurationSeconds > 0)
@@ -743,10 +768,15 @@ public partial class Player : CharacterBody3D
     /// (real PlayerInventory slots — see LeftHandItemId/RightHandItemId) with enough of it in
     /// the inventory — this is the single place every item-gated verb (repair hull breach,
     /// repair damaged conduit, install conduit, ...) is gated, so a target never needs its own
-    /// affordability logic.</summary>
+    /// affordability logic. One extra clause is specific to the power drill (the only stateful
+    /// tool so far, see PlayerInventory.DrillState) — holding it isn't enough, it also needs an
+    /// installed battery with real charge left.</summary>
     private bool IsAffordable(Verb verb) =>
         verb.Requirements.Count == 0 ||
-        verb.Requirements.All(r => (r.ItemId == LeftHandItemId || r.ItemId == RightHandItemId) && _inventory.Has(r.ItemId, r.Count));
+        verb.Requirements.All(r =>
+            (r.ItemId == LeftHandItemId || r.ItemId == RightHandItemId) &&
+            _inventory.Has(r.ItemId, r.Count) &&
+            (r.ItemId != "power_drill" || _inventory.Drill is { HasBattery: true, Charge: > 0f }));
 
     /// <summary>The single place a target's verbs are filtered to affordable ones and ordered
     /// for cycling/selection — every caller (Interact, CycleSelectedVerb, UpdateVerbHud) must
@@ -845,6 +875,10 @@ public partial class Player : CharacterBody3D
             BackpackContents = _inventory.Backpack is { } backpack
                 ? new Dictionary<string, int>(backpack.Contents.Counts)
                 : new Dictionary<string, int>(),
+            BackpackSlotCount = _inventory.Backpack?.Contents.Slots.Count ?? PlayerInventory.BackpackSlotCount,
+            HasDrill = _inventory.Drill is not null,
+            DrillHasBattery = _inventory.Drill?.HasBattery ?? false,
+            DrillCharge = _inventory.Drill?.Charge ?? 0f,
         };
     }
 
@@ -873,13 +907,18 @@ public partial class Player : CharacterBody3D
         // SlotContainer, keeping body-refill and backpack-refill from cross-contaminating.
         if (data.BackpackItemId is { } backpackItemId)
         {
-            var contents = new SlotContainer(PlayerInventory.BackpackSlotCount);
+            var contents = new SlotContainer(data.BackpackSlotCount);
             foreach (var (itemId, count) in data.BackpackContents)
             {
                 contents.Add(itemId, count);
             }
 
             _inventory.EquipContainerDirectly(backpackItemId, contents);
+        }
+
+        if (data.HasDrill)
+        {
+            _inventory.AttachDrill(data.DrillHasBattery, data.DrillCharge);
         }
 
         _credits = data.Credits;

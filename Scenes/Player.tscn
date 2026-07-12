@@ -260,6 +260,44 @@ offset_top = -18.0
 mouse_filter = 2
 horizontal_alignment = 2
 
+[node name="DrillBattery" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots" node_paths=PackedStringArray("Tooltip")]
+custom_minimum_size = Vector2(48, 48)
+layout_mode = 2
+script = ExtResource("3")
+IsDrillBatterySlot = true
+Tooltip = NodePath("../../../../InventoryTooltip")
+
+[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/EquipSlots/DrillBattery"]
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("HudLabelBackground")
+
+[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/DrillBattery"]
+visible = false
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 6.0
+offset_top = 6.0
+offset_right = -6.0
+offset_bottom = -6.0
+mouse_filter = 2
+color = Color(0.6, 0.6, 0.6, 1)
+
+[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/DrillBattery"]
+visible = false
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -22.0
+offset_top = -18.0
+mouse_filter = 2
+horizontal_alignment = 2
+
 [node name="BackpackSeparator" type="HSeparator" parent="HUD/InventoryPanel/Layout"]
 layout_mode = 2
 
@@ -655,3 +693,18 @@ visible = false
 layout_mode = 2
 size_flags_horizontal = 0
 theme_override_styles/normal = SubResource("HudLabelBackground")
+
+[node name="DrillLabel" type="Label" parent="HUD/ResourcesPanel"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_styles/normal = SubResource("HudLabelBackground")
+text = "DRILL"
+
+[node name="DrillBar" type="ProgressBar" parent="HUD/ResourcesPanel"]
+visible = false
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+theme_override_styles/background = SubResource("HudLabelBackground")
+value = 100.0
+show_percentage = false

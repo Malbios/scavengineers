@@ -29,30 +29,48 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         Requirements = [new ItemRequirement("scrap_metal", 1)],
     };
 
+    // Wall/floor/ceiling work (not conduits) needs a power drill in hand alongside the
+    // consumed material — a real tool, not spent, gated on its own charge (see
+    // Player.IsAffordable/Interact's drill-specific clauses).
+    private static readonly ItemRequirement PowerDrillRequirement = new("power_drill", 1) { Consumed = false };
+
     public static readonly Verb InstallWallVerb = new("build_wall", "VERB_BUILD_WALL", DurationSeconds: 0.2f)
     {
-        Requirements = [new ItemRequirement("wall_panel", 1)],
+        Requirements = [new ItemRequirement("wall_panel", 1), PowerDrillRequirement],
     };
 
     private static readonly Verb RemoveConduitVerb = new("remove_conduit", "VERB_REMOVE_CONDUIT", DurationSeconds: 0.2f) { IsDestructive = true };
-    private static readonly Verb RemoveWallVerb = new("remove_wall", "VERB_REMOVE_WALL", DurationSeconds: 0.2f) { IsDestructive = true };
+
+    private static readonly Verb RemoveWallVerb = new("remove_wall", "VERB_REMOVE_WALL", DurationSeconds: 0.2f)
+    {
+        IsDestructive = true,
+        Requirements = [PowerDrillRequirement],
+    };
 
     // Floor and ceiling panels reuse the same wall_panel construction-part item as walls —
     // one item covers all three rather than inventing two more catalog entries for the same
     // purpose.
     private static readonly Verb InstallFloorVerb = new("install_floor", "VERB_INSTALL_FLOOR", DurationSeconds: 0.2f)
     {
-        Requirements = [new ItemRequirement("wall_panel", 1)],
+        Requirements = [new ItemRequirement("wall_panel", 1), PowerDrillRequirement],
     };
 
-    private static readonly Verb RemoveFloorVerb = new("remove_floor", "VERB_REMOVE_FLOOR", DurationSeconds: 0.2f) { IsDestructive = true };
+    private static readonly Verb RemoveFloorVerb = new("remove_floor", "VERB_REMOVE_FLOOR", DurationSeconds: 0.2f)
+    {
+        IsDestructive = true,
+        Requirements = [PowerDrillRequirement],
+    };
 
     private static readonly Verb InstallCeilingVerb = new("install_ceiling", "VERB_INSTALL_CEILING", DurationSeconds: 0.2f)
     {
-        Requirements = [new ItemRequirement("wall_panel", 1)],
+        Requirements = [new ItemRequirement("wall_panel", 1), PowerDrillRequirement],
     };
 
-    private static readonly Verb RemoveCeilingVerb = new("remove_ceiling", "VERB_REMOVE_CEILING", DurationSeconds: 0.2f) { IsDestructive = true };
+    private static readonly Verb RemoveCeilingVerb = new("remove_ceiling", "VERB_REMOVE_CEILING", DurationSeconds: 0.2f)
+    {
+        IsDestructive = true,
+        Requirements = [PowerDrillRequirement],
+    };
 
     // Battery/Switch/RechargeStation verbs — Install requires holding the machine's own item
     // (bought from a trade console, or refunded by a prior Uninstall); Uninstall gives that same

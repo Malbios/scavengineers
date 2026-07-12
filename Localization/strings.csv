@@ -17,6 +17,8 @@ VERB_CLOSE_DOOR,Close Door,Tür schließen
 VERB_PRY_DOOR,Pry Door Open,Tür aufbrechen
 OBJECT_DOOR,Door,Tür
 ITEM_CROWBAR,Crowbar,Brechstange
+ITEM_POWER_DRILL,Power Drill,Akkuschrauber
+ITEM_DEBUG_BACKPACK,Debug Backpack,Debug-Rucksack
 OBJECT_DAMAGED_CONDUIT,Damaged Conduit,Beschädigte Leitung
 VERB_INSTALL_CONDUIT,Install Conduit,Leitung verlegen
 VERB_REMOVE_CONDUIT,Remove Conduit,Leitung entfernen

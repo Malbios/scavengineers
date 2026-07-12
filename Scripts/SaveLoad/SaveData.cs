@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 
+using Scavengineers.Scripts.Inventory;
+
 namespace Scavengineers.Scripts.SaveLoad;
 
 public sealed class SaveData
@@ -115,4 +117,20 @@ public sealed class PlayerSaveData
     public string? BackpackItemId { get; set; }
 
     public Dictionary<string, int> BackpackContents { get; set; } = new();
+
+    /// <summary>Defaulted to the normal backpack's own size — an old save missing this field
+    /// (predates the debug backpack's different slot count) reconstructs at the size every
+    /// backpack used to always be. Captured from the actual worn container's own slot count at
+    /// save time (Player.CapturePlayerState), not assumed, so a debug backpack's real 24 slots
+    /// round-trip correctly instead of being silently truncated back to 8.</summary>
+    public int BackpackSlotCount { get; set; } = PlayerInventory.BackpackSlotCount;
+
+    /// <summary>False for a save from before the power drill existed — distinct from
+    /// DrillHasBattery/DrillCharge's own JSON-missing defaults (false/0f) so an old save
+    /// doesn't get misread as "owns an empty drill" (see Player.ApplyPlayerState).</summary>
+    public bool HasDrill { get; set; }
+
+    public bool DrillHasBattery { get; set; }
+
+    public float DrillCharge { get; set; }
 }

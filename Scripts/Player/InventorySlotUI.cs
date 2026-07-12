@@ -28,6 +28,14 @@ public partial class InventorySlotUI : Control
     [Export]
     public bool IsBackSlot { get; set; }
 
+    /// <summary>True only for the one drill-battery slot — reads/writes the held power drill's
+    /// own battery via <see cref="PlayerRef"/>, the same non-fungible-item-via-PlayerRef shape
+    /// <see cref="IsBackSlot"/> already established. Shows a synthetic "battery" slot (count
+    /// always 1) when the drill has one installed — the drill's actual charge is shown
+    /// separately (HUD/ResourcesPanel's DrillBar), not on this slot.</summary>
+    [Export]
+    public bool IsDrillBatterySlot { get; set; }
+
     public SlotContainer? Container { get; set; }
 
     /// <summary>Wired on every slot (not just Back) — ordinary slots need it too, to react when
@@ -132,6 +140,22 @@ public partial class InventorySlotUI : Control
             return;
         }
 
+        if (IsDrillBatterySlot)
+        {
+            if (!source.IsDrillBatterySlot && source.CurrentSlot()?.ItemId == "battery")
+            {
+                PlayerRef.Inventory.InsertDrillBattery();
+            }
+
+            return;
+        }
+
+        if (source.IsDrillBatterySlot)
+        {
+            PlayerRef.Inventory.EjectDrillBattery();
+            return;
+        }
+
         if (source.Container is null || Container is null)
         {
             return;
@@ -145,6 +169,11 @@ public partial class InventorySlotUI : Control
         if (IsBackSlot)
         {
             return PlayerRef?.Inventory.Backpack is { } backpack ? (backpack.ItemId, 1) : null;
+        }
+
+        if (IsDrillBatterySlot)
+        {
+            return PlayerRef?.Inventory.Drill is { HasBattery: true } ? ("battery", 1) : null;
         }
 
         return Container is { } c && SlotIndex >= 0 && SlotIndex < c.Slots.Count ? c.Slots[SlotIndex] : null;

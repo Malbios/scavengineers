@@ -38,6 +38,22 @@ public sealed class PlayerInventory
 
     public EquippedContainer? Backpack { get; private set; }
 
+    /// <summary>A power drill's own battery — the first item with real per-instance state that
+    /// isn't a worn container (see <see cref="EquippedContainer"/>). Deliberately not a generic
+    /// slot-level extension to <see cref="SlotContainer"/> (that would touch every inventory
+    /// consumer for one tool) — just enough state riding alongside the "power_drill" item,
+    /// wherever it currently sits (hand or backpack), independent of location the same way
+    /// <see cref="Backpack"/>'s existence doesn't care which hand it was equipped from.</summary>
+    public sealed class DrillState
+    {
+        public bool HasBattery { get; set; }
+
+        /// <summary>0-1; meaningless while <see cref="HasBattery"/> is false.</summary>
+        public float Charge { get; set; }
+    }
+
+    public DrillState? Drill { get; private set; }
+
     /// <summary>The raw per-slot view of the two hands (see InventorySlotUI) — a worn
     /// backpack's own contents are addressed separately via <see cref="Backpack"/>.Contents,
     /// never merged in here.</summary>
@@ -211,9 +227,46 @@ public sealed class PlayerInventory
         return true;
     }
 
+    /// <summary>Attaches drill state directly — used by the fresh-game stipend (fully charged)
+    /// and by save/load restore, mirroring <see cref="EquipContainerDirectly"/>'s shape.</summary>
+    public void AttachDrill(bool hasBattery, float charge) => Drill = new DrillState { HasBattery = hasBattery, Charge = charge };
+
+    /// <summary>Loads a spare "battery" item (wherever it currently sits) into the drill — always
+    /// a fresh full charge, no partial-charge carry-in, matching ShipSim.InstallBattery's own
+    /// "installed battery always starts at Condition 1f" precedent. No-op/false if there's no
+    /// drill, it's already loaded, or no spare battery is available.</summary>
+    public bool InsertDrillBattery()
+    {
+        if (Drill is not { HasBattery: false } || !TryRemove("battery", 1))
+        {
+            return false;
+        }
+
+        Drill.HasBattery = true;
+        Drill.Charge = 1f;
+        return true;
+    }
+
+    /// <summary>Ejects the drill's battery back into inventory as a plain fungible "battery" item
+    /// — remaining charge is discarded, mirroring ShipSim.RemoveBattery's own precedent of not
+    /// preserving partial charge either. No-op/false if there's no drill or it's already empty.</summary>
+    public bool EjectDrillBattery()
+    {
+        if (Drill is not { HasBattery: true })
+        {
+            return false;
+        }
+
+        Drill.HasBattery = false;
+        Drill.Charge = 0f;
+        Add("battery", 1);
+        return true;
+    }
+
     public void Clear()
     {
         _hands.Clear();
         Backpack = null;
+        Drill = null;
     }
 }
