@@ -264,12 +264,6 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public Material? CeilingPanelMaterial { get; set; }
 
-    /// <summary>Swapped onto a floor/ceiling panel instead of hiding it once its surface is
-    /// missing — same "still there, but reads as open to space" language
-    /// <see cref="Ship.AirlockDoorVerbTarget.SpaceMaterial"/> already uses for a vented airlock.</summary>
-    [Export]
-    public Material? BreachedPanelMaterial { get; set; }
-
     /// <summary>The grid column of the room-split boundary (i.e. the edge between
     /// column-1 and column) — excluded from wall targeting entirely, since
     /// InteriorDoorVerbTarget already owns the two doorway edges there and would desync if this
@@ -1035,9 +1029,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
     }
 
-    /// <summary>Syncs a floor tile's cosmetic material *and* its own dedicated collision
-    /// (Disabled while breached) to the current Deck state — a real physical hole, not just a
-    /// different-colored panel.</summary>
+    /// <summary>Syncs a floor tile to the current Deck state: hides the panel mesh and disables
+    /// its own dedicated collision while breached — a real, actually-open hole (you can see and
+    /// fly/fall through it), not a different-colored but still-solid panel.</summary>
     private void RefreshFloorPanelState(Vector2I tile)
     {
         var cell = new CellCoord(tile.X, tile.Y);
@@ -1047,7 +1041,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
 
         var breached = ShipSimRef?.Deck.IsHullBreached(cell, StructuralSurface.Floor) ?? false;
-        panel.Mesh.SetSurfaceOverrideMaterial(0, breached ? BreachedPanelMaterial : FloorPanelMaterial);
+        panel.Mesh.Visible = !breached;
         panel.Collision.Disabled = breached;
     }
 
@@ -1061,7 +1055,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
 
         var breached = ShipSimRef?.Deck.IsHullBreached(cell, StructuralSurface.Ceiling) ?? false;
-        panel.Mesh.SetSurfaceOverrideMaterial(0, breached ? BreachedPanelMaterial : CeilingPanelMaterial);
+        panel.Mesh.Visible = !breached;
         panel.Collision.Disabled = breached;
     }
 
