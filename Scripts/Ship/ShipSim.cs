@@ -12,21 +12,27 @@ namespace Scavengineers.Scripts.Ship;
 
 /// <summary>
 /// Owns and ticks a real Scavengineers.Sim <see cref="ShipModel.Deck"/> for a greybox ship: a
-/// full 1m-tile grid matching the two-room floor plan already built in the scene (Room 1 =
-/// tiles i 0-5, Room 2 = i 6-11, both j 0-5), optionally hosting a hull breach (atmosphere)
-/// and/or a battery/switch/recharge-station power grid, toggled per scene via the exported
-/// flags. Real, data-driven ship layouts (arbitrary footprints) are still separate, larger
-/// future work — this is a fixed-shape stand-in, just no longer a single abstract cell.
+/// full 1m-tile grid matching the room floor plan already built in the scene (rooms are
+/// <see cref="GridWidth"/> tiles wide, split into columns by <see cref="RoomSplitColumns"/>,
+/// both <see cref="GridDepth"/> deep), optionally hosting a hull breach (atmosphere) and/or a
+/// battery/switch/recharge-station power grid, toggled per scene via the exported flags. Real,
+/// data-driven ship layouts (arbitrary footprints) are still separate, larger future work —
+/// this is a fixed-shape stand-in, just no longer a single abstract cell.
 /// </summary>
 public partial class ShipSim : Node
 {
-    private const int GridWidth = 12;
     private const int GridDepth = 6;
 
-    // Room 1 = i 0-5, Room 2 = i 6-11 (matches MidWallA/B at local x=3). The doorway gap
-    // (MidWallA/B only cover j 0,1 and 4,5) is j 2,3 — the only edges between the rooms that
-    // aren't a permanent wall.
-    private const int RoomSplitIndex = 6;
+    // Room 1 = i 0-5, Room 2 = i 6-11 by default (matches MidWallA/B at local x=3). Each split
+    // column seals every row except DoorwayRows, which stays open as that boundary's doorway.
+    // Home Ship and Station keep the single default split; the Derelict overrides both this and
+    // GridWidth in the scene to add a third room.
+    [Export]
+    public int GridWidth { get; set; } = 12;
+
+    [Export]
+    public int[] RoomSplitColumns { get; set; } = [6];
+
     private static readonly int[] DoorwayRows = [2, 3];
 
     // Every device below (the 4 further down) is added unwired — the player must run their own
@@ -107,11 +113,14 @@ public partial class ShipSim : Node
             }
         }
 
-        for (var j = 0; j < GridDepth; j++)
+        foreach (var splitColumn in RoomSplitColumns)
         {
-            if (!DoorwayRows.Contains(j))
+            for (var j = 0; j < GridDepth; j++)
             {
-                Deck.SealEdge(new CellCoord(RoomSplitIndex - 1, j), new CellCoord(RoomSplitIndex, j));
+                if (!DoorwayRows.Contains(j))
+                {
+                    Deck.SealEdge(new CellCoord(splitColumn - 1, j), new CellCoord(splitColumn, j));
+                }
             }
         }
 
