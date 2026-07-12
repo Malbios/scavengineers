@@ -79,12 +79,15 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
         AddChild(_cycleTimer);
         _cycleTimer.Timeout += OnCycleComplete;
 
-        // Sync the slab's visibility/collision to the starting _isOpen = true — the scene
-        // file's own initial state for these nodes must agree, but this makes it correct even
-        // if it doesn't. Deliberately not calling ApplyEdgeSeal here: ShipSimRef's own Deck may
-        // not be built yet at this exact point in _Ready() order, and the doorway already starts
-        // unsealed by default, matching _isOpen's own starting value.
-        ApplySlabVisual();
+        // Deferred: a CollisionShape3D's very first Disabled toggle in the same frame it enters
+        // the tree can race the physics server's own "shape added" registration for that frame
+        // (Jolt in particular) — the write is silently lost and the shape stays solid until some
+        // later toggle (e.g. the player closing then reopening the door) forces a real update.
+        // One frame is enough to land after that registration. Deliberately not calling
+        // ApplyEdgeSeal here: ShipSimRef's own Deck may not be built yet at this exact point in
+        // _Ready() order, and the doorway already starts unsealed by default, matching _isOpen's
+        // own starting value.
+        CallDeferred(nameof(ApplySlabVisual));
     }
 
     public override void _PhysicsProcess(double delta)
