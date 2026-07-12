@@ -29,6 +29,10 @@ project/assembly_name="Scavengineers"
 
 locale/translations=PackedStringArray("res://Localization/strings.en.translation", "res://Localization/strings.de.translation")
 
+[layer_names]
+
+3d_physics/layer_2="build_aim_only"
+
 [physics]
 
 3d/physics_engine="Jolt Physics"

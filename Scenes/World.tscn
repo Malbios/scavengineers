@@ -139,6 +139,9 @@ size = Vector3(0.08, 1.475, 0.08)
 [sub_resource type="BoxMesh" id="PanelMesh"]
 size = Vector3(0.98, 0.05, 0.98)
 
+[sub_resource type="BoxShape3D" id="PanelCollisionShape"]
+size = Vector3(1, 0.05, 1)
+
 [sub_resource type="StandardMaterial3D" id="ConduitSlotWiredMaterial"]
 albedo_color = Color(0.15, 0.75, 0.85, 1)
 
@@ -309,6 +312,7 @@ WallSegmentMesh = SubResource("WallSegmentMesh")
 WallSegmentShape = SubResource("WallSegmentShape")
 WallMaterial = ExtResource("7")
 PanelMesh = SubResource("PanelMesh")
+PanelCollisionShape = SubResource("PanelCollisionShape")
 FloorPanelMaterial = ExtResource("6")
 CeilingPanelMaterial = ExtResource("8")
 BreachedPanelMaterial = SubResource("SpaceMaterial")
@@ -330,16 +334,21 @@ SaveId = "home_ship_build_target"
 GhostMaterial = SubResource("ConduitGhostMaterial")
 ExcludedEdgeColumn = 6
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/Floor" unique_id=1868991503]
-shape = SubResource("FloorShape")
-
-[node name="Ceiling" type="StaticBody3D" parent="HomeShip" unique_id=325094412 node_paths=PackedStringArray("BuildTarget")]
+[node name="Ceiling" type="StaticBody3D" parent="HomeShip" unique_id=325094412 node_paths=PackedStringArray("BuildTarget") collision_layer=2]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 3.1, 0)
 script = ExtResource("20")
 BuildTarget = NodePath("../Floor")
 IsCeiling = true
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/Ceiling" unique_id=99486624]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/Ceiling"]
+shape = SubResource("FloorShape")
+
+[node name="FloorAimHelper" type="StaticBody3D" parent="HomeShip" node_paths=PackedStringArray("BuildTarget") collision_layer=2]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, -0.1, 0)
+script = ExtResource("20")
+BuildTarget = NodePath("../Floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/FloorAimHelper"]
 shape = SubResource("FloorShape")
 
 [node name="RoomLight" type="OmniLight3D" parent="HomeShip" unique_id=587716326]

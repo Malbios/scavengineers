@@ -249,6 +249,15 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public Mesh? PanelMesh { get; set; }
 
+    /// <summary>Shared full-tile (1x1, not PanelMesh's cosmetic 0.98 inset) collision box for
+    /// each panel's own dedicated CollisionShape3D — this is what actually blocks/allows
+    /// movement per tile now (see RefreshFloorPanelState/RefreshCeilingPanelState). The Home
+    /// Ship's Floor/Ceiling no longer have a single unsplit collider at all; a raycast-only
+    /// "aim helper" body (see World.tscn's Ceiling/FloorAimHelper, on the build_aim_only physics
+    /// layer) is what lets the player still target a fully-enclosed hole to repair it.</summary>
+    [Export]
+    public Shape3D? PanelCollisionShape { get; set; }
+
     [Export]
     public Material? FloorPanelMaterial { get; set; }
 
@@ -257,9 +266,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     /// <summary>Swapped onto a floor/ceiling panel instead of hiding it once its surface is
     /// missing — same "still there, but reads as open to space" language
-    /// <see cref="Ship.AirlockDoorVerbTarget.SpaceMaterial"/> already uses for a vented airlock.
-    /// The floor panel keeps its collision either way (see <see cref="ShipSim"/>'s single
-    /// unsplit collider) — this is a visual/atmosphere consequence only, you don't fall through.</summary>
+    /// <see cref="Ship.AirlockDoorVerbTarget.SpaceMaterial"/> already uses for a vented airlock.</summary>
     [Export]
     public Material? BreachedPanelMaterial { get; set; }
 
@@ -334,8 +341,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     private readonly Dictionary<ConduitSlot, Node3D> _placedConduits = new();
     private readonly Dictionary<(CellCoord, CellCoord), (MeshInstance3D Mesh, CollisionShape3D Collision)> _placedWalls = new();
-    private readonly Dictionary<CellCoord, MeshInstance3D> _floorPanels = new();
-    private readonly Dictionary<CellCoord, MeshInstance3D> _ceilingPanels = new();
+    private readonly Dictionary<CellCoord, (MeshInstance3D Mesh, CollisionShape3D Collision)> _floorPanels = new();
+    private readonly Dictionary<CellCoord, (MeshInstance3D Mesh, CollisionShape3D Collision)> _ceilingPanels = new();
 
     /// <summary>At most one of each <see cref="MachineType"/> at a time, matching ShipSim's own
     /// singular _battery field and fixed Switch/RechargeFixtureId — installing a second one
@@ -408,13 +415,23 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             AddChild(floorPanel);
             floorPanel.Position = ToLocal(TileWorldPosition(tile, FloorPanelHeight));
             floorPanel.SetSurfaceOverrideMaterial(0, FloorPanelMaterial);
-            _floorPanels[cell] = floorPanel;
+
+            var floorCollision = new CollisionShape3D { Shape = PanelCollisionShape };
+            AddChild(floorCollision);
+            floorCollision.Position = floorPanel.Position;
+
+            _floorPanels[cell] = (floorPanel, floorCollision);
 
             var ceilingPanel = new MeshInstance3D { Mesh = PanelMesh };
             AddChild(ceilingPanel);
             ceilingPanel.Position = ToLocal(TileWorldPosition(tile, CeilingPanelHeight));
             ceilingPanel.SetSurfaceOverrideMaterial(0, CeilingPanelMaterial);
-            _ceilingPanels[cell] = ceilingPanel;
+
+            var ceilingCollision = new CollisionShape3D { Shape = PanelCollisionShape };
+            AddChild(ceilingCollision);
+            ceilingCollision.Position = ceilingPanel.Position;
+
+            _ceilingPanels[cell] = (ceilingPanel, ceilingCollision);
         }
     }
 
@@ -970,20 +987,20 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 break;
             case PendingAction.InstallFloor:
                 ShipSimRef!.Deck.RepairHull(new CellCoord(_pendingTile.X, _pendingTile.Y), StructuralSurface.Floor);
-                RefreshFloorPanelVisual(_pendingTile);
+                RefreshFloorPanelState(_pendingTile);
                 break;
             case PendingAction.RemoveFloor:
                 ShipSimRef!.Deck.BreachHull(new CellCoord(_pendingTile.X, _pendingTile.Y), StructuralSurface.Floor);
-                RefreshFloorPanelVisual(_pendingTile);
+                RefreshFloorPanelState(_pendingTile);
                 AddOrDrop(inventory, "wall_panel", 1);
                 break;
             case PendingAction.InstallCeiling:
                 ShipSimRef!.Deck.RepairHull(new CellCoord(_pendingTile.X, _pendingTile.Y), StructuralSurface.Ceiling);
-                RefreshCeilingPanelVisual(_pendingTile);
+                RefreshCeilingPanelState(_pendingTile);
                 break;
             case PendingAction.RemoveCeiling:
                 ShipSimRef!.Deck.BreachHull(new CellCoord(_pendingTile.X, _pendingTile.Y), StructuralSurface.Ceiling);
-                RefreshCeilingPanelVisual(_pendingTile);
+                RefreshCeilingPanelState(_pendingTile);
                 AddOrDrop(inventory, "wall_panel", 1);
                 break;
             case PendingAction.InstallMachine:
@@ -1018,7 +1035,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
     }
 
-    private void RefreshFloorPanelVisual(Vector2I tile)
+    /// <summary>Syncs a floor tile's cosmetic material *and* its own dedicated collision
+    /// (Disabled while breached) to the current Deck state — a real physical hole, not just a
+    /// different-colored panel.</summary>
+    private void RefreshFloorPanelState(Vector2I tile)
     {
         var cell = new CellCoord(tile.X, tile.Y);
         if (!_floorPanels.TryGetValue(cell, out var panel))
@@ -1027,10 +1047,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
 
         var breached = ShipSimRef?.Deck.IsHullBreached(cell, StructuralSurface.Floor) ?? false;
-        panel.SetSurfaceOverrideMaterial(0, breached ? BreachedPanelMaterial : FloorPanelMaterial);
+        panel.Mesh.SetSurfaceOverrideMaterial(0, breached ? BreachedPanelMaterial : FloorPanelMaterial);
+        panel.Collision.Disabled = breached;
     }
 
-    private void RefreshCeilingPanelVisual(Vector2I tile)
+    /// <summary>Ceiling counterpart of <see cref="RefreshFloorPanelState"/>.</summary>
+    private void RefreshCeilingPanelState(Vector2I tile)
     {
         var cell = new CellCoord(tile.X, tile.Y);
         if (!_ceilingPanels.TryGetValue(cell, out var panel))
@@ -1039,7 +1061,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
 
         var breached = ShipSimRef?.Deck.IsHullBreached(cell, StructuralSurface.Ceiling) ?? false;
-        panel.SetSurfaceOverrideMaterial(0, breached ? BreachedPanelMaterial : CeilingPanelMaterial);
+        panel.Mesh.SetSurfaceOverrideMaterial(0, breached ? BreachedPanelMaterial : CeilingPanelMaterial);
+        panel.Collision.Disabled = breached;
     }
 
     private void InstallConduit(ConduitSlot slot)
@@ -1671,16 +1694,35 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             SpawnWallSegment(a, b);
         }
 
+        // ClearAllBuildState just breached every floor/ceiling tile as its own "removed"
+        // baseline (mirroring how it unseals every wall) — repair them all back to intact
+        // before selectively re-breaching only the ones the save actually recorded as open.
+        // Previously this step was missing (breach was purely cosmetic, so nothing ever
+        // surfaced it); now that breach means "no collision," skipping it would drop the
+        // player through the entire floor and ceiling on every load except the handful of
+        // tiles that happened to be breached when the save was made.
+        foreach (var cell in _floorPanels.Keys)
+        {
+            ShipSimRef!.Deck.RepairHull(cell, StructuralSurface.Floor);
+            RefreshFloorPanelState(new Vector2I(cell.X, cell.Y));
+        }
+
+        foreach (var cell in _ceilingPanels.Keys)
+        {
+            ShipSimRef!.Deck.RepairHull(cell, StructuralSurface.Ceiling);
+            RefreshCeilingPanelState(new Vector2I(cell.X, cell.Y));
+        }
+
         foreach (var tile in state.FloorBreaches)
         {
             ShipSimRef!.Deck.BreachHull(new CellCoord(tile.X, tile.Y), StructuralSurface.Floor);
-            RefreshFloorPanelVisual(new Vector2I(tile.X, tile.Y));
+            RefreshFloorPanelState(new Vector2I(tile.X, tile.Y));
         }
 
         foreach (var tile in state.CeilingBreaches)
         {
             ShipSimRef!.Deck.BreachHull(new CellCoord(tile.X, tile.Y), StructuralSurface.Ceiling);
-            RefreshCeilingPanelVisual(new Vector2I(tile.X, tile.Y));
+            RefreshCeilingPanelState(new Vector2I(tile.X, tile.Y));
         }
 
         foreach (var machine in state.Machines)
@@ -1722,13 +1764,13 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         foreach (var cell in _floorPanels.Keys)
         {
             ShipSimRef?.Deck.BreachHull(cell, StructuralSurface.Floor);
-            RefreshFloorPanelVisual(new Vector2I(cell.X, cell.Y));
+            RefreshFloorPanelState(new Vector2I(cell.X, cell.Y));
         }
 
         foreach (var cell in _ceilingPanels.Keys)
         {
             ShipSimRef?.Deck.BreachHull(cell, StructuralSurface.Ceiling);
-            RefreshCeilingPanelVisual(new Vector2I(cell.X, cell.Y));
+            RefreshCeilingPanelState(new Vector2I(cell.X, cell.Y));
         }
 
         foreach (var type in _placedMachines.Keys.ToList())

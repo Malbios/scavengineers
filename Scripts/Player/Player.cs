@@ -627,6 +627,10 @@ public partial class Player : CharacterBody3D
             Exclude = new Godot.Collections.Array<Rid> { GetRid() },
             CollideWithAreas = false,
             CollideWithBodies = true,
+            // Layer 1 only — excludes the "build_aim_only" layer (project.godot) the Home
+            // Ship's floor/ceiling aim-helper bodies live on, which never blocks movement
+            // and would otherwise make a genuine hole look like a nearby surface to push off.
+            CollisionMask = 1,
         };
 
         return spaceState.IntersectShape(query, maxResults: 1).Count > 0;
@@ -644,6 +648,10 @@ public partial class Player : CharacterBody3D
         var query = PhysicsRayQueryParameters3D.Create(
             GlobalPosition, GlobalPosition + Vector3.Down * FreefallRaycastDistance);
         query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+        // Layer 1 only, same reasoning as IsNearSurface — the Home Ship's floor aim-helper
+        // body (layer "build_aim_only") is deliberately non-blocking and must not register
+        // as real floor here, or a genuine hole through it would never trigger zero-g.
+        query.CollisionMask = 1;
 
         // Matches IsNearSurface's own IntersectShape(...).Count > 0 idiom — IntersectRay
         // returns an empty Dictionary on a miss, populated (position/normal/collider/...) on a hit.

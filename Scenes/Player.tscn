@@ -34,6 +34,7 @@ current = true
 
 [node name="InteractRay" type="RayCast3D" parent="Head/Camera3D" unique_id=884361321]
 target_position = Vector3(0, 0, -2.5)
+collision_mask = 3
 
 [node name="HUD" type="CanvasLayer" parent="." unique_id=1671283592]
 
