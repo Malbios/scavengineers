@@ -30,6 +30,10 @@ public partial class Player : CharacterBody3D
     // jetpack yet, so control only comes from pushing off something within reach.
     private const float ZeroGControlRadius = 1.2f;
 
+    // Placeholder/tunable — comfortably more than any current room's floor-to-ceiling height
+    // (3m), so a normal room can never trip this; revisit once multi-deck verticality exists.
+    private const float FreefallRaycastDistance = 15f;
+
     /// <summary>Which ship (and which of its tiles) currently governs the player's ambient O2
     /// reading — set at runtime by whichever <see cref="Scavengineers.Scripts.Ship.ShipAtmosphereZone"/>
     /// the player is standing in. Both ships (and both of a ship's rooms) are loaded and
@@ -473,7 +477,8 @@ public partial class Player : CharacterBody3D
         // A vented/breached room reads as vacuum — read up front since it now also decides which
         // movement mode applies below, not just the suit-resource drain further down.
         var roomVolume = ShipSimRef?.VolumeAt(new CellCoord(_ambientTile.X, _ambientTile.Y));
-        var inZeroG = (roomVolume?.O2Fraction ?? 0.21) <= ZeroGO2Threshold;
+        var inZeroG = (roomVolume?.O2Fraction ?? 0.21) <= ZeroGO2Threshold
+            || (!IsOnFloor() && NoFloorBelow());
         MotionMode = inZeroG ? MotionModeEnum.Floating : MotionModeEnum.Grounded;
 
         var velocity = Velocity;
@@ -625,6 +630,24 @@ public partial class Player : CharacterBody3D
         };
 
         return spaceState.IntersectShape(query, maxResults: 1).Count > 0;
+    }
+
+    /// <summary>No ship structure at all within a generous distance straight down — you've
+    /// walked/fallen off the edge of a ship (a removed wall or floor) into open space, not just
+    /// lost your footing inside a room that still has a floor nearby. Independent of room O2:
+    /// atmosphere venting is gradual (AtmosphereSystem.Vent's Lerp), so a freshly-breached room
+    /// can take several seconds to read as vacuum — too slow to save you from an immediate fall
+    /// through a hole you just made.</summary>
+    private bool NoFloorBelow()
+    {
+        var spaceState = GetWorld3D().DirectSpaceState;
+        var query = PhysicsRayQueryParameters3D.Create(
+            GlobalPosition, GlobalPosition + Vector3.Down * FreefallRaycastDistance);
+        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+
+        // Matches IsNearSurface's own IntersectShape(...).Count > 0 idiom — IntersectRay
+        // returns an empty Dictionary on a miss, populated (position/normal/collider/...) on a hit.
+        return spaceState.IntersectRay(query).Count == 0;
     }
 
     private IVerbTarget? GetCurrentVerbTarget()
