@@ -35,6 +35,14 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
     [Export]
     public ShipSim? ShipSimRef { get; set; }
 
+    /// <summary>Whether opening/closing this door needs <see cref="ShipSim.InteriorDoorFixtureId"/>
+    /// powered — true for the Home Ship (a real "keep your systems running" gate). The Derelict
+    /// has no working power grid of its own (see <see cref="ShipSim.HasPowerGrid"/>, never set for
+    /// it), so its own interior door sets this false — otherwise <see cref="AvailableVerbs"/>
+    /// would always be empty and the door could never be opened or closed again.</summary>
+    [Export]
+    public bool RequiresPower { get; set; } = true;
+
     /// <summary>The togglable body of the door — covers most of the opening, toggles
     /// visible/collidable on open/close. The frame (this node) never toggles.</summary>
     [Export]
@@ -56,7 +64,7 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
     public bool IsOpen => _isOpen;
 
     public IReadOnlyList<Verb> AvailableVerbs =>
-        ShipSimRef is not null && ShipSimRef.IsPowered(ShipSim.InteriorDoorFixtureId)
+        ShipSimRef is not null && (!RequiresPower || ShipSimRef.IsPowered(ShipSim.InteriorDoorFixtureId))
             ? [IsOpen ? CloseVerb : OpenVerb]
             : [];
 
