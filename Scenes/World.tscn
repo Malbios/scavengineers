@@ -158,6 +158,9 @@ albedo_color = Color(0.35, 0.55, 0.75, 1)
 [sub_resource type="StandardMaterial3D" id="PowerCellMaterial"]
 albedo_color = Color(0.2, 0.702, 0.902, 1)
 
+[sub_resource type="StandardMaterial3D" id="CrowbarMaterial"]
+albedo_color = Color(0.702, 0.302, 0.15, 1)
+
 [sub_resource type="BoxShape3D" id="DerelictWallNorthLeftShape"]
 size = Vector3(3, 3, 0.2)
 
@@ -370,6 +373,18 @@ shape = SubResource("BunkShape")
 [node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/Bunk"]
 mesh = SubResource("BunkMesh")
 surface_material_override/0 = SubResource("BunkMaterial")
+
+[node name="Crowbar" type="StaticBody3D" parent="HomeShip"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.15, 0.5)
+script = ExtResource("12")
+ItemId = "crowbar"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/Crowbar"]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/Crowbar"]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("CrowbarMaterial")
 
 [node name="InteriorDoor" type="StaticBody3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "SlabMesh", "SlabCollision") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.5, -0.8)
@@ -782,7 +797,6 @@ surface_material_override/0 = SubResource("DamagedConduitMaterial")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.5, -0.8)
 script = ExtResource("16")
 ShipSimRef = NodePath("../ShipSim")
-RequiresPower = false
 SlabMesh = NodePath("SlabMesh")
 SlabCollision = NodePath("SlabCollision")
 SaveId = "derelict_interior_door"

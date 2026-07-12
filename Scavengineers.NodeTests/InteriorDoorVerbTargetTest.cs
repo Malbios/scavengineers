@@ -6,17 +6,18 @@ using static GdUnit4.Assertions;
 
 namespace Scavengineers.NodeTests;
 
-/// <summary>Regression coverage for the Derelict's interior door: it has no working power grid
-/// (see ShipSim.HasPowerGrid, never set for it), so before InteriorDoorVerbTarget.RequiresPower
-/// existed, AvailableVerbs was always empty for it — the door could never be opened or closed by
-/// the player, though it still defaulted to open and passable. Also verifies the actual physical
-/// passability claim end-to-end (SlabCollision.Disabled) rather than trusting it by inspection.</summary>
+/// <summary>Regression coverage for the interior door's unpowered behavior: a ship with no
+/// working power grid (e.g. the Derelict) starts its interior doors closed rather than the old
+/// hardcoded "always starts open", and offers only a crowbar-pry verb to get through — no motor
+/// to drive the mechanism, so an already-open unpowered door can't be closed either. Also verifies
+/// the actual physical passability claim end-to-end (SlabCollision.Disabled) rather than trusting
+/// it by inspection.</summary>
 [TestSuite]
 public class InteriorDoorVerbTargetTest
 {
     [TestCase]
     [RequireGodotRuntime]
-    public void UnpoweredShip_WithoutRequiresPowerFalse_HasNoAvailableVerbs()
+    public void UnpoweredShip_ClosedDoor_OffersOnlyPryVerb()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var shipSim = AutoFree(new ShipSim { HasFireHazard = true, HasHullBreaches = true });
@@ -25,23 +26,24 @@ public class InteriorDoorVerbTargetTest
         var door = AutoFree(new InteriorDoorVerbTarget { ShipSimRef = shipSim });
         sceneTree.Root.AddChild(door);
 
-        AssertBool(door.RequiresPower).IsTrue(); // default, matches the Home Ship's gated door
-        AssertThat(door.AvailableVerbs).IsEmpty(); // the bug: never powered, never interactable
+        AssertBool(door.IsOpen).IsFalse(); // the field default, before the deferred power-derived apply even runs
+        AssertThat(door.AvailableVerbs).HasSize(1);
+        AssertThat(door.AvailableVerbs[0].Id).IsEqual("pry_door");
     }
 
     [TestCase]
     [RequireGodotRuntime]
-    public void UnpoweredShip_WithRequiresPowerFalse_OffersCloseVerbWhileOpen()
+    public void UnpoweredShip_OpenDoor_HasNoAvailableVerbs()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var shipSim = AutoFree(new ShipSim { HasFireHazard = true, HasHullBreaches = true });
         sceneTree.Root.AddChild(shipSim);
 
-        var door = AutoFree(new InteriorDoorVerbTarget { ShipSimRef = shipSim, RequiresPower = false });
+        var door = AutoFree(new InteriorDoorVerbTarget { ShipSimRef = shipSim });
         sceneTree.Root.AddChild(door);
+        door.ApplySaveState(true); // simulate an already-open door, e.g. loaded from an old save
 
-        AssertThat(door.AvailableVerbs).HasSize(1);
-        AssertBool(door.IsOpen).IsTrue();
+        AssertThat(door.AvailableVerbs).IsEmpty(); // no motor to close it, and no "pry shut"
     }
 
     [TestCase]
@@ -52,7 +54,7 @@ public class InteriorDoorVerbTargetTest
         var shipSim = AutoFree(new ShipSim { HasFireHazard = true, HasHullBreaches = true });
         sceneTree.Root.AddChild(shipSim);
 
-        var door = AutoFree(new InteriorDoorVerbTarget { ShipSimRef = shipSim, RequiresPower = false });
+        var door = AutoFree(new InteriorDoorVerbTarget { ShipSimRef = shipSim });
         var slabMesh = new MeshInstance3D { Name = "SlabMesh" };
         var slabCollision = new CollisionShape3D { Name = "SlabCollision", Shape = new BoxShape3D() };
         door.AddChild(slabMesh);

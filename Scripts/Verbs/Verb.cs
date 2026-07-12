@@ -28,4 +28,10 @@ public sealed record Verb(string Id, string LocalizationKey, float DurationSecon
     public bool IsDestructive { get; init; }
 }
 
-public sealed record ItemRequirement(string ItemId, int Count);
+public sealed record ItemRequirement(string ItemId, int Count)
+{
+    /// <summary>True (the default) removes the item from inventory on use, matching every
+    /// existing requirement (repair costs, build costs, ...). False for a durable tool that must
+    /// be held but isn't spent — see InteriorDoorVerbTarget's crowbar pry.</summary>
+    public bool Consumed { get; init; } = true;
+}

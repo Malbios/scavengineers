@@ -14,7 +14,9 @@ OBJECT_RECHARGE_STATION,Recharge Station,Ladestation
 OBJECT_AIRLOCK,Airlock,Luftschleuse
 VERB_OPEN_DOOR,Open Door,Tür öffnen
 VERB_CLOSE_DOOR,Close Door,Tür schließen
+VERB_PRY_DOOR,Pry Door Open,Tür aufbrechen
 OBJECT_DOOR,Door,Tür
+ITEM_CROWBAR,Crowbar,Brechstange
 OBJECT_DAMAGED_CONDUIT,Damaged Conduit,Beschädigte Leitung
 VERB_INSTALL_CONDUIT,Install Conduit,Leitung verlegen
 VERB_REMOVE_CONDUIT,Remove Conduit,Leitung entfernen

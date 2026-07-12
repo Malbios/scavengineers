@@ -198,6 +198,7 @@ public partial class Player : CharacterBody3D
         _inventory.Add("scrap_metal", 50);
         _inventory.Add("ration_bar", 3);
         _inventory.Add("water_bottle", 3);
+        _inventory.Add("crowbar", 1);
 
         CaptureMouse();
         // Setting MouseMode here alone is unreliable if the window doesn't yet have OS
@@ -235,7 +236,7 @@ public partial class Player : CharacterBody3D
         {
             _busyTarget!.CancelVerb();
 
-            foreach (var requirement in _busyVerb!.Requirements)
+            foreach (var requirement in _busyVerb!.Requirements.Where(r => r.Consumed))
             {
                 _inventory.Add(requirement.ItemId, requirement.Count);
             }
@@ -678,7 +679,7 @@ public partial class Player : CharacterBody3D
             return;
         }
 
-        foreach (var requirement in verb.Requirements)
+        foreach (var requirement in verb.Requirements.Where(r => r.Consumed))
         {
             _inventory.TryRemove(requirement.ItemId, requirement.Count);
         }

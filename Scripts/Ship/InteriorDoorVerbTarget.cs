@@ -24,6 +24,12 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
     private static readonly Verb OpenVerb = new("open_door", "VERB_OPEN_DOOR", DurationSeconds: 0.2f);
     private static readonly Verb CloseVerb = new("close_door", "VERB_CLOSE_DOOR", DurationSeconds: 0.2f);
 
+    // Placeholder/tunable — longer than the powered open/close to feel like real manual effort.
+    private static readonly Verb PryVerb = new("pry_door", "VERB_PRY_DOOR", DurationSeconds: 1.5f)
+    {
+        Requirements = [new ItemRequirement("crowbar", 1) { Consumed = false }],
+    };
+
     // Placeholder/tunable, matching SuitResources's drain-constant convention.
     private const float BatteryDrainPerSecond = 0.03f;
 
@@ -34,14 +40,6 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
 
     [Export]
     public ShipSim? ShipSimRef { get; set; }
-
-    /// <summary>Whether opening/closing this door needs <see cref="ShipSim.InteriorDoorFixtureId"/>
-    /// powered — true for the Home Ship (a real "keep your systems running" gate). The Derelict
-    /// has no working power grid of its own (see <see cref="ShipSim.HasPowerGrid"/>, never set for
-    /// it), so its own interior door sets this false — otherwise <see cref="AvailableVerbs"/>
-    /// would always be empty and the door could never be opened or closed again.</summary>
-    [Export]
-    public bool RequiresPower { get; set; } = true;
 
     /// <summary>The togglable body of the door — covers most of the opening, toggles
     /// visible/collidable on open/close. The frame (this node) never toggles.</summary>
@@ -56,17 +54,33 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
 
     private Timer? _cycleTimer;
     private bool _cycling;
+    private bool _cyclingIsPry;
     private bool _pendingOpenState;
-
-    // Starts open, matching the doorway's permanently-unsealed default before this door existed.
-    private bool _isOpen = true;
+    private bool _isOpen;
 
     public bool IsOpen => _isOpen;
 
-    public IReadOnlyList<Verb> AvailableVerbs =>
-        ShipSimRef is not null && (!RequiresPower || ShipSimRef.IsPowered(ShipSim.InteriorDoorFixtureId))
-            ? [IsOpen ? CloseVerb : OpenVerb]
-            : [];
+    /// <summary>Powered: the normal instant Open/Close, same as ever. Unpowered: no ship motor to
+    /// drive the mechanism, so the only way through a closed door is <see cref="PryVerb"/> (a
+    /// crowbar, by hand) — and an unpowered door that's already open can't be closed either,
+    /// matching the powered gate's own "blocks both directions" behavior.</summary>
+    public IReadOnlyList<Verb> AvailableVerbs
+    {
+        get
+        {
+            if (ShipSimRef is null)
+            {
+                return [];
+            }
+
+            if (ShipSimRef.IsPowered(ShipSim.InteriorDoorFixtureId))
+            {
+                return [IsOpen ? CloseVerb : OpenVerb];
+            }
+
+            return IsOpen ? [] : [PryVerb];
+        }
+    }
 
     public string? DisplayNameKey => "OBJECT_DOOR";
 
@@ -75,24 +89,34 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
 
     public override void _Ready()
     {
-        _cycleTimer = new Timer { OneShot = true, WaitTime = OpenVerb.DurationSeconds };
+        _cycleTimer = new Timer { OneShot = true };
         AddChild(_cycleTimer);
         _cycleTimer.Timeout += OnCycleComplete;
 
-        // Deferred: a CollisionShape3D's very first Disabled toggle in the same frame it enters
-        // the tree can race the physics server's own "shape added" registration for that frame
-        // (Jolt in particular) — the write is silently lost and the shape stays solid until some
-        // later toggle (e.g. the player closing then reopening the door) forces a real update.
-        // One frame is enough to land after that registration. Deliberately not calling
-        // ApplyEdgeSeal here: ShipSimRef's own Deck may not be built yet at this exact point in
-        // _Ready() order, and the doorway already starts unsealed by default, matching _isOpen's
-        // own starting value.
-        CallDeferred(nameof(ApplySlabVisual));
+        // Deferred for two reasons: ShipSimRef's own Deck/power may not be built yet at this
+        // exact point in _Ready() order (needed to decide the starting _isOpen below), and a
+        // CollisionShape3D's very first Disabled toggle in the same frame it enters the tree can
+        // race the physics server's own "shape added" registration for that frame (Jolt in
+        // particular) — the write is silently lost and the shape stays solid until some later
+        // toggle forces a real update. One frame lands after both.
+        CallDeferred(nameof(ApplyInitialState));
+    }
+
+    /// <summary>A fresh, unpowered ship starts with its interior doors closed (no motor to hold
+    /// them open) rather than the old hardcoded "always starts open" — matching PryVerb's own
+    /// "closed is the state you need a crowbar for" framing. A loaded save overrides this via
+    /// ApplySaveState regardless, same as before.</summary>
+    private void ApplyInitialState()
+    {
+        _isOpen = ShipSimRef?.IsPowered(ShipSim.InteriorDoorFixtureId) ?? false;
+        ApplyEdgeSeal();
+        ApplySlabVisual();
     }
 
     public override void _PhysicsProcess(double delta)
     {
-        if (_cycling)
+        // A pry is manual force, not motor-driven — no ship battery involved.
+        if (_cycling && !_cyclingIsPry)
         {
             ShipSimRef?.DrainBattery(BatteryDrainPerSecond * (float)delta);
         }
@@ -100,14 +124,16 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
-        if (ShipSimRef is null || _cycling || (verb.Id != OpenVerb.Id && verb.Id != CloseVerb.Id))
+        if (ShipSimRef is null || _cycling || (verb.Id != OpenVerb.Id && verb.Id != CloseVerb.Id && verb.Id != PryVerb.Id))
         {
             return;
         }
 
-        _pendingOpenState = verb.Id == OpenVerb.Id;
+        _pendingOpenState = verb.Id != CloseVerb.Id;
+        _cyclingIsPry = verb.Id == PryVerb.Id;
         _cycling = true;
-        _cycleTimer!.Start();
+        _cycleTimer!.WaitTime = verb.DurationSeconds;
+        _cycleTimer.Start();
     }
 
     public void CancelVerb()
