@@ -85,6 +85,23 @@ public class DeckTests
     }
 
     [Fact]
+    public void WallEdgeBreaches_ExposesTheRawEdgePairs_NotJustTheCellsTheyTouch()
+    {
+        var deck = new Deck();
+        var a = new CellCoord(0, 0);
+        var b = new CellCoord(-1, 0);
+
+        deck.BreachWallEdge(a, b);
+
+        // BreachWallEdge normalizes argument order internally (see Deck.Normalize) — assert
+        // against that same normalization rather than the (a, b) order passed in above.
+        Assert.Contains(Deck.Normalize(a, b), deck.WallEdgeBreaches);
+
+        deck.RepairWallEdge(a, b);
+        Assert.Empty(deck.WallEdgeBreaches);
+    }
+
+    [Fact]
     public void RepairingOneOpenEdge_LeavesAnotherOpenEdgeOnTheSameCellStillBreached()
     {
         var deck = new Deck();

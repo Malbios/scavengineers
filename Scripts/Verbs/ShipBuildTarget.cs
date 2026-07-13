@@ -1751,12 +1751,16 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// <summary>Local (to this Floor body) position + rotation for a 1-tile wall segment on the
     /// given edge — works uniformly for interior edges and boundary edges (where the "far" cell
     /// is off-grid), since the midpoint math is the same either way.</summary>
-    private (Vector3 Position, Vector3 RotationDegrees) EdgeTransform(CellCoord a, CellCoord b)
+    private static Vector3 EdgeShipLocalPosition(CellCoord a, CellCoord b)
     {
         var midX = (a.X + b.X) / 2f;
         var midY = (a.Y + b.Y) / 2f;
-        var shipLocal = new Vector3(midX - 3 + 0.5f, WallCenterHeight, midY - 3 + 0.5f);
-        var world = (ShipRoot ?? GetParent<Node3D>()).ToGlobal(shipLocal);
+        return new Vector3(midX - 3 + 0.5f, WallCenterHeight, midY - 3 + 0.5f);
+    }
+
+    private (Vector3 Position, Vector3 RotationDegrees) EdgeTransform(CellCoord a, CellCoord b)
+    {
+        var world = (ShipRoot ?? GetParent<Node3D>()).ToGlobal(EdgeShipLocalPosition(a, b));
 
         // WallSegmentMesh is authored running along X (separates cells differing in Y) — rotate
         // 90 degrees when the edge instead separates cells differing in X.
@@ -1765,16 +1769,23 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         return (ToLocal(world), rotationDegrees);
     }
 
+    /// <summary>World position of an edge's midpoint — the wall-breach counterpart to
+    /// <see cref="TileWorldPosition"/>, reusing <see cref="EdgeTransform"/>'s own position math so
+    /// a breach pull target always lines up with the actual wall segment.</summary>
+    private Vector3 EdgeWorldPosition(CellCoord a, CellCoord b) =>
+        (ShipRoot ?? GetParent<Node3D>()).ToGlobal(EdgeShipLocalPosition(a, b));
+
     private Vector3 TileWorldPosition(Vector2I tile, float height)
     {
         var shipLocal = new Vector3(tile.X - 3 + 0.5f, height, tile.Y - 3 + 0.5f);
         return (ShipRoot ?? GetParent<Node3D>()).ToGlobal(shipLocal);
     }
 
-    /// <summary>World positions of every currently-open floor/ceiling breach on this ship — the
-    /// decompression-pull hazard's own read of Deck.HullBreaches, reusing the exact same
-    /// TileWorldPosition/panel-height math GenerateFloorCeilingPanels already uses so a pull
-    /// target always lines up with the actual hole, not a re-derived approximation.</summary>
+    /// <summary>World positions of every currently-open floor/ceiling/wall breach on this ship —
+    /// the decompression-pull hazard's own read of Deck.HullBreaches/WallEdgeBreaches, reusing the
+    /// exact same TileWorldPosition/EdgeWorldPosition math GenerateFloorCeilingPanels/SpawnWallSegment
+    /// already use so a pull target always lines up with the actual hole, not a re-derived
+    /// approximation.</summary>
     public IEnumerable<Vector3> ActiveBreachPositions()
     {
         if (ShipSimRef is null)
@@ -1795,6 +1806,14 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             {
                 yield return TileWorldPosition(tile, CeilingPanelHeight);
             }
+        }
+
+        // Floor/ceiling breaches are tracked per-cell (handled above); a breached/removed wall is
+        // tracked per-edge instead (Deck.WallEdgeBreaches, not the per-cell _breaches set), so it
+        // needs its own pass rather than fitting into IsHullBreached(cell, surface) above.
+        foreach (var (a, b) in ShipSimRef.Deck.WallEdgeBreaches)
+        {
+            yield return EdgeWorldPosition(a, b);
         }
     }
 

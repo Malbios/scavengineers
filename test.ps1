@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # Open inventory (Tab), right-click the drill to open its battery window, drag its installed battery onto a SPECIFIC empty backpack slot that is NOT the first free one (e.g. drop it on slot 5 while slots 1-4 are empty) and confirm it lands exactly in that slot, not the first free one. Try dropping it onto an already-occupied slot and confirm nothing happens (battery stays installed) rather than it silently landing elsewhere. Repeat both checks for the flashlight's battery. Also confirm dragging a battery from a backpack slot back into the drill/flashlight window still works as before.
+$scene = "res://Scenes/World.tscn" # On Home Ship or Derelict, pry/scrap open an exterior wall (not floor/ceiling) with the power drill to create a wall breach, then stand near it in zero-g and confirm you now feel a real decompression pull toward that wall breach (previously only floor/ceiling holes pulled you). Confirm the room's O2 still visibly vents through the wall breach as before (that part already worked). Repair the wall and confirm the pull stops.
 
 & $godotExe --path $projectPath $scene

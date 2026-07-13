@@ -37,6 +37,11 @@ public sealed class Deck
             .Concat(_wallEdgeBreaches.SelectMany(e => new[] { e.Item1, e.Item2 }))
             .ToHashSet();
 
+    /// <summary>The raw breached edge pairs — <see cref="HullBreaches"/> flattens these to just
+    /// the cells they touch, losing which specific edge is open; a consumer that needs the actual
+    /// edge (e.g. to compute a wall's own world position for a hazard) needs this instead.</summary>
+    public IReadOnlySet<(CellCoord, CellCoord)> WallEdgeBreaches => _wallEdgeBreaches;
+
     public IReadOnlySet<CellCoord> Fires => _fires;
 
     public void AddCell(CellCoord cell) => _cells.Add(cell);
