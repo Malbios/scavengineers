@@ -8,10 +8,10 @@ namespace Scavengineers.NodeTests;
 
 /// <summary>Regression coverage for the interior door's unpowered behavior: a ship with no
 /// working power grid (e.g. the Derelict) starts its interior doors closed rather than the old
-/// hardcoded "always starts open", and offers only a crowbar-pry verb to get through — no motor
-/// to drive the mechanism, so an already-open unpowered door can't be closed either. Also verifies
-/// the actual physical passability claim end-to-end (SlabCollision.Disabled) rather than trusting
-/// it by inspection.</summary>
+/// hardcoded "always starts open", and offers only a crowbar-pry verb to get through either
+/// direction — no motor to drive the mechanism, so the same pry verb forces it open when closed
+/// or shut again when already open. Also verifies the actual physical passability claim
+/// end-to-end (SlabCollision.Disabled) rather than trusting it by inspection.</summary>
 [TestSuite]
 public class InteriorDoorVerbTargetTest
 {
@@ -33,7 +33,7 @@ public class InteriorDoorVerbTargetTest
 
     [TestCase]
     [RequireGodotRuntime]
-    public void UnpoweredShip_OpenDoor_HasNoAvailableVerbs()
+    public void UnpoweredShip_OpenDoor_OffersPryVerbToForceItShut()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var shipSim = AutoFree(new ShipSim { HasFireHazard = true, HasHullBreaches = true });
@@ -43,7 +43,8 @@ public class InteriorDoorVerbTargetTest
         sceneTree.Root.AddChild(door);
         door.ApplySaveState(true); // simulate an already-open door, e.g. loaded from an old save
 
-        AssertThat(door.AvailableVerbs).IsEmpty(); // no motor to close it, and no "pry shut"
+        AssertThat(door.AvailableVerbs).HasSize(1);
+        AssertThat(door.AvailableVerbs[0].Id).IsEqual("pry_door");
     }
 
     [TestCase]

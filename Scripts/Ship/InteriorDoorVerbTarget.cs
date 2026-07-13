@@ -61,9 +61,10 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
     public bool IsOpen => _isOpen;
 
     /// <summary>Powered: the normal instant Open/Close, same as ever. Unpowered: no ship motor to
-    /// drive the mechanism, so the only way through a closed door is <see cref="PryVerb"/> (a
-    /// crowbar, by hand) — and an unpowered door that's already open can't be closed either,
-    /// matching the powered gate's own "blocks both directions" behavior.</summary>
+    /// drive the mechanism either way, so <see cref="PryVerb"/> (a crowbar, by hand) is the only
+    /// option regardless of current state — it prys the door open if closed, or forces it shut
+    /// again if already open (see <see cref="ExecuteVerb"/>, which decides the direction from the
+    /// current <see cref="IsOpen"/> state rather than from which verb was picked).</summary>
     public IReadOnlyList<Verb> AvailableVerbs
     {
         get
@@ -78,7 +79,7 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
                 return [IsOpen ? CloseVerb : OpenVerb];
             }
 
-            return IsOpen ? [] : [PryVerb];
+            return [PryVerb];
         }
     }
 
@@ -129,8 +130,8 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
             return;
         }
 
-        _pendingOpenState = verb.Id != CloseVerb.Id;
         _cyclingIsPry = verb.Id == PryVerb.Id;
+        _pendingOpenState = _cyclingIsPry ? !IsOpen : verb.Id != CloseVerb.Id;
         _cycling = true;
         _cycleTimer!.WaitTime = verb.DurationSeconds;
         _cycleTimer.Start();

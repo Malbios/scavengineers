@@ -102,9 +102,10 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     public bool IsOpen => _isOpen;
 
     /// <summary>Powered: the normal instant Open/Close, same as ever. Unpowered: no motor to
-    /// drive the mechanism, so the only way through a closed airlock is <see cref="PryVerb"/> (a
-    /// crowbar, by hand) — and an unpowered airlock that's already open can't be closed either,
-    /// matching InteriorDoorVerbTarget's own "blocks both directions" behavior.</summary>
+    /// drive the mechanism either way, so <see cref="PryVerb"/> (a crowbar, by hand) is the only
+    /// option regardless of current state — it prys the airlock open if closed, or forces it shut
+    /// again if already open (see <see cref="ExecuteVerb"/>, which decides the direction from the
+    /// current <see cref="IsOpen"/> state rather than from which verb was picked).</summary>
     public IReadOnlyList<Verb> AvailableVerbs
     {
         get
@@ -119,7 +120,7 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
                 return [IsOpen ? CloseVerb : OpenVerb];
             }
 
-            return IsOpen ? [] : [PryVerb];
+            return [PryVerb];
         }
     }
 
@@ -162,8 +163,8 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
             return;
         }
 
-        _pendingOpenState = verb.Id != CloseVerb.Id;
         _cyclingIsPry = verb.Id == PryVerb.Id;
+        _pendingOpenState = _cyclingIsPry ? !IsOpen : verb.Id != CloseVerb.Id;
         _cycling = true;
         _cycleTimer!.WaitTime = verb.DurationSeconds;
         _cycleTimer.Start();
