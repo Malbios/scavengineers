@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # Freeze/unfreeze now confirmed working (items float once a room reads 0% O2) - remaining complaint was a pushed item losing momentum almost instantly. Dropped ZeroGSettleDamp from 2f to 0.4f on both PickupItem and ContainerPickupItem so a shove glides for a couple of seconds instead of stopping dead. Go to the Derelict, wait for a room to fully vent, and shove a loose item - confirm it now drifts noticeably further/longer before settling, rather than stopping almost immediately. Confirm it still eventually settles rather than drifting forever. Confirm items in normal-gravity rooms (Home Ship) still don't move when bumped.
+$scene = "res://Scenes/World.tscn" # Found why opening the airlock into a breached room gave it "a bit of oxygen" for a while: AirlockBridge's equalize rate and AtmosphereSystem's vent rate were equal (0.5/s each), so pulling toward a shared average and pulling toward vacuum settled into a tug-of-war holding several percent O2 the whole time the airlock stayed open. Vent rate bumped to 5.0/s (10x the bridge) so vent decisively wins. Open the airlock to the Derelict and confirm the breached room no longer noticeably fills with air even briefly - it should read as vacuum (items floating, HUD showing near-0% O2) essentially the whole time the airlock is open, not just after waiting.
 
 & $godotExe --path $projectPath $scene

@@ -12,7 +12,13 @@ namespace Scavengineers.Sim.Atmosphere;
 /// </summary>
 public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
 {
-    private const double VentRatePerSecond = 0.5;
+    // Placeholder/tunable — must decisively outpace AirlockBridge's own EqualizeRatePerSecond
+    // (0.5). At equal rates, opening an airlock into a breached room let the bridge's push toward
+    // a shared average and this vent's pull toward vacuum settle into a tug-of-war equilibrium
+    // that held several percent O2 indefinitely — the room visibly "got a bit of air" the whole
+    // time the airlock stayed open, instead of just a brief moment. 10x the bridge's rate keeps
+    // that peak under 1% at realistic per-frame dt (see AirlockBridgeTests).
+    private const double VentRatePerSecond = 5.0;
     private const double LifeSupportRegenRatePerSecond = 0.2;
 
     private readonly Deck _deck;

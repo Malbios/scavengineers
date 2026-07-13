@@ -104,6 +104,33 @@ public class AirlockBridgeTests
     }
 
     [Fact]
+    public void Open_BreachedRoomNeverMeaningfullyFillsWithAir_EvenAtRealisticFrameRates()
+    {
+        // Regression: at equal vent/bridge rates, opening the airlock into a breached room let
+        // the bridge's push toward a shared average and the derelict's own vent settle into a
+        // tug-of-war equilibrium holding several percent O2 for as long as the airlock stayed
+        // open — the room visibly "got a bit of air" rather than just a brief moment. Vent must
+        // decisively outpace the bridge's equalize rate so this never happens, checked here at a
+        // realistic per-physics-frame dt (60fps), not the large dt-per-Tick used elsewhere.
+        var (home, homeCell) = BreathableSystem();
+        var (derelict, derelictCell) = BreachedSystem();
+        derelict.Tick(50); // derelict starts fully vented, isolated
+
+        var bridge = new AirlockBridge(home, homeCell, derelict, derelictCell) { IsOpen = true };
+
+        const double frameDt = 1.0 / 60.0;
+        for (var i = 0; i < 300; i++) // 5 seconds of real gameplay frames, airlock held open
+        {
+            derelict.Tick(frameDt);
+            bridge.Tick(frameDt);
+
+            Assert.True(
+                derelict.VolumeAt(derelictCell).O2Fraction < 0.02,
+                $"O2 rose to {derelict.VolumeAt(derelictCell).O2Fraction} at frame {i}");
+        }
+    }
+
+    [Fact]
     public void Open_WithASealedOffRoom_LeavesThatRoomUnaffected()
     {
         // If the home ship's own interior door has sealed off a room from the doorway tile,
