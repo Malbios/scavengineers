@@ -326,6 +326,7 @@ horizontal_alignment = 1
 [node name="DrillBatterySlot" type="Control" parent="HUD/DrillWindow/Layout" node_paths=PackedStringArray("Tooltip")]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
+size_flags_horizontal = 4
 script = ExtResource("3")
 IsDrillBatterySlot = true
 EmptySlotNameKey = "HUD_DRILL_BATTERY_SLOT"
@@ -393,6 +394,7 @@ horizontal_alignment = 1
 [node name="FlashlightBatterySlot" type="Control" parent="HUD/FlashlightWindow/Layout" node_paths=PackedStringArray("Tooltip")]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
+size_flags_horizontal = 4
 script = ExtResource("3")
 IsFlashlightBatterySlot = true
 EmptySlotNameKey = "HUD_FLASHLIGHT_BATTERY_SLOT"
