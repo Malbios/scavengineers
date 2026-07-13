@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 
 using Godot;
+using Scavengineers.Scripts.Ship;
 using Scavengineers.Scripts.Verbs;
 
 namespace Scavengineers.Scripts.Inventory;
@@ -32,19 +33,13 @@ public partial class PickupItem : RigidBody3D, IVerbTarget
 
         // Completely inert by default — matching the old StaticBody3D behavior (immovable, no
         // physics response at all), so there's zero risk of an interpenetration "pop" or a
-        // fall-through from any collision-generation timing race. Only ShipAtmosphereZone
-        // unfreezes this once its room is actually confirmed to be in vacuum.
-        //
-        // FreezeMode must be Kinematic, not the default Static — under this project's Jolt
-        // physics backend specifically, an Area3D's overlap detection (GetOverlappingBodies,
-        // body_entered) simply cannot see an already-frozen body at all when FreezeMode is
-        // Static, so ShipAtmosphereZone could never find this item again to unfreeze it
-        // (confirmed Godot/Jolt engine limitation: godotengine/godot#103767). Kinematic freeze
-        // still means immovable-except-by-script — Area3D detection is the only thing this
-        // changes.
-        FreezeMode = FreezeModeEnum.Kinematic;
+        // fall-through from any collision-generation timing race. Only unfrozen once this item's
+        // own _PhysicsProcess (see ShipAtmosphereZone.UpdateFreezeState) confirms its current room
+        // is actually in vacuum.
         Freeze = true;
     }
+
+    public override void _PhysicsProcess(double delta) => ShipAtmosphereZone.UpdateFreezeState(this);
 
     public IReadOnlyList<Verb> AvailableVerbs { get; } = [PickUpVerb];
 

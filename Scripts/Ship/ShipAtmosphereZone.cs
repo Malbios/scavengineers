@@ -56,17 +56,33 @@ public partial class ShipAtmosphereZone : Area3D
         var isVacuum = ShipSimRef.VolumeAt(new CellCoord(Tile.X, Tile.Y)).O2Fraction <= ZeroGO2Threshold;
         GravitySpaceOverride = isVacuum ? SpaceOverride.Replace : SpaceOverride.Disabled;
         Gravity = 0f;
+    }
 
-        // Loose pickups start frozen (see PickupItem/ContainerPickupItem's own default) — only
-        // unfrozen here, once their room is actually confirmed to be in vacuum, so they stay
-        // completely inert (immovable, no physics response) everywhere else. Read fresh from the
-        // Area3D's live overlap list every tick rather than tracked via BodyEntered/Exited, so a
-        // body that later drifts out of this zone into another one is never left stale.
-        foreach (var body in GetOverlappingBodies())
+    /// <summary>Called from a loose pickup's own _PhysicsProcess to freeze/unfreeze itself based
+    /// on whichever zone it's currently standing in — the item queries space for its zone, rather
+    /// than the zone tracking the item via GetOverlappingBodies/BodyEntered, because Jolt's Area3D
+    /// overlap monitoring silently excludes static and frozen bodies by default (confirmed
+    /// Godot/Jolt engine limitation: godotengine/godot#103767) — a zone could never find an
+    /// already-frozen item again to unfreeze it. A direct space query isn't gated by that
+    /// monitoring optimization, since there's no "overlap pair" being cached: it asks "what's
+    /// here right now," which doesn't care whether the item making the query is frozen.</summary>
+    public static void UpdateFreezeState(RigidBody3D item)
+    {
+        var spaceState = item.GetWorld3D().DirectSpaceState;
+        var query = new PhysicsPointQueryParameters3D
         {
-            if (body is RigidBody3D rigidBody)
+            Position = item.GlobalPosition,
+            CollideWithBodies = false,
+            CollideWithAreas = true,
+        };
+
+        foreach (var result in spaceState.IntersectPoint(query))
+        {
+            if (result["collider"].As<GodotObject>() is ShipAtmosphereZone { ShipSimRef: { } shipSim } zone)
             {
-                rigidBody.Freeze = !isVacuum;
+                var isVacuum = shipSim.VolumeAt(new CellCoord(zone.Tile.X, zone.Tile.Y)).O2Fraction <= ZeroGO2Threshold;
+                item.Freeze = !isVacuum;
+                return;
             }
         }
     }

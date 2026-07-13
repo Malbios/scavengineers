@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 
 using Godot;
+using Scavengineers.Scripts.Ship;
 using Scavengineers.Scripts.Verbs;
 using PlayerScript = Scavengineers.Scripts.Player.Player;
 
@@ -31,10 +32,11 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget
         LinearDamp = ZeroGSettleDamp;
         AngularDamp = ZeroGSettleDamp;
 
-        // See PickupItem's own Freeze/FreezeMode default for why — same reasoning applies here.
-        FreezeMode = FreezeModeEnum.Kinematic;
+        // See PickupItem's own Freeze default for why — same reasoning applies here.
         Freeze = true;
     }
+
+    public override void _PhysicsProcess(double delta) => ShipAtmosphereZone.UpdateFreezeState(this);
 
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 
