@@ -230,6 +230,7 @@ public partial class Player : CharacterBody3D
         _inventory.Add("power_drill", 1);
         _inventory.AttachDrill(hasBattery: true, charge: 1f);
         _inventory.Add("flashlight", 1);
+        _inventory.Add("debug_flashlight", 1);
 
         CaptureMouse();
         // Setting MouseMode here alone is unreliable if the window doesn't yet have OS
@@ -643,17 +644,21 @@ public partial class Player : CharacterBody3D
         Velocity = velocity;
         MoveAndSlide();
 
-        // The beam only exists while the flashlight is both held and toggled on — unequipping
-        // or swapping it out of hand turns it off automatically without touching _flashlightOn.
+        // The real beam only exists while the flashlight is both held and toggled on —
+        // unequipping or swapping it out of hand turns it off automatically without touching
+        // _flashlightOn. The debug flashlight (see fresh-game stipend) forces the beam on
+        // regardless — a testing convenience, not something you hold, and it doesn't drain suit
+        // power either (see the Tick call below, gated on the real held-flashlight case only).
         var holdingFlashlight = LeftHandItemId == "flashlight" || RightHandItemId == "flashlight";
-        _flashlightSpot!.Visible = _flashlightOn && holdingFlashlight;
+        var realFlashlightOn = _flashlightOn && holdingFlashlight;
+        _flashlightSpot!.Visible = realFlashlightOn || _inventory.Has("debug_flashlight", 1);
 
         // Suit resources keep draining while busy performing a verb — a task's duration is a
         // real elapsed-time cost, not a pause (docs/project-plan.md's "time acceleration ...
         // pays the full bill" framing). A breached room's dropping O2 burns the suit's own
         // reserve faster on top of the flat drain, and a lit flashlight burns suit power faster
         // too (see SuitResources.Tick).
-        _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21, _flashlightSpot.Visible);
+        _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21, realFlashlightOn);
         _o2Bar!.Value = _suitResources.O2Percent;
         _powerBar!.Value = _suitResources.PowerPercent;
 

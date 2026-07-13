@@ -31,6 +31,14 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     private static readonly Verb OpenVerb = new("open_airlock", "VERB_OPEN_AIRLOCK", DurationSeconds: 0.2f);
     private static readonly Verb CloseVerb = new("close_airlock", "VERB_CLOSE_AIRLOCK", DurationSeconds: 0.2f);
 
+    // Placeholder/tunable — longer than the powered open/close to feel like real manual effort,
+    // matching InteriorDoorVerbTarget's own PryVerb. Reuses VERB_PRY_DOOR's text rather than a
+    // new key — an airlock is a door.
+    private static readonly Verb PryVerb = new("pry_airlock", "VERB_PRY_DOOR", DurationSeconds: 1.5f)
+    {
+        Requirements = [new ItemRequirement("crowbar", 1) { Consumed = false }],
+    };
+
     // Placeholder/tunable, matching SuitResources's drain-constant convention.
     private const float BatteryDrainPerSecond = 0.05f;
 
@@ -86,16 +94,34 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     private AirlockBridge? _bridge;
     private Timer? _cycleTimer;
     private bool _cycling;
+    private bool _cyclingIsPry;
     private bool _pendingOpenState;
     private bool _isOpen;
     private Material? _doorMaterial;
 
     public bool IsOpen => _isOpen;
 
-    public IReadOnlyList<Verb> AvailableVerbs =>
-        _bridge is null || ShipARef is null || !ShipARef.IsPowered(PowerFixtureId)
-            ? []
-            : [IsOpen ? CloseVerb : OpenVerb];
+    /// <summary>Powered: the normal instant Open/Close, same as ever. Unpowered: no motor to
+    /// drive the mechanism, so the only way through a closed airlock is <see cref="PryVerb"/> (a
+    /// crowbar, by hand) — and an unpowered airlock that's already open can't be closed either,
+    /// matching InteriorDoorVerbTarget's own "blocks both directions" behavior.</summary>
+    public IReadOnlyList<Verb> AvailableVerbs
+    {
+        get
+        {
+            if (_bridge is null || ShipARef is null)
+            {
+                return [];
+            }
+
+            if (ShipARef.IsPowered(PowerFixtureId))
+            {
+                return [IsOpen ? CloseVerb : OpenVerb];
+            }
+
+            return IsOpen ? [] : [PryVerb];
+        }
+    }
 
     public string? DisplayNameKey => "OBJECT_AIRLOCK";
 
@@ -122,7 +148,8 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     {
         _bridge?.Tick(delta);
 
-        if (_cycling)
+        // A pry is manual force, not motor-driven — no ship battery involved.
+        if (_cycling && !_cyclingIsPry)
         {
             ShipARef?.DrainBattery(BatteryDrainPerSecond * (float)delta);
         }
@@ -130,14 +157,16 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
-        if (_bridge is null || _cycling || (verb.Id != OpenVerb.Id && verb.Id != CloseVerb.Id))
+        if (_bridge is null || _cycling || (verb.Id != OpenVerb.Id && verb.Id != CloseVerb.Id && verb.Id != PryVerb.Id))
         {
             return;
         }
 
-        _pendingOpenState = verb.Id == OpenVerb.Id;
+        _pendingOpenState = verb.Id != CloseVerb.Id;
+        _cyclingIsPry = verb.Id == PryVerb.Id;
         _cycling = true;
-        _cycleTimer!.Start();
+        _cycleTimer!.WaitTime = verb.DurationSeconds;
+        _cycleTimer.Start();
     }
 
     public void CancelVerb()
