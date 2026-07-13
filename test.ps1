@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # symmetric corridors + Station no-alteration check
+$scene = "res://Scenes/World.tscn" # Extend Floor: remove a boundary wall, extend into the gap, check per-edge wall labels + O2 venting + save/load
 
 & $godotExe --path $projectPath $scene
