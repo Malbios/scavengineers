@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # airlock corridor rebuild check
+$scene = "res://Scenes/World.tscn" # symmetric corridors + Station no-alteration check
 
 & $godotExe --path $projectPath $scene
