@@ -19,9 +19,17 @@
 [ext_resource type="Script" path="res://Scripts/Ship/TravelConsoleVerbTarget.cs" id="21"]
 [ext_resource type="Script" path="res://Scripts/Ship/StationConsoleVerbTarget.cs" id="22"]
 [ext_resource type="Script" path="res://Scripts/Ship/BunkVerbTarget.cs" id="23"]
+[ext_resource type="Shader" path="res://Shaders/starfield_sky.gdshader" id="24"]
+
+[sub_resource type="ShaderMaterial" id="StarfieldSkyMaterial"]
+shader = ExtResource("24")
+
+[sub_resource type="Sky" id="StarfieldSky"]
+sky_material = SubResource("StarfieldSkyMaterial")
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 2
+sky = SubResource("StarfieldSky")
 ambient_light_color = Color(0.18, 0.18, 0.22, 1)
 ambient_light_energy = 0.08
 
@@ -212,12 +220,6 @@ size = Vector3(8, 3, 0.2)
 [sub_resource type="StandardMaterial3D" id="AirlockDoorMaterial"]
 albedo_color = Color(0.85, 0.75, 0.15, 1)
 
-[sub_resource type="StandardMaterial3D" id="SpaceMaterial"]
-albedo_color = Color(0.02, 0.02, 0.05, 1)
-emission_enabled = true
-emission = Color(0.05, 0.05, 0.15, 1)
-emission_energy_multiplier = 0.4
-
 [sub_resource type="StandardMaterial3D" id="AirlockPanelMaterial"]
 albedo_color = Color(0.9, 0.65, 0.05, 1)
 
@@ -296,7 +298,7 @@ shape = SubResource("ShipZoneWideShape")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="HomeShip" unique_id=1413109270]
 transform = Transform3D(0.866, -0.25, 0.433, 0, 0.866, 0.5, -0.5, -0.433, 0.75, 0, 4, 0)
-light_energy = 0.8
+light_energy = 0.05
 shadow_enabled = true
 
 [node name="Floor" type="StaticBody3D" parent="HomeShip" unique_id=61458931 node_paths=PackedStringArray("ShipSimRef", "ShipRoot", "RoomLight") groups=["saveable"]]
@@ -882,7 +884,6 @@ TileA = Vector2i(11, 2)
 TileB = Vector2i(0, 2)
 SlabMesh = NodePath("SlabMesh")
 SlabCollision = NodePath("SlabCollision")
-SpaceMaterial = SubResource("SpaceMaterial")
 SaveId = "derelict_airlock"
 
 [node name="FrameCollision" type="CollisionShape3D" parent="DerelictAirlock"]
@@ -919,6 +920,7 @@ shape = SubResource("ShipZoneNarrowShape")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="Station"]
 transform = Transform3D(0.866, -0.25, 0.433, 0, 0.866, 0.5, -0.5, -0.433, 0.75, 0, 4, 0)
+light_energy = 0.05
 shadow_enabled = true
 
 [node name="Floor" type="StaticBody3D" parent="Station"]
@@ -1058,7 +1060,6 @@ TileA = Vector2i(0, 2)
 TileB = Vector2i(11, 2)
 SlabMesh = NodePath("SlabMesh")
 SlabCollision = NodePath("SlabCollision")
-SpaceMaterial = SubResource("SpaceMaterial")
 SaveId = "station_airlock"
 
 [node name="FrameCollision" type="CollisionShape3D" parent="StationAirlock"]

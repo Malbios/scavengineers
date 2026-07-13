@@ -63,13 +63,6 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     [Export]
     public CollisionShape3D? SlabCollision { get; set; }
 
-    /// <summary>Swapped onto <see cref="SlabMesh"/> instead of hiding it when the door is opened
-    /// while undocked — nothing is physically there on the other side (the Home Ship hasn't
-    /// travelled there), so revealing the still-present room through the frame would look wrong.
-    /// The slab stays up, opaque and impassable, standing in for "open to space."</summary>
-    [Export]
-    public Material? SpaceMaterial { get; set; }
-
     [Export]
     public string SaveId { get; set; } = "";
 
@@ -176,21 +169,23 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
         ApplyPhysicalState();
     }
 
-    /// <summary>Re-derives the door's entire physical effect — slab visibility/material,
-    /// passability, atmosphere bridging, vacuum breaching — from the current open/closed and
-    /// docked/undocked state together. Called whenever either changes, so an airlock left open
-    /// through a docking-state change (e.g. undocking without closing it first) immediately
-    /// switches from "see/walk through to the other ship" to "opaque, impassable, venting to
-    /// space," or back, without waiting for the next open/close.</summary>
+    /// <summary>Re-derives the door's entire physical effect — slab visibility, passability,
+    /// atmosphere bridging, vacuum breaching — from the current open/closed and docked/undocked
+    /// state together. Called whenever either changes, so an airlock left open through a
+    /// docking-state change (e.g. undocking without closing it first) immediately switches from
+    /// "walk through to the other ship" to "walk/float straight out into open space," or back,
+    /// without waiting for the next open/close. Open is always passable either way now — there's
+    /// nothing physically in the way undocked either, just open space (see the docked/undocked
+    /// distinction's other effect below: whether that's actually vacuum).</summary>
     private void ApplyPhysicalState()
     {
-        var passable = _isOpen && _docked;
+        var passable = _isOpen;
         var ventingToSpace = _isOpen && !_docked;
 
         if (SlabMesh is not null)
         {
             SlabMesh.Visible = !passable;
-            SlabMesh.SetSurfaceOverrideMaterial(0, ventingToSpace ? SpaceMaterial : _doorMaterial);
+            SlabMesh.SetSurfaceOverrideMaterial(0, _doorMaterial);
         }
 
         if (SlabCollision is not null)
