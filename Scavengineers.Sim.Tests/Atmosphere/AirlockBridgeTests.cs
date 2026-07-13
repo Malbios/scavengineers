@@ -104,14 +104,13 @@ public class AirlockBridgeTests
     }
 
     [Fact]
-    public void Open_BreachedRoomNeverMeaningfullyFillsWithAir_EvenAtRealisticFrameRates()
+    public void Open_BreachedRoomRapidlySettlesNearVacuum_EvenAtRealisticFrameRates()
     {
-        // Regression: at equal vent/bridge rates, opening the airlock into a breached room let
-        // the bridge's push toward a shared average and the derelict's own vent settle into a
-        // tug-of-war equilibrium holding several percent O2 for as long as the airlock stayed
-        // open — the room visibly "got a bit of air" rather than just a brief moment. Vent must
-        // decisively outpace the bridge's equalize rate so this never happens, checked here at a
-        // realistic per-physics-frame dt (60fps), not the large dt-per-Tick used elsewhere.
+        // A brief mixing blip right as the airlock opens is expected (both sides are being pulled
+        // toward the same shared average), but it must settle back to near vacuum within a
+        // couple of seconds, not linger at an elevated shared value for as long as the airlock
+        // stays open — checked at a realistic per-physics-frame dt (60fps), not the large
+        // dt-per-Tick used elsewhere.
         var (home, homeCell) = BreathableSystem();
         var (derelict, derelictCell) = BreachedSystem();
         derelict.Tick(50); // derelict starts fully vented, isolated
@@ -119,27 +118,26 @@ public class AirlockBridgeTests
         var bridge = new AirlockBridge(home, homeCell, derelict, derelictCell) { IsOpen = true };
 
         const double frameDt = 1.0 / 60.0;
-        for (var i = 0; i < 300; i++) // 5 seconds of real gameplay frames, airlock held open
+        for (var i = 0; i < 180; i++) // 3 seconds of real gameplay frames, airlock held open
         {
             derelict.Tick(frameDt);
             bridge.Tick(frameDt);
-
-            Assert.True(
-                derelict.VolumeAt(derelictCell).O2Fraction < 0.02,
-                $"O2 rose to {derelict.VolumeAt(derelictCell).O2Fraction} at frame {i}");
         }
+
+        Assert.True(
+            derelict.VolumeAt(derelictCell).O2Fraction < 0.01,
+            $"derelict O2 should have settled near vacuum within 3s, was {derelict.VolumeAt(derelictCell).O2Fraction}");
     }
 
     [Fact]
-    public void Open_QuickTransitBarelyDrainsTheHomeRoom_ButLeavingItOpenGraduallyDoes()
+    public void Open_RapidlyVentsTheHomeRoomToo_MatchingTheBreachsOwnSpeed()
     {
-        // Regression: making AtmosphereSystem's own vent rate decisively outpace the bridge (see
-        // the sibling test above) had a side effect — the bridge's shared average is now pulled
-        // much closer to true vacuum, and at the old bridge rate (equal to the vent rate before
-        // that fix), a normal few-second airlock transit already cost the home room a third of
-        // its air, with half a minute open fully draining it. The bridge's own rate must be much
-        // slower than any within-a-deck rate, so a quick transit barely registers while a
-        // long-left-open airlock still gradually drains a connected room (real tension, just slow).
+        // Design choice, not a bug: once the airlock is open, any path to outer space should feel
+        // dangerous immediately, not just for the room with the actual hole — a slower bridge
+        // rate was tried first (treating the airlock as a narrow chokepoint so a quick transit
+        // wouldn't cost air), but that undersold the danger of opening an airlock into a breached
+        // room at all. The bridge's rate matches AtmosphereSystem's own vent rate, so the home
+        // room's connected air drains just as fast as the breach itself.
         var doorwayCell = new CellCoord(0, 0);
         var homeDeck = new Deck();
         for (var i = 0; i < 5; i++)
@@ -154,7 +152,7 @@ public class AirlockBridgeTests
         var bridge = new AirlockBridge(home, doorwayCell, derelict, derelictCell) { IsOpen = true };
 
         const double frameDt = 1.0 / 60.0;
-        for (var i = 0; i < 300; i++) // 5 seconds — a normal quick transit
+        for (var i = 0; i < 180; i++) // 3 seconds — even a quick transit
         {
             home.Tick(frameDt);
             derelict.Tick(frameDt);
@@ -162,19 +160,8 @@ public class AirlockBridgeTests
         }
 
         Assert.True(
-            home.VolumeAt(doorwayCell).O2Fraction > AtmosphereVolume.Breathable.O2Fraction * 0.9,
-            $"a 5s transit should barely dent the home room's air, was {home.VolumeAt(doorwayCell).O2Fraction}");
-
-        for (var i = 0; i < 1500; i++) // 25 more seconds — airlock left open, 30s total
-        {
-            home.Tick(frameDt);
-            derelict.Tick(frameDt);
-            bridge.Tick(frameDt);
-        }
-
-        Assert.True(
-            home.VolumeAt(doorwayCell).O2Fraction < AtmosphereVolume.Breathable.O2Fraction * 0.8,
-            $"leaving it open half a minute should still meaningfully drain the room, was {home.VolumeAt(doorwayCell).O2Fraction}");
+            home.VolumeAt(doorwayCell).O2Fraction < 0.1,
+            $"a few seconds with the airlock open should rapidly drain the home room too, was {home.VolumeAt(doorwayCell).O2Fraction}");
     }
 
     [Fact]
