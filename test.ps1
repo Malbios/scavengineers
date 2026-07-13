@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # Extend Floor: extend a tile and wait a few seconds without crashing (atmosphere tick used to throw on the new cell)
+$scene = "res://Scenes/World.tscn" # Wall height 3m->2m: walk all 3 ships, check no gaps/z-fighting at ceiling, no ceiling clipping, wall conduits offer 2 height slots not 3
 
 & $godotExe --path $projectPath $scene
