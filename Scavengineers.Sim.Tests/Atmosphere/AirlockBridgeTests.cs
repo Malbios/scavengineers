@@ -131,6 +131,53 @@ public class AirlockBridgeTests
     }
 
     [Fact]
+    public void Open_QuickTransitBarelyDrainsTheHomeRoom_ButLeavingItOpenGraduallyDoes()
+    {
+        // Regression: making AtmosphereSystem's own vent rate decisively outpace the bridge (see
+        // the sibling test above) had a side effect — the bridge's shared average is now pulled
+        // much closer to true vacuum, and at the old bridge rate (equal to the vent rate before
+        // that fix), a normal few-second airlock transit already cost the home room a third of
+        // its air, with half a minute open fully draining it. The bridge's own rate must be much
+        // slower than any within-a-deck rate, so a quick transit barely registers while a
+        // long-left-open airlock still gradually drains a connected room (real tension, just slow).
+        var doorwayCell = new CellCoord(0, 0);
+        var homeDeck = new Deck();
+        for (var i = 0; i < 5; i++)
+        {
+            homeDeck.AddCell(new CellCoord(i, 0));
+        }
+
+        var home = new AtmosphereSystem(homeDeck);
+        var (derelict, derelictCell) = BreachedSystem();
+        derelict.Tick(50); // derelict is now near-vacuum, isolated
+
+        var bridge = new AirlockBridge(home, doorwayCell, derelict, derelictCell) { IsOpen = true };
+
+        const double frameDt = 1.0 / 60.0;
+        for (var i = 0; i < 300; i++) // 5 seconds — a normal quick transit
+        {
+            home.Tick(frameDt);
+            derelict.Tick(frameDt);
+            bridge.Tick(frameDt);
+        }
+
+        Assert.True(
+            home.VolumeAt(doorwayCell).O2Fraction > AtmosphereVolume.Breathable.O2Fraction * 0.9,
+            $"a 5s transit should barely dent the home room's air, was {home.VolumeAt(doorwayCell).O2Fraction}");
+
+        for (var i = 0; i < 1500; i++) // 25 more seconds — airlock left open, 30s total
+        {
+            home.Tick(frameDt);
+            derelict.Tick(frameDt);
+            bridge.Tick(frameDt);
+        }
+
+        Assert.True(
+            home.VolumeAt(doorwayCell).O2Fraction < AtmosphereVolume.Breathable.O2Fraction * 0.8,
+            $"leaving it open half a minute should still meaningfully drain the room, was {home.VolumeAt(doorwayCell).O2Fraction}");
+    }
+
+    [Fact]
     public void Open_WithASealedOffRoom_LeavesThatRoomUnaffected()
     {
         // If the home ship's own interior door has sealed off a room from the doorway tile,

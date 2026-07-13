@@ -17,7 +17,16 @@ namespace Scavengineers.Sim.Atmosphere;
 /// </summary>
 public sealed class AirlockBridge(AtmosphereSystem systemA, CellCoord cellA, AtmosphereSystem systemB, CellCoord cellB)
 {
-    private const double EqualizeRatePerSecond = 0.5;
+    // Placeholder/tunable — deliberately much slower than any within-deck rate (Equalize is
+    // instant, AtmosphereSystem's own VentRatePerSecond is 5.0): a real airlock doorway is a
+    // narrow chokepoint, not an open connection between two rooms. At the old 0.5 (equal to
+    // AtmosphereSystem's vent rate), a home-ship room bridged to an aggressively-vented breached
+    // room got dragged toward the same near-vacuum shared average almost as fast as the breached
+    // room itself vented — a normal few-second airlock transit already cost a third of the room's
+    // air, and leaving the airlock open half a minute fully drained it. This still lets a
+    // long-left-open airlock gradually drain a connected room (real tension), just on a timescale
+    // of tens of seconds rather than single-digit ones (see AirlockBridgeTests).
+    private const double EqualizeRatePerSecond = 0.05;
 
     public bool IsOpen { get; set; }
 
