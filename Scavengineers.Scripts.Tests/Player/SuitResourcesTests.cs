@@ -5,14 +5,14 @@ namespace Scavengineers.Scripts.Tests.Player;
 public class SuitResourcesTests
 {
     [Fact]
-    public void Tick_DrainsO2AndPower_AtTheBaseRate_InBreathableAir()
+    public void Tick_DrainsO2_AtTheBaseRate_InBreathableAir()
     {
         var suit = new SuitResources();
 
         suit.Tick(1.0, ambientO2Fraction: 0.21); // breathable, no extra exposure drain
 
         Assert.Equal(100f - 100f / 300f, suit.O2Percent, precision: 3);
-        Assert.Equal(100f - 100f / 480f, suit.PowerPercent, precision: 3);
+        Assert.Equal(100f, suit.HealthPercent); // O2 isn't empty yet — Health untouched
     }
 
     [Fact]
@@ -29,18 +29,6 @@ public class SuitResourcesTests
     }
 
     [Fact]
-    public void Tick_DrainsPowerFaster_WhenFlashlightIsOn()
-    {
-        var suitWithFlashlight = new SuitResources();
-        var suitWithoutFlashlight = new SuitResources();
-
-        suitWithFlashlight.Tick(1.0, ambientO2Fraction: 0.21, flashlightOn: true);
-        suitWithoutFlashlight.Tick(1.0, ambientO2Fraction: 0.21, flashlightOn: false);
-
-        Assert.True(suitWithFlashlight.PowerPercent < suitWithoutFlashlight.PowerPercent);
-    }
-
-    [Fact]
     public void Tick_DrainsO2Faster_WhenInSmoke()
     {
         var suitInSmoke = new SuitResources();
@@ -54,6 +42,30 @@ public class SuitResourcesTests
     }
 
     [Fact]
+    public void Tick_LeavesHealthAlone_WhileO2StillRemains()
+    {
+        var suit = new SuitResources();
+
+        // Full vacuum for a while — O2 drops a lot but shouldn't hit exactly 0 this quickly.
+        suit.Tick(1.0, ambientO2Fraction: 0.0);
+
+        Assert.True(suit.O2Percent > 0f);
+        Assert.Equal(100f, suit.HealthPercent);
+    }
+
+    [Fact]
+    public void Tick_DrainsHealth_OnceO2IsFullyDepleted()
+    {
+        var suit = new SuitResources();
+        suit.RestoreFrom(0f, 100f);
+
+        suit.Tick(1.0, ambientO2Fraction: 0.0);
+
+        Assert.Equal(0f, suit.O2Percent);
+        Assert.True(suit.HealthPercent < 100f);
+    }
+
+    [Fact]
     public void RestoreFrom_ClampsBothValuesToZeroToOneHundred()
     {
         var suit = new SuitResources();
@@ -61,6 +73,6 @@ public class SuitResourcesTests
         suit.RestoreFrom(150f, -20f);
 
         Assert.Equal(100f, suit.O2Percent);
-        Assert.Equal(0f, suit.PowerPercent);
+        Assert.Equal(0f, suit.HealthPercent);
     }
 }

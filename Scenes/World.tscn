@@ -920,8 +920,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
 mesh = SubResource("DoorSlabMesh")
 surface_material_override/0 = SubResource("AirlockDoorMaterial")
 
-[node name="Player" parent="." unique_id=191954104 instance=ExtResource("2")]
+[node name="Player" parent="." unique_id=191954104 instance=ExtResource("2") node_paths=PackedStringArray("SaveManagerRef")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 DroppedItemMesh = SubResource("PickupItemMesh")
 DroppedItemShape = SubResource("PickupItemShape")
 DroppedItemMaterial = SubResource("PickupItemMaterial")
+SaveManagerRef = NodePath("../SaveManager")

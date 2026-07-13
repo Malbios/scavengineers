@@ -54,6 +54,19 @@ public sealed class PlayerInventory
 
     public DrillState? Drill { get; private set; }
 
+    /// <summary>A flashlight's own battery — the same per-instance-state shape as
+    /// <see cref="DrillState"/>, since removing the player's generic Power stat left the
+    /// flashlight with nothing limiting continuous use.</summary>
+    public sealed class FlashlightState
+    {
+        public bool HasBattery { get; set; }
+
+        /// <summary>0-1; meaningless while <see cref="HasBattery"/> is false.</summary>
+        public float Charge { get; set; }
+    }
+
+    public FlashlightState? Flashlight { get; private set; }
+
     /// <summary>The raw per-slot view of the two hands (see InventorySlotUI) — a worn
     /// backpack's own contents are addressed separately via <see cref="Backpack"/>.Contents,
     /// never merged in here.</summary>
@@ -263,10 +276,44 @@ public sealed class PlayerInventory
         return true;
     }
 
+    /// <summary>Attaches flashlight battery state directly — mirrors <see cref="AttachDrill"/>'s
+    /// own fresh-game-stipend/save-load-restore usage.</summary>
+    public void AttachFlashlight(bool hasBattery, float charge) => Flashlight = new FlashlightState { HasBattery = hasBattery, Charge = charge };
+
+    /// <summary>Loads a spare "battery" item into the flashlight — mirrors
+    /// <see cref="InsertDrillBattery"/> exactly (always a fresh full charge, no partial carry-in).</summary>
+    public bool InsertFlashlightBattery()
+    {
+        if (Flashlight is not { HasBattery: false } || !TryRemove("battery", 1))
+        {
+            return false;
+        }
+
+        Flashlight.HasBattery = true;
+        Flashlight.Charge = 1f;
+        return true;
+    }
+
+    /// <summary>Ejects the flashlight's battery back into inventory — mirrors
+    /// <see cref="EjectDrillBattery"/> exactly (remaining charge discarded, not preserved).</summary>
+    public bool EjectFlashlightBattery()
+    {
+        if (Flashlight is not { HasBattery: true })
+        {
+            return false;
+        }
+
+        Flashlight.HasBattery = false;
+        Flashlight.Charge = 0f;
+        Add("battery", 1);
+        return true;
+    }
+
     public void Clear()
     {
         _hands.Clear();
         Backpack = null;
         Drill = null;
+        Flashlight = null;
     }
 }

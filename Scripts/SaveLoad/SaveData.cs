@@ -104,7 +104,10 @@ public sealed class PlayerSaveData
 
     public float O2Percent { get; set; }
 
-    public float PowerPercent { get; set; }
+    /// <summary>Defaulted to 100f — an old save predating Health has no way to have died, so it
+    /// loads as fully healthy, same "missing field = safe default" convention as HungerPercent
+    /// etc. below.</summary>
+    public float HealthPercent { get; set; } = 100f;
 
     /// <summary>Defaulted to 100f, not 0 — an old save missing this field (System.Text.Json
     /// only overwrites properties actually present in the JSON) loads as "fully rested" rather
@@ -140,4 +143,12 @@ public sealed class PlayerSaveData
     public bool DrillHasBattery { get; set; }
 
     public float DrillCharge { get; set; }
+
+    /// <summary>False for a save from before the flashlight had its own battery — same
+    /// HasDrill/DrillHasBattery/DrillCharge shape and reasoning.</summary>
+    public bool HasFlashlight { get; set; }
+
+    public bool FlashlightHasBattery { get; set; }
+
+    public float FlashlightCharge { get; set; }
 }

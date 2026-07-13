@@ -85,12 +85,15 @@ public partial class SaveManager : Node
         GD.Print($"[SaveManager] Saved to {SavePath}");
     }
 
-    public void Load()
+    /// <summary>Returns whether a save was actually applied — false (no-op, logged) for a missing
+    /// or unreadable file, so callers like Player.Die() can fall back instead of retrying a load
+    /// that will never succeed.</summary>
+    public bool Load()
     {
         if (!File.Exists(SavePath))
         {
             GD.Print("[SaveManager] No save file found — nothing to load.");
-            return;
+            return false;
         }
 
         SaveData? data;
@@ -101,13 +104,13 @@ public partial class SaveManager : Node
         catch (Exception e)
         {
             GD.PushWarning($"[SaveManager] Save file could not be read: {e.Message}");
-            return;
+            return false;
         }
 
         if (data is null)
         {
             GD.PushWarning("[SaveManager] Save file was empty or invalid.");
-            return;
+            return false;
         }
 
         if (data.Version != SaveData.CurrentVersion)
@@ -174,6 +177,7 @@ public partial class SaveManager : Node
         }
 
         GD.Print("[SaveManager] Loaded.");
+        return true;
     }
 
     private List<T> FindSaveables<T>() where T : class =>

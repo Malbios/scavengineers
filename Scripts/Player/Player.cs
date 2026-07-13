@@ -21,6 +21,14 @@ public partial class Player : CharacterBody3D
     // Placeholder/tunable — 25 wall/floor/ceiling actions per full battery.
     private const float DrillChargeDrainPerUse = 0.04f;
 
+    // Placeholder/tunable — ~15 min of continuous use per full battery, same pacing the
+    // flashlight's old generic-Power drain used before Power was removed as a player stat.
+    private const float FlashlightChargeDrainPerSecond = 1f / 900f;
+
+    // Placeholder/tunable — the Hunger/Thirst/Energy-at-0% debuff (a slowdown, not a failure
+    // state; that's O2/Health's job — see SuitResources).
+    private const float NeedsDebuffMoveMultiplier = 0.5f;
+
     // Zero-g movement (placeholder/tunable) — triggers whenever the room's own O2 reads at or
     // below this fraction (see ShipSimRef.VolumeAt), same "vacuum" threshold spirit as
     // AtmosphereVolume.Vacuum's O2Fraction of 0, with a little slack so the switch doesn't
@@ -72,7 +80,7 @@ public partial class Player : CharacterBody3D
     private Label? _verbLabel;
     private ProgressBar? _verbProgressBar;
     private ProgressBar? _o2Bar;
-    private ProgressBar? _powerBar;
+    private ProgressBar? _healthBar;
     private Label? _roomO2Label;
     private Label? _leftHandLabel;
     private Label? _rightHandLabel;
@@ -96,6 +104,8 @@ public partial class Player : CharacterBody3D
     private ProgressBar? _energyBar;
     private Label? _drillLabel;
     private ProgressBar? _drillBar;
+    private Label? _flashlightLabel;
+    private ProgressBar? _flashlightBar;
     private SpotLight3D? _flashlightSpot;
     private bool _flashlightOn;
     private ColorRect? _smokeOverlay;
@@ -112,6 +122,11 @@ public partial class Player : CharacterBody3D
 
     [Export]
     public Material? DroppedItemMaterial { get; set; }
+
+    /// <summary>The death fallback's reload target — SaveManager already holds the reverse
+    /// PlayerRef (World.tscn), this is the same reference the other way round.</summary>
+    [Export]
+    public SaveManager? SaveManagerRef { get; set; }
 
     /// <summary>Whether the mouse-driven inventory panel (Tab) is currently open — while true,
     /// look/Interact/verb-cycling/mouse-recapture are all suppressed so clicking and dragging in
@@ -192,13 +207,15 @@ public partial class Player : CharacterBody3D
         _verbLabel = GetNode<Label>("HUD/VerbLabel");
         _verbProgressBar = GetNode<ProgressBar>("HUD/VerbProgressBar");
         _o2Bar = GetNode<ProgressBar>("HUD/ResourcesPanel/O2Bar");
-        _powerBar = GetNode<ProgressBar>("HUD/ResourcesPanel/PowerBar");
+        _healthBar = GetNode<ProgressBar>("HUD/ResourcesPanel/HealthBar");
         _hungerBar = GetNode<ProgressBar>("HUD/ResourcesPanel/HungerBar");
         _thirstBar = GetNode<ProgressBar>("HUD/ResourcesPanel/ThirstBar");
         _energyBar = GetNode<ProgressBar>("HUD/ResourcesPanel/EnergyBar");
         _roomO2Label = GetNode<Label>("HUD/ResourcesPanel/RoomO2Label");
         _drillLabel = GetNode<Label>("HUD/ResourcesPanel/DrillLabel");
         _drillBar = GetNode<ProgressBar>("HUD/ResourcesPanel/DrillBar");
+        _flashlightLabel = GetNode<Label>("HUD/ResourcesPanel/FlashlightLabel");
+        _flashlightBar = GetNode<ProgressBar>("HUD/ResourcesPanel/FlashlightBar");
         _flashlightSpot = GetNode<SpotLight3D>("Head/Camera3D/FlashlightSpot");
         _smokeOverlay = GetNode<ColorRect>("HUD/SmokeOverlay");
         _leftHandLabel = GetNode<Label>("HUD/LeftHandLabel");
@@ -232,6 +249,7 @@ public partial class Player : CharacterBody3D
         _inventory.Add("power_drill", 1);
         _inventory.AttachDrill(hasBattery: true, charge: 1f);
         _inventory.Add("flashlight", 1);
+        _inventory.AttachFlashlight(hasBattery: true, charge: 1f);
         _inventory.Add("debug_flashlight", 1);
 
         CaptureMouse();
@@ -522,6 +540,12 @@ public partial class Player : CharacterBody3D
             || (!IsOnFloor() && NoFloorBelow());
         MotionMode = inZeroG ? MotionModeEnum.Floating : MotionModeEnum.Grounded;
 
+        // Read before this frame's _needs.Tick further down — one frame of staleness against a
+        // drain that only moves per-second is irrelevant, and movement needs this before the
+        // grounded/zero-g branches run.
+        var needsDebuffActive = _needs.HungerPercent <= 0f || _needs.ThirstPercent <= 0f || _needs.EnergyPercent <= 0f;
+        var moveMultiplier = needsDebuffActive ? NeedsDebuffMoveMultiplier : 1f;
+
         var velocity = Velocity;
 
         if (inZeroG)
@@ -569,7 +593,7 @@ public partial class Player : CharacterBody3D
                 // drift (drag still applies above) until you reach something else to push off.
                 if (thrust != Vector3.Zero && IsNearSurface())
                 {
-                    velocity += thrust.Normalized() * ZeroGThrustAcceleration * (float)delta;
+                    velocity += thrust.Normalized() * ZeroGThrustAcceleration * moveMultiplier * (float)delta;
                 }
             }
             else
@@ -595,9 +619,9 @@ public partial class Player : CharacterBody3D
                 }
             }
 
-            if (velocity.Length() > ZeroGMaxSpeed)
+            if (velocity.Length() > ZeroGMaxSpeed * moveMultiplier)
             {
-                velocity = velocity.Normalized() * ZeroGMaxSpeed;
+                velocity = velocity.Normalized() * ZeroGMaxSpeed * moveMultiplier;
             }
         }
         else
@@ -638,22 +662,28 @@ public partial class Player : CharacterBody3D
                 inputDirection = inputDirection.Normalized();
 
                 var moveDirection = (Transform.Basis * new Vector3(inputDirection.X, 0, inputDirection.Y)).Normalized();
-                velocity.X = moveDirection.X * MoveSpeed;
-                velocity.Z = moveDirection.Z * MoveSpeed;
+                velocity.X = moveDirection.X * MoveSpeed * moveMultiplier;
+                velocity.Z = moveDirection.Z * MoveSpeed * moveMultiplier;
             }
         }
 
         Velocity = velocity;
         MoveAndSlide();
 
-        // The real beam only exists while the flashlight is both held and toggled on —
-        // unequipping or swapping it out of hand turns it off automatically without touching
-        // _flashlightOn. The debug flashlight (see fresh-game stipend) forces the beam on
-        // regardless — a testing convenience, not something you hold, and it doesn't drain suit
-        // power either (see the Tick call below, gated on the real held-flashlight case only).
+        // The real beam only exists while the flashlight is both held and toggled on, and its own
+        // battery still has charge — unequipping/swapping it out of hand turns it off
+        // automatically without touching _flashlightOn, and an empty battery just as silently
+        // stops it lighting (same "Charge: > 0f" gating IsAffordable already uses for the drill).
+        // The debug flashlight (see fresh-game stipend) forces the beam on regardless — a testing
+        // convenience, not something you hold, and it has no battery to drain either.
         var holdingFlashlight = LeftHandItemId == "flashlight" || RightHandItemId == "flashlight";
-        var realFlashlightOn = _flashlightOn && holdingFlashlight;
+        var realFlashlightOn = _flashlightOn && holdingFlashlight && _inventory.Flashlight is { HasBattery: true, Charge: > 0f };
         _flashlightSpot!.Visible = realFlashlightOn || _inventory.Has("debug_flashlight", 1);
+
+        if (realFlashlightOn)
+        {
+            _inventory.Flashlight!.Charge = Mathf.Max(0f, _inventory.Flashlight.Charge - FlashlightChargeDrainPerSecond * (float)delta);
+        }
 
         // A burning cell is real smoke, not just a number — it drains O2 faster (see
         // SuitResources.Tick's inSmoke case) and gets a screen overlay below so it's actually
@@ -672,11 +702,17 @@ public partial class Player : CharacterBody3D
         // Suit resources keep draining while busy performing a verb — a task's duration is a
         // real elapsed-time cost, not a pause (docs/project-plan.md's "time acceleration ...
         // pays the full bill" framing). A breached room's dropping O2 burns the suit's own
-        // reserve faster on top of the flat drain, a lit flashlight burns suit power faster, and
-        // smoke burns O2 faster too (see SuitResources.Tick).
-        _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21, realFlashlightOn, inSmoke);
+        // reserve faster on top of the flat drain, and smoke burns O2 faster too (see
+        // SuitResources.Tick). Once O2 bottoms out, it starts draining Health instead — a hard
+        // 0-Health death, handled below.
+        _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21, inSmoke);
         _o2Bar!.Value = _suitResources.O2Percent;
-        _powerBar!.Value = _suitResources.PowerPercent;
+        _healthBar!.Value = _suitResources.HealthPercent;
+
+        if (_suitResources.HealthPercent <= 0f)
+        {
+            Die();
+        }
 
         _needs.Tick(delta);
         _hungerBar!.Value = _needs.HungerPercent;
@@ -701,6 +737,14 @@ public partial class Player : CharacterBody3D
         if (holdingDrill)
         {
             _drillBar.Value = _inventory.Drill is { HasBattery: true } drill ? drill.Charge * 100 : 0;
+        }
+
+        // Same "only while holding it" feedback as the drill above.
+        _flashlightLabel!.Visible = holdingFlashlight;
+        _flashlightBar!.Visible = holdingFlashlight;
+        if (holdingFlashlight)
+        {
+            _flashlightBar.Value = _inventory.Flashlight is { HasBattery: true } flashlight ? flashlight.Charge * 100 : 0;
         }
 
         UpdateVerbHud();
@@ -938,7 +982,7 @@ public partial class Player : CharacterBody3D
             Yaw = Rotation.Y,
             Pitch = _pitch,
             O2Percent = _suitResources.O2Percent,
-            PowerPercent = _suitResources.PowerPercent,
+            HealthPercent = _suitResources.HealthPercent,
             HungerPercent = _needs.HungerPercent,
             ThirstPercent = _needs.ThirstPercent,
             EnergyPercent = _needs.EnergyPercent,
@@ -952,6 +996,9 @@ public partial class Player : CharacterBody3D
             HasDrill = _inventory.Drill is not null,
             DrillHasBattery = _inventory.Drill?.HasBattery ?? false,
             DrillCharge = _inventory.Drill?.Charge ?? 0f,
+            HasFlashlight = _inventory.Flashlight is not null,
+            FlashlightHasBattery = _inventory.Flashlight?.HasBattery ?? false,
+            FlashlightCharge = _inventory.Flashlight?.Charge ?? 0f,
         };
     }
 
@@ -966,7 +1013,7 @@ public partial class Player : CharacterBody3D
             _head.Rotation = new Vector3(_pitch, 0, 0);
         }
 
-        _suitResources.RestoreFrom(data.O2Percent, data.PowerPercent);
+        _suitResources.RestoreFrom(data.O2Percent, data.HealthPercent);
         _needs.RestoreFrom(data.HungerPercent, data.ThirstPercent, data.EnergyPercent);
 
         _inventory.Clear();
@@ -994,10 +1041,30 @@ public partial class Player : CharacterBody3D
             _inventory.AttachDrill(data.DrillHasBattery, data.DrillCharge);
         }
 
+        if (data.HasFlashlight)
+        {
+            _inventory.AttachFlashlight(data.FlashlightHasBattery, data.FlashlightCharge);
+        }
+
         _credits = data.Credits;
     }
 
     public void RefillSuitResources() => _suitResources.RestoreFrom(100f, 100f);
+
+    /// <summary>Hard death from 0 Health (see the O2-driven drain in SuitResources.Tick) —
+    /// reloads the last save so the player picks back up from wherever they last saved.
+    /// Falls back to a full O2/Health restore in place (no position/inventory reset — there's
+    /// nothing more specific to reset to yet) if there's no save to reload, e.g. a fresh game
+    /// that died before ever pressing F5. No dedicated "you died" screen yet — a later polish
+    /// pass, not this one.</summary>
+    private void Die()
+    {
+        GD.Print("[Player] Died — reloading last save.");
+        if (SaveManagerRef is not { } saveManager || !saveManager.Load())
+        {
+            RefillSuitResources();
+        }
+    }
 
     /// <summary>The Bunk's Sleep-completion hook — a full night's rest.</summary>
     public void RestEnergy() => _needs.Rest(100f);

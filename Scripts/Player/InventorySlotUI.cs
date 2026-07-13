@@ -36,6 +36,12 @@ public partial class InventorySlotUI : Control
     [Export]
     public bool IsDrillBatterySlot { get; set; }
 
+    /// <summary>True only for the one flashlight-battery slot — same PlayerRef-addressed,
+    /// synthetic-single-slot shape as <see cref="IsDrillBatterySlot"/>, just for the flashlight's
+    /// own battery instead of the drill's.</summary>
+    [Export]
+    public bool IsFlashlightBatterySlot { get; set; }
+
     /// <summary>Localization key shown by <see cref="OnMouseEntered"/> when this slot has
     /// nothing in it — an empty slot otherwise gives no hover feedback about what it's for.</summary>
     [Export]
@@ -173,6 +179,22 @@ public partial class InventorySlotUI : Control
             return;
         }
 
+        if (IsFlashlightBatterySlot)
+        {
+            if (!source.IsFlashlightBatterySlot && source.CurrentSlot()?.ItemId == "battery")
+            {
+                PlayerRef.Inventory.InsertFlashlightBattery();
+            }
+
+            return;
+        }
+
+        if (source.IsFlashlightBatterySlot)
+        {
+            PlayerRef.Inventory.EjectFlashlightBattery();
+            return;
+        }
+
         if (source.Container is null || Container is null)
         {
             return;
@@ -191,6 +213,11 @@ public partial class InventorySlotUI : Control
         if (IsDrillBatterySlot)
         {
             return PlayerRef?.Inventory.Drill is { HasBattery: true } ? ("battery", 1) : null;
+        }
+
+        if (IsFlashlightBatterySlot)
+        {
+            return PlayerRef?.Inventory.Flashlight is { HasBattery: true } ? ("battery", 1) : null;
         }
 
         return Container is { } c && SlotIndex >= 0 && SlotIndex < c.Slots.Count ? c.Slots[SlotIndex] : null;

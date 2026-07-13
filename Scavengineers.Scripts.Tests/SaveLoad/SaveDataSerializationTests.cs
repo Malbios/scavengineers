@@ -22,7 +22,7 @@ public class SaveDataSerializationTests
                 Yaw = 0.25f,
                 Pitch = -0.1f,
                 O2Percent = 87.5f,
-                PowerPercent = 42f,
+                HealthPercent = 66f,
                 Inventory = new Dictionary<string, int> { ["scrap_metal"] = 5 },
                 Credits = 20,
                 BackpackItemId = "backpack",
@@ -31,6 +31,9 @@ public class SaveDataSerializationTests
                 HasDrill = true,
                 DrillHasBattery = true,
                 DrillCharge = 0.68f,
+                HasFlashlight = true,
+                FlashlightHasBattery = true,
+                FlashlightCharge = 0.5f,
             },
             ObjectStates = new Dictionary<string, bool> { ["door-1"] = true },
             ObjectStringStates = new Dictionary<string, string> { ["conduit-1"] = "repaired" },
@@ -55,6 +58,10 @@ public class SaveDataSerializationTests
         Assert.True(roundTripped.Player.HasDrill);
         Assert.True(roundTripped.Player.DrillHasBattery);
         Assert.Equal(data.Player.DrillCharge, roundTripped.Player.DrillCharge);
+        Assert.Equal(data.Player.HealthPercent, roundTripped.Player.HealthPercent);
+        Assert.True(roundTripped.Player.HasFlashlight);
+        Assert.True(roundTripped.Player.FlashlightHasBattery);
+        Assert.Equal(data.Player.FlashlightCharge, roundTripped.Player.FlashlightCharge);
         Assert.Equal(data.ObjectStates, roundTripped.ObjectStates);
         Assert.Equal(data.ObjectStringStates, roundTripped.ObjectStringStates);
         Assert.Single(roundTripped.DroppedContainers);
