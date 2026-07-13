@@ -41,6 +41,19 @@ public class SuitResourcesTests
     }
 
     [Fact]
+    public void Tick_DrainsO2Faster_WhenInSmoke()
+    {
+        var suitInSmoke = new SuitResources();
+        var suitClearAir = new SuitResources();
+
+        suitInSmoke.Tick(1.0, ambientO2Fraction: 0.21, inSmoke: true);
+        suitClearAir.Tick(1.0, ambientO2Fraction: 0.21, inSmoke: false);
+
+        Assert.True(suitInSmoke.O2Percent < suitClearAir.O2Percent);
+        Assert.True(suitInSmoke.O2Percent < 100f - 100f / 300f); // worse than the base-only drain
+    }
+
+    [Fact]
     public void RestoreFrom_ClampsBothValuesToZeroToOneHundred()
     {
         var suit = new SuitResources();

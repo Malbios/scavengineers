@@ -98,6 +98,7 @@ public partial class Player : CharacterBody3D
     private ProgressBar? _drillBar;
     private SpotLight3D? _flashlightSpot;
     private bool _flashlightOn;
+    private ColorRect? _smokeOverlay;
 
     /// <summary>The generic dropped-item visual (same box mesh + per-item material-override
     /// pattern InventoryOverflow.DropAt and ShipBuildTarget's own refunds already use) — reused
@@ -199,6 +200,7 @@ public partial class Player : CharacterBody3D
         _drillLabel = GetNode<Label>("HUD/ResourcesPanel/DrillLabel");
         _drillBar = GetNode<ProgressBar>("HUD/ResourcesPanel/DrillBar");
         _flashlightSpot = GetNode<SpotLight3D>("Head/Camera3D/FlashlightSpot");
+        _smokeOverlay = GetNode<ColorRect>("HUD/SmokeOverlay");
         _leftHandLabel = GetNode<Label>("HUD/LeftHandLabel");
         _rightHandLabel = GetNode<Label>("HUD/RightHandLabel");
         _creditsLabel = GetNode<Label>("HUD/CreditsLabel");
@@ -653,12 +655,21 @@ public partial class Player : CharacterBody3D
         var realFlashlightOn = _flashlightOn && holdingFlashlight;
         _flashlightSpot!.Visible = realFlashlightOn || _inventory.Has("debug_flashlight", 1);
 
+        // A burning cell is real smoke, not just a number — it drains O2 faster (see
+        // SuitResources.Tick's inSmoke case) and gets a screen overlay below so it's actually
+        // felt, not just read off the O2 bar.
+        var inSmoke = ShipSimRef?.Deck.IsOnFire(new CellCoord(_ambientTile.X, _ambientTile.Y)) ?? false;
+        if (_smokeOverlay is not null)
+        {
+            _smokeOverlay.Visible = inSmoke;
+        }
+
         // Suit resources keep draining while busy performing a verb — a task's duration is a
         // real elapsed-time cost, not a pause (docs/project-plan.md's "time acceleration ...
         // pays the full bill" framing). A breached room's dropping O2 burns the suit's own
-        // reserve faster on top of the flat drain, and a lit flashlight burns suit power faster
-        // too (see SuitResources.Tick).
-        _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21, realFlashlightOn);
+        // reserve faster on top of the flat drain, a lit flashlight burns suit power faster, and
+        // smoke burns O2 faster too (see SuitResources.Tick).
+        _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21, realFlashlightOn, inSmoke);
         _o2Bar!.Value = _suitResources.O2Percent;
         _powerBar!.Value = _suitResources.PowerPercent;
 

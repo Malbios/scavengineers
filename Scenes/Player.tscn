@@ -44,6 +44,16 @@ spot_angle = 30.0
 
 [node name="HUD" type="CanvasLayer" parent="." unique_id=1671283592]
 
+[node name="SmokeOverlay" type="ColorRect" parent="HUD"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.05, 0.05, 0.05, 0.55)
+
 [node name="Crosshair" type="Control" parent="HUD" unique_id=2109340878]
 layout_mode = 3
 anchors_preset = 8

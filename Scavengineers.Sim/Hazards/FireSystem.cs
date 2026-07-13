@@ -1,4 +1,5 @@
 using Scavengineers.Sim.Atmosphere;
+using Scavengineers.Sim.Grid;
 using Scavengineers.Sim.Power;
 using Scavengineers.Sim.ShipModel;
 
@@ -22,8 +23,31 @@ public sealed class FireSystem(Deck deck, AtmosphereSystem atmosphere, PowerSyst
     private const double O2ConsumptionPerSecond = 0.01;
     private const double HeatGainPerSecond = 5.0;
 
+    // Placeholder/tunable — ~20s to fully degrade a neighbor from full Condition. Runs before the
+    // ignition check below in the same Tick, so a conduit heat-damaged below
+    // DamagedConditionThreshold this tick can ignite via that same, unchanged check on a later
+    // tick if it's also powered and in enough O2 — spread reuses the existing ignition rule
+    // rather than adding a second one.
+    private const float HeatDamagePerSecond = 0.05f;
+
     public void Tick(double dt)
     {
+        foreach (var burningCell in deck.Fires)
+        {
+            foreach (var cell in AdjacentCells(burningCell).Append(burningCell))
+            {
+                if (cell != burningCell && (!deck.Cells.Contains(cell) || deck.IsEdgeSealed(burningCell, cell)))
+                {
+                    continue;
+                }
+
+                foreach (var conduit in deck.Fixtures.OfType<ConduitFixture>().Where(f => f.Tile == cell))
+                {
+                    conduit.Condition = Math.Max(0f, conduit.Condition - HeatDamagePerSecond * (float)dt);
+                }
+            }
+        }
+
         foreach (var fixture in deck.Fixtures)
         {
             if (fixture is not ConduitFixture conduit || deck.IsOnFire(conduit.Tile))
@@ -65,5 +89,13 @@ public sealed class FireSystem(Deck deck, AtmosphereSystem atmosphere, PowerSyst
                 Temperature = volume.Temperature + HeatGainPerSecond * dt,
             });
         }
+    }
+
+    private static IEnumerable<CellCoord> AdjacentCells(CellCoord cell)
+    {
+        yield return cell with { X = cell.X + 1 };
+        yield return cell with { X = cell.X - 1 };
+        yield return cell with { Y = cell.Y + 1 };
+        yield return cell with { Y = cell.Y - 1 };
     }
 }

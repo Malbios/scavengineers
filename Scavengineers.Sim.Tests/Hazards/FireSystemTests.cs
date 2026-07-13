@@ -109,4 +109,75 @@ public class FireSystemTests
 
         Assert.False(deck.IsOnFire(conduitCell));
     }
+
+    [Fact]
+    public void BurningCell_DegradesAnAdjacentUnsealedConduitsConditionOverTime()
+    {
+        var burning = new CellCoord(0, 0);
+        var neighbor = new CellCoord(1, 0);
+        var deck = new Deck();
+        deck.AddCell(burning);
+        deck.AddCell(neighbor);
+        var neighborConduit = new ConduitFixture("neighbor", neighbor, FixtureSurface.FloorUnderside);
+        deck.AddFixture(neighborConduit);
+        deck.IgniteFire(burning);
+
+        var fire = new FireSystem(deck, new AtmosphereSystem(deck), new PowerSystem(deck));
+        fire.Tick(1);
+
+        Assert.True(neighborConduit.Condition < 1f);
+    }
+
+    [Fact]
+    public void BurningCell_DoesNotDegradeAConduitAcrossASealedEdge()
+    {
+        var burning = new CellCoord(0, 0);
+        var neighbor = new CellCoord(1, 0);
+        var deck = new Deck();
+        deck.AddCell(burning);
+        deck.AddCell(neighbor);
+        deck.SealEdge(burning, neighbor);
+        var neighborConduit = new ConduitFixture("neighbor", neighbor, FixtureSurface.FloorUnderside);
+        deck.AddFixture(neighborConduit);
+        deck.IgniteFire(burning);
+
+        var fire = new FireSystem(deck, new AtmosphereSystem(deck), new PowerSystem(deck));
+        fire.Tick(1);
+
+        Assert.Equal(1f, neighborConduit.Condition);
+    }
+
+    [Fact]
+    public void HeatDamagedPoweredNeighbor_EventuallyIgnitesOnItsOwn()
+    {
+        // source is adjacent to neighbor directly (not through burning) so the power graph
+        // connects without needing a fixture on the burning cell itself.
+        var burning = new CellCoord(0, 0);
+        var neighbor = new CellCoord(1, 0);
+        var source = new CellCoord(2, 0);
+        var deck = new Deck();
+        deck.AddCell(burning);
+        deck.AddCell(neighbor);
+        deck.AddCell(source);
+        deck.AddFixture(new MachineFixture("source", source, FixtureSurface.WallInner));
+        var neighborConduit = new ConduitFixture("neighbor", neighbor, FixtureSurface.FloorUnderside);
+        deck.AddFixture(neighborConduit);
+        deck.IgniteFire(burning);
+
+        var power = new PowerSystem(deck);
+        power.MarkSource(new PowerNodeId("source"));
+        var fire = new FireSystem(deck, new AtmosphereSystem(deck), power);
+
+        // Checks ignition ever occurred during the run, not just the final state — the neighbor
+        // can self-extinguish afterward from its own O2 consumption once burning (already covered
+        // by Burning_SelfExtinguishesOnceOxygenDepleted), which isn't what this test is about.
+        var everIgnited = false;
+        for (var i = 0; i < 20 && !everIgnited; i++)
+        {
+            fire.Tick(1);
+            everIgnited = deck.IsOnFire(neighbor);
+        }
+
+        Assert.True(everIgnited);
+    }
 }

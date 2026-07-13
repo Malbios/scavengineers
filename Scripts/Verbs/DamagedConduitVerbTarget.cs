@@ -44,9 +44,16 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, IStat
     public Material? RepairedMaterial { get; set; }
 
     /// <summary>Shown whenever ShipSim's FireSystem has this conduit's tile actively burning —
-    /// the only player-visible sign anything is happening, since this pass has no flame VFX.</summary>
+    /// combined with SmokeParticles below, now that fire is a real hazard worth calling
+    /// attention to rather than just a material swap.</summary>
     [Export]
     public Material? BurningMaterial { get; set; }
+
+    /// <summary>A grey particle puff toggled on/off alongside BurningMaterial — the visible cue
+    /// that a burning cell now actually drains the player's O2 faster and impairs their vision
+    /// (see Player.cs's inSmoke handling), not just a cosmetic material change.</summary>
+    [Export]
+    public GpuParticles3D? SmokeParticles { get; set; }
 
     /// <summary>Generic dropped-item visual for the Scrap yield, if it doesn't fully fit in the
     /// player's inventory — see InventoryOverflow.</summary>
@@ -103,6 +110,11 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, IStat
 
         _wasBurning = isBurning;
         Mesh?.SetSurfaceOverrideMaterial(0, isBurning ? BurningMaterial : _idleMaterial);
+
+        if (SmokeParticles is not null)
+        {
+            SmokeParticles.Emitting = isBurning;
+        }
     }
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
@@ -182,6 +194,11 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, IStat
 
                 ExtinguishIfBurning();
                 Mesh?.SetSurfaceOverrideMaterial(0, RepairedMaterial);
+                if (SmokeParticles is not null)
+                {
+                    SmokeParticles.Emitting = false;
+                }
+
                 break;
 
             case ConduitState.Scrapped:
@@ -189,6 +206,11 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, IStat
                 // fixture up by id to find its tile, which no longer resolves once gone.
                 ExtinguishIfBurning();
                 ShipSimRef?.Deck.RemoveFixture(ShipSim.DamagedConduitFixtureId);
+                if (SmokeParticles is not null)
+                {
+                    SmokeParticles.Emitting = false;
+                }
+
                 Visible = false;
                 if (Collider is not null)
                 {

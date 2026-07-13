@@ -129,6 +129,26 @@ emission_enabled = true
 emission = Color(1, 0.45, 0.05, 1)
 emission_energy_multiplier = 2.5
 
+[sub_resource type="StandardMaterial3D" id="SmokeParticleMaterial"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.3, 0.3, 0.32, 0.6)
+billboard_mode = 3
+
+[sub_resource type="QuadMesh" id="SmokeParticleMesh"]
+material = SubResource("SmokeParticleMaterial")
+size = Vector2(0.2, 0.2)
+
+[sub_resource type="ParticleProcessMaterial" id="SmokeProcessMaterial"]
+direction = Vector3(0, 1, 0)
+spread = 15.0
+initial_velocity_min = 0.15
+initial_velocity_max = 0.3
+gravity = Vector3(0, 0.2, 0)
+scale_min = 0.5
+scale_max = 1.0
+color = Color(0.3, 0.3, 0.32, 0.5)
+
 [sub_resource type="BoxMesh" id="ConduitSlotMesh"]
 size = Vector3(0.5, 0.05, 0.5)
 
@@ -842,7 +862,7 @@ shape = SubResource("PickupItemShape")
 mesh = SubResource("PickupItemMesh")
 surface_material_override/0 = SubResource("PowerCellMaterial")
 
-[node name="DamagedConduit" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("ShipSimRef", "Mesh", "Collider") groups=["saveable"]]
+[node name="DamagedConduit" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("ShipSimRef", "Mesh", "Collider", "SmokeParticles") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0.3, 0.5)
 script = ExtResource("17")
 ShipSimRef = NodePath("../ShipSim")
@@ -851,6 +871,7 @@ Collider = NodePath("CollisionShape3D")
 RepairingMaterial = SubResource("RepairingMaterial")
 RepairedMaterial = SubResource("RepairedConduitMaterial")
 BurningMaterial = SubResource("BurningConduitMaterial")
+SmokeParticles = NodePath("SmokeParticles")
 DroppedItemMesh = SubResource("PickupItemMesh")
 DroppedItemShape = SubResource("PickupItemShape")
 DroppedItemMaterial = SubResource("PickupItemMaterial")
@@ -862,6 +883,14 @@ shape = SubResource("BreachPatchShape")
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/DamagedConduit"]
 mesh = SubResource("BreachPatchMesh")
 surface_material_override/0 = SubResource("DamagedConduitMaterial")
+
+[node name="SmokeParticles" type="GPUParticles3D" parent="Derelict/DamagedConduit"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+emitting = false
+amount = 12
+lifetime = 2.0
+process_material = SubResource("SmokeProcessMaterial")
+draw_pass_1 = SubResource("SmokeParticleMesh")
 
 [node name="InteriorDoor" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("ShipSimRef", "SlabMesh", "SlabCollision") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.0, -0.8)
