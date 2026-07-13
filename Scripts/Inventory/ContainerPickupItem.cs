@@ -13,7 +13,7 @@ namespace Scavengineers.Scripts.Inventory;
 /// carries a live <see cref="SlotContainer"/> instead of a flat count — the same instance that
 /// was equipped, contents intact.
 /// </summary>
-public partial class ContainerPickupItem : StaticBody3D, IVerbTarget
+public partial class ContainerPickupItem : RigidBody3D, IVerbTarget
 {
     private static readonly Verb PickUpVerb = new("pick_up", "VERB_PICK_UP", DurationSeconds: 0f);
 

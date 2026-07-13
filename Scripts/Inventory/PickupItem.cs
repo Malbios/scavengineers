@@ -5,7 +5,7 @@ using Scavengineers.Scripts.Verbs;
 
 namespace Scavengineers.Scripts.Inventory;
 
-public partial class PickupItem : StaticBody3D, IVerbTarget
+public partial class PickupItem : RigidBody3D, IVerbTarget
 {
     private static readonly Verb PickUpVerb = new("pick_up", "VERB_PICK_UP", DurationSeconds: 0f);
 

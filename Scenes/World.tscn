@@ -400,7 +400,7 @@ shape = SubResource("BunkShape")
 mesh = SubResource("BunkMesh")
 surface_material_override/0 = SubResource("BunkMaterial")
 
-[node name="Crowbar" type="StaticBody3D" parent="HomeShip"]
+[node name="Crowbar" type="RigidBody3D" parent="HomeShip"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.15, 0.5)
 script = ExtResource("12")
 ItemId = "crowbar"
@@ -533,7 +533,7 @@ IsCeiling = true
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/Ceiling" unique_id=458212308]
 shape = SubResource("DerelictFloorShape")
 
-[node name="WallPanel1" type="StaticBody3D" parent="Derelict"]
+[node name="WallPanel1" type="RigidBody3D" parent="Derelict"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.15, -2)
 script = ExtResource("12")
 ItemId = "wall_panel"
@@ -545,7 +545,7 @@ shape = SubResource("PickupItemShape")
 mesh = SubResource("PickupItemMesh")
 surface_material_override/0 = SubResource("WallPanelPickupMaterial")
 
-[node name="WallPanel2" type="StaticBody3D" parent="Derelict"]
+[node name="WallPanel2" type="RigidBody3D" parent="Derelict"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.5, 0.15, -1)
 script = ExtResource("12")
 ItemId = "wall_panel"
@@ -557,7 +557,7 @@ shape = SubResource("PickupItemShape")
 mesh = SubResource("PickupItemMesh")
 surface_material_override/0 = SubResource("WallPanelPickupMaterial")
 
-[node name="ScrapMetal" type="StaticBody3D" parent="Derelict" unique_id=225809168]
+[node name="ScrapMetal" type="RigidBody3D" parent="Derelict" unique_id=225809168]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0.15, -2)
 script = ExtResource("12")
 ItemId = "scrap_metal"
@@ -569,7 +569,7 @@ shape = SubResource("PickupItemShape")
 mesh = SubResource("PickupItemMesh")
 surface_material_override/0 = SubResource("ScrapMetalMaterial")
 
-[node name="ScrapMetal2" type="StaticBody3D" parent="Derelict"]
+[node name="ScrapMetal2" type="RigidBody3D" parent="Derelict"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.15, -0.5)
 script = ExtResource("12")
 ItemId = "scrap_metal"
@@ -581,7 +581,7 @@ shape = SubResource("PickupItemShape")
 mesh = SubResource("PickupItemMesh")
 surface_material_override/0 = SubResource("ScrapMetalMaterial")
 
-[node name="ScrapMetal3" type="StaticBody3D" parent="Derelict"]
+[node name="ScrapMetal3" type="RigidBody3D" parent="Derelict"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 0.15, 0.5)
 script = ExtResource("12")
 ItemId = "scrap_metal"
@@ -593,7 +593,7 @@ shape = SubResource("PickupItemShape")
 mesh = SubResource("PickupItemMesh")
 surface_material_override/0 = SubResource("ScrapMetalMaterial")
 
-[node name="SpareParts" type="StaticBody3D" parent="Derelict" unique_id=498314835]
+[node name="SpareParts" type="RigidBody3D" parent="Derelict" unique_id=498314835]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.606081, 0.15, 2)
 script = ExtResource("12")
 ItemId = "spare_parts"
@@ -605,7 +605,7 @@ shape = SubResource("PickupItemShape")
 mesh = SubResource("PickupItemMesh")
 surface_material_override/0 = SubResource("SparePartsMaterial")
 
-[node name="ScrapMetal4" type="StaticBody3D" parent="Derelict"]
+[node name="ScrapMetal4" type="RigidBody3D" parent="Derelict"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.15, -1.5)
 script = ExtResource("12")
 ItemId = "scrap_metal"
@@ -617,7 +617,7 @@ shape = SubResource("PickupItemShape")
 mesh = SubResource("PickupItemMesh")
 surface_material_override/0 = SubResource("ScrapMetalMaterial")
 
-[node name="ScrapMetal5" type="StaticBody3D" parent="Derelict"]
+[node name="ScrapMetal5" type="RigidBody3D" parent="Derelict"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0.15, 1.5)
 script = ExtResource("12")
 ItemId = "scrap_metal"
@@ -629,7 +629,7 @@ shape = SubResource("PickupItemShape")
 mesh = SubResource("PickupItemMesh")
 surface_material_override/0 = SubResource("ScrapMetalMaterial")
 
-[node name="SpareParts2" type="StaticBody3D" parent="Derelict"]
+[node name="SpareParts2" type="RigidBody3D" parent="Derelict"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.5, 0.15, 1)
 script = ExtResource("12")
 ItemId = "spare_parts"
@@ -641,7 +641,7 @@ shape = SubResource("PickupItemShape")
 mesh = SubResource("PickupItemMesh")
 surface_material_override/0 = SubResource("SparePartsMaterial")
 
-[node name="WallPanel3" type="StaticBody3D" parent="Derelict"]
+[node name="WallPanel3" type="RigidBody3D" parent="Derelict"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0.15, -1)
 script = ExtResource("12")
 ItemId = "wall_panel"
@@ -653,7 +653,7 @@ shape = SubResource("PickupItemShape")
 mesh = SubResource("PickupItemMesh")
 surface_material_override/0 = SubResource("WallPanelPickupMaterial")
 
-[node name="PowerCell1" type="StaticBody3D" parent="Derelict"]
+[node name="PowerCell1" type="RigidBody3D" parent="Derelict"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.5, 0.15, -2)
 script = ExtResource("12")
 ItemId = "power_cell"

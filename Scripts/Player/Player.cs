@@ -30,10 +30,11 @@ public partial class Player : CharacterBody3D
     private const float NeedsDebuffMoveMultiplier = 0.5f;
 
     // Zero-g movement (placeholder/tunable) — triggers whenever the room's own O2 reads at or
-    // below this fraction (see ShipSimRef.VolumeAt), same "vacuum" threshold spirit as
-    // AtmosphereVolume.Vacuum's O2Fraction of 0, with a little slack so the switch doesn't
-    // flicker right at the exact boundary while a room is still venting/equalizing.
-    private const float ZeroGO2Threshold = 0.01f;
+    // below ShipAtmosphereZone.ZeroGO2Threshold (see ShipSimRef.VolumeAt), same "vacuum" threshold
+    // spirit as AtmosphereVolume.Vacuum's O2Fraction of 0, with a little slack so the switch
+    // doesn't flicker right at the exact boundary while a room is still venting/equalizing. Shared
+    // with ShipAtmosphereZone's own real physics zero-g override for loose items — one definition
+    // of "this room counts as vacuum" for both.
     private const float ZeroGThrustAcceleration = 6f;
     private const float ZeroGDrag = 2f; // passive deceleration per second, always applied
     private const float ZeroGMaxSpeed = 3.5f;
@@ -573,7 +574,7 @@ public partial class Player : CharacterBody3D
         // A vented/breached room reads as vacuum — read up front since it now also decides which
         // movement mode applies below, not just the suit-resource drain further down.
         var roomVolume = ShipSimRef?.VolumeAt(new CellCoord(_ambientTile.X, _ambientTile.Y));
-        var inZeroG = (roomVolume?.O2Fraction ?? 0.21) <= ZeroGO2Threshold
+        var inZeroG = (roomVolume?.O2Fraction ?? 0.21) <= ShipAtmosphereZone.ZeroGO2Threshold
             || (!IsOnFloor() && NoFloorBelow());
         MotionMode = inZeroG ? MotionModeEnum.Floating : MotionModeEnum.Grounded;
 
