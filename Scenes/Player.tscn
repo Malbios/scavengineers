@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://dd5isx558nv1v" path="res://Scripts/Player/Player.cs" id="1"]
 [ext_resource type="Script" uid="uid://gtalqbepbiga" path="res://Scripts/Player/Crosshair.cs" id="2"]
 [ext_resource type="Script" path="res://Scripts/Player/InventorySlotUI.cs" id="3"]
+[ext_resource type="Script" path="res://Scripts/Player/DraggableWindow.cs" id="4"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -144,7 +145,7 @@ z_index = 10
 mouse_filter = 2
 theme_override_styles/normal = SubResource("HudLabelBackground")
 
-[node name="InventoryPanel" type="PanelContainer" parent="HUD"]
+[node name="InventoryPanel" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar")]
 visible = false
 anchors_preset = 8
 anchor_left = 0.5
@@ -158,10 +159,19 @@ offset_bottom = 100.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
+script = ExtResource("4")
+TitleBar = NodePath("Layout/TitleBar")
 
 [node name="Layout" type="VBoxContainer" parent="HUD/InventoryPanel"]
 layout_mode = 2
 theme_override_constants/separation = 10
+
+[node name="TitleBar" type="Label" parent="HUD/InventoryPanel/Layout"]
+layout_mode = 2
+mouse_filter = 0
+theme_override_styles/normal = SubResource("HudLabelBackground")
+text = "INVENTORY"
+horizontal_alignment = 1
 
 [node name="EquipSlots" type="HBoxContainer" parent="HUD/InventoryPanel/Layout"]
 layout_mode = 2
@@ -285,22 +295,50 @@ offset_top = -15.0
 mouse_filter = 2
 horizontal_alignment = 2
 
-[node name="DrillBattery" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots" node_paths=PackedStringArray("Tooltip")]
+[node name="DrillWindow" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar")]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -216.0
+offset_top = -160.0
+offset_right = -136.0
+offset_bottom = -80.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("HudLabelBackground")
+script = ExtResource("4")
+TitleBar = NodePath("Layout/TitleBar")
+
+[node name="Layout" type="VBoxContainer" parent="HUD/DrillWindow"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TitleBar" type="Label" parent="HUD/DrillWindow/Layout"]
+layout_mode = 2
+mouse_filter = 0
+theme_override_styles/normal = SubResource("HudLabelBackground")
+text = "DRILL BATTERY"
+horizontal_alignment = 1
+
+[node name="DrillBatterySlot" type="Control" parent="HUD/DrillWindow/Layout" node_paths=PackedStringArray("Tooltip")]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 script = ExtResource("3")
 IsDrillBatterySlot = true
 EmptySlotNameKey = "HUD_DRILL_BATTERY_SLOT"
-Tooltip = NodePath("../../../../InventoryTooltip")
+Tooltip = NodePath("../../../InventoryTooltip")
 
-[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/EquipSlots/DrillBattery"]
+[node name="Background" type="Panel" parent="HUD/DrillWindow/Layout/DrillBatterySlot"]
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/DrillBattery"]
+[node name="Icon" type="ColorRect" parent="HUD/DrillWindow/Layout/DrillBatterySlot"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -312,7 +350,7 @@ offset_bottom = -4.0
 mouse_filter = 2
 color = Color(0.6, 0.6, 0.6, 1)
 
-[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/DrillBattery"]
+[node name="Count" type="Label" parent="HUD/DrillWindow/Layout/DrillBatterySlot"]
 visible = false
 layout_mode = 1
 anchor_left = 1.0
@@ -324,22 +362,50 @@ offset_top = -15.0
 mouse_filter = 2
 horizontal_alignment = 2
 
-[node name="FlashlightBattery" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots" node_paths=PackedStringArray("Tooltip")]
+[node name="FlashlightWindow" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar")]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = 136.0
+offset_top = -160.0
+offset_right = 216.0
+offset_bottom = -80.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("HudLabelBackground")
+script = ExtResource("4")
+TitleBar = NodePath("Layout/TitleBar")
+
+[node name="Layout" type="VBoxContainer" parent="HUD/FlashlightWindow"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TitleBar" type="Label" parent="HUD/FlashlightWindow/Layout"]
+layout_mode = 2
+mouse_filter = 0
+theme_override_styles/normal = SubResource("HudLabelBackground")
+text = "FLASHLIGHT BATTERY"
+horizontal_alignment = 1
+
+[node name="FlashlightBatterySlot" type="Control" parent="HUD/FlashlightWindow/Layout" node_paths=PackedStringArray("Tooltip")]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 script = ExtResource("3")
 IsFlashlightBatterySlot = true
 EmptySlotNameKey = "HUD_FLASHLIGHT_BATTERY_SLOT"
-Tooltip = NodePath("../../../../InventoryTooltip")
+Tooltip = NodePath("../../../InventoryTooltip")
 
-[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/EquipSlots/FlashlightBattery"]
+[node name="Background" type="Panel" parent="HUD/FlashlightWindow/Layout/FlashlightBatterySlot"]
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/FlashlightBattery"]
+[node name="Icon" type="ColorRect" parent="HUD/FlashlightWindow/Layout/FlashlightBatterySlot"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -351,7 +417,7 @@ offset_bottom = -4.0
 mouse_filter = 2
 color = Color(0.6, 0.6, 0.6, 1)
 
-[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/FlashlightBattery"]
+[node name="Count" type="Label" parent="HUD/FlashlightWindow/Layout/FlashlightBatterySlot"]
 visible = false
 layout_mode = 1
 anchor_left = 1.0
@@ -363,17 +429,42 @@ offset_top = -15.0
 mouse_filter = 2
 horizontal_alignment = 2
 
-[node name="BackpackSeparator" type="HSeparator" parent="HUD/InventoryPanel/Layout"]
-layout_mode = 2
+[node name="BackpackWindow" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar")]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -116.0
+offset_top = 110.0
+offset_right = 116.0
+offset_bottom = 230.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("HudLabelBackground")
+script = ExtResource("4")
+TitleBar = NodePath("Layout/TitleBar")
 
-[node name="BackpackGrid" type="GridContainer" parent="HUD/InventoryPanel/Layout"]
+[node name="Layout" type="VBoxContainer" parent="HUD/BackpackWindow"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TitleBar" type="Label" parent="HUD/BackpackWindow/Layout"]
+layout_mode = 2
+mouse_filter = 0
+theme_override_styles/normal = SubResource("HudLabelBackground")
+text = "BACKPACK"
+horizontal_alignment = 1
+
+[node name="BackpackGrid" type="GridContainer" parent="HUD/BackpackWindow/Layout"]
 visible = false
 layout_mode = 2
 columns = 4
 theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 8
 
-[node name="SlotTemplate" type="Control" parent="HUD/InventoryPanel/Layout/BackpackGrid" node_paths=PackedStringArray("Tooltip")]
+[node name="SlotTemplate" type="Control" parent="HUD/BackpackWindow/Layout/BackpackGrid" node_paths=PackedStringArray("Tooltip")]
 visible = false
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
@@ -381,14 +472,14 @@ script = ExtResource("3")
 EmptySlotNameKey = "HUD_BACKPACK_SLOT"
 Tooltip = NodePath("../../../../InventoryTooltip")
 
-[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/BackpackGrid/SlotTemplate"]
+[node name="Background" type="Panel" parent="HUD/BackpackWindow/Layout/BackpackGrid/SlotTemplate"]
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/BackpackGrid/SlotTemplate"]
+[node name="Icon" type="ColorRect" parent="HUD/BackpackWindow/Layout/BackpackGrid/SlotTemplate"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -400,7 +491,7 @@ offset_bottom = -4.0
 mouse_filter = 2
 color = Color(0.6, 0.6, 0.6, 1)
 
-[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/BackpackGrid/SlotTemplate"]
+[node name="Count" type="Label" parent="HUD/BackpackWindow/Layout/BackpackGrid/SlotTemplate"]
 visible = false
 layout_mode = 1
 anchor_left = 1.0

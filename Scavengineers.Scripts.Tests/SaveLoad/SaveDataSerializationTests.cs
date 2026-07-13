@@ -34,6 +34,10 @@ public class SaveDataSerializationTests
                 HasFlashlight = true,
                 FlashlightHasBattery = true,
                 FlashlightCharge = 0.5f,
+                InventoryWindow = new WindowPosition(10f, 20f),
+                DrillWindow = new WindowPosition(-30f, 40f),
+                FlashlightWindow = new WindowPosition(50f, 60f),
+                BackpackWindow = new WindowPosition(70f, 80f),
             },
             ObjectStates = new Dictionary<string, bool> { ["door-1"] = true },
             ObjectStringStates = new Dictionary<string, string> { ["conduit-1"] = "repaired" },
@@ -62,6 +66,10 @@ public class SaveDataSerializationTests
         Assert.True(roundTripped.Player.HasFlashlight);
         Assert.True(roundTripped.Player.FlashlightHasBattery);
         Assert.Equal(data.Player.FlashlightCharge, roundTripped.Player.FlashlightCharge);
+        Assert.Equal(data.Player.InventoryWindow, roundTripped.Player.InventoryWindow);
+        Assert.Equal(data.Player.DrillWindow, roundTripped.Player.DrillWindow);
+        Assert.Equal(data.Player.FlashlightWindow, roundTripped.Player.FlashlightWindow);
+        Assert.Equal(data.Player.BackpackWindow, roundTripped.Player.BackpackWindow);
         Assert.Equal(data.ObjectStates, roundTripped.ObjectStates);
         Assert.Equal(data.ObjectStringStates, roundTripped.ObjectStringStates);
         Assert.Single(roundTripped.DroppedContainers);

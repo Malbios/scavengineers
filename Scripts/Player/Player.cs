@@ -86,6 +86,9 @@ public partial class Player : CharacterBody3D
     private Label? _rightHandLabel;
     private Label? _creditsLabel;
     private Control? _inventoryPanel;
+    private Control? _drillWindow;
+    private Control? _flashlightWindow;
+    private Control? _backpackWindow;
     private Control? _backpackGrid;
     private InventorySlotUI? _backpackSlotTemplate;
     private readonly List<InventorySlotUI> _backpackSlotUIs = new();
@@ -222,7 +225,10 @@ public partial class Player : CharacterBody3D
         _rightHandLabel = GetNode<Label>("HUD/RightHandLabel");
         _creditsLabel = GetNode<Label>("HUD/CreditsLabel");
         _inventoryPanel = GetNode<Control>("HUD/InventoryPanel");
-        _backpackGrid = GetNode<Control>("HUD/InventoryPanel/Layout/BackpackGrid");
+        _drillWindow = GetNode<Control>("HUD/DrillWindow");
+        _flashlightWindow = GetNode<Control>("HUD/FlashlightWindow");
+        _backpackWindow = GetNode<Control>("HUD/BackpackWindow");
+        _backpackGrid = GetNode<Control>("HUD/BackpackWindow/Layout/BackpackGrid");
 
         foreach (var child in GetNode("HUD/InventoryPanel/Layout/EquipSlots").GetChildren())
         {
@@ -233,7 +239,10 @@ public partial class Player : CharacterBody3D
             }
         }
 
-        _backpackSlotTemplate = GetNode<InventorySlotUI>("HUD/InventoryPanel/Layout/BackpackGrid/SlotTemplate");
+        GetNode<InventorySlotUI>("HUD/DrillWindow/Layout/DrillBatterySlot").PlayerRef = this;
+        GetNode<InventorySlotUI>("HUD/FlashlightWindow/Layout/FlashlightBatterySlot").PlayerRef = this;
+
+        _backpackSlotTemplate = GetNode<InventorySlotUI>("HUD/BackpackWindow/Layout/BackpackGrid/SlotTemplate");
 
         // Placeholder/tunable starting stipend for testing the free-form conduit wiring
         // extensively — same "don't wait on it" spirit as the near-instant verb durations.
@@ -521,7 +530,31 @@ public partial class Player : CharacterBody3D
             _inventoryPanel.Visible = false;
         }
 
+        // None of the item windows are useful without the main panel open to drag items to/from.
+        _drillWindow!.Visible = false;
+        _flashlightWindow!.Visible = false;
+        _backpackWindow!.Visible = false;
+
         CaptureMouse();
+    }
+
+    /// <summary>Right-click-on-inventory-item entry point (see InventorySlotUI) — toggles open/
+    /// closed whichever window (if any) represents that item's own inventory. A no-op for any
+    /// item that doesn't have one.</summary>
+    public void ToggleItemWindow(string itemId)
+    {
+        switch (itemId)
+        {
+            case "power_drill":
+                _drillWindow!.Visible = !_drillWindow.Visible;
+                break;
+            case "flashlight":
+                _flashlightWindow!.Visible = !_flashlightWindow.Visible;
+                break;
+            case "backpack" or "debug_backpack" when _inventory.Backpack is not null:
+                _backpackWindow!.Visible = !_backpackWindow.Visible;
+                break;
+        }
     }
 
     public override void _PhysicsProcess(double delta)
@@ -999,6 +1032,10 @@ public partial class Player : CharacterBody3D
             HasFlashlight = _inventory.Flashlight is not null,
             FlashlightHasBattery = _inventory.Flashlight?.HasBattery ?? false,
             FlashlightCharge = _inventory.Flashlight?.Charge ?? 0f,
+            InventoryWindow = new WindowPosition(_inventoryPanel!.Position.X, _inventoryPanel.Position.Y),
+            DrillWindow = new WindowPosition(_drillWindow!.Position.X, _drillWindow.Position.Y),
+            FlashlightWindow = new WindowPosition(_flashlightWindow!.Position.X, _flashlightWindow.Position.Y),
+            BackpackWindow = new WindowPosition(_backpackWindow!.Position.X, _backpackWindow.Position.Y),
         };
     }
 
@@ -1046,6 +1083,28 @@ public partial class Player : CharacterBody3D
             _inventory.AttachFlashlight(data.FlashlightHasBattery, data.FlashlightCharge);
         }
 
+        // Only applied when present — an old save predating this feature leaves every window at
+        // its scene-authored default position.
+        if (data.InventoryWindow is { } inventoryWindowPos)
+        {
+            _inventoryPanel!.Position = new Vector2(inventoryWindowPos.X, inventoryWindowPos.Y);
+        }
+
+        if (data.DrillWindow is { } drillWindowPos)
+        {
+            _drillWindow!.Position = new Vector2(drillWindowPos.X, drillWindowPos.Y);
+        }
+
+        if (data.FlashlightWindow is { } flashlightWindowPos)
+        {
+            _flashlightWindow!.Position = new Vector2(flashlightWindowPos.X, flashlightWindowPos.Y);
+        }
+
+        if (data.BackpackWindow is { } backpackWindowPos)
+        {
+            _backpackWindow!.Position = new Vector2(backpackWindowPos.X, backpackWindowPos.Y);
+        }
+
         _credits = data.Credits;
     }
 
@@ -1075,6 +1134,12 @@ public partial class Player : CharacterBody3D
         // creates a new SlotContainer instance, and this is the cheapest way to keep the panel's
         // backpack section always addressing whichever one (if any) is currently worn.
         _backpackGrid!.Visible = _inventory.Backpack is not null;
+        if (_inventory.Backpack is null)
+        {
+            // Unequipping while its contents window happens to be open closes it instead of
+            // leaving an empty window floating with nothing left to show.
+            _backpackWindow!.Visible = false;
+        }
 
         var backpackSlotCount = _inventory.Backpack?.Contents.Slots.Count ?? 0;
         if (backpackSlotCount != _backpackSlotUICount)

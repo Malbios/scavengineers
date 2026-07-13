@@ -120,6 +120,18 @@ public partial class InventorySlotUI : Control
         }
     }
 
+    /// <summary>Right-click opens whichever window (if any) represents this slot's occupying
+    /// item's own inventory (drill/flashlight battery, worn backpack contents) — see
+    /// Player.ToggleItemWindow. A separate event path from the left-click drag-and-drop below, so
+    /// it doesn't interfere with it. A no-op for an empty slot or an item with no window.</summary>
+    public override void _GuiInput(InputEvent @event)
+    {
+        if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Right, Pressed: true } && CurrentSlot() is { } occupied)
+        {
+            PlayerRef?.ToggleItemWindow(occupied.ItemId);
+        }
+    }
+
     public override Variant _GetDragData(Vector2 atPosition)
     {
         if (CurrentSlot() is not { } slot)

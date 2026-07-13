@@ -90,6 +90,12 @@ public readonly record struct WallConduitCoord(int TileX, int TileY, int Neighbo
 /// dynamically spawned machine is never in that group).</summary>
 public readonly record struct MachineCoord(string Type, int EdgeAX, int EdgeAY, int EdgeBX, int EdgeBY, string? State);
 
+/// <summary>A draggable HUD window's top-left position (see Scripts/Player/DraggableWindow.cs).
+/// Nullable on PlayerSaveData rather than defaulted to a sentinel — a dragged window can
+/// legitimately end up at a negative X/Y (partly off the top/left edge), so only "the JSON key is
+/// absent" unambiguously means "never moved / predates this feature."</summary>
+public readonly record struct WindowPosition(float X, float Y);
+
 public sealed class PlayerSaveData
 {
     public float PosX { get; set; }
@@ -151,4 +157,12 @@ public sealed class PlayerSaveData
     public bool FlashlightHasBattery { get; set; }
 
     public float FlashlightCharge { get; set; }
+
+    public WindowPosition? InventoryWindow { get; set; }
+
+    public WindowPosition? DrillWindow { get; set; }
+
+    public WindowPosition? FlashlightWindow { get; set; }
+
+    public WindowPosition? BackpackWindow { get; set; }
 }
