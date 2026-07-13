@@ -168,11 +168,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         (new Vector2I(1, 0), true),
     ];
 
-    // The doorway rows the Home Ship's boundary/interior walls leave open for the two airlocks
-    // and the interior door — matches ShipSim's own DoorwayRows exactly (kept in sync by hand;
-    // both are the same "fixed-shape stand-in" the project plan already accepts pre-data-driven
-    // ship layouts, see ShipSim.cs's own hardcoded grid).
-    private static readonly int[] HomeShipDoorwayRows = [2, 3];
+    // The doorway rows every ship's boundary/interior walls leave open for airlocks and interior
+    // doors — matches ShipSim's own DoorwayRows exactly (kept in sync by hand; both are the same
+    // "fixed-shape stand-in" the project plan already accepts pre-data-driven ship layouts, see
+    // ShipSim.cs's own hardcoded grid).
+    private static readonly int[] DoorwayRows = [2, 3];
 
     // The Home Ship's default Battery/Switch/RechargeStation edges — matches the old hand-placed
     // World.tscn positions exactly (see BatteryHeight/etc above). Battery and Switch sit on
@@ -299,15 +299,15 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public int ExcludedEdgeColumn { get; set; } = -1;
 
-    /// <summary>True only for the Home Ship's Floor — seeds its current boundary/interior wall
-    /// layout (and, see <see cref="BatteryMesh"/>, its Battery/Switch/RechargeStation) as real,
+    /// <summary>True for any ship whose current boundary/interior wall layout (and, see
+    /// <see cref="BatteryMesh"/>, its Battery/Switch/RechargeStation) should be seeded as real,
     /// player-removable structure once at startup (see <see cref="SeedDefaultShipLayout"/>),
-    /// through the exact same helpers a save replay uses. The Derelict/Station don't use this
-    /// seeding — the Derelict's layout is hand-authored (it's "already wrecked", not player-
-    /// built), and Station never seeds or accepts any structural change at all (see
-    /// <see cref="AllowStructuralModification"/>).</summary>
+    /// through the exact same helpers a save replay uses — the Home Ship and the Derelict both
+    /// set this. Station doesn't: it never seeds or accepts any structural change at all (see
+    /// <see cref="AllowStructuralModification"/>), so its hand-authored hull stays exactly as
+    /// placed.</summary>
     [Export]
-    public bool SeedHomeShipDefaultLayout { get; set; }
+    public bool SeedDefaultLayout { get; set; }
 
     /// <summary>False makes <see cref="ResolveAvailableVerbs"/> return nothing regardless of aim
     /// state — for a ship the player is never meant to be able to alter (the Station:
@@ -435,7 +435,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         // this same class of ordering issue elsewhere in the project, e.g. ShipSim's own
         // deferred vacuum seeding).
         CallDeferred(nameof(GenerateFloorCeilingPanels));
-        if (SeedHomeShipDefaultLayout)
+        if (SeedDefaultLayout)
         {
             CallDeferred(nameof(SeedDefaultShipLayout));
         }
@@ -535,11 +535,13 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
     }
 
-    /// <summary>The Home Ship's current wall layout, materialized as real player-removable
-    /// structure instead of fixed scene geometry — boundary walls (breach-based) and the
-    /// interior room-split wall (edge-based), both leaving <see cref="HomeShipDoorwayRows"/>
-    /// open for the airlocks/interior door, exactly matching the shape the old static
-    /// WallNorth/South/WestA-B/EastA-B/MidWallA-B nodes used to hand-author.</summary>
+    /// <summary>A ship's current wall layout, materialized as real player-removable structure
+    /// instead of fixed scene geometry — boundary walls (breach-based), and one interior
+    /// room-split wall per entry in <see cref="ShipSim.RoomSplitColumns"/> (edge-based), both
+    /// leaving <see cref="DoorwayRows"/> open for airlocks/interior doors. Skips spawning a
+    /// segment on any edge already marked wall-breached (see <see cref="MaybeSpawnWall"/>) — a
+    /// ship seeded with a starting breach (e.g. the Derelict's <see cref="ShipSim.HasHullBreaches"/>)
+    /// stays open there instead of getting walled over.</summary>
     private void SeedDefaultShipLayout()
     {
         if (ShipSimRef is null)
@@ -552,19 +554,22 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
         for (var i = 0; i < gridWidth; i++)
         {
-            SpawnWallSegment(new CellCoord(i, 0), new CellCoord(i, -1));
-            SpawnWallSegment(new CellCoord(i, gridDepth - 1), new CellCoord(i, gridDepth));
+            MaybeSpawnWall(new CellCoord(i, 0), new CellCoord(i, -1));
+            MaybeSpawnWall(new CellCoord(i, gridDepth - 1), new CellCoord(i, gridDepth));
         }
 
-        foreach (var j in Enumerable.Range(0, gridDepth).Where(row => !HomeShipDoorwayRows.Contains(row)))
+        foreach (var j in Enumerable.Range(0, gridDepth).Where(row => !DoorwayRows.Contains(row)))
         {
-            SpawnWallSegment(new CellCoord(0, j), new CellCoord(-1, j));
-            SpawnWallSegment(new CellCoord(gridWidth - 1, j), new CellCoord(gridWidth, j));
+            MaybeSpawnWall(new CellCoord(0, j), new CellCoord(-1, j));
+            MaybeSpawnWall(new CellCoord(gridWidth - 1, j), new CellCoord(gridWidth, j));
 
-            var a = new CellCoord(5, j);
-            var b = new CellCoord(6, j);
-            ShipSimRef.Deck.SealEdge(a, b);
-            SpawnWallSegment(a, b);
+            foreach (var splitColumn in ShipSimRef.RoomSplitColumns)
+            {
+                var a = new CellCoord(splitColumn - 1, j);
+                var b = new CellCoord(splitColumn, j);
+                ShipSimRef.Deck.SealEdge(a, b);
+                MaybeSpawnWall(a, b);
+            }
         }
 
         // Airlock corridors — a narrow (DoorwayRows-only) strip of real cells attached to the
@@ -575,14 +580,14 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         // AirlockDoorVerbTarget's own frame already caps it, same as it did at the old boundary.
         for (var i = -1; i >= -ShipSimRef.WestCorridorLength; i--)
         {
-            SpawnWallSegment(new CellCoord(i, 2), new CellCoord(i, 1));
-            SpawnWallSegment(new CellCoord(i, 3), new CellCoord(i, 4));
+            MaybeSpawnWall(new CellCoord(i, 2), new CellCoord(i, 1));
+            MaybeSpawnWall(new CellCoord(i, 3), new CellCoord(i, 4));
         }
 
         for (var i = gridWidth; i < gridWidth + ShipSimRef.EastCorridorLength; i++)
         {
-            SpawnWallSegment(new CellCoord(i, 2), new CellCoord(i, 1));
-            SpawnWallSegment(new CellCoord(i, 3), new CellCoord(i, 4));
+            MaybeSpawnWall(new CellCoord(i, 2), new CellCoord(i, 1));
+            MaybeSpawnWall(new CellCoord(i, 3), new CellCoord(i, 4));
         }
 
         // Battery/Switch/RechargeStation only exist on ships that opted into the machine-
@@ -592,6 +597,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             InstallBattery(BatteryEdge.A, BatteryEdge.B, savedState: null);
             InstallSwitch(SwitchEdge.A, SwitchEdge.B, savedState: null);
             InstallRechargeStation(RechargeStationEdge.A, RechargeStationEdge.B, savedState: null);
+        }
+    }
+
+    /// <summary>Spawns a wall segment unless this edge already starts wall-breached (see
+    /// <see cref="ShipSim.HasHullBreaches"/>) — a starting breach is a real, already-open gap,
+    /// not scaffolding that gets walled over and then immediately needs repairing.</summary>
+    private void MaybeSpawnWall(CellCoord a, CellCoord b)
+    {
+        if (!ShipSimRef!.Deck.IsWallEdgeBreached(a, b))
+        {
+            SpawnWallSegment(a, b);
         }
     }
 
@@ -695,14 +711,14 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         UpdateGhostTransform();
     }
 
-    // Only the two doorway edges (matching HomeShipDoorwayRows) are InteriorDoorVerbTarget's to
-    // own — the rest of this column is a real, solid wall (MidWallA/B) that this generic tool
-    // must still manage, same as any other interior wall. Checking a.Y (== b.Y for this edge
-    // shape, a column boundary between same-row cells) previously wasn't done at all, which
-    // excluded the *entire* column from wall/conduit targeting, not just its two doorway rows.
+    // Only the two doorway edges (matching DoorwayRows) are InteriorDoorVerbTarget's to own —
+    // the rest of this column is a real, solid wall (MidWallA/B) that this generic tool must
+    // still manage, same as any other interior wall. Checking a.Y (== b.Y for this edge shape, a
+    // column boundary between same-row cells) previously wasn't done at all, which excluded the
+    // *entire* column from wall/conduit targeting, not just its two doorway rows.
     private bool IsExcludedColumn(CellCoord a, CellCoord b) =>
         ExcludedEdgeColumn >= 0 &&
-        HomeShipDoorwayRows.Contains(a.Y) &&
+        DoorwayRows.Contains(a.Y) &&
         ((a.X == ExcludedEdgeColumn - 1 && b.X == ExcludedEdgeColumn) ||
          (b.X == ExcludedEdgeColumn - 1 && a.X == ExcludedEdgeColumn));
 

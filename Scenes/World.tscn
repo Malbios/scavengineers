@@ -48,12 +48,6 @@ size = Vector3(12, 0.2, 6)
 [sub_resource type="BoxShape3D" id="DerelictFloorShape"]
 size = Vector3(18, 0.2, 6)
 
-[sub_resource type="BoxShape3D" id="DerelictRoom3WallShape"]
-size = Vector3(6, 2, 0.2)
-
-[sub_resource type="BoxMesh" id="DerelictRoom3WallMesh"]
-size = Vector3(6, 2, 0.2)
-
 [sub_resource type="BoxShape3D" id="WallShapeEW"]
 size = Vector3(0.2, 2, 6)
 
@@ -189,30 +183,6 @@ albedo_color = Color(0.2, 0.702, 0.902, 1)
 [sub_resource type="StandardMaterial3D" id="CrowbarMaterial"]
 albedo_color = Color(0.702, 0.302, 0.15, 1)
 
-[sub_resource type="BoxShape3D" id="DerelictWallNorthLeftShape"]
-size = Vector3(3, 2, 0.2)
-
-[sub_resource type="BoxMesh" id="DerelictWallNorthLeftMesh"]
-size = Vector3(3, 2, 0.2)
-
-[sub_resource type="BoxShape3D" id="DerelictWallNorthRightShape"]
-size = Vector3(8, 2, 0.2)
-
-[sub_resource type="BoxMesh" id="DerelictWallNorthRightMesh"]
-size = Vector3(8, 2, 0.2)
-
-[sub_resource type="BoxShape3D" id="DerelictWallSouthLeftShape"]
-size = Vector3(6, 2, 0.2)
-
-[sub_resource type="BoxMesh" id="DerelictWallSouthLeftMesh"]
-size = Vector3(6, 2, 0.2)
-
-[sub_resource type="BoxShape3D" id="DerelictWallSouthRightShape"]
-size = Vector3(5, 2, 0.2)
-
-[sub_resource type="BoxMesh" id="DerelictWallSouthRightMesh"]
-size = Vector3(5, 2, 0.2)
-
 [sub_resource type="BoxShape3D" id="ComputerShape"]
 size = Vector3(0.5, 0.8, 0.4)
 
@@ -347,7 +317,7 @@ PanelMesh = SubResource("PanelMesh")
 PanelCollisionShape = SubResource("PanelCollisionShape")
 FloorPanelMaterial = ExtResource("6")
 CeilingPanelMaterial = ExtResource("8")
-SeedHomeShipDefaultLayout = true
+SeedDefaultLayout = true
 BatteryMesh = SubResource("BatteryMesh")
 BatteryShape = SubResource("BatteryShape")
 BatteryMaterial = SubResource("BatteryMaterial")
@@ -524,6 +494,7 @@ FloorPanelMaterial = ExtResource("9")
 CeilingPanelMaterial = ExtResource("11")
 GhostMaterial = SubResource("ConduitGhostMaterial")
 ExcludedEdgeColumn = 6
+SeedDefaultLayout = true
 DroppedItemMesh = SubResource("PickupItemMesh")
 DroppedItemShape = SubResource("PickupItemShape")
 DroppedItemMaterial = SubResource("PickupItemMaterial")
@@ -538,186 +509,6 @@ BuildTarget = NodePath("../Floor")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/FloorAimHelper"]
 shape = SubResource("DerelictFloorShape")
-
-[node name="WallNorthLeft" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 1.0, -3)
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/WallNorthLeft"]
-shape = SubResource("DerelictWallNorthLeftShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallNorthLeft"]
-mesh = SubResource("DerelictWallNorthLeftMesh")
-surface_material_override/0 = ExtResource("10")
-
-[node name="WallNorthRight" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1.0, -3)
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/WallNorthRight"]
-shape = SubResource("DerelictWallNorthRightShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallNorthRight"]
-mesh = SubResource("DerelictWallNorthRightMesh")
-surface_material_override/0 = ExtResource("10")
-
-[node name="WallSouthLeft" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0, 3)
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/WallSouthLeft"]
-shape = SubResource("DerelictWallSouthLeftShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallSouthLeft"]
-mesh = SubResource("DerelictWallSouthLeftMesh")
-surface_material_override/0 = ExtResource("10")
-
-[node name="WallSouthRight" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, 1.0, 3)
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/WallSouthRight"]
-shape = SubResource("DerelictWallSouthRightShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallSouthRight"]
-mesh = SubResource("DerelictWallSouthRightMesh")
-surface_material_override/0 = ExtResource("10")
-
-[node name="WallEast" type="StaticBody3D" parent="Derelict" unique_id=794719843 node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 1.0, 0)
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/WallEast" unique_id=1982163572]
-shape = SubResource("WallShapeEW")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallEast" unique_id=725819178]
-mesh = SubResource("WallMeshEW")
-surface_material_override/0 = ExtResource("10")
-
-[node name="WallWestA" type="StaticBody3D" parent="Derelict" unique_id=736840175 node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 1.0, -2)
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/WallWestA" unique_id=343832043]
-shape = SubResource("MidWallShapeEW")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallWestA" unique_id=288778608]
-mesh = SubResource("MidWallMeshEW")
-surface_material_override/0 = ExtResource("10")
-
-[node name="WallWestB" type="StaticBody3D" parent="Derelict" unique_id=474725168 node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 1.0, 2)
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/WallWestB" unique_id=834407101]
-shape = SubResource("MidWallShapeEW")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallWestB" unique_id=6616454]
-mesh = SubResource("MidWallMeshEW")
-surface_material_override/0 = ExtResource("10")
-
-[node name="CorridorWallNorth" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.0, -1)
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/CorridorWallNorth"]
-shape = SubResource("CorridorWallSegmentShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/CorridorWallNorth"]
-mesh = SubResource("CorridorWallSegmentMesh")
-surface_material_override/0 = ExtResource("10")
-
-[node name="CorridorWallSouth" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.0, 1)
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/CorridorWallSouth"]
-shape = SubResource("CorridorWallSegmentShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/CorridorWallSouth"]
-mesh = SubResource("CorridorWallSegmentMesh")
-surface_material_override/0 = ExtResource("10")
-
-[node name="MidWallA" type="StaticBody3D" parent="Derelict" unique_id=1461756098 node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.0, -2)
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/MidWallA" unique_id=1657899624]
-shape = SubResource("MidWallShapeEW")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/MidWallA" unique_id=1075898967]
-mesh = SubResource("MidWallMeshEW")
-surface_material_override/0 = ExtResource("10")
-
-[node name="MidWallB" type="StaticBody3D" parent="Derelict" unique_id=883558225 node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.0, 2)
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/MidWallB" unique_id=251449466]
-shape = SubResource("MidWallShapeEW")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/MidWallB" unique_id=246224119]
-mesh = SubResource("MidWallMeshEW")
-surface_material_override/0 = ExtResource("10")
-
-[node name="MidWallC" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 1.0, -2)
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/MidWallC"]
-shape = SubResource("MidWallShapeEW")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/MidWallC"]
-mesh = SubResource("MidWallMeshEW")
-surface_material_override/0 = ExtResource("10")
-
-[node name="MidWallD" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 1.0, 2)
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/MidWallD"]
-shape = SubResource("MidWallShapeEW")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/MidWallD"]
-mesh = SubResource("MidWallMeshEW")
-surface_material_override/0 = ExtResource("10")
-
-[node name="Room3WallNorth" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1.0, -3)
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/Room3WallNorth"]
-shape = SubResource("DerelictRoom3WallShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/Room3WallNorth"]
-mesh = SubResource("DerelictRoom3WallMesh")
-surface_material_override/0 = ExtResource("10")
-
-[node name="Room3WallSouth" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1.0, 3)
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/Room3WallSouth"]
-shape = SubResource("DerelictRoom3WallShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/Room3WallSouth"]
-mesh = SubResource("DerelictRoom3WallMesh")
-surface_material_override/0 = ExtResource("10")
 
 [node name="Ceiling" type="StaticBody3D" parent="Derelict" unique_id=1015045709 node_paths=PackedStringArray("BuildTarget")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 2.1, 0)

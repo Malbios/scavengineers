@@ -58,9 +58,12 @@ public partial class ShipSim : Node
     private static readonly CellCoord DerelictAirlockCell = new(11, 2);
 
     // The Derelict's two starting hull breaches — a real gap cut into the wall mesh at these
-    // tiles, repaired via ShipBuildTarget's generic wall-building (docs/project-plan.md
-    // Appendix A7/A8) rather than a dedicated repair object.
-    private static readonly CellCoord[] InitialBreachCells = [new(6, 5), new(3, 0)];
+    // edges, repaired via ShipBuildTarget's generic wall-building (docs/project-plan.md
+    // Appendix A7/A8) rather than a dedicated repair object. Paired with each edge's "outside"
+    // neighbor since a wall breach is per-edge (Deck.BreachWallEdge), not per-cell — (6,5) is on
+    // the south boundary row (GridDepth - 1), (3,0) is on the north boundary row.
+    private static readonly (CellCoord Cell, CellCoord Outside)[] InitialBreaches =
+        [(new(6, 5), new(6, 6)), (new(3, 0), new(3, -1))];
 
     // Room 1, clear of the Derelict's wall-panel pickup (1,1) and breach (3,0) — a minimal,
     // switch-less power source just to energize one already-damaged conduit (docs/project-plan.md
@@ -88,7 +91,7 @@ public partial class ShipSim : Node
     public bool HasPowerGrid { get; set; }
 
     /// <summary>Whether this ship starts with real gaps cut into its hull at
-    /// <see cref="InitialBreachCells"/> — true only for the Derelict.</summary>
+    /// <see cref="InitialBreaches"/> — true only for the Derelict.</summary>
     [Export]
     public bool HasHullBreaches { get; set; }
 
@@ -159,9 +162,9 @@ public partial class ShipSim : Node
 
         if (HasHullBreaches)
         {
-            foreach (var cell in InitialBreachCells)
+            foreach (var (cell, outside) in InitialBreaches)
             {
-                Deck.BreachHull(cell);
+                Deck.BreachWallEdge(cell, outside);
             }
         }
 
