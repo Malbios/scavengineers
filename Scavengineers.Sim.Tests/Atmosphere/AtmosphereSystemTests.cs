@@ -137,6 +137,40 @@ public class AtmosphereSystemTests
     }
 
     [Fact]
+    public void AddCell_LetsTickReadANewlyExtendedCellWithoutThrowing()
+    {
+        var origin = new CellCoord(0, 0);
+        var deck = DeckWithCells(origin);
+        var system = new AtmosphereSystem(deck);
+
+        var extended = new CellCoord(1, 0);
+        deck.AddCell(extended);
+        deck.BreachWallEdge(extended, new CellCoord(2, 0));
+        system.AddCell(extended);
+
+        system.Tick(1);
+
+        Assert.Equal(system.VolumeAt(origin).Pressure, system.VolumeAt(extended).Pressure, precision: 6);
+    }
+
+    [Fact]
+    public void RemoveCell_DropsItsVolume_SoANewCellAtTheSameCoordStartsFresh()
+    {
+        var cell = new CellCoord(1, 0);
+        var deck = DeckWithCells(new CellCoord(0, 0));
+        var system = new AtmosphereSystem(deck);
+        deck.AddCell(cell);
+        deck.BreachHull(cell);
+        system.AddCell(cell);
+        system.Tick(50); // drive it well below Breathable
+
+        system.RemoveCell(cell);
+        system.AddCell(cell);
+
+        Assert.Equal(AtmosphereVolume.Breathable.Pressure, system.VolumeAt(cell).Pressure);
+    }
+
+    [Fact]
     public void TwoTileWideDoor_SealedOnBothEdges_KeepsRoomsIndependent()
     {
         // A 2-tile-wide doorway (InteriorDoorVerbTarget's shape) is really two edges that must

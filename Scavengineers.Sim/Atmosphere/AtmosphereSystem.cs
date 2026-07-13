@@ -65,6 +65,19 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
 
     public AtmosphereVolume VolumeAt(CellCoord cell) => _volumes[cell];
 
+    /// <summary>Registers a cell added to <see cref="_deck"/> after construction (dynamic ship
+    /// expansion) — the constructor's own <c>_volumes</c> snapshot has no other way to grow, so
+    /// skipping this leaves every read/write below throwing KeyNotFoundException the next tick.
+    /// Defaults to Breathable, same as the constructor's own default, since a freshly extended
+    /// cell is normally still connected to its origin room's air.</summary>
+    public void AddCell(CellCoord cell, AtmosphereVolume? volume = null) =>
+        _volumes[cell] = volume ?? AtmosphereVolume.Breathable;
+
+    /// <summary>Counterpart of <see cref="AddCell"/> for a cell removed from <see cref="_deck"/>
+    /// (e.g. an extended cell torn down by a load that doesn't include it) — keeps this system's
+    /// own per-cell state from silently outliving the Deck cell it belonged to.</summary>
+    public void RemoveCell(CellCoord cell) => _volumes.Remove(cell);
+
     /// <summary>
     /// Overwrites a cell's volume from outside this system's own <see cref="Tick"/> — the hook
     /// <see cref="AirlockBridge"/> uses to write back a cell's state after equalizing it against

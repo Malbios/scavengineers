@@ -498,6 +498,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private void ExtendFloor(CellCoord origin, CellCoord newCell)
     {
         ShipSimRef!.Deck.AddCell(newCell);
+        ShipSimRef.Atmosphere?.AddCell(newCell);
         GeneratePanelsForCell(newCell);
         ShipSimRef.Deck.BreachHull(newCell, StructuralSurface.Ceiling);
         RefreshCeilingPanelState(new Vector2I(newCell.X, newCell.Y));
@@ -1848,6 +1849,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             if (!ShipSimRef!.Deck.Cells.Contains(cell))
             {
                 ShipSimRef.Deck.AddCell(cell);
+                ShipSimRef.Atmosphere?.AddCell(cell);
                 GeneratePanelsForCell(cell);
                 _extendedCells.Add(cell);
             }
@@ -1989,6 +1991,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             }
 
             ShipSimRef?.Deck.RemoveCell(cell);
+            ShipSimRef?.Atmosphere?.RemoveCell(cell);
         }
 
         _extendedCells.Clear();
