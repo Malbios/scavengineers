@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # Fire hazard: let the Derelict's damaged conduit ignite, confirm smoke particles + screen darkening + faster O2 drain, and that it spreads to a nearby unsealed conduit
+$scene = "res://Scenes/World.tscn" # Derelict hull fix: repair its 2 seeded breaches and confirm O2 actually recovers (Derelict + bridged Home Ship); remove/reinstall any other wall and confirm the visual actually toggles now
 
 & $godotExe --path $projectPath $scene
