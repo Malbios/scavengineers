@@ -492,11 +492,15 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// back to <paramref name="origin"/> becomes a normal open interior connection (unsealed by
     /// default, same as any other doorway); <see cref="NormalizeBoundaryEdgesForCell"/> handles
     /// clearing that edge's now-stale wall-breach flag and marking the new cell's other, still-
-    /// open sides.</summary>
+    /// open sides. Only the floor is claimed — the ceiling starts breached (open), same as any
+    /// other missing ceiling, so it needs its own separate Install Ceiling verb rather than
+    /// coming for free.</summary>
     private void ExtendFloor(CellCoord origin, CellCoord newCell)
     {
         ShipSimRef!.Deck.AddCell(newCell);
         GeneratePanelsForCell(newCell);
+        ShipSimRef.Deck.BreachHull(newCell, StructuralSurface.Ceiling);
+        RefreshCeilingPanelState(new Vector2I(newCell.X, newCell.Y));
         _extendedCells.Add(newCell);
         NormalizeBoundaryEdgesForCell(newCell);
     }
@@ -1646,7 +1650,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private void UpdateGhostTransform()
     {
         var isInstall = _previewVerb == InstallConduitVerb || _previewVerb == InstallWallVerb ||
-                         _previewVerb == InstallFloorVerb || _previewVerb == InstallCeilingVerb;
+                         _previewVerb == InstallFloorVerb || _previewVerb == InstallCeilingVerb ||
+                         _previewVerb == ExtendFloorVerb;
         if (!isInstall)
         {
             _ghost!.Visible = false;
@@ -1674,6 +1679,16 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 _ghost.Mesh = PanelMesh;
                 _ghost.RotationDegrees = Vector3.Zero;
                 _ghost.Position = ToLocal(TileWorldPosition(_aimedTile, CeilingPanelHeight));
+                break;
+
+            case AimKind.Edge when _previewVerb == ExtendFloorVerb:
+                // Previews the new cell itself (across the edge, at _edgeB) rather than the
+                // edge — that's where the floor panel will actually land, same shape as the
+                // Tile/InstallFloorVerb preview above.
+                _ghost!.Visible = true;
+                _ghost.Mesh = PanelMesh;
+                _ghost.RotationDegrees = Vector3.Zero;
+                _ghost.Position = ToLocal(TileWorldPosition(new Vector2I(_edgeB.X, _edgeB.Y), FloorPanelHeight));
                 break;
 
             case AimKind.Edge when _previewVerb == InstallConduitVerb:
