@@ -199,7 +199,7 @@ size = Vector3(0.5, 0.8, 0.4)
 size = Vector3(0.5, 0.8, 0.4)
 
 [sub_resource type="BoxShape3D" id="CorridorZoneShape"]
-size = Vector3(2.2, 2.2, 2.4)
+size = Vector3(4.0, 2.2, 2.4)
 
 [sub_resource type="BoxShape3D" id="StationRoomZoneShape"]
 size = Vector3(6.2, 4.2, 6.4)
