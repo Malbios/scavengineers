@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # Check the Station's corridor doorway no longer shows open space above it (lintel piece added)
+$scene = "res://Scenes/World.tscn" # Confirm Station now has its own distinct cool blue-grey floor/wall/ceiling textures, not Home Ship's
 
 & $godotExe --path $projectPath $scene
