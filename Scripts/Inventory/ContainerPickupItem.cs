@@ -17,12 +17,20 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget
 {
     private static readonly Verb PickUpVerb = new("pick_up", "VERB_PICK_UP", DurationSeconds: 0f);
 
+    // See PickupItem's own ZeroGSettleDamp for why — same reasoning applies here.
+    private const float ZeroGSettleDamp = 2f;
+
     [Export]
     public string ItemId { get; set; } = "";
 
     public SlotContainer? Contents { get; set; }
 
-    public override void _Ready() => AddToGroup("dropped_container");
+    public override void _Ready()
+    {
+        AddToGroup("dropped_container");
+        LinearDamp = ZeroGSettleDamp;
+        AngularDamp = ZeroGSettleDamp;
+    }
 
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 

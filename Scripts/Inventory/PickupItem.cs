@@ -9,11 +9,27 @@ public partial class PickupItem : RigidBody3D, IVerbTarget
 {
     private static readonly Verb PickUpVerb = new("pick_up", "VERB_PICK_UP", DurationSeconds: 0f);
 
+    // Placeholder/tunable — with zero gravity in a breached room (see ShipAtmosphereZone), gravity
+    // no longer settles out any stray physics nudge (e.g. the floor's own collision finishing a
+    // frame after this item spawns — see ShipBuildTarget.GenerateFloorCeilingPanels's deferred
+    // build). Undamped, that nudge would drift at a constant velocity forever, and a room can sit
+    // unobserved (both ships simulate simultaneously) for however long it takes the player to
+    // arrive — long enough to drift clear out through an open hull breach. Damping bounds the
+    // *total* distance a stray nudge can ever travel to a small, fixed amount regardless of how
+    // much time passes, while still leaving a felt, gentle float rather than snapping to a stop.
+    private const float ZeroGSettleDamp = 2f;
+
     [Export]
     public string ItemId { get; set; } = "";
 
     [Export]
     public int Count { get; set; } = 1;
+
+    public override void _Ready()
+    {
+        LinearDamp = ZeroGSettleDamp;
+        AngularDamp = ZeroGSettleDamp;
+    }
 
     public IReadOnlyList<Verb> AvailableVerbs { get; } = [PickUpVerb];
 
