@@ -19,7 +19,7 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget
     private static readonly Verb PickUpVerb = new("pick_up", "VERB_PICK_UP", DurationSeconds: 0f);
 
     // See PickupItem's own ZeroGSettleDamp for why — same reasoning applies here.
-    private const float ZeroGSettleDamp = 2f;
+    private const float ZeroGSettleDamp = 0.4f;
 
     [Export]
     public string ItemId { get; set; } = "";

@@ -17,8 +17,9 @@ public partial class PickupItem : RigidBody3D, IVerbTarget
     // unobserved (both ships simulate simultaneously) for however long it takes the player to
     // arrive — long enough to drift clear out through an open hull breach. Damping bounds the
     // *total* distance a stray nudge can ever travel to a small, fixed amount regardless of how
-    // much time passes, while still leaving a felt, gentle float rather than snapping to a stop.
-    private const float ZeroGSettleDamp = 2f;
+    // much time passes. Kept low so an intentional player shove still carries and glides for a
+    // couple of seconds rather than stopping dead — 2f killed that momentum almost instantly.
+    private const float ZeroGSettleDamp = 0.4f;
 
     [Export]
     public string ItemId { get; set; } = "";
