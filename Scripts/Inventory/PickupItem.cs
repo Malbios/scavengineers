@@ -29,6 +29,12 @@ public partial class PickupItem : RigidBody3D, IVerbTarget
     {
         LinearDamp = ZeroGSettleDamp;
         AngularDamp = ZeroGSettleDamp;
+
+        // Completely inert by default — byte-for-byte matching the old StaticBody3D behavior
+        // (immovable, no physics response at all), so there's zero risk of an interpenetration
+        // "pop" or a fall-through from any collision-generation timing race. Only
+        // ShipAtmosphereZone unfreezes this once its room is actually confirmed to be in vacuum.
+        Freeze = true;
     }
 
     public IReadOnlyList<Verb> AvailableVerbs { get; } = [PickUpVerb];

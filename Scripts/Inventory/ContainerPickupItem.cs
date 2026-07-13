@@ -30,6 +30,9 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget
         AddToGroup("dropped_container");
         LinearDamp = ZeroGSettleDamp;
         AngularDamp = ZeroGSettleDamp;
+
+        // See PickupItem's own Freeze default for why — same reasoning applies here.
+        Freeze = true;
     }
 
     public float? CurrentVerbProgress => null; // instant, never "in progress"

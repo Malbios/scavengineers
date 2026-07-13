@@ -56,6 +56,19 @@ public partial class ShipAtmosphereZone : Area3D
         var isVacuum = ShipSimRef.VolumeAt(new CellCoord(Tile.X, Tile.Y)).O2Fraction <= ZeroGO2Threshold;
         GravitySpaceOverride = isVacuum ? SpaceOverride.Replace : SpaceOverride.Disabled;
         Gravity = 0f;
+
+        // Loose pickups start frozen (see PickupItem/ContainerPickupItem's own default) — only
+        // unfrozen here, once their room is actually confirmed to be in vacuum, so they stay
+        // completely inert (immovable, no physics response) everywhere else. Read fresh from the
+        // Area3D's live overlap list every tick rather than tracked via BodyEntered/Exited, so a
+        // body that later drifts out of this zone into another one is never left stale.
+        foreach (var body in GetOverlappingBodies())
+        {
+            if (body is RigidBody3D rigidBody)
+            {
+                rigidBody.Freeze = !isVacuum;
+            }
+        }
     }
 
     // Deliberately no BodyExited handler: the corridor between the two zones isn't its own
