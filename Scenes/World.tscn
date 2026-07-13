@@ -60,6 +60,12 @@ size = Vector3(0.2, 4, 2)
 [sub_resource type="BoxMesh" id="MidWallMeshEW"]
 size = Vector3(0.2, 4, 2)
 
+[sub_resource type="BoxShape3D" id="StationLintelShape"]
+size = Vector3(0.2, 2, 2)
+
+[sub_resource type="BoxMesh" id="StationLintelMesh"]
+size = Vector3(0.2, 2, 2)
+
 [sub_resource type="BoxShape3D" id="SwitchShape"]
 size = Vector3(0.3, 0.3, 0.1)
 
@@ -826,6 +832,16 @@ shape = SubResource("MidWallShapeEW")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Station/WallEastB"]
 mesh = SubResource("MidWallMeshEW")
+surface_material_override/0 = ExtResource("7")
+
+[node name="CorridorLintel" type="StaticBody3D" parent="Station"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 3.0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Station/CorridorLintel"]
+shape = SubResource("StationLintelShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Station/CorridorLintel"]
+mesh = SubResource("StationLintelMesh")
 surface_material_override/0 = ExtResource("7")
 
 [node name="CorridorWallNorth" type="StaticBody3D" parent="Station"]
