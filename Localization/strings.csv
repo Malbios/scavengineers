@@ -17,7 +17,7 @@ OBJECT_RECHARGE_STATION,Recharge Station,Ladestation
 OBJECT_AIRLOCK,Airlock,Luftschleuse
 VERB_OPEN_DOOR,Open Door,Tür öffnen
 VERB_CLOSE_DOOR,Close Door,Tür schließen
-VERB_PRY_DOOR,Pry Door Open,Tür aufbrechen
+VERB_PRY_DOOR,Pry Door,Tür forcieren
 OBJECT_DOOR,Door,Tür
 ITEM_CROWBAR,Crowbar,Brechstange
 ITEM_POWER_DRILL,Power Drill,Akkuschrauber
