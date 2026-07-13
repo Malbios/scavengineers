@@ -1,5 +1,5 @@
 ---
-name: code-audit
+name: cq
 description: Spawns parallel subagents to review code quality/architecture adherence, find missing test coverage, and flag forward-looking risks (TODOs, localization/save/asset gaps) in this repo. Manually triggered only — not something to auto-invoke. Defaults to just what's changed since main; pass "full" to scan the whole repo, or a path to scope to one area.
 disable-model-invocation: true
 ---
