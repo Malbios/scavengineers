@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # Let O2 hit 0% and confirm real Health drain + death (reload last save, or a full O2/Health revival if no save exists yet); confirm the old Power stat/bar is completely gone from the HUD; confirm the flashlight now needs its own battery (drag one into its new equip slot, confirm it drains with use and the beam cuts out at 0 charge, confirm the debug flashlight still bypasses all of this); confirm letting Hunger/Thirst/Energy hit 0% visibly halves movement speed without killing you; confirm F5/F9 save-load round-trips Health and the flashlight battery correctly
+$scene = "res://Scenes/World.tscn" # Confirm the HUD reads noticeably smaller/tighter now: the bottom-left resource bars (O2/Health/Hunger/Thirst/Energy, plus Drill/Flashlight while held) are shorter with smaller text and less gap between rows and don't overflow their panel; the hand/credits labels top-left are smaller and closer together; the Tab inventory panel's equip-slot squares are smaller but icons/counts still sit centered inside them, not clipped or overlapping
 
 & $godotExe --path $projectPath $scene

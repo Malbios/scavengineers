@@ -10,14 +10,17 @@ height = 1.8
 
 [sub_resource type="StyleBoxFlat" id="HudLabelBackground"]
 bg_color = Color(0, 0, 0, 0.55)
-content_margin_left = 6.0
-content_margin_top = 3.0
-content_margin_right = 6.0
-content_margin_bottom = 3.0
-corner_radius_top_left = 4
-corner_radius_top_right = 4
-corner_radius_bottom_right = 4
-corner_radius_bottom_left = 4
+content_margin_left = 4.0
+content_margin_top = 1.0
+content_margin_right = 4.0
+content_margin_bottom = 1.0
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="Theme" id="HudTheme"]
+default_font_size = 12
 
 [node name="Player" type="CharacterBody3D" unique_id=66675123]
 script = ExtResource("1")
@@ -119,16 +122,19 @@ show_percentage = false
 [node name="LeftHandLabel" type="Label" parent="HUD"]
 offset_left = 16.0
 offset_top = 16.0
+theme = SubResource("HudTheme")
 theme_override_styles/normal = SubResource("HudLabelBackground")
 
 [node name="RightHandLabel" type="Label" parent="HUD"]
 offset_left = 16.0
-offset_top = 44.0
+offset_top = 38.0
+theme = SubResource("HudTheme")
 theme_override_styles/normal = SubResource("HudLabelBackground")
 
 [node name="CreditsLabel" type="Label" parent="HUD"]
 offset_left = 16.0
-offset_top = 72.0
+offset_top = 60.0
+theme = SubResource("HudTheme")
 theme_override_styles/normal = SubResource("HudLabelBackground")
 
 [node name="InventoryTooltip" type="Label" parent="HUD"]
@@ -160,10 +166,10 @@ theme_override_constants/separation = 10
 [node name="EquipSlots" type="HBoxContainer" parent="HUD/InventoryPanel/Layout"]
 layout_mode = 2
 alignment = 1
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
 [node name="LeftHand" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots" node_paths=PackedStringArray("Tooltip")]
-custom_minimum_size = Vector2(48, 48)
+custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 script = ExtResource("3")
 SlotIndex = 0
@@ -182,10 +188,10 @@ visible = false
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 6.0
-offset_top = 6.0
-offset_right = -6.0
-offset_bottom = -6.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
 mouse_filter = 2
 color = Color(0.6, 0.6, 0.6, 1)
 
@@ -196,13 +202,13 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -22.0
-offset_top = -18.0
+offset_left = -19.0
+offset_top = -15.0
 mouse_filter = 2
 horizontal_alignment = 2
 
 [node name="RightHand" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots" node_paths=PackedStringArray("Tooltip")]
-custom_minimum_size = Vector2(48, 48)
+custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 script = ExtResource("3")
 SlotIndex = 1
@@ -221,10 +227,10 @@ visible = false
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 6.0
-offset_top = 6.0
-offset_right = -6.0
-offset_bottom = -6.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
 mouse_filter = 2
 color = Color(0.6, 0.6, 0.6, 1)
 
@@ -235,13 +241,13 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -22.0
-offset_top = -18.0
+offset_left = -19.0
+offset_top = -15.0
 mouse_filter = 2
 horizontal_alignment = 2
 
 [node name="Back" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots" node_paths=PackedStringArray("Tooltip")]
-custom_minimum_size = Vector2(48, 48)
+custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 script = ExtResource("3")
 IsBackSlot = true
@@ -260,10 +266,10 @@ visible = false
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 6.0
-offset_top = 6.0
-offset_right = -6.0
-offset_bottom = -6.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
 mouse_filter = 2
 color = Color(0.6, 0.6, 0.6, 1)
 
@@ -274,13 +280,13 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -22.0
-offset_top = -18.0
+offset_left = -19.0
+offset_top = -15.0
 mouse_filter = 2
 horizontal_alignment = 2
 
 [node name="DrillBattery" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots" node_paths=PackedStringArray("Tooltip")]
-custom_minimum_size = Vector2(48, 48)
+custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 script = ExtResource("3")
 IsDrillBatterySlot = true
@@ -299,10 +305,10 @@ visible = false
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 6.0
-offset_top = 6.0
-offset_right = -6.0
-offset_bottom = -6.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
 mouse_filter = 2
 color = Color(0.6, 0.6, 0.6, 1)
 
@@ -313,13 +319,13 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -22.0
-offset_top = -18.0
+offset_left = -19.0
+offset_top = -15.0
 mouse_filter = 2
 horizontal_alignment = 2
 
 [node name="FlashlightBattery" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots" node_paths=PackedStringArray("Tooltip")]
-custom_minimum_size = Vector2(48, 48)
+custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 script = ExtResource("3")
 IsFlashlightBatterySlot = true
@@ -338,10 +344,10 @@ visible = false
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 6.0
-offset_top = 6.0
-offset_right = -6.0
-offset_bottom = -6.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
 mouse_filter = 2
 color = Color(0.6, 0.6, 0.6, 1)
 
@@ -352,8 +358,8 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -22.0
-offset_top = -18.0
+offset_left = -19.0
+offset_top = -15.0
 mouse_filter = 2
 horizontal_alignment = 2
 
@@ -369,7 +375,7 @@ theme_override_constants/v_separation = 8
 
 [node name="SlotTemplate" type="Control" parent="HUD/InventoryPanel/Layout/BackpackGrid" node_paths=PackedStringArray("Tooltip")]
 visible = false
-custom_minimum_size = Vector2(48, 48)
+custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 script = ExtResource("3")
 EmptySlotNameKey = "HUD_BACKPACK_SLOT"
@@ -387,10 +393,10 @@ visible = false
 layout_mode = 1
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 6.0
-offset_top = 6.0
-offset_right = -6.0
-offset_bottom = -6.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
 mouse_filter = 2
 color = Color(0.6, 0.6, 0.6, 1)
 
@@ -401,8 +407,8 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -22.0
-offset_top = -18.0
+offset_left = -19.0
+offset_top = -15.0
 mouse_filter = 2
 horizontal_alignment = 2
 
@@ -411,11 +417,13 @@ anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = -245.0
-offset_right = 176.0
+offset_top = -190.0
+offset_right = 150.0
 offset_bottom = -17.0
 grow_vertical = 0
 mouse_filter = 2
+theme = SubResource("HudTheme")
+theme_override_constants/separation = 2
 
 [node name="O2Label" type="Label" parent="HUD/ResourcesPanel" unique_id=1009985224]
 layout_mode = 2
@@ -424,7 +432,7 @@ theme_override_styles/normal = SubResource("HudLabelBackground")
 text = "O2"
 
 [node name="O2Bar" type="ProgressBar" parent="HUD/ResourcesPanel" unique_id=1829003878]
-custom_minimum_size = Vector2(0, 16)
+custom_minimum_size = Vector2(0, 11)
 layout_mode = 2
 theme_override_styles/background = SubResource("HudLabelBackground")
 value = 100.0
@@ -437,7 +445,7 @@ theme_override_styles/normal = SubResource("HudLabelBackground")
 text = "HEALTH"
 
 [node name="HealthBar" type="ProgressBar" parent="HUD/ResourcesPanel"]
-custom_minimum_size = Vector2(0, 16)
+custom_minimum_size = Vector2(0, 11)
 layout_mode = 2
 theme_override_styles/background = SubResource("HudLabelBackground")
 value = 100.0
@@ -450,7 +458,7 @@ theme_override_styles/normal = SubResource("HudLabelBackground")
 text = "HUNGER"
 
 [node name="HungerBar" type="ProgressBar" parent="HUD/ResourcesPanel"]
-custom_minimum_size = Vector2(0, 16)
+custom_minimum_size = Vector2(0, 11)
 layout_mode = 2
 theme_override_styles/background = SubResource("HudLabelBackground")
 value = 100.0
@@ -463,7 +471,7 @@ theme_override_styles/normal = SubResource("HudLabelBackground")
 text = "THIRST"
 
 [node name="ThirstBar" type="ProgressBar" parent="HUD/ResourcesPanel"]
-custom_minimum_size = Vector2(0, 16)
+custom_minimum_size = Vector2(0, 11)
 layout_mode = 2
 theme_override_styles/background = SubResource("HudLabelBackground")
 value = 100.0
@@ -476,7 +484,7 @@ theme_override_styles/normal = SubResource("HudLabelBackground")
 text = "ENERGY"
 
 [node name="EnergyBar" type="ProgressBar" parent="HUD/ResourcesPanel"]
-custom_minimum_size = Vector2(0, 16)
+custom_minimum_size = Vector2(0, 11)
 layout_mode = 2
 theme_override_styles/background = SubResource("HudLabelBackground")
 value = 100.0
@@ -497,7 +505,7 @@ text = "DRILL"
 
 [node name="DrillBar" type="ProgressBar" parent="HUD/ResourcesPanel"]
 visible = false
-custom_minimum_size = Vector2(0, 16)
+custom_minimum_size = Vector2(0, 11)
 layout_mode = 2
 theme_override_styles/background = SubResource("HudLabelBackground")
 value = 100.0
@@ -512,7 +520,7 @@ text = "FLASHLIGHT"
 
 [node name="FlashlightBar" type="ProgressBar" parent="HUD/ResourcesPanel"]
 visible = false
-custom_minimum_size = Vector2(0, 16)
+custom_minimum_size = Vector2(0, 11)
 layout_mode = 2
 theme_override_styles/background = SubResource("HudLabelBackground")
 value = 100.0
