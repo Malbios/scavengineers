@@ -5,6 +5,9 @@ VERB_PICK_UP,Pick Up,Aufheben
 VERB_TRAVEL,Travel,Reisen
 VERB_RECHARGE,Recharge,Aufladen
 HUD_ROOM_O2,Room O2,Raum-O2
+HUD_BACK_SLOT,Backpack,Rucksack
+HUD_DRILL_BATTERY_SLOT,Drill Battery,Akku-Fach
+HUD_BACKPACK_SLOT,Backpack Slot,Rucksackfach
 ITEM_SCRAP_METAL,Scrap Metal,Schrott
 ITEM_SPARE_PARTS,Spare Parts,Ersatzteile
 VERB_OPEN_AIRLOCK,Open Airlock,Schleuse öffnen

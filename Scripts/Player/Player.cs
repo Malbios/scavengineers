@@ -65,7 +65,13 @@ public partial class Player : CharacterBody3D
     private Label? _creditsLabel;
     private Control? _inventoryPanel;
     private Control? _backpackGrid;
+    private InventorySlotUI? _backpackSlotTemplate;
     private readonly List<InventorySlotUI> _backpackSlotUIs = new();
+
+    /// <summary>Slot count the backpack grid was last built for — <see cref="UpdateInventoryHud"/>
+    /// only rebuilds the grid's <see cref="InventorySlotUI"/> children when this changes (equip/
+    /// unequip/load), not every frame.</summary>
+    private int _backpackSlotUICount = -1;
     private readonly SuitResources _suitResources = new();
     private readonly PlayerNeeds _needs = new();
     private readonly PlayerInventory _inventory = new();
@@ -191,14 +197,7 @@ public partial class Player : CharacterBody3D
             }
         }
 
-        foreach (var child in _backpackGrid.GetChildren())
-        {
-            if (child is InventorySlotUI slot)
-            {
-                slot.PlayerRef = this;
-                _backpackSlotUIs.Add(slot);
-            }
-        }
+        _backpackSlotTemplate = GetNode<InventorySlotUI>("HUD/InventoryPanel/Layout/BackpackGrid/SlotTemplate");
 
         // Placeholder/tunable starting stipend for testing the free-form conduit wiring
         // extensively — same "don't wait on it" spirit as the near-instant verb durations.
@@ -935,6 +934,13 @@ public partial class Player : CharacterBody3D
         // creates a new SlotContainer instance, and this is the cheapest way to keep the panel's
         // backpack section always addressing whichever one (if any) is currently worn.
         _backpackGrid!.Visible = _inventory.Backpack is not null;
+
+        var backpackSlotCount = _inventory.Backpack?.Contents.Slots.Count ?? 0;
+        if (backpackSlotCount != _backpackSlotUICount)
+        {
+            RebuildBackpackSlotUIs(backpackSlotCount);
+        }
+
         foreach (var slot in _backpackSlotUIs)
         {
             slot.Container = _inventory.Backpack?.Contents;
@@ -949,5 +955,31 @@ public partial class Player : CharacterBody3D
         _rightHandLabel!.Text = Tr("HUD_RIGHT_HAND") + ": " + (RightHandItemId is { } rightItem
             ? Tr("ITEM_" + rightItem.ToUpperInvariant())
             : Tr("HUD_HOLDING_EMPTY"));
+    }
+
+    /// <summary>Rebuilds BackpackGrid's InventorySlotUI children to match the worn backpack's
+    /// actual slot count (8 for the normal backpack, 24 for the debug backpack, 0 while
+    /// unequipped) by duplicating <see cref="_backpackSlotTemplate"/> — the scene itself only
+    /// ever carries that one hidden template node, not a fixed slot count.</summary>
+    private void RebuildBackpackSlotUIs(int slotCount)
+    {
+        foreach (var slot in _backpackSlotUIs)
+        {
+            slot.QueueFree();
+        }
+
+        _backpackSlotUIs.Clear();
+
+        for (var i = 0; i < slotCount; i++)
+        {
+            var slot = (InventorySlotUI)_backpackSlotTemplate!.Duplicate();
+            slot.Visible = true;
+            slot.SlotIndex = i;
+            slot.PlayerRef = this;
+            _backpackGrid!.AddChild(slot);
+            _backpackSlotUIs.Add(slot);
+        }
+
+        _backpackSlotUICount = slotCount;
     }
 }

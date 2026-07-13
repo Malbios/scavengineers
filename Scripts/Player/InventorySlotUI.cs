@@ -36,6 +36,11 @@ public partial class InventorySlotUI : Control
     [Export]
     public bool IsDrillBatterySlot { get; set; }
 
+    /// <summary>Localization key shown by <see cref="OnMouseEntered"/> when this slot has
+    /// nothing in it — an empty slot otherwise gives no hover feedback about what it's for.</summary>
+    [Export]
+    public string EmptySlotNameKey { get; set; } = "";
+
     public SlotContainer? Container { get; set; }
 
     /// <summary>Wired on every slot (not just Back) — ordinary slots need it too, to react when
@@ -79,12 +84,24 @@ public partial class InventorySlotUI : Control
 
     private void OnMouseEntered()
     {
-        if (Tooltip is null || CurrentSlot() is not { } slot)
+        if (Tooltip is null)
         {
             return;
         }
 
-        Tooltip.Text = $"{Tr("ITEM_" + slot.ItemId.ToUpperInvariant())}: {slot.Count}";
+        if (CurrentSlot() is { } slot)
+        {
+            Tooltip.Text = $"{Tr("ITEM_" + slot.ItemId.ToUpperInvariant())}: {slot.Count}";
+        }
+        else if (EmptySlotNameKey.Length > 0)
+        {
+            Tooltip.Text = Tr(EmptySlotNameKey);
+        }
+        else
+        {
+            return;
+        }
+
         Tooltip.Visible = true;
         Tooltip.GlobalPosition = GetGlobalMousePosition() + new Vector2(16, 16);
     }
