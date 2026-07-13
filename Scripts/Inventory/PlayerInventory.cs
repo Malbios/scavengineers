@@ -276,6 +276,24 @@ public sealed class PlayerInventory
         return true;
     }
 
+    /// <summary>Same battery-state mutation as <see cref="EjectDrillBattery"/>, but places the
+    /// ejected battery into a specific target slot instead of wherever <see cref="Add"/> finds
+    /// room — used when the player drags the drill's battery onto a particular hand/backpack slot
+    /// rather than dropping it in open space (see InventorySlotUI._DropData). No-op/false if
+    /// there's no installed battery to eject, or the target slot isn't actually empty.</summary>
+    public bool EjectDrillBatteryTo(SlotContainer container, int slotIndex)
+    {
+        if (Drill is not { HasBattery: true } || container.Slots[slotIndex] is not null)
+        {
+            return false;
+        }
+
+        Drill.HasBattery = false;
+        Drill.Charge = 0f;
+        container.SetSlot(slotIndex, ("battery", 1));
+        return true;
+    }
+
     /// <summary>Attaches flashlight battery state directly — mirrors <see cref="AttachDrill"/>'s
     /// own fresh-game-stipend/save-load-restore usage.</summary>
     public void AttachFlashlight(bool hasBattery, float charge) => Flashlight = new FlashlightState { HasBattery = hasBattery, Charge = charge };
@@ -306,6 +324,22 @@ public sealed class PlayerInventory
         Flashlight.HasBattery = false;
         Flashlight.Charge = 0f;
         Add("battery", 1);
+        return true;
+    }
+
+    /// <summary>Same battery-state mutation as <see cref="EjectFlashlightBattery"/>, but places
+    /// the ejected battery into a specific target slot — mirrors
+    /// <see cref="EjectDrillBatteryTo"/> exactly.</summary>
+    public bool EjectFlashlightBatteryTo(SlotContainer container, int slotIndex)
+    {
+        if (Flashlight is not { HasBattery: true } || container.Slots[slotIndex] is not null)
+        {
+            return false;
+        }
+
+        Flashlight.HasBattery = false;
+        Flashlight.Charge = 0f;
+        container.SetSlot(slotIndex, ("battery", 1));
         return true;
     }
 

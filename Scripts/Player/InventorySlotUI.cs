@@ -187,7 +187,20 @@ public partial class InventorySlotUI : Control
 
         if (source.IsDrillBatterySlot)
         {
-            PlayerRef.Inventory.EjectDrillBattery();
+            // A real indexed Container slot (e.g. a hand or backpack slot) lands the battery
+            // exactly where it was dropped, failing outright if that exact slot is occupied
+            // rather than silently placing it elsewhere. Only falls back to the generic
+            // "wherever there's room" placement when the target isn't a real slot at all (e.g.
+            // dropped onto the flashlight's own battery slot).
+            if (Container is not null)
+            {
+                PlayerRef.Inventory.EjectDrillBatteryTo(Container, SlotIndex);
+            }
+            else
+            {
+                PlayerRef.Inventory.EjectDrillBattery();
+            }
+
             return;
         }
 
@@ -203,7 +216,16 @@ public partial class InventorySlotUI : Control
 
         if (source.IsFlashlightBatterySlot)
         {
-            PlayerRef.Inventory.EjectFlashlightBattery();
+            // Same exact-slot-or-fail placement as the drill battery branch above.
+            if (Container is not null)
+            {
+                PlayerRef.Inventory.EjectFlashlightBatteryTo(Container, SlotIndex);
+            }
+            else
+            {
+                PlayerRef.Inventory.EjectFlashlightBattery();
+            }
+
             return;
         }
 
