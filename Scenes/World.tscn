@@ -200,7 +200,7 @@ size = Vector3(0.5, 0.8, 0.4)
 size = Vector3(0.5, 0.8, 0.4)
 
 [sub_resource type="BoxShape3D" id="CorridorZoneShape"]
-size = Vector3(8.2, 3.2, 2.4)
+size = Vector3(3.2, 3.2, 2.4)
 
 [sub_resource type="StandardMaterial3D" id="AirlockDoorMaterial"]
 albedo_color = Color(0.85, 0.75, 0.15, 1)
@@ -262,8 +262,8 @@ PlayerRef = NodePath("../Player")
 script = ExtResource("3")
 HasPowerGrid = true
 HasLifeSupport = true
-WestCorridorLength = 8
-EastCorridorLength = 8
+WestCorridorLength = 3
+EastCorridorLength = 3
 
 [node name="ShipZoneRoom1" type="Area3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.1, 1.5, 0)
@@ -286,20 +286,20 @@ BuildTargetRef = NodePath("../Floor")
 shape = SubResource("ShipZoneWideShape")
 
 [node name="ShipZoneCorridorWest" type="Area3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 1.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 1.5, 0)
 script = ExtResource("14")
 ShipSimRef = NodePath("../ShipSim")
-Tile = Vector2i(-4, 2)
+Tile = Vector2i(-2, 2)
 BuildTargetRef = NodePath("../Floor")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/ShipZoneCorridorWest"]
 shape = SubResource("CorridorZoneShape")
 
 [node name="ShipZoneCorridorEast" type="Area3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 1.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.5, 1.5, 0)
 script = ExtResource("14")
 ShipSimRef = NodePath("../ShipSim")
-Tile = Vector2i(15, 2)
+Tile = Vector2i(13, 2)
 BuildTargetRef = NodePath("../Floor")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/ShipZoneCorridorEast"]
@@ -850,12 +850,12 @@ mesh = SubResource("DoorSlabMesh")
 surface_material_override/0 = SubResource("AirlockDoorMaterial")
 
 [node name="DerelictAirlock" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipARef", "ShipBRef", "SlabMesh", "SlabCollision") groups=["saveable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 1.5, -0.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1.5, -0.8)
 script = ExtResource("15")
 ShipARef = NodePath("../HomeShip/ShipSim")
 ShipBRef = NodePath("../Derelict/ShipSim")
 PowerFixtureId = "derelict_airlock_power"
-TileA = Vector2i(19, 2)
+TileA = Vector2i(14, 2)
 TileB = Vector2i(0, 2)
 SlabMesh = NodePath("SlabMesh")
 SlabCollision = NodePath("SlabCollision")
@@ -984,12 +984,12 @@ mesh = SubResource("ComputerMesh")
 surface_material_override/0 = SubResource("TradeConsoleMaterial")
 
 [node name="StationAirlock" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipARef", "ShipBRef", "SlabMesh", "SlabCollision") groups=["saveable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11, 1.5, -0.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1.5, -0.8)
 script = ExtResource("15")
 ShipARef = NodePath("../HomeShip/ShipSim")
 ShipBRef = NodePath("../Station/ShipSim")
 PowerFixtureId = "station_airlock_power"
-TileA = Vector2i(-8, 2)
+TileA = Vector2i(-3, 2)
 TileB = Vector2i(11, 2)
 SlabMesh = NodePath("SlabMesh")
 SlabCollision = NodePath("SlabCollision")
