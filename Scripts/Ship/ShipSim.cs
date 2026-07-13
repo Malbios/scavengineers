@@ -21,7 +21,9 @@ namespace Scavengineers.Scripts.Ship;
 /// </summary>
 public partial class ShipSim : Node
 {
-    private const int GridDepth = 6;
+    // Public so ShipBuildTarget.SeedDefaultShipLayout can size its own corridor-wall seeding off
+    // the same single source of truth instead of re-hardcoding it.
+    public const int GridDepth = 6;
 
     // Room 1 = i 0-5, Room 2 = i 6-11 by default (matches MidWallA/B at local x=3). Each split
     // column seals every row except DoorwayRows, which stays open as that boundary's doorway.
@@ -32,6 +34,16 @@ public partial class ShipSim : Node
 
     [Export]
     public int[] RoomSplitColumns { get; set; } = [6];
+
+    /// <summary>Extra 2-tile-wide (DoorwayRows-only) strip of cells attached to the west/east
+    /// boundary — real Deck.Cells, not a separate grid, so the same floor/wall/ceiling panel and
+    /// wall-removal systems apply to them automatically. 0 by default (opt-in); only the Home
+    /// Ship's airlock corridors use these today.</summary>
+    [Export]
+    public int WestCorridorLength { get; set; }
+
+    [Export]
+    public int EastCorridorLength { get; set; }
 
     private static readonly int[] DoorwayRows = [2, 3];
 
@@ -110,6 +122,22 @@ public partial class ShipSim : Node
             for (var j = 0; j < GridDepth; j++)
             {
                 Deck.AddCell(new CellCoord(i, j));
+            }
+        }
+
+        for (var i = 1; i <= WestCorridorLength; i++)
+        {
+            foreach (var j in DoorwayRows)
+            {
+                Deck.AddCell(new CellCoord(-i, j));
+            }
+        }
+
+        for (var i = 0; i < EastCorridorLength; i++)
+        {
+            foreach (var j in DoorwayRows)
+            {
+                Deck.AddCell(new CellCoord(GridWidth + i, j));
             }
         }
 

@@ -459,8 +459,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             return;
         }
 
-        const int gridWidth = 12;
-        const int gridDepth = 6;
+        var gridWidth = ShipSimRef.GridWidth;
+        var gridDepth = ShipSim.GridDepth;
 
         for (var i = 0; i < gridWidth; i++)
         {
@@ -471,12 +471,30 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         foreach (var j in Enumerable.Range(0, gridDepth).Where(row => !HomeShipDoorwayRows.Contains(row)))
         {
             SpawnWallSegment(new CellCoord(0, j), new CellCoord(-1, j));
-            SpawnWallSegment(new CellCoord(11, j), new CellCoord(12, j));
+            SpawnWallSegment(new CellCoord(gridWidth - 1, j), new CellCoord(gridWidth, j));
 
             var a = new CellCoord(5, j);
             var b = new CellCoord(6, j);
             ShipSimRef.Deck.SealEdge(a, b);
             SpawnWallSegment(a, b);
+        }
+
+        // Airlock corridors — a narrow (DoorwayRows-only) strip of real cells attached to the
+        // west/east boundary (see ShipSim.WestCorridorLength/EastCorridorLength). Only the long
+        // sides need walling: the inner junction already falls out of the boundary-wall loop
+        // above (rows 2/3 there were always left open for the doorway, and now lead into real
+        // corridor cells instead of nothing), and the outer tip needs no wall at all since the
+        // AirlockDoorVerbTarget's own frame already caps it, same as it did at the old boundary.
+        for (var i = -1; i >= -ShipSimRef.WestCorridorLength; i--)
+        {
+            SpawnWallSegment(new CellCoord(i, 2), new CellCoord(i, 1));
+            SpawnWallSegment(new CellCoord(i, 3), new CellCoord(i, 4));
+        }
+
+        for (var i = gridWidth; i < gridWidth + ShipSimRef.EastCorridorLength; i++)
+        {
+            SpawnWallSegment(new CellCoord(i, 2), new CellCoord(i, 1));
+            SpawnWallSegment(new CellCoord(i, 3), new CellCoord(i, 4));
         }
 
         // Battery/Switch/RechargeStation only exist on ships that opted into the machine-

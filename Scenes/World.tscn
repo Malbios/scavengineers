@@ -199,20 +199,8 @@ size = Vector3(0.5, 0.8, 0.4)
 [sub_resource type="BoxMesh" id="ComputerMesh"]
 size = Vector3(0.5, 0.8, 0.4)
 
-[sub_resource type="BoxShape3D" id="CorridorFloorShape"]
-size = Vector3(8, 0.2, 2)
-
-[sub_resource type="BoxMesh" id="CorridorFloorMesh"]
-size = Vector3(8, 0.2, 2)
-
-[sub_resource type="StandardMaterial3D" id="CorridorMaterial"]
-albedo_color = Color(0.5, 0.5, 0.55, 1)
-
-[sub_resource type="BoxShape3D" id="CorridorWallShape"]
-size = Vector3(8, 3, 0.2)
-
-[sub_resource type="BoxMesh" id="CorridorWallMesh"]
-size = Vector3(8, 3, 0.2)
+[sub_resource type="BoxShape3D" id="CorridorZoneShape"]
+size = Vector3(8.2, 3.2, 2.4)
 
 [sub_resource type="StandardMaterial3D" id="AirlockDoorMaterial"]
 albedo_color = Color(0.85, 0.75, 0.15, 1)
@@ -274,6 +262,8 @@ PlayerRef = NodePath("../Player")
 script = ExtResource("3")
 HasPowerGrid = true
 HasLifeSupport = true
+WestCorridorLength = 8
+EastCorridorLength = 8
 
 [node name="ShipZoneRoom1" type="Area3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.1, 1.5, 0)
@@ -294,6 +284,26 @@ BuildTargetRef = NodePath("../Floor")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/ShipZoneRoom2"]
 shape = SubResource("ShipZoneWideShape")
+
+[node name="ShipZoneCorridorWest" type="Area3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 1.5, 0)
+script = ExtResource("14")
+ShipSimRef = NodePath("../ShipSim")
+Tile = Vector2i(-4, 2)
+BuildTargetRef = NodePath("../Floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/ShipZoneCorridorWest"]
+shape = SubResource("CorridorZoneShape")
+
+[node name="ShipZoneCorridorEast" type="Area3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 1.5, 0)
+script = ExtResource("14")
+ShipSimRef = NodePath("../ShipSim")
+Tile = Vector2i(15, 2)
+BuildTargetRef = NodePath("../Floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/ShipZoneCorridorEast"]
+shape = SubResource("CorridorZoneShape")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="HomeShip" unique_id=1413109270]
 transform = Transform3D(0.866, -0.25, 0.433, 0, 0.866, 0.5, -0.5, -0.433, 0.75, 0, 4, 0)
@@ -839,55 +849,13 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
 mesh = SubResource("DoorSlabMesh")
 surface_material_override/0 = SubResource("AirlockDoorMaterial")
 
-[node name="DerelictCorridor" type="Node3D" parent="."]
-
-[node name="CorridorFloor" type="StaticBody3D" parent="DerelictCorridor" unique_id=1944015123]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, -0.1, 0)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="DerelictCorridor/CorridorFloor" unique_id=1701635675]
-shape = SubResource("CorridorFloorShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="DerelictCorridor/CorridorFloor" unique_id=1031324381]
-mesh = SubResource("CorridorFloorMesh")
-surface_material_override/0 = SubResource("CorridorMaterial")
-
-[node name="CorridorCeiling" type="StaticBody3D" parent="DerelictCorridor" unique_id=142820253]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 3.1, 0)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="DerelictCorridor/CorridorCeiling" unique_id=1075881568]
-shape = SubResource("CorridorFloorShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="DerelictCorridor/CorridorCeiling" unique_id=548443566]
-mesh = SubResource("CorridorFloorMesh")
-surface_material_override/0 = SubResource("CorridorMaterial")
-
-[node name="CorridorWallNorth" type="StaticBody3D" parent="DerelictCorridor" unique_id=1921653449]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 1.5, -1)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="DerelictCorridor/CorridorWallNorth" unique_id=805433364]
-shape = SubResource("CorridorWallShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="DerelictCorridor/CorridorWallNorth" unique_id=993190974]
-mesh = SubResource("CorridorWallMesh")
-surface_material_override/0 = SubResource("CorridorMaterial")
-
-[node name="CorridorWallSouth" type="StaticBody3D" parent="DerelictCorridor" unique_id=735587100]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 1.5, 1)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="DerelictCorridor/CorridorWallSouth" unique_id=1703533565]
-shape = SubResource("CorridorWallShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="DerelictCorridor/CorridorWallSouth" unique_id=1336500104]
-mesh = SubResource("CorridorWallMesh")
-surface_material_override/0 = SubResource("CorridorMaterial")
-
 [node name="DerelictAirlock" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipARef", "ShipBRef", "SlabMesh", "SlabCollision") groups=["saveable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 1.5, -0.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 1.5, -0.8)
 script = ExtResource("15")
 ShipARef = NodePath("../HomeShip/ShipSim")
 ShipBRef = NodePath("../Derelict/ShipSim")
 PowerFixtureId = "derelict_airlock_power"
-TileA = Vector2i(11, 2)
+TileA = Vector2i(19, 2)
 TileB = Vector2i(0, 2)
 SlabMesh = NodePath("SlabMesh")
 SlabCollision = NodePath("SlabCollision")
@@ -1015,55 +983,13 @@ shape = SubResource("ComputerShape")
 mesh = SubResource("ComputerMesh")
 surface_material_override/0 = SubResource("TradeConsoleMaterial")
 
-[node name="StationCorridor" type="Node3D" parent="."]
-
-[node name="StationCorridorFloor" type="StaticBody3D" parent="StationCorridor"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, -0.1, 0)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="StationCorridor/StationCorridorFloor"]
-shape = SubResource("CorridorFloorShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="StationCorridor/StationCorridorFloor"]
-mesh = SubResource("CorridorFloorMesh")
-surface_material_override/0 = SubResource("CorridorMaterial")
-
-[node name="StationCorridorCeiling" type="StaticBody3D" parent="StationCorridor"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 3.1, 0)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="StationCorridor/StationCorridorCeiling"]
-shape = SubResource("CorridorFloorShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="StationCorridor/StationCorridorCeiling"]
-mesh = SubResource("CorridorFloorMesh")
-surface_material_override/0 = SubResource("CorridorMaterial")
-
-[node name="StationCorridorWallNorth" type="StaticBody3D" parent="StationCorridor"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 1.5, -1)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="StationCorridor/StationCorridorWallNorth"]
-shape = SubResource("CorridorWallShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="StationCorridor/StationCorridorWallNorth"]
-mesh = SubResource("CorridorWallMesh")
-surface_material_override/0 = SubResource("CorridorMaterial")
-
-[node name="StationCorridorWallSouth" type="StaticBody3D" parent="StationCorridor"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 1.5, 1)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="StationCorridor/StationCorridorWallSouth"]
-shape = SubResource("CorridorWallShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="StationCorridor/StationCorridorWallSouth"]
-mesh = SubResource("CorridorWallMesh")
-surface_material_override/0 = SubResource("CorridorMaterial")
-
 [node name="StationAirlock" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipARef", "ShipBRef", "SlabMesh", "SlabCollision") groups=["saveable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 1.5, -0.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11, 1.5, -0.8)
 script = ExtResource("15")
 ShipARef = NodePath("../HomeShip/ShipSim")
 ShipBRef = NodePath("../Station/ShipSim")
 PowerFixtureId = "station_airlock_power"
-TileA = Vector2i(0, 2)
+TileA = Vector2i(-8, 2)
 TileB = Vector2i(11, 2)
 SlabMesh = NodePath("SlabMesh")
 SlabCollision = NodePath("SlabCollision")
