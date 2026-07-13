@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # Derelict hull fix: repair its 2 seeded breaches and confirm O2 actually recovers (Derelict + bridged Home Ship); remove/reinstall any other wall and confirm the visual actually toggles now
+$scene = "res://Scenes/World.tscn" # Station room now 4m tall, corridor stays 2m (check the step at the boundary); confirm smoke screen-darkening/O2 drain now actually triggers; check the pry-door verb text reads fine both directions
 
 & $godotExe --path $projectPath $scene
