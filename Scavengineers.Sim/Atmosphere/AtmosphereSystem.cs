@@ -21,6 +21,28 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
     private const double VentRatePerSecond = 5.0;
     private const double LifeSupportRegenRatePerSecond = 0.2;
 
+    // Placeholder/tunable — picked via a throwaway probe (a straight 16-cell corridor, breach
+    // cell 0 only, tick at a realistic 1/60 dt). At this rate, a cell 5 hops from the breach
+    // stays within ~2% of full Breathable O2 for the first ~1-2 seconds (the "moment of grace"
+    // this change exists for), then visibly drops; a cell 10 hops away stays essentially
+    // untouched for a couple of seconds before following. The whole corridor still converges to
+    // near-vacuum in ~50s (the far end, 15 hops out, reaches ~2% O2 by then) — comparable to
+    // BreachedHull_ApproachesVacuumAsTimeAccumulates's single-cell benchmark, not wildly slower.
+    // A lower rate (2.0) gave a longer, more dramatic grace period but left the far end of a
+    // large room stuck around 15%+ O2 even after 50s — too slow to ever feel like it resolves.
+    private const double DiffusionRatePerSecond = 12.0;
+
+    // Hard ceiling on the per-tick diffusion factor, independent of dt or DiffusionRatePerSecond.
+    // Diffuse is a simultaneous (Jacobi) neighbor-average step, and two mutually-adjacent cells
+    // updating from the same snapshot can "sign-flip" (sloshing back and forth) instead of
+    // smoothly converging once the factor exceeds 0.5 (for a 2-node pair, the imbalance decays by
+    // (1 - 2*factor) each tick — negative once factor > 0.5, meaning the two cells swap places
+    // instead of meeting in the middle). 0.25 leaves 2x headroom under that threshold and also
+    // protects against a large/spiking dt (a frame hitch) turning a modest rate into an
+    // oscillation-triggering factor for one unlucky frame. Vent/Regenerate don't need this cap —
+    // they're single-target Lerps toward a fixed constant, not pairwise-coupled.
+    private const double MaxDiffusionFactorPerTick = 0.25;
+
     private readonly Deck _deck;
     private readonly Dictionary<CellCoord, AtmosphereVolume> _volumes;
     private readonly bool _hasLifeSupport;
@@ -60,11 +82,22 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
             yield return AtmosphereNode.Outside;
         }
 
+        foreach (var neighbor in UnsealedCellNeighbors(cell))
+        {
+            yield return new AtmosphereNode(neighbor);
+        }
+    }
+
+    /// <summary>The shared "what counts as a connected cell" check — used both by <see
+    /// cref="Neighbors"/> (so the connectivity graph and <see cref="Diffuse"/> can never disagree
+    /// about adjacency) and by Diffuse itself.</summary>
+    private IEnumerable<CellCoord> UnsealedCellNeighbors(CellCoord cell)
+    {
         foreach (var neighbor in AdjacentCells(cell))
         {
             if (_deck.Cells.Contains(neighbor) && !_deck.IsEdgeSealed(cell, neighbor))
             {
-                yield return new AtmosphereNode(neighbor);
+                yield return neighbor;
             }
         }
     }
@@ -93,9 +126,11 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
 
     /// <summary>
     /// Every cell currently connected to <paramref name="cell"/> (through unsealed edges, not
-    /// vented to Outside) — the hook <see cref="AirlockBridge"/> uses to bridge two ships'
-    /// *entire* currently-connected volumes rather than just one named tile each, since a real
-    /// airlock joins two whole rooms, not two points.
+    /// vented to Outside) — the hook <see cref="Scavengineers.Scripts.Player.Player"/> uses for
+    /// its own smoke-detection check ("is there a fire anywhere in my current room"). Airlock
+    /// bridging no longer needs this: since atmosphere spreads by per-cell diffusion now, an
+    /// airlock only exchanges its own two named cells directly (see <see cref="AirlockBridge"/>),
+    /// letting each side's own <see cref="Diffuse"/> carry the effect further on subsequent ticks.
     /// </summary>
     public IReadOnlySet<CellCoord> ComponentContaining(CellCoord cell)
     {
@@ -112,8 +147,10 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
     }
 
     /// <summary>
-    /// Advances the sim by <paramref name="dt"/> seconds: equalizes each sealed component's
-    /// scalars across its cells, then vents any component connected to the outside toward vacuum.
+    /// Advances the sim by <paramref name="dt"/> seconds: diffuses each connected component's
+    /// scalars toward each cell's own neighbors (not an instant whole-component average), then
+    /// vents any directly-breached cell in a component connected to the outside toward vacuum,
+    /// or regenerates a fully-sealed component with life support toward breathable.
     /// </summary>
     public void Tick(double dt)
     {
@@ -125,11 +162,11 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
                 continue;
             }
 
-            Equalize(cells);
+            Diffuse(cells, dt);
 
             if (component.Contains(AtmosphereNode.Outside))
             {
-                Vent(cells, dt);
+                Vent(cells.Where(_deck.IsHullBreached).ToList(), dt);
             }
             else if (_hasLifeSupport)
             {
@@ -138,33 +175,62 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
         }
     }
 
-    private void Equalize(IReadOnlyList<CellCoord> cells)
+    /// <summary>Each cell moves toward the average of its own unsealed neighbors' *previous*-tick
+    /// values (a simultaneous/"Jacobi" step, not a sequential one — see the snapshot below) —
+    /// replaces the old instant whole-component average so distance/hop-count now genuinely
+    /// matters: a cell several hops from a breach only feels the effect once it's propagated
+    /// neighbor-by-neighbor, rather than every cell in a room updating in lockstep the same
+    /// tick. Runs unconditionally for every multi-cell component (breached or not) — two sealed
+    /// rooms joined by an open door still gradually mix toward each other, just now over several
+    /// ticks instead of instantly.</summary>
+    private void Diffuse(IReadOnlyList<CellCoord> cells, double dt)
     {
         if (cells.Count < 2)
         {
             return;
         }
 
-        var averagePressure = cells.Average(c => _volumes[c].Pressure);
-        var averageO2 = cells.Average(c => _volumes[c].O2Fraction);
-        var averageTemperature = cells.Average(c => _volumes[c].Temperature);
+        var factor = Math.Min(DiffusionRatePerSecond * dt, MaxDiffusionFactorPerTick);
+        if (factor <= 0)
+        {
+            return;
+        }
+
+        var snapshot = cells.ToDictionary(c => c, c => _volumes[c]);
+        var updated = new Dictionary<CellCoord, AtmosphereVolume>(snapshot.Count);
 
         foreach (var cell in cells)
         {
-            _volumes[cell] = _volumes[cell] with
+            var neighborValues = UnsealedCellNeighbors(cell).Select(n => snapshot[n]).ToList();
+            if (neighborValues.Count == 0)
             {
-                Pressure = averagePressure,
-                O2Fraction = averageO2,
-                Temperature = averageTemperature,
+                continue;
+            }
+
+            var current = snapshot[cell];
+            updated[cell] = current with
+            {
+                Pressure = Lerp(current.Pressure, neighborValues.Average(v => v.Pressure), factor),
+                O2Fraction = Lerp(current.O2Fraction, neighborValues.Average(v => v.O2Fraction), factor),
+                Temperature = Lerp(current.Temperature, neighborValues.Average(v => v.Temperature), factor),
             };
+        }
+
+        foreach (var (cell, volume) in updated)
+        {
+            _volumes[cell] = volume;
         }
     }
 
-    private void Vent(IReadOnlyList<CellCoord> cells, double dt)
+    /// <summary>Vents only the cell(s) directly exposed to a hull breach — everywhere else in the
+    /// component only feels this via <see cref="Diffuse"/> carrying the drop outward tick by
+    /// tick, which is what creates the "a few cells away keeps some air for a moment"
+    /// distance-based delay.</summary>
+    private void Vent(IReadOnlyList<CellCoord> breachedCells, double dt)
     {
         var factor = Math.Clamp(VentRatePerSecond * dt, 0, 1);
 
-        foreach (var cell in cells)
+        foreach (var cell in breachedCells)
         {
             var current = _volumes[cell];
             _volumes[cell] = current with

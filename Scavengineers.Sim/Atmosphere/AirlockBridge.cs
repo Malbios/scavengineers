@@ -5,15 +5,13 @@ namespace Scavengineers.Sim.Atmosphere;
 /// <summary>
 /// Links two otherwise-independent <see cref="AtmosphereSystem"/>s (e.g. two docked ships) —
 /// deliberately a bolt-on, not a merge of the two ships' connectivity graphs — see
-/// docs/architecture/atmosphere-power-sim.md. Reuses the same lumped-scalar equalization idea
-/// <see cref="AtmosphereSystem"/> already applies within a single deck, just gradually (via a
-/// rate) instead of instantly, since the two sides are only linked through an airlock.
+/// docs/architecture/atmosphere-power-sim.md.
 ///
-/// Averages each side's *entire currently-connected volume* (via
-/// <see cref="AtmosphereSystem.ComponentContaining"/>), not just the two named cells — a real
-/// airlock joins two whole rooms, not two points, and with either ship now a multi-cell grid,
-/// nudging one cell alone gets diluted away by that ship's own internal equalize before it
-/// could ever show up.
+/// Exchanges only the two named cells directly — the airlock is just one more diffusion-style
+/// edge, a single hop linking two otherwise-independent graphs. Each side's own
+/// <see cref="AtmosphereSystem"/> internal per-cell diffusion carries the effect further into
+/// that ship on subsequent ticks, the same way it would for a breach opening at that cell —
+/// no need to pool/average each side's entire connected component the way this used to.
 /// </summary>
 public sealed class AirlockBridge(AtmosphereSystem systemA, CellCoord cellA, AtmosphereSystem systemB, CellCoord cellB)
 {
@@ -34,40 +32,28 @@ public sealed class AirlockBridge(AtmosphereSystem systemA, CellCoord cellA, Atm
             return;
         }
 
-        var cellsA = systemA.ComponentContaining(cellA);
-        var cellsB = systemB.ComponentContaining(cellB);
+        var volumeA = systemA.VolumeAt(cellA);
+        var volumeB = systemB.VolumeAt(cellB);
 
-        var volumesA = cellsA.Select(systemA.VolumeAt).ToList();
-        var volumesB = cellsB.Select(systemB.VolumeAt).ToList();
-        var allVolumes = volumesA.Concat(volumesB).ToList();
-
-        var averagePressure = allVolumes.Average(v => v.Pressure);
-        var averageO2 = allVolumes.Average(v => v.O2Fraction);
-        var averageTemperature = allVolumes.Average(v => v.Temperature);
+        var averagePressure = (volumeA.Pressure + volumeB.Pressure) / 2;
+        var averageO2 = (volumeA.O2Fraction + volumeB.O2Fraction) / 2;
+        var averageTemperature = (volumeA.Temperature + volumeB.Temperature) / 2;
 
         var factor = Math.Clamp(EqualizeRatePerSecond * dt, 0, 1);
 
-        foreach (var cell in cellsA)
+        systemA.ApplyExternalVolume(cellA, volumeA with
         {
-            var current = systemA.VolumeAt(cell);
-            systemA.ApplyExternalVolume(cell, current with
-            {
-                Pressure = Lerp(current.Pressure, averagePressure, factor),
-                O2Fraction = Lerp(current.O2Fraction, averageO2, factor),
-                Temperature = Lerp(current.Temperature, averageTemperature, factor),
-            });
-        }
+            Pressure = Lerp(volumeA.Pressure, averagePressure, factor),
+            O2Fraction = Lerp(volumeA.O2Fraction, averageO2, factor),
+            Temperature = Lerp(volumeA.Temperature, averageTemperature, factor),
+        });
 
-        foreach (var cell in cellsB)
+        systemB.ApplyExternalVolume(cellB, volumeB with
         {
-            var current = systemB.VolumeAt(cell);
-            systemB.ApplyExternalVolume(cell, current with
-            {
-                Pressure = Lerp(current.Pressure, averagePressure, factor),
-                O2Fraction = Lerp(current.O2Fraction, averageO2, factor),
-                Temperature = Lerp(current.Temperature, averageTemperature, factor),
-            });
-        }
+            Pressure = Lerp(volumeB.Pressure, averagePressure, factor),
+            O2Fraction = Lerp(volumeB.O2Fraction, averageO2, factor),
+            Temperature = Lerp(volumeB.Temperature, averageTemperature, factor),
+        });
     }
 
     private static double Lerp(double from, double to, double factor) => from + (to - from) * factor;

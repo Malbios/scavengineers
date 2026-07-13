@@ -71,11 +71,12 @@ public class AirlockBridgeTests
     }
 
     [Fact]
-    public void Open_AffectsTheWholeConnectedRoomNotJustTheNamedTile()
+    public void Open_OnlyDirectlyExchangesTheDoorwayCell_FarCellsLagBehindAndCatchUpLater()
     {
-        // Regression: a multi-cell ship's own Equalize used to dilute the bridge's effect on a
-        // single named tile almost to nothing. The bridge must move the *whole* connected
-        // volume together with the ship's own Tick, not fight it.
+        // The bridge now only exchanges the two named cells directly (see AirlockBridge's own
+        // doc comment) — a far cell only feels the effect via the home ship's own internal
+        // per-cell diffusion carrying it inward, hop by hop. This is the intended replacement for
+        // the old "whole connected room moves in lockstep" behavior, not a regression of it.
         var doorwayCell = new CellCoord(0, 0);
         var homeDeck = new Deck();
         for (var i = 0; i < 10; i++)
@@ -88,19 +89,31 @@ public class AirlockBridgeTests
         derelict.Tick(50); // derelict is now near-vacuum, isolated
 
         var bridge = new AirlockBridge(home, doorwayCell, derelict, derelictCell) { IsOpen = true };
+        var farCell = new CellCoord(9, 0); // 9 hops from the doorway
 
         for (var i = 0; i < 20; i++)
         {
-            home.Tick(1); // the ship's own internal equalize, every tick, same as ShipSim
+            home.Tick(1); // the ship's own internal diffusion, every tick, same as ShipSim
+            derelict.Tick(1); // derelict keeps venting to outside independently, same as ShipSim
             bridge.Tick(1);
         }
 
-        // Every cell in the home ship's connected volume should have dropped noticeably —
-        // not just the doorway tile, and not by the old bug's diluted fraction of a percent
-        // (10 home cells outnumber 1 derelict cell, so full equilibrium settles well above
-        // the derelict's own near-vacuum level — the point is "noticeable", not "equal").
-        var farCell = new CellCoord(9, 0);
-        Assert.True(home.VolumeAt(farCell).Pressure < AtmosphereVolume.Breathable.Pressure * 0.95);
+        // Shortly after opening, the doorway cell has dropped notably but the far cell has
+        // barely moved — this is the "keeps some air for a moment" behavior replacing the old
+        // "whole room reacts almost as fast as the doorway" bug.
+        Assert.True(home.VolumeAt(doorwayCell).Pressure < AtmosphereVolume.Breathable.Pressure * 0.5);
+        Assert.True(home.VolumeAt(farCell).Pressure > AtmosphereVolume.Breathable.Pressure * 0.9);
+
+        // Given enough total real time, diffusion eventually carries the effect the whole way
+        // down the corridor — the far cell isn't permanently immune, just delayed.
+        for (var i = 0; i < 500; i++)
+        {
+            derelict.Tick(1);
+            home.Tick(1);
+            bridge.Tick(1);
+        }
+
+        Assert.True(home.VolumeAt(farCell).Pressure < AtmosphereVolume.Breathable.Pressure * 0.5);
     }
 
     [Fact]
@@ -138,6 +151,12 @@ public class AirlockBridgeTests
         // wouldn't cost air), but that undersold the danger of opening an airlock into a breached
         // room at all. The bridge's rate matches AtmosphereSystem's own vent rate, so the home
         // room's connected air drains just as fast as the breach itself.
+        //
+        // Threshold re-verified after the diffusion redesign: the bridge now only exchanges the
+        // doorway cell directly (not the whole averaged room), and that cell's own neighbor keeps
+        // diffusing a little air back into it each tick, so it settles just above the old 0.1
+        // cutoff (~0.10 vs comfortably under before) rather than exactly matching the pre-redesign
+        // number — still more than halved from Breathable within 3 seconds, still clearly rapid.
         var doorwayCell = new CellCoord(0, 0);
         var homeDeck = new Deck();
         for (var i = 0; i < 5; i++)
@@ -160,7 +179,7 @@ public class AirlockBridgeTests
         }
 
         Assert.True(
-            home.VolumeAt(doorwayCell).O2Fraction < 0.1,
+            home.VolumeAt(doorwayCell).O2Fraction < 0.12,
             $"a few seconds with the airlock open should rapidly drain the home room too, was {home.VolumeAt(doorwayCell).O2Fraction}");
     }
 

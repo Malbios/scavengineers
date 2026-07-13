@@ -73,7 +73,7 @@ public class AtmosphereSystemTests
     }
 
     [Fact]
-    public void TwoSealedRoomsJoinedByOpenDoor_EqualizeTowardSharedValue()
+    public void TwoRoomsJoinedByOpenDoor_GraduallyConvergeOverManyTicks()
     {
         var roomA = new CellCoord(0, 0);
         var roomB = new CellCoord(1, 0);
@@ -87,12 +87,24 @@ public class AtmosphereSystemTests
         system.Tick(1); // room B now has lower pressure than room A
         deck.RepairHull(roomB);
 
-        Assert.True(system.VolumeAt(roomB).Pressure < system.VolumeAt(roomA).Pressure);
+        var pressureBBeforeOpen = system.VolumeAt(roomB).Pressure;
+        Assert.True(pressureBBeforeOpen < system.VolumeAt(roomA).Pressure);
 
         deck.UnsealEdge(roomA, roomB);
-        system.Tick(0); // dt = 0: equalize only, no additional venting
 
-        Assert.Equal(system.VolumeAt(roomA).Pressure, system.VolumeAt(roomB).Pressure, precision: 6);
+        // A single realistic-frame-dt tick nudges the two cells toward each other, not equal —
+        // instant whole-component equalization is exactly what per-cell diffusion replaces.
+        system.Tick(1.0 / 60.0);
+        Assert.True(system.VolumeAt(roomB).Pressure > pressureBBeforeOpen);
+        Assert.NotEqual(system.VolumeAt(roomA).Pressure, system.VolumeAt(roomB).Pressure);
+
+        // Given enough real time, two directly-adjacent, unsealed cells fully converge.
+        for (var i = 0; i < 300; i++)
+        {
+            system.Tick(1.0 / 60.0);
+        }
+
+        Assert.Equal(system.VolumeAt(roomA).Pressure, system.VolumeAt(roomB).Pressure, precision: 1);
     }
 
     [Fact]
@@ -161,9 +173,12 @@ public class AtmosphereSystemTests
         deck.BreachWallEdge(extended, new CellCoord(2, 0));
         system.AddCell(extended);
 
-        system.Tick(1);
+        system.Tick(1); // must not throw KeyNotFoundException for the freshly-extended cell
 
-        Assert.Equal(system.VolumeAt(origin).Pressure, system.VolumeAt(extended).Pressure, precision: 6);
+        // extended is directly breached, origin isn't — under diffusion they no longer move in
+        // lockstep, so extended drops further/faster than origin, not equal to it.
+        Assert.True(system.VolumeAt(extended).Pressure < system.VolumeAt(origin).Pressure);
+        Assert.Equal(AtmosphereVolume.Breathable.Pressure, system.VolumeAt(origin).Pressure);
     }
 
     [Fact]
@@ -204,5 +219,44 @@ public class AtmosphereSystemTests
         Assert.Equal(AtmosphereVolume.Breathable.Pressure, system.VolumeAt(roomA1).Pressure);
         Assert.Equal(AtmosphereVolume.Breathable.Pressure, system.VolumeAt(roomA2).Pressure);
         Assert.True(system.VolumeAt(roomB1).Pressure < 0.1);
+    }
+
+    [Fact]
+    public void BreachedCorridor_FarCellRetainsMoreO2ThanNearCellBeforeEventuallyConverging()
+    {
+        var deck = new Deck();
+        const int corridorLength = 16;
+        for (var i = 0; i < corridorLength; i++)
+        {
+            deck.AddCell(new CellCoord(i, 0));
+        }
+
+        var breachCell = new CellCoord(0, 0);
+        var nearCell = new CellCoord(1, 0); // 1 hop from the breach
+        var farCell = new CellCoord(10, 0); // 10 hops from the breach
+        deck.BreachHull(breachCell);
+        var system = new AtmosphereSystem(deck);
+
+        const double frameDt = 1.0 / 60.0;
+        for (var i = 0; i < 120; i++) // 2 seconds
+        {
+            system.Tick(frameDt);
+        }
+
+        // A couple of seconds in: the breach cell itself is well depleted, a near cell has
+        // started following, but a cell 10 hops away has barely moved — exactly the "keeps some
+        // air for a moment" behavior instant whole-component equalize couldn't express.
+        Assert.True(system.VolumeAt(breachCell).O2Fraction < system.VolumeAt(nearCell).O2Fraction);
+        Assert.True(system.VolumeAt(nearCell).O2Fraction < system.VolumeAt(farCell).O2Fraction);
+        Assert.True(system.VolumeAt(farCell).O2Fraction > AtmosphereVolume.Breathable.O2Fraction * 0.8);
+
+        for (var i = 0; i < 2880; i++) // 48 more seconds (50s total)
+        {
+            system.Tick(frameDt);
+        }
+
+        // Given enough total time, the whole corridor converges near vacuum — the delay is a
+        // lag, not a permanent immunity.
+        Assert.True(system.VolumeAt(farCell).O2Fraction < 0.05);
     }
 }

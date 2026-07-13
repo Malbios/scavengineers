@@ -24,9 +24,13 @@ public partial class ShipAtmosphereZone : Area3D
     [Export]
     public ShipSim? ShipSimRef { get; set; }
 
-    /// <summary>Any tile within this zone's room — atmosphere is lumped uniformly across a
-    /// connected component, so the exact tile only matters once the room is sealed off from
-    /// the rest of the ship.</summary>
+    /// <summary>Any tile within this zone's room — used as a fallback representative reading
+    /// (e.g. for the loose-pickup freeze check, and for the real physics gravity override below,
+    /// which is inherently zone-wide since Godot's Area3D gravity override can't vary per body
+    /// position). The player's own O2/zero-g reading no longer uses this: since atmosphere now
+    /// diffuses per-cell rather than equalizing a whole room instantly, different tiles in the
+    /// same room can genuinely disagree near a fresh breach, so the player reads its own actual
+    /// current tile instead — see <see cref="TileAt"/>.</summary>
     [Export]
     public Vector2I Tile { get; set; }
 
@@ -80,6 +84,19 @@ public partial class ShipAtmosphereZone : Area3D
         }
 
         return null;
+    }
+
+    /// <summary>Converts a world position into this zone's ship's own grid tile coordinate — the
+    /// same local-space "+3, floor" convention ShipBuildTarget's own aim-point conversion uses.
+    /// This zone's own parent is always that ship's spatial root (HomeShip/Derelict/Station),
+    /// matching ShipBuildTarget's own "ShipRoot ?? GetParent&lt;Node3D&gt;()" fallback. Lets the
+    /// player read its own actual current cell instead of this zone's fixed representative
+    /// <see cref="Tile"/>, now that per-cell diffusion means different cells in the same room can
+    /// genuinely disagree for a while near a fresh breach.</summary>
+    public Vector2I TileAt(Vector3 worldPosition)
+    {
+        var local = GetParent<Node3D>().ToLocal(worldPosition);
+        return new Vector2I(Mathf.FloorToInt(local.X + 3), Mathf.FloorToInt(local.Z + 3));
     }
 
     /// <summary>Called from a loose pickup's own _PhysicsProcess to freeze/unfreeze itself based

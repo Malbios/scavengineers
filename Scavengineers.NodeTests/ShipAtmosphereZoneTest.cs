@@ -130,4 +130,28 @@ public class ShipAtmosphereZoneTest
         AssertBool(ReferenceEquals(deepInA, zoneA)).IsTrue();
         AssertBool(ReferenceEquals(deepInB, zoneB)).IsTrue();
     }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TileAt_ConvertsWorldPositionToTileUsingTheParentShipRootsLocalSpace()
+    {
+        // A zone's parent is always its ship's spatial root (HomeShip/Derelict/Station) — here
+        // offset from world origin, matching how a real ship (e.g. the Derelict) sits at a
+        // non-zero world transform. TileAt must convert relative to that root, not world space
+        // directly.
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var shipRoot = AutoFree(new Node3D { Transform = new Transform3D(Basis.Identity, new Vector3(16, 0, 0)) });
+        sceneTree.Root.AddChild(shipRoot);
+
+        var zone = AutoFree(new ShipAtmosphereZone());
+        shipRoot.AddChild(zone);
+
+        // Same "+3, floor" local-space convention as ShipBuildTarget's own aim-point conversion:
+        // local grid-space X=9.5 -> tile 12, local Z=2.5 -> tile 5.
+        var worldPoint = shipRoot.ToGlobal(new Vector3(9.5f, 0, 2.5f));
+
+        var tile = zone.TileAt(worldPoint);
+
+        AssertBool(tile == new Vector2I(12, 5)).IsTrue();
+    }
 }

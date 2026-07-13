@@ -82,13 +82,18 @@ public partial class Player : CharacterBody3D
     /// ambient O2 reading stuck on a stale ship/room (permanently wrong if that ship never
     /// regenerates air). A live query can't go stale: if no zone is found (e.g. a true gap
     /// between two rooms), the previous reading is deliberately left alone rather than cleared,
-    /// same "hold the last room's reading" behavior as before.</summary>
+    /// same "hold the last room's reading" behavior as before.
+    ///
+    /// Reads the zone's TileAt(GlobalPosition) — the player's own actual current cell — rather
+    /// than the zone's fixed representative Tile: atmosphere now diffuses per-cell instead of
+    /// equalizing a whole room instantly, so a cell right next to a fresh breach can genuinely
+    /// read very differently from one across the same room.</summary>
     private void UpdateAmbientShipSim()
     {
         if (ShipAtmosphereZone.FindZoneAt(GetWorld3D(), GlobalPosition) is { } zone)
         {
             ShipSimRef = zone.ShipSimRef;
-            _ambientTile = zone.Tile;
+            _ambientTile = zone.TileAt(GlobalPosition);
             _ambientBuildTarget = zone.BuildTargetRef;
         }
     }

@@ -4,7 +4,7 @@ Full detail: `docs/project-plan.md` §5 "Architectural notes", Appendix A6-A7, �
 
 ## Settled
 
-- **Atmosphere = lumped per-volume scalars, never per-tile CFD.** Each sealed volume holds pressure/O₂ fraction/temperature; breaches equalize between volumes or to vacuum at a rate. This ceiling is deliberate — do not let it "improve" into a fluid sim.
+- **Atmosphere = lumped per-cell scalars with neighbor-to-neighbor diffusion, never per-tile CFD.** Each cell holds its own pressure/O₂ fraction/temperature; a breach vents only the directly-exposed cell toward vacuum, and diffusion (each cell moving toward the average of its own unsealed neighbors, one hop per tick) carries that effect outward — this is what makes distance/graph-hop-count matter (a cell several hops from a breach keeps some air for a moment) without simulating velocity, momentum, or advection. This ceiling is still deliberate — do not let it "improve" into real fluid dynamics.
 - **The one-solver trick (A6):** atmosphere, power, data/signal (later), and room-detection all reduce to the *same* connectivity engine reading the ship's structural tier:
 
   | System | "Network" is… | Flow blocked by… |
