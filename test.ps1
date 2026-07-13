@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # Extend Floor: ghost preview shows a floor panel at the new tile; extending gives only a floor (no ceiling) until you separately Install Ceiling
+$scene = "res://Scenes/World.tscn" # Extend Floor: extend a tile and wait a few seconds without crashing (atmosphere tick used to throw on the new cell)
 
 & $godotExe --path $projectPath $scene
