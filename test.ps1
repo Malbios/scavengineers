@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # Confirm Station now has its own distinct cool blue-grey floor/wall/ceiling textures, not Home Ship's
+$scene = "res://Scenes/World.tscn" # Confirm Station's bold teal textures now read as clearly distinct from Home Ship (grey) and Derelict (brown)
 
 & $godotExe --path $projectPath $scene
