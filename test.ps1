@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # Cut power, pry an airlock/interior door open, confirm it now offers Pry again to force it shut
+$scene = "res://Scenes/World.tscn" # /cq fixes: check decompression pull works in all 3 Derelict rooms, not just its corridor
 
 & $godotExe --path $projectPath $scene
