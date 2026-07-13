@@ -1610,6 +1610,33 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         return (ShipRoot ?? GetParent<Node3D>()).ToGlobal(shipLocal);
     }
 
+    /// <summary>World positions of every currently-open floor/ceiling breach on this ship — the
+    /// decompression-pull hazard's own read of Deck.HullBreaches, reusing the exact same
+    /// TileWorldPosition/panel-height math GenerateFloorCeilingPanels already uses so a pull
+    /// target always lines up with the actual hole, not a re-derived approximation.</summary>
+    public IEnumerable<Vector3> ActiveBreachPositions()
+    {
+        if (ShipSimRef is null)
+        {
+            yield break;
+        }
+
+        foreach (var cell in ShipSimRef.Deck.HullBreaches)
+        {
+            var tile = new Vector2I(cell.X, cell.Y);
+
+            if (ShipSimRef.Deck.IsHullBreached(cell, StructuralSurface.Floor))
+            {
+                yield return TileWorldPosition(tile, FloorPanelHeight);
+            }
+
+            if (ShipSimRef.Deck.IsHullBreached(cell, StructuralSurface.Ceiling))
+            {
+                yield return TileWorldPosition(tile, CeilingPanelHeight);
+            }
+        }
+    }
+
     private static string ConduitFixtureId(ConduitSlot slot) => slot.WallNeighbor is { } neighbor
         ? $"player_conduit_{slot.Tile.X}_{slot.Tile.Y}_wall_{neighbor.X}_{neighbor.Y}_slot{slot.WallSlot}"
         : $"player_conduit_{slot.Tile.X}_{slot.Tile.Y}_floor";

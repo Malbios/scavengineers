@@ -1,4 +1,5 @@
 using Godot;
+using Scavengineers.Scripts.Verbs;
 using PlayerScript = Scavengineers.Scripts.Player.Player;
 
 namespace Scavengineers.Scripts.Ship;
@@ -22,6 +23,13 @@ public partial class ShipAtmosphereZone : Area3D
     [Export]
     public Vector2I Tile { get; set; }
 
+    /// <summary>The ship's floor/ceiling breach-tracking ShipBuildTarget, if this ship has one
+    /// (currently just the Home Ship — see ShipBuildTarget.ActiveBreachPositions) — the
+    /// decompression-pull hazard's own read of "is there an open hole nearby." Left unset on
+    /// ships without floor/ceiling construction; Player treats a null reference as "no pull."</summary>
+    [Export]
+    public ShipBuildTarget? BuildTargetRef { get; set; }
+
     public override void _Ready()
     {
         BodyEntered += OnBodyEntered;
@@ -34,7 +42,7 @@ public partial class ShipAtmosphereZone : Area3D
     {
         if (body is PlayerScript player)
         {
-            player.SetAmbientShipSim(ShipSimRef, Tile);
+            player.SetAmbientShipSim(ShipSimRef, Tile, BuildTargetRef);
         }
     }
 }

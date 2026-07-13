@@ -278,20 +278,22 @@ script = ExtResource("3")
 HasPowerGrid = true
 HasLifeSupport = true
 
-[node name="ShipZoneRoom1" type="Area3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef")]
+[node name="ShipZoneRoom1" type="Area3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.1, 1.5, 0)
 script = ExtResource("14")
 ShipSimRef = NodePath("../ShipSim")
 Tile = Vector2i(2, 2)
+BuildTargetRef = NodePath("../Floor")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/ShipZoneRoom1"]
 shape = SubResource("ShipZoneNarrowShape")
 
-[node name="ShipZoneRoom2" type="Area3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef")]
+[node name="ShipZoneRoom2" type="Area3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1.5, 0)
 script = ExtResource("14")
 ShipSimRef = NodePath("../ShipSim")
 Tile = Vector2i(8, 2)
+BuildTargetRef = NodePath("../Floor")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/ShipZoneRoom2"]
 shape = SubResource("ShipZoneWideShape")

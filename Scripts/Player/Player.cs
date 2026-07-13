@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 using Godot;
+using Scavengineers.Sim.Atmosphere;
 using Scavengineers.Sim.Grid;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
@@ -33,6 +34,13 @@ public partial class Player : CharacterBody3D
     // jetpack yet, so control only comes from pushing off something within reach.
     private const float ZeroGControlRadius = 1.2f;
 
+    // Decompression pull (placeholder/tunable) — an open floor/ceiling breach's own "unsecured
+    // near a hole" hazard, on top of (not instead of) the slow O2/pressure drain. Pulls toward
+    // the breach's own position rather than a fixed direction, so it settles near the hole
+    // instead of launching you straight through it — ZeroGDrag keeps fighting it the whole time.
+    private const float DecompressionPullRange = 5f;
+    private const float DecompressionPullAcceleration = 4f;
+
     // Placeholder/tunable — comfortably more than any current room's floor-to-ceiling height
     // (3m), so a normal room can never trip this; revisit once multi-deck verticality exists.
     private const float FreefallRaycastDistance = 15f;
@@ -46,10 +54,16 @@ public partial class Player : CharacterBody3D
 
     private Vector2I _ambientTile;
 
-    public void SetAmbientShipSim(ShipSim? shipSim, Vector2I tile)
+    /// <summary>The current room's floor/ceiling breach tracker, if it has one — null on ships
+    /// without floor/ceiling construction (see ShipAtmosphereZone.BuildTargetRef). Drives the
+    /// decompression-pull hazard in the zero-g branch of _PhysicsProcess.</summary>
+    private ShipBuildTarget? _ambientBuildTarget;
+
+    public void SetAmbientShipSim(ShipSim? shipSim, Vector2I tile, ShipBuildTarget? buildTarget = null)
     {
         ShipSimRef = shipSim;
         _ambientTile = tile;
+        _ambientBuildTarget = buildTarget;
     }
 
     private Node3D? _head;
@@ -558,6 +572,24 @@ public partial class Player : CharacterBody3D
             else
             {
                 velocity = Vector3.Zero;
+            }
+
+            // Not gated on IsNearSurface/IsBusy like thrust above — decompression isn't
+            // something you opt into, it applies to anyone unsecured near an open breach.
+            if (_ambientBuildTarget is not null)
+            {
+                var pullStrength = Mathf.Clamp((float)((roomVolume?.Pressure ?? 0) / AtmosphereVolume.Breathable.Pressure), 0f, 1f);
+                foreach (var breachPosition in _ambientBuildTarget.ActiveBreachPositions())
+                {
+                    var toBreach = breachPosition - GlobalPosition;
+                    var distance = toBreach.Length();
+                    if (distance > DecompressionPullRange || distance < 0.01f)
+                    {
+                        continue;
+                    }
+
+                    velocity += toBreach.Normalized() * DecompressionPullAcceleration * pullStrength * (float)delta;
+                }
             }
 
             if (velocity.Length() > ZeroGMaxSpeed)
