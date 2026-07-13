@@ -72,6 +72,7 @@ public class SaveDataSerializationTests
         data.CeilingBreaches.Add(new TileCoord(6, 5));
         data.Machines.Add(new MachineCoord("battery", 4, 0, 4, -1, "0.75"));
         data.Machines.Add(new MachineCoord("recharge_station", 9, 0, 9, -1, null));
+        data.ExtendedCells.Add(new TileCoord(7, 2));
 
         var roundTripped = JsonSerializer.Deserialize<BuildTargetSaveData>(JsonSerializer.Serialize(data));
 
@@ -82,5 +83,6 @@ public class SaveDataSerializationTests
         Assert.Equal(2, roundTripped.Machines.Count);
         Assert.Equal("0.75", roundTripped.Machines[0].State);
         Assert.Null(roundTripped.Machines[1].State);
+        Assert.Equal(new TileCoord(7, 2), roundTripped.ExtendedCells[0]);
     }
 }

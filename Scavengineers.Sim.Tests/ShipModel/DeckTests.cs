@@ -68,6 +68,56 @@ public class DeckTests
     }
 
     [Fact]
+    public void BreachAndRepairWallEdge_IsSymmetric_RegardlessOfArgumentOrder()
+    {
+        var deck = new Deck();
+        var a = new CellCoord(0, 0);
+        var b = new CellCoord(-1, 0);
+
+        deck.BreachWallEdge(a, b);
+
+        Assert.True(deck.IsWallEdgeBreached(a, b));
+        Assert.True(deck.IsWallEdgeBreached(b, a));
+        Assert.Contains(a, deck.HullBreaches);
+
+        deck.RepairWallEdge(a, b);
+        Assert.False(deck.IsWallEdgeBreached(a, b));
+    }
+
+    [Fact]
+    public void RepairingOneOpenEdge_LeavesAnotherOpenEdgeOnTheSameCellStillBreached()
+    {
+        var deck = new Deck();
+        var cell = new CellCoord(0, 0);
+        var north = new CellCoord(0, -1);
+        var south = new CellCoord(0, 1);
+
+        deck.BreachWallEdge(cell, north);
+        deck.BreachWallEdge(cell, south);
+
+        deck.RepairWallEdge(cell, north);
+
+        Assert.False(deck.IsWallEdgeBreached(cell, north));
+        Assert.True(deck.IsWallEdgeBreached(cell, south));
+        Assert.True(deck.IsHullBreached(cell));
+
+        deck.RepairWallEdge(cell, south);
+        Assert.False(deck.IsHullBreached(cell));
+    }
+
+    [Fact]
+    public void RemoveCell_DropsItFromCells()
+    {
+        var deck = new Deck();
+        var cell = new CellCoord(0, 0);
+        deck.AddCell(cell);
+
+        deck.RemoveCell(cell);
+
+        Assert.DoesNotContain(cell, deck.Cells);
+    }
+
+    [Fact]
     public void AddFixture_IsRetrievableFromFixturesList()
     {
         var deck = new Deck();

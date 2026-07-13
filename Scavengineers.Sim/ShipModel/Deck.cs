@@ -24,6 +24,7 @@ public sealed class Deck
     private readonly HashSet<CellCoord> _cells = [];
     private readonly HashSet<(CellCoord, CellCoord)> _sealedEdges = [];
     private readonly HashSet<(CellCoord Cell, StructuralSurface Surface)> _breaches = [];
+    private readonly HashSet<(CellCoord, CellCoord)> _wallEdgeBreaches = [];
     private readonly HashSet<CellCoord> _fires = [];
     private readonly List<Fixture> _fixtures = [];
 
@@ -31,11 +32,16 @@ public sealed class Deck
 
     public IReadOnlyList<Fixture> Fixtures => _fixtures;
 
-    public IReadOnlySet<CellCoord> HullBreaches => _breaches.Select(b => b.Cell).ToHashSet();
+    public IReadOnlySet<CellCoord> HullBreaches =>
+        _breaches.Select(b => b.Cell)
+            .Concat(_wallEdgeBreaches.SelectMany(e => new[] { e.Item1, e.Item2 }))
+            .ToHashSet();
 
     public IReadOnlySet<CellCoord> Fires => _fires;
 
     public void AddCell(CellCoord cell) => _cells.Add(cell);
+
+    public void RemoveCell(CellCoord cell) => _cells.Remove(cell);
 
     public void SealEdge(CellCoord a, CellCoord b) => _sealedEdges.Add(Normalize(a, b));
 
@@ -45,16 +51,32 @@ public sealed class Deck
 
     /// <summary>Defaults to <see cref="StructuralSurface.Wall"/> so every pre-existing caller
     /// (hull breaches, airlock venting) keeps compiling unchanged — only floor/ceiling callers
-    /// need to name their reason explicitly.</summary>
+    /// need to name their reason explicitly. For Wall specifically, this is a per-*cell* flag —
+    /// correct for a direct "this whole room is exposed to vacuum" event (an airlock venting),
+    /// but not for a specific wall segment (see <see cref="BreachWallEdge"/> for that; a cell can
+    /// have several independently open wall directions at once, which a single per-cell flag
+    /// can't distinguish).</summary>
     public void BreachHull(CellCoord cell, StructuralSurface surface = StructuralSurface.Wall) =>
         _breaches.Add((cell, surface));
 
     public void RepairHull(CellCoord cell, StructuralSurface surface = StructuralSurface.Wall) =>
         _breaches.Remove((cell, surface));
 
-    public bool IsHullBreached(CellCoord cell) => _breaches.Any(b => b.Cell == cell);
+    public bool IsHullBreached(CellCoord cell) =>
+        _breaches.Any(b => b.Cell == cell) || _wallEdgeBreaches.Any(e => e.Item1 == cell || e.Item2 == cell);
 
     public bool IsHullBreached(CellCoord cell, StructuralSurface surface) => _breaches.Contains((cell, surface));
+
+    /// <summary>A specific hull-boundary wall segment (an edge to a cell that doesn't exist),
+    /// tracked per edge rather than per cell — the piece <see cref="BreachHull"/>/<see cref="RepairHull"/>
+    /// can't represent, since a cell can have more than one independently open wall direction at
+    /// once (most visibly a freshly extended floor tile, open on every side but the one it was
+    /// extended from).</summary>
+    public void BreachWallEdge(CellCoord a, CellCoord b) => _wallEdgeBreaches.Add(Normalize(a, b));
+
+    public void RepairWallEdge(CellCoord a, CellCoord b) => _wallEdgeBreaches.Remove(Normalize(a, b));
+
+    public bool IsWallEdgeBreached(CellCoord a, CellCoord b) => _wallEdgeBreaches.Contains(Normalize(a, b));
 
     public void IgniteFire(CellCoord cell) => _fires.Add(cell);
 

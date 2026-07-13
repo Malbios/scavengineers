@@ -72,6 +72,15 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         Requirements = [PowerDrillRequirement],
     };
 
+    // Same cost shape as InstallFloorVerb — it's the same construction work, just claiming a
+    // brand-new cell instead of repairing an existing one's panel. Only offered alongside
+    // InstallWallVerb on a boundary edge that's currently open (see ResolveAvailableVerbs) — you
+    // extend through a gap you've made, not through an intact wall.
+    private static readonly Verb ExtendFloorVerb = new("extend_floor", "VERB_EXTEND_FLOOR", DurationSeconds: 0.2f)
+    {
+        Requirements = [new ItemRequirement("wall_panel", 1), PowerDrillRequirement],
+    };
+
     // Battery/Switch/RechargeStation verbs — Install requires holding the machine's own item
     // (bought from a trade console, or refunded by a prior Uninstall); Uninstall gives that same
     // item back, Scrap gives partial scrap_metal instead (a real tradeoff, same shape as
@@ -193,6 +202,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         RemoveFloor,
         InstallCeiling,
         RemoveCeiling,
+        ExtendFloor,
         InstallMachine,
         UninstallMachine,
         ScrapMachine,
@@ -365,6 +375,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private readonly Dictionary<CellCoord, (MeshInstance3D Mesh, CollisionShape3D Collision)> _floorPanels = new();
     private readonly Dictionary<CellCoord, (MeshInstance3D Mesh, CollisionShape3D Collision)> _ceilingPanels = new();
 
+    /// <summary>Cells added beyond the ship's default footprint via <see cref="ExtendFloor"/> —
+    /// as opposed to every cell ShipSim's own GridWidth/corridor exports generate at startup.
+    /// Tracked separately so CaptureBuildState/ApplyBuildState/ClearAllBuildState know exactly
+    /// which cells to persist and which to actually remove on a load that doesn't include them.</summary>
+    private readonly HashSet<CellCoord> _extendedCells = new();
+
     /// <summary>At most one of each <see cref="MachineType"/> at a time, matching ShipSim's own
     /// singular _battery field and fixed Switch/RechargeFixtureId — installing a second one
     /// elsewhere isn't offered while one already exists (see ResolveAvailableVerbs).</summary>
@@ -437,29 +453,80 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
         foreach (var cell in ShipSimRef.Deck.Cells)
         {
-            var tile = new Vector2I(cell.X, cell.Y);
+            GeneratePanelsForCell(cell);
+        }
+    }
 
-            var floorPanel = new MeshInstance3D { Mesh = PanelMesh };
-            AddChild(floorPanel);
-            floorPanel.Position = ToLocal(TileWorldPosition(tile, FloorPanelHeight));
-            floorPanel.SetSurfaceOverrideMaterial(0, FloorPanelMaterial);
+    /// <summary>One cell's floor+ceiling panel pair — extracted so a dynamically extended cell
+    /// (see <see cref="ExtendFloor"/>) can get the exact same real, removable structure as every
+    /// other cell already generated at startup, not a separate one-off representation.</summary>
+    private void GeneratePanelsForCell(CellCoord cell)
+    {
+        var tile = new Vector2I(cell.X, cell.Y);
 
-            var floorCollision = new CollisionShape3D { Shape = PanelCollisionShape };
-            AddChild(floorCollision);
-            floorCollision.Position = floorPanel.Position;
+        var floorPanel = new MeshInstance3D { Mesh = PanelMesh };
+        AddChild(floorPanel);
+        floorPanel.Position = ToLocal(TileWorldPosition(tile, FloorPanelHeight));
+        floorPanel.SetSurfaceOverrideMaterial(0, FloorPanelMaterial);
 
-            _floorPanels[cell] = (floorPanel, floorCollision);
+        var floorCollision = new CollisionShape3D { Shape = PanelCollisionShape };
+        AddChild(floorCollision);
+        floorCollision.Position = floorPanel.Position;
 
-            var ceilingPanel = new MeshInstance3D { Mesh = PanelMesh };
-            AddChild(ceilingPanel);
-            ceilingPanel.Position = ToLocal(TileWorldPosition(tile, CeilingPanelHeight));
-            ceilingPanel.SetSurfaceOverrideMaterial(0, CeilingPanelMaterial);
+        _floorPanels[cell] = (floorPanel, floorCollision);
 
-            var ceilingCollision = new CollisionShape3D { Shape = PanelCollisionShape };
-            AddChild(ceilingCollision);
-            ceilingCollision.Position = ceilingPanel.Position;
+        var ceilingPanel = new MeshInstance3D { Mesh = PanelMesh };
+        AddChild(ceilingPanel);
+        ceilingPanel.Position = ToLocal(TileWorldPosition(tile, CeilingPanelHeight));
+        ceilingPanel.SetSurfaceOverrideMaterial(0, CeilingPanelMaterial);
 
-            _ceilingPanels[cell] = (ceilingPanel, ceilingCollision);
+        var ceilingCollision = new CollisionShape3D { Shape = PanelCollisionShape };
+        AddChild(ceilingCollision);
+        ceilingCollision.Position = ceilingPanel.Position;
+
+        _ceilingPanels[cell] = (ceilingPanel, ceilingCollision);
+    }
+
+    /// <summary>Claims a brand-new real Deck cell beyond the ship's existing footprint —
+    /// genuine dynamic ship expansion, not just repairing an existing breached panel. The edge
+    /// back to <paramref name="origin"/> becomes a normal open interior connection (unsealed by
+    /// default, same as any other doorway); <see cref="NormalizeBoundaryEdgesForCell"/> handles
+    /// clearing that edge's now-stale wall-breach flag and marking the new cell's other, still-
+    /// open sides.</summary>
+    private void ExtendFloor(CellCoord origin, CellCoord newCell)
+    {
+        ShipSimRef!.Deck.AddCell(newCell);
+        GeneratePanelsForCell(newCell);
+        _extendedCells.Add(newCell);
+        NormalizeBoundaryEdgesForCell(newCell);
+    }
+
+    /// <summary>For each of a cell's 4 neighbors: if it's a real cell, the edge is interior now —
+    /// clear any wall-breach flag left over from before it was extended into (a no-op if there
+    /// never was one). If it's still not a real cell, mark that edge open — no wall has been
+    /// built there yet. Checking generically like this (rather than tracking which direction was
+    /// "the origin") means the exact same call works for save-replay too, where cells may have
+    /// been extended in an arbitrary chain.</summary>
+    private void NormalizeBoundaryEdgesForCell(CellCoord cell)
+    {
+        CellCoord[] neighbors =
+        [
+            new CellCoord(cell.X + 1, cell.Y),
+            new CellCoord(cell.X - 1, cell.Y),
+            new CellCoord(cell.X, cell.Y + 1),
+            new CellCoord(cell.X, cell.Y - 1),
+        ];
+
+        foreach (var neighbor in neighbors)
+        {
+            if (ShipSimRef!.Deck.Cells.Contains(neighbor))
+            {
+                ShipSimRef.Deck.RepairWallEdge(cell, neighbor);
+            }
+            else
+            {
+                ShipSimRef.Deck.BreachWallEdge(cell, neighbor);
+            }
         }
     }
 
@@ -669,9 +736,16 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 // Boundary edge — Install repairs an existing breach, Remove deliberately
                 // creates one (a real, consequential choice, same as scrapping the floor or
                 // ceiling). A wall-mounted conduit needs an actual hull wall to mount on, so
-                // it's only offered while that hull is intact.
-                var breached = ShipSimRef.Deck.IsHullBreached(_edgeA, StructuralSurface.Wall);
+                // it's only offered while that hull is intact. Tracked per edge, not per cell
+                // (see Deck.BreachWallEdge) — a cell can have several independently open wall
+                // directions at once, most visibly a freshly extended floor tile.
+                var breached = ShipSimRef.Deck.IsWallEdgeBreached(_edgeA, _edgeB);
                 var verbs = new List<Verb> { breached ? InstallWallVerb : RemoveWallVerb };
+                if (breached)
+                {
+                    verbs.Add(ExtendFloorVerb);
+                }
+
                 if (EdgeConduitVerb(wallPresent: !breached) is { } boundaryConduitVerb)
                 {
                     verbs.Add(boundaryConduitVerb);
@@ -946,7 +1020,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     private void ExecuteWallVerb(Verb verb, PlayerInventory inventory)
     {
-        if (verb.Id != InstallWallVerb.Id && verb.Id != RemoveWallVerb.Id)
+        if (verb.Id != InstallWallVerb.Id && verb.Id != RemoveWallVerb.Id && verb.Id != ExtendFloorVerb.Id)
         {
             return;
         }
@@ -954,7 +1028,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         var isBoundary = !ShipSimRef!.Deck.Cells.Contains(_edgeB);
         if (isBoundary)
         {
-            var breached = ShipSimRef.Deck.IsHullBreached(_edgeA, StructuralSurface.Wall);
+            var breached = ShipSimRef.Deck.IsWallEdgeBreached(_edgeA, _edgeB);
             if (verb.Id == InstallWallVerb.Id && breached)
             {
                 _pendingAction = PendingAction.RepairHullWall;
@@ -962,6 +1036,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             else if (verb.Id == RemoveWallVerb.Id && !breached)
             {
                 _pendingAction = PendingAction.BreachHullWall;
+            }
+            else if (verb.Id == ExtendFloorVerb.Id && breached)
+            {
+                _pendingAction = PendingAction.ExtendFloor;
             }
             else
             {
@@ -1018,7 +1096,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 SpawnWallSegment(_pendingEdgeA, _pendingEdgeB);
                 break;
             case PendingAction.RepairHullWall:
-                ShipSimRef!.Deck.RepairHull(_pendingEdgeA);
+                ShipSimRef!.Deck.RepairWallEdge(_pendingEdgeA, _pendingEdgeB);
                 SpawnWallSegment(_pendingEdgeA, _pendingEdgeB);
                 break;
             case PendingAction.RemoveWall:
@@ -1027,9 +1105,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 AddOrDrop(inventory, "wall_panel", 1);
                 break;
             case PendingAction.BreachHullWall:
-                ShipSimRef!.Deck.BreachHull(_pendingEdgeA);
+                ShipSimRef!.Deck.BreachWallEdge(_pendingEdgeA, _pendingEdgeB);
                 FreeWallSegment(_pendingEdgeA, _pendingEdgeB);
                 AddOrDrop(inventory, "wall_panel", 1);
+                break;
+            case PendingAction.ExtendFloor:
+                ExtendFloor(_pendingEdgeA, _pendingEdgeB);
                 break;
             case PendingAction.InstallFloor:
                 ShipSimRef!.Deck.RepairHull(new CellCoord(_pendingTile.X, _pendingTile.Y), StructuralSurface.Floor);
@@ -1717,6 +1798,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             data.Machines.Add(new MachineCoord(ItemIdFor(type), placed.EdgeA.X, placed.EdgeA.Y, placed.EdgeB.X, placed.EdgeB.Y, MachineStateOf(type, placed.Node)));
         }
 
+        foreach (var cell in _extendedCells)
+        {
+            data.ExtendedCells.Add(new TileCoord(cell.X, cell.Y));
+        }
+
         return data;
     }
 
@@ -1737,6 +1823,25 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     public void ApplyBuildState(BuildTargetSaveData state)
     {
         ClearAllBuildState();
+
+        // Two passes: every extended cell must exist in Deck.Cells before any of them normalize
+        // their boundary edges, since a cell extended from another extended cell (a chain) needs
+        // its neighbor to already be real to correctly tell "interior" from "still open."
+        foreach (var tile in state.ExtendedCells)
+        {
+            var cell = new CellCoord(tile.X, tile.Y);
+            if (!ShipSimRef!.Deck.Cells.Contains(cell))
+            {
+                ShipSimRef.Deck.AddCell(cell);
+                GeneratePanelsForCell(cell);
+                _extendedCells.Add(cell);
+            }
+        }
+
+        foreach (var tile in state.ExtendedCells)
+        {
+            NormalizeBoundaryEdgesForCell(new CellCoord(tile.X, tile.Y));
+        }
 
         foreach (var tile in state.Conduits)
         {
@@ -1761,7 +1866,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             }
             else
             {
-                ShipSimRef.Deck.RepairHull(a, StructuralSurface.Wall);
+                ShipSimRef.Deck.RepairWallEdge(a, b);
             }
 
             SpawnWallSegment(a, b);
@@ -1825,7 +1930,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             ShipSimRef?.Deck.UnsealEdge(a, b);
             if (ShipSimRef is not null && !ShipSimRef.Deck.Cells.Contains(b))
             {
-                ShipSimRef.Deck.BreachHull(a, StructuralSurface.Wall);
+                ShipSimRef.Deck.BreachWallEdge(a, b);
             }
 
             pair.Mesh.QueueFree();
@@ -1850,5 +1955,27 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         {
             RemoveMachine(type);
         }
+
+        // A load that doesn't include a previously-extended cell must actually remove it —
+        // Load() (SaveManager.cs) applies state onto the live scene, not a fresh reload, so a
+        // stale extension from earlier in the same session would otherwise just linger.
+        foreach (var cell in _extendedCells)
+        {
+            if (_floorPanels.Remove(cell, out var floorPanel))
+            {
+                floorPanel.Mesh.QueueFree();
+                floorPanel.Collision.QueueFree();
+            }
+
+            if (_ceilingPanels.Remove(cell, out var ceilingPanel))
+            {
+                ceilingPanel.Mesh.QueueFree();
+                ceilingPanel.Collision.QueueFree();
+            }
+
+            ShipSimRef?.Deck.RemoveCell(cell);
+        }
+
+        _extendedCells.Clear();
     }
 }

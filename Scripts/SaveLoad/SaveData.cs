@@ -67,6 +67,13 @@ public sealed class BuildTargetSaveData
     /// "recharge_station") at a time. Purely additive: defaults to empty for any save predating
     /// these being player-install/uninstall-able rather than fixed scene nodes.</summary>
     public List<MachineCoord> Machines { get; set; } = new();
+
+    /// <summary>Cells added beyond the ship's default footprint via the Extend Floor verb —
+    /// distinct from every other list here, which all describe state *on* an existing cell.
+    /// Replayed first (see ShipBuildTarget.ApplyBuildState) since Walls/FloorBreaches/
+    /// CeilingBreaches entries may reference one of these cells. Purely additive: empty for any
+    /// save predating dynamic ship expansion.</summary>
+    public List<TileCoord> ExtendedCells { get; set; } = new();
 }
 
 public readonly record struct TileCoord(int X, int Y);

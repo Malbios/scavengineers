@@ -52,6 +52,7 @@ VERB_INSTALL_FLOOR,Install Floor Panel,Bodenplatte einbauen
 VERB_REMOVE_FLOOR,Remove Floor Panel,Bodenplatte entfernen
 VERB_INSTALL_CEILING,Install Ceiling Panel,Deckenplatte einbauen
 VERB_REMOVE_CEILING,Remove Ceiling Panel,Deckenplatte entfernen
+VERB_EXTEND_FLOOR,Extend Floor,Boden erweitern
 ITEM_BATTERY,Battery,Batterie
 ITEM_SWITCH,Switch,Schalter
 ITEM_RECHARGE_STATION,Recharge Station,Ladestation
