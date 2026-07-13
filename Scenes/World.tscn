@@ -20,6 +20,9 @@
 [ext_resource type="Script" path="res://Scripts/Ship/StationConsoleVerbTarget.cs" id="22"]
 [ext_resource type="Script" path="res://Scripts/Ship/BunkVerbTarget.cs" id="23"]
 [ext_resource type="Shader" path="res://Shaders/starfield_sky.gdshader" id="24"]
+[ext_resource type="Material" path="res://Assets/Materials/station_floor_material.tres" id="25"]
+[ext_resource type="Material" path="res://Assets/Materials/station_wall_material.tres" id="26"]
+[ext_resource type="Material" path="res://Assets/Materials/station_ceiling_material.tres" id="27"]
 
 [sub_resource type="ShaderMaterial" id="StarfieldSkyMaterial"]
 shader = ExtResource("24")
@@ -774,12 +777,12 @@ ShipSimRef = NodePath("../ShipSim")
 ShipRoot = NodePath("..")
 WallSegmentMesh = SubResource("WallSegmentMesh")
 WallSegmentShape = SubResource("WallSegmentShape")
-WallMaterial = ExtResource("7")
+WallMaterial = ExtResource("26")
 GhostMaterial = SubResource("ConduitGhostMaterial")
 PanelMesh = SubResource("PanelMesh")
 PanelCollisionShape = SubResource("PanelCollisionShape")
-FloorPanelMaterial = ExtResource("6")
-CeilingPanelMaterial = ExtResource("8")
+FloorPanelMaterial = ExtResource("25")
+CeilingPanelMaterial = ExtResource("27")
 AllowStructuralModification = false
 TallCeilingHeight = 4.025
 SaveId = "station_build_target"
@@ -792,7 +795,7 @@ shape = SubResource("StationWallShapeNS")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Station/WallNorth"]
 mesh = SubResource("StationWallMeshNS")
-surface_material_override/0 = ExtResource("7")
+surface_material_override/0 = ExtResource("26")
 
 [node name="WallSouth" type="StaticBody3D" parent="Station"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.0, 3)
@@ -802,7 +805,7 @@ shape = SubResource("StationWallShapeNS")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Station/WallSouth"]
 mesh = SubResource("StationWallMeshNS")
-surface_material_override/0 = ExtResource("7")
+surface_material_override/0 = ExtResource("26")
 
 [node name="WallWest" type="StaticBody3D" parent="Station"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 2.0, 0)
@@ -812,7 +815,7 @@ shape = SubResource("WallShapeEW")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Station/WallWest"]
 mesh = SubResource("WallMeshEW")
-surface_material_override/0 = ExtResource("7")
+surface_material_override/0 = ExtResource("26")
 
 [node name="WallEastA" type="StaticBody3D" parent="Station"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 2.0, -2)
@@ -822,7 +825,7 @@ shape = SubResource("MidWallShapeEW")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Station/WallEastA"]
 mesh = SubResource("MidWallMeshEW")
-surface_material_override/0 = ExtResource("7")
+surface_material_override/0 = ExtResource("26")
 
 [node name="WallEastB" type="StaticBody3D" parent="Station"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 2.0, 2)
@@ -832,7 +835,7 @@ shape = SubResource("MidWallShapeEW")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Station/WallEastB"]
 mesh = SubResource("MidWallMeshEW")
-surface_material_override/0 = ExtResource("7")
+surface_material_override/0 = ExtResource("26")
 
 [node name="CorridorLintel" type="StaticBody3D" parent="Station"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 3.0, 0)
@@ -842,7 +845,7 @@ shape = SubResource("StationLintelShape")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Station/CorridorLintel"]
 mesh = SubResource("StationLintelMesh")
-surface_material_override/0 = ExtResource("7")
+surface_material_override/0 = ExtResource("26")
 
 [node name="CorridorWallNorth" type="StaticBody3D" parent="Station"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1.0, -1)
@@ -852,7 +855,7 @@ shape = SubResource("CorridorWallSegmentShape")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Station/CorridorWallNorth"]
 mesh = SubResource("CorridorWallSegmentMesh")
-surface_material_override/0 = ExtResource("7")
+surface_material_override/0 = ExtResource("26")
 
 [node name="CorridorWallSouth" type="StaticBody3D" parent="Station"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1.0, 1)
@@ -862,7 +865,7 @@ shape = SubResource("CorridorWallSegmentShape")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Station/CorridorWallSouth"]
 mesh = SubResource("CorridorWallSegmentMesh")
-surface_material_override/0 = ExtResource("7")
+surface_material_override/0 = ExtResource("26")
 
 [node name="ShipZoneCorridorEast" type="Area3D" parent="Station" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1.0, 0)
