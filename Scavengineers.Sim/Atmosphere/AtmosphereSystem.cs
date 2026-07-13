@@ -165,6 +165,7 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
             {
                 Pressure = Lerp(current.Pressure, AtmosphereVolume.Vacuum.Pressure, factor),
                 O2Fraction = Lerp(current.O2Fraction, AtmosphereVolume.Vacuum.O2Fraction, factor),
+                Temperature = Lerp(current.Temperature, AtmosphereVolume.Vacuum.Temperature, factor),
             };
         }
     }

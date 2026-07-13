@@ -44,6 +44,19 @@ public class AtmosphereSystemTests
     }
 
     [Fact]
+    public void BreachedHull_DrainsTemperatureTowardVacuumOverTime()
+    {
+        var cell = new CellCoord(0, 0);
+        var deck = DeckWithCells(cell);
+        deck.BreachHull(cell);
+        var system = new AtmosphereSystem(deck);
+
+        system.Tick(1);
+
+        Assert.True(system.VolumeAt(cell).Temperature < AtmosphereVolume.Breathable.Temperature);
+    }
+
+    [Fact]
     public void BreachedHull_ApproachesVacuumAsTimeAccumulates()
     {
         var cell = new CellCoord(0, 0);

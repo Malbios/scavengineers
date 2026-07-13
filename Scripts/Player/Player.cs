@@ -112,6 +112,8 @@ public partial class Player : CharacterBody3D
     private SpotLight3D? _flashlightSpot;
     private bool _flashlightOn;
     private ColorRect? _smokeOverlay;
+    private ColorRect? _coldOverlay;
+    private ColorRect? _burnOverlay;
 
     /// <summary>The generic dropped-item visual (same box mesh + per-item material-override
     /// pattern InventoryOverflow.DropAt and ShipBuildTarget's own refunds already use) — reused
@@ -221,6 +223,8 @@ public partial class Player : CharacterBody3D
         _flashlightBar = GetNode<ProgressBar>("HUD/ResourcesPanel/FlashlightBar");
         _flashlightSpot = GetNode<SpotLight3D>("Head/Camera3D/FlashlightSpot");
         _smokeOverlay = GetNode<ColorRect>("HUD/SmokeOverlay");
+        _coldOverlay = GetNode<ColorRect>("HUD/ColdOverlay");
+        _burnOverlay = GetNode<ColorRect>("HUD/BurnOverlay");
         _leftHandLabel = GetNode<Label>("HUD/LeftHandLabel");
         _rightHandLabel = GetNode<Label>("HUD/RightHandLabel");
         _creditsLabel = GetNode<Label>("HUD/CreditsLabel");
@@ -737,10 +741,15 @@ public partial class Player : CharacterBody3D
         // pays the full bill" framing). A breached room's dropping O2 burns the suit's own
         // reserve faster on top of the flat drain, and smoke burns O2 faster too (see
         // SuitResources.Tick). Once O2 bottoms out, it starts draining Health instead — a hard
-        // 0-Health death, handled below.
-        _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21, inSmoke);
+        // 0-Health death, handled below. Extreme ambient temperature (a breach gone properly
+        // cold, or standing in an active fire's heat) drains Health too, compounding with O2
+        // depletion instead of being a separate stat (see SuitResources.Tick).
+        var ambientTemperature = roomVolume?.Temperature ?? AtmosphereVolume.Breathable.Temperature;
+        _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21, ambientTemperature, inSmoke);
         _o2Bar!.Value = _suitResources.O2Percent;
         _healthBar!.Value = _suitResources.HealthPercent;
+        _coldOverlay!.Visible = _suitResources.IsFreezing;
+        _burnOverlay!.Visible = _suitResources.IsBurning;
 
         if (_suitResources.HealthPercent <= 0f)
         {

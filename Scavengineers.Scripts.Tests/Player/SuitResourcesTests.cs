@@ -66,6 +66,42 @@ public class SuitResourcesTests
     }
 
     [Fact]
+    public void Tick_DrainsHealth_WhenCriticallyCold_EvenWithO2Remaining()
+    {
+        var suit = new SuitResources();
+
+        suit.Tick(1.0, ambientO2Fraction: 0.21, ambientTemperature: 50.0);
+
+        Assert.True(suit.IsFreezing);
+        Assert.True(suit.HealthPercent < 100f);
+    }
+
+    [Fact]
+    public void Tick_DrainsHealth_WhenCriticallyHot()
+    {
+        var suit = new SuitResources();
+
+        suit.Tick(1.0, ambientO2Fraction: 0.21, ambientTemperature: 500.0);
+
+        Assert.True(suit.IsBurning);
+        Assert.True(suit.HealthPercent < 100f);
+    }
+
+    [Fact]
+    public void Tick_DrainsHealthFaster_WhenO2DepletedAndFreezingTogether_ThanO2DepletionAlone()
+    {
+        var suitO2DepletedOnly = new SuitResources();
+        suitO2DepletedOnly.RestoreFrom(0f, 100f);
+        var suitO2DepletedAndFreezing = new SuitResources();
+        suitO2DepletedAndFreezing.RestoreFrom(0f, 100f);
+
+        suitO2DepletedOnly.Tick(1.0, ambientO2Fraction: 0.0, ambientTemperature: 293.15);
+        suitO2DepletedAndFreezing.Tick(1.0, ambientO2Fraction: 0.0, ambientTemperature: 50.0);
+
+        Assert.True(suitO2DepletedAndFreezing.HealthPercent < suitO2DepletedOnly.HealthPercent);
+    }
+
+    [Fact]
     public void RestoreFrom_ClampsBothValuesToZeroToOneHundred()
     {
         var suit = new SuitResources();
