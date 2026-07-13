@@ -43,6 +43,13 @@ public partial class Player : CharacterBody3D
     // jetpack yet, so control only comes from pushing off something within reach.
     private const float ZeroGControlRadius = 1.2f;
 
+    // Placeholder/tunable — CharacterBody3D doesn't push RigidBody3D obstacles on its own
+    // (MoveAndSlide resolves the character's own motion but never applies a reciprocal impulse to
+    // whatever it collided with), so a loose item the player walks into would otherwise never
+    // move even once unfrozen/drifting in zero-g (see ShipAtmosphereZone). A frozen item (the
+    // normal-gravity default) just ignores the impulse, so this never needs its own zero-g check.
+    private const float ItemPushImpulse = 2f;
+
     // Decompression pull (placeholder/tunable) — an open floor/ceiling breach's own "unsecured
     // near a hole" hazard, on top of (not instead of) the slow O2/pressure drain. Pulls toward
     // the breach's own position rather than a fixed direction, so it settles near the hole
@@ -707,6 +714,17 @@ public partial class Player : CharacterBody3D
 
         Velocity = velocity;
         MoveAndSlide();
+
+        // Shove any unfrozen (i.e. actually drifting in zero-g) loose item the player collided
+        // with this frame — see ItemPushImpulse's own doc comment for why this doesn't happen
+        // automatically. A frozen item (normal gravity) just ignores the impulse.
+        for (var i = 0; i < GetSlideCollisionCount(); i++)
+        {
+            if (GetSlideCollision(i).GetCollider() is RigidBody3D { Freeze: false } rigidBody)
+            {
+                rigidBody.ApplyCentralImpulse(-GetSlideCollision(i).GetNormal() * ItemPushImpulse);
+            }
+        }
 
         // The real beam only exists while the flashlight is both held and toggled on, and its own
         // battery still has charge — unequipping/swapping it out of hand turns it off
