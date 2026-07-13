@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # Station room now 4m tall, corridor stays 2m (check the step at the boundary); confirm smoke screen-darkening/O2 drain now actually triggers; check the pry-door verb text reads fine both directions
+$scene = "res://Scenes/World.tscn" # Check the Station's corridor doorway no longer shows open space above it (lintel piece added)
 
 & $godotExe --path $projectPath $scene
