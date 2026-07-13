@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # /cq fixes: check decompression pull works in all 3 Derelict rooms, not just its corridor
+$scene = "res://Scenes/World.tscn" # Fire hazard: let the Derelict's damaged conduit ignite, confirm smoke particles + screen darkening + faster O2 drain, and that it spreads to a nearby unsealed conduit
 
 & $godotExe --path $projectPath $scene
