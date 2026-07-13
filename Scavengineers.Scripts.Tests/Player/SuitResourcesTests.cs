@@ -29,6 +29,18 @@ public class SuitResourcesTests
     }
 
     [Fact]
+    public void Tick_DrainsPowerFaster_WhenFlashlightIsOn()
+    {
+        var suitWithFlashlight = new SuitResources();
+        var suitWithoutFlashlight = new SuitResources();
+
+        suitWithFlashlight.Tick(1.0, ambientO2Fraction: 0.21, flashlightOn: true);
+        suitWithoutFlashlight.Tick(1.0, ambientO2Fraction: 0.21, flashlightOn: false);
+
+        Assert.True(suitWithFlashlight.PowerPercent < suitWithoutFlashlight.PowerPercent);
+    }
+
+    [Fact]
     public void RestoreFrom_ClampsBothValuesToZeroToOneHundred()
     {
         var suit = new SuitResources();

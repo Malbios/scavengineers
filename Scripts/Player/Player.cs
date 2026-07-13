@@ -82,6 +82,8 @@ public partial class Player : CharacterBody3D
     private ProgressBar? _energyBar;
     private Label? _drillLabel;
     private ProgressBar? _drillBar;
+    private SpotLight3D? _flashlightSpot;
+    private bool _flashlightOn;
 
     /// <summary>The generic dropped-item visual (same box mesh + per-item material-override
     /// pattern InventoryOverflow.DropAt and ShipBuildTarget's own refunds already use) — reused
@@ -182,6 +184,7 @@ public partial class Player : CharacterBody3D
         _roomO2Label = GetNode<Label>("HUD/ResourcesPanel/RoomO2Label");
         _drillLabel = GetNode<Label>("HUD/ResourcesPanel/DrillLabel");
         _drillBar = GetNode<ProgressBar>("HUD/ResourcesPanel/DrillBar");
+        _flashlightSpot = GetNode<SpotLight3D>("Head/Camera3D/FlashlightSpot");
         _leftHandLabel = GetNode<Label>("HUD/LeftHandLabel");
         _rightHandLabel = GetNode<Label>("HUD/RightHandLabel");
         _creditsLabel = GetNode<Label>("HUD/CreditsLabel");
@@ -212,6 +215,7 @@ public partial class Player : CharacterBody3D
         _inventory.Add("crowbar", 1);
         _inventory.Add("power_drill", 1);
         _inventory.AttachDrill(hasBattery: true, charge: 1f);
+        _inventory.Add("flashlight", 1);
 
         CaptureMouse();
         // Setting MouseMode here alone is unreliable if the window doesn't yet have OS
@@ -312,11 +316,22 @@ public partial class Player : CharacterBody3D
         }
     }
 
-    /// <summary>Eats/drinks whatever's held (left hand first, then right) — a direct hotbar-style
-    /// action, not a raycast-targeted verb, since there's no world object involved. A no-op if
-    /// neither hand holds a consumable (ItemCatalog.HungerRestore/ThirstRestore both 0).</summary>
-    private void UseHeldItem() =>
-        _ = TryConsumeHand(PlayerInventory.LeftHandSlotIndex) || TryConsumeHand(PlayerInventory.RightHandSlotIndex);
+    /// <summary>Direct hotbar-style action on whatever's held, not a raycast-targeted verb, since
+    /// there's no world object involved. Eats/drinks a consumable (left hand first, then right)
+    /// if one's held; otherwise toggles a held flashlight on/off. A no-op if neither hand holds
+    /// either.</summary>
+    private void UseHeldItem()
+    {
+        if (TryConsumeHand(PlayerInventory.LeftHandSlotIndex) || TryConsumeHand(PlayerInventory.RightHandSlotIndex))
+        {
+            return;
+        }
+
+        if (LeftHandItemId == "flashlight" || RightHandItemId == "flashlight")
+        {
+            _flashlightOn = !_flashlightOn;
+        }
+    }
 
     private bool TryConsumeHand(int handIndex)
     {
@@ -596,11 +611,17 @@ public partial class Player : CharacterBody3D
         Velocity = velocity;
         MoveAndSlide();
 
+        // The beam only exists while the flashlight is both held and toggled on — unequipping
+        // or swapping it out of hand turns it off automatically without touching _flashlightOn.
+        var holdingFlashlight = LeftHandItemId == "flashlight" || RightHandItemId == "flashlight";
+        _flashlightSpot!.Visible = _flashlightOn && holdingFlashlight;
+
         // Suit resources keep draining while busy performing a verb — a task's duration is a
         // real elapsed-time cost, not a pause (docs/project-plan.md's "time acceleration ...
         // pays the full bill" framing). A breached room's dropping O2 burns the suit's own
-        // reserve faster on top of the flat drain (see SuitResources.Tick).
-        _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21);
+        // reserve faster on top of the flat drain, and a lit flashlight burns suit power faster
+        // too (see SuitResources.Tick).
+        _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21, _flashlightSpot.Visible);
         _o2Bar!.Value = _suitResources.O2Percent;
         _powerBar!.Value = _suitResources.PowerPercent;
 

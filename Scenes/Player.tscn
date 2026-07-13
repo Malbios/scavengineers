@@ -36,6 +36,12 @@ current = true
 target_position = Vector3(0, 0, -2.5)
 collision_mask = 3
 
+[node name="FlashlightSpot" type="SpotLight3D" parent="Head/Camera3D"]
+visible = false
+light_energy = 2.5
+spot_range = 10.0
+spot_angle = 30.0
+
 [node name="HUD" type="CanvasLayer" parent="." unique_id=1671283592]
 
 [node name="Crosshair" type="Control" parent="HUD" unique_id=2109340878]

@@ -23,7 +23,7 @@
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 2
 ambient_light_color = Color(0.18, 0.18, 0.22, 1)
-ambient_light_energy = 0.75
+ambient_light_energy = 0.08
 
 [sub_resource type="BoxShape3D" id="ShipZoneNarrowShape"]
 size = Vector3(6.2, 3.2, 6.4)
@@ -297,6 +297,7 @@ shape = SubResource("ShipZoneWideShape")
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="HomeShip" unique_id=1413109270]
 transform = Transform3D(0.866, -0.25, 0.433, 0, 0.866, 0.5, -0.5, -0.433, 0.75, 0, 4, 0)
 light_energy = 0.8
+shadow_enabled = true
 
 [node name="Floor" type="StaticBody3D" parent="HomeShip" unique_id=61458931 node_paths=PackedStringArray("ShipSimRef", "ShipRoot", "RoomLight") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, -0.1, 0)
@@ -918,6 +919,7 @@ shape = SubResource("ShipZoneNarrowShape")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="Station"]
 transform = Transform3D(0.866, -0.25, 0.433, 0, 0.866, 0.5, -0.5, -0.433, 0.75, 0, 4, 0)
+shadow_enabled = true
 
 [node name="Floor" type="StaticBody3D" parent="Station"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)

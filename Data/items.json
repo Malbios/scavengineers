@@ -11,5 +11,6 @@
   { "id": "water_bottle", "maxStackSize": 10, "color": "#4FA8D8", "thirstRestore": 40 },
   { "id": "crowbar", "maxStackSize": 1, "color": "#B34D26" },
   { "id": "power_drill", "maxStackSize": 1, "color": "#4D4D4D" },
-  { "id": "debug_backpack", "maxStackSize": 1, "color": "#CC00CC" }
+  { "id": "debug_backpack", "maxStackSize": 1, "color": "#CC00CC" },
+  { "id": "flashlight", "maxStackSize": 1, "color": "#E6D659" }
 ]

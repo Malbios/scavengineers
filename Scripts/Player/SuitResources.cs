@@ -13,19 +13,21 @@ public sealed class SuitResources
     private const float O2DrainPerSecond = 100f / 300f; // empties over ~5 minutes
     private const float PowerDrainPerSecond = 100f / 480f; // empties over ~8 minutes
     private const float ExposureDrainMultiplier = 100f / 20f; // full vacuum: empties in ~20s on top of the base drain
+    private const float FlashlightPowerDrainPerSecond = 100f / 900f; // placeholder/tunable: ~15 min of continuous use
     private const double BreathableO2Fraction = 0.21;
 
     public float O2Percent { get; private set; } = 100f;
 
     public float PowerPercent { get; private set; } = 100f;
 
-    public void Tick(double delta, double ambientO2Fraction = BreathableO2Fraction)
+    public void Tick(double delta, double ambientO2Fraction = BreathableO2Fraction, bool flashlightOn = false)
     {
         var exposureFraction = Math.Clamp(1 - ambientO2Fraction / BreathableO2Fraction, 0, 1);
         var totalO2Drain = O2DrainPerSecond + ExposureDrainMultiplier * (float)exposureFraction;
+        var totalPowerDrain = PowerDrainPerSecond + (flashlightOn ? FlashlightPowerDrainPerSecond : 0f);
 
         O2Percent = Math.Clamp(O2Percent - totalO2Drain * (float)delta, 0f, 100f);
-        PowerPercent = Math.Clamp(PowerPercent - PowerDrainPerSecond * (float)delta, 0f, 100f);
+        PowerPercent = Math.Clamp(PowerPercent - totalPowerDrain * (float)delta, 0f, 100f);
     }
 
     public void RestoreFrom(float o2Percent, float powerPercent)
