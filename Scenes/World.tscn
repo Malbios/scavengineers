@@ -200,7 +200,13 @@ size = Vector3(0.5, 0.8, 0.4)
 size = Vector3(0.5, 0.8, 0.4)
 
 [sub_resource type="BoxShape3D" id="CorridorZoneShape"]
-size = Vector3(3.2, 3.2, 2.4)
+size = Vector3(2.2, 3.2, 2.4)
+
+[sub_resource type="BoxShape3D" id="CorridorWallSegmentShape"]
+size = Vector3(2, 3, 0.2)
+
+[sub_resource type="BoxMesh" id="CorridorWallSegmentMesh"]
+size = Vector3(2, 3, 0.2)
 
 [sub_resource type="StandardMaterial3D" id="AirlockDoorMaterial"]
 albedo_color = Color(0.85, 0.75, 0.15, 1)
@@ -219,12 +225,6 @@ size = Vector3(0.2, 3, 1.6)
 
 [sub_resource type="BoxMesh" id="DoorSlabMesh"]
 size = Vector3(0.2, 3, 1.6)
-
-[sub_resource type="BoxShape3D" id="StationFloorShape"]
-size = Vector3(6, 0.2, 6)
-
-[sub_resource type="BoxMesh" id="StationFloorMesh"]
-size = Vector3(6, 0.2, 6)
 
 [sub_resource type="BoxShape3D" id="StationWallShapeNS"]
 size = Vector3(6, 3, 0.2)
@@ -262,8 +262,8 @@ PlayerRef = NodePath("../Player")
 script = ExtResource("3")
 HasPowerGrid = true
 HasLifeSupport = true
-WestCorridorLength = 3
-EastCorridorLength = 3
+WestCorridorLength = 2
+EastCorridorLength = 2
 
 [node name="ShipZoneRoom1" type="Area3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.1, 1.5, 0)
@@ -286,20 +286,20 @@ BuildTargetRef = NodePath("../Floor")
 shape = SubResource("ShipZoneWideShape")
 
 [node name="ShipZoneCorridorWest" type="Area3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 1.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.5, 0)
 script = ExtResource("14")
 ShipSimRef = NodePath("../ShipSim")
-Tile = Vector2i(-2, 2)
+Tile = Vector2i(-1, 2)
 BuildTargetRef = NodePath("../Floor")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/ShipZoneCorridorWest"]
 shape = SubResource("CorridorZoneShape")
 
 [node name="ShipZoneCorridorEast" type="Area3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.5, 1.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 1.5, 0)
 script = ExtResource("14")
 ShipSimRef = NodePath("../ShipSim")
-Tile = Vector2i(13, 2)
+Tile = Vector2i(12, 2)
 BuildTargetRef = NodePath("../Floor")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/ShipZoneCorridorEast"]
@@ -435,7 +435,7 @@ mesh = SubResource("DoorSlabMesh")
 surface_material_override/0 = SubResource("AirlockDoorMaterial")
 
 [node name="Derelict" type="Node3D" parent="." unique_id=116891484]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 0)
 
 [node name="ShipSim" type="Node" parent="Derelict" unique_id=709254306]
 script = ExtResource("3")
@@ -443,6 +443,7 @@ HasFireHazard = true
 HasHullBreaches = true
 GridWidth = 18
 RoomSplitColumns = PackedInt32Array(6, 12)
+WestCorridorLength = 2
 
 [node name="ShipZoneRoom1" type="Area3D" parent="Derelict" node_paths=PackedStringArray("ShipSimRef")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1.5, 0)
@@ -452,6 +453,16 @@ Tile = Vector2i(2, 2)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/ShipZoneRoom1"]
 shape = SubResource("ShipZoneWideShape")
+
+[node name="ShipZoneCorridorWest" type="Area3D" parent="Derelict" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.5, 0)
+script = ExtResource("14")
+ShipSimRef = NodePath("../ShipSim")
+Tile = Vector2i(-1, 2)
+BuildTargetRef = NodePath("../Floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/ShipZoneCorridorWest"]
+shape = SubResource("CorridorZoneShape")
 
 [node name="ShipZoneRoom2" type="Area3D" parent="Derelict" node_paths=PackedStringArray("ShipSimRef")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 1.5, 0)
@@ -587,6 +598,30 @@ shape = SubResource("MidWallShapeEW")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallWestB" unique_id=6616454]
 mesh = SubResource("MidWallMeshEW")
+surface_material_override/0 = ExtResource("10")
+
+[node name="CorridorWallNorth" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("BuildTarget")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.5, -1)
+script = ExtResource("20")
+BuildTarget = NodePath("../Floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/CorridorWallNorth"]
+shape = SubResource("CorridorWallSegmentShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/CorridorWallNorth"]
+mesh = SubResource("CorridorWallSegmentMesh")
+surface_material_override/0 = ExtResource("10")
+
+[node name="CorridorWallSouth" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("BuildTarget")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.5, 1)
+script = ExtResource("20")
+BuildTarget = NodePath("../Floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/CorridorWallSouth"]
+shape = SubResource("CorridorWallSegmentShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/CorridorWallSouth"]
+mesh = SubResource("CorridorWallSegmentMesh")
 surface_material_override/0 = ExtResource("10")
 
 [node name="MidWallA" type="StaticBody3D" parent="Derelict" unique_id=1461756098 node_paths=PackedStringArray("BuildTarget")]
@@ -850,13 +885,13 @@ mesh = SubResource("DoorSlabMesh")
 surface_material_override/0 = SubResource("AirlockDoorMaterial")
 
 [node name="DerelictAirlock" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipARef", "ShipBRef", "SlabMesh", "SlabCollision") groups=["saveable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1.5, -0.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 1.5, -0.8)
 script = ExtResource("15")
 ShipARef = NodePath("../HomeShip/ShipSim")
 ShipBRef = NodePath("../Derelict/ShipSim")
 PowerFixtureId = "derelict_airlock_power"
-TileA = Vector2i(14, 2)
-TileB = Vector2i(0, 2)
+TileA = Vector2i(13, 2)
+TileB = Vector2i(-2, 2)
 SlabMesh = NodePath("SlabMesh")
 SlabCollision = NodePath("SlabCollision")
 SaveId = "derelict_airlock"
@@ -878,11 +913,13 @@ mesh = SubResource("DoorSlabMesh")
 surface_material_override/0 = SubResource("AirlockDoorMaterial")
 
 [node name="Station" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, 0)
 
 [node name="ShipSim" type="Node" parent="Station"]
 script = ExtResource("3")
 HasLifeSupport = true
+GridWidth = 6
+EastCorridorLength = 2
 
 [node name="ShipZoneRoom1" type="Area3D" parent="Station" node_paths=PackedStringArray("ShipSimRef")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
@@ -898,15 +935,21 @@ transform = Transform3D(0.866, -0.25, 0.433, 0, 0.866, 0.5, -0.5, -0.433, 0.75, 
 light_energy = 0.05
 shadow_enabled = true
 
-[node name="Floor" type="StaticBody3D" parent="Station"]
+[node name="Floor" type="StaticBody3D" parent="Station" node_paths=PackedStringArray("ShipSimRef", "ShipRoot")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Station/Floor"]
-shape = SubResource("StationFloorShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Station/Floor"]
-mesh = SubResource("StationFloorMesh")
-surface_material_override/0 = ExtResource("6")
+script = ExtResource("18")
+ShipSimRef = NodePath("../ShipSim")
+ShipRoot = NodePath("..")
+WallSegmentMesh = SubResource("WallSegmentMesh")
+WallSegmentShape = SubResource("WallSegmentShape")
+WallMaterial = ExtResource("7")
+GhostMaterial = SubResource("ConduitGhostMaterial")
+PanelMesh = SubResource("PanelMesh")
+PanelCollisionShape = SubResource("PanelCollisionShape")
+FloorPanelMaterial = ExtResource("6")
+CeilingPanelMaterial = ExtResource("8")
+AllowStructuralModification = false
+SaveId = "station_build_target"
 
 [node name="WallNorth" type="StaticBody3D" parent="Station"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -3)
@@ -958,15 +1001,35 @@ shape = SubResource("MidWallShapeEW")
 mesh = SubResource("MidWallMeshEW")
 surface_material_override/0 = ExtResource("7")
 
-[node name="Ceiling" type="StaticBody3D" parent="Station"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.1, 0)
+[node name="CorridorWallNorth" type="StaticBody3D" parent="Station"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1.5, -1)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Station/Ceiling"]
-shape = SubResource("StationFloorShape")
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Station/CorridorWallNorth"]
+shape = SubResource("CorridorWallSegmentShape")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Station/Ceiling"]
-mesh = SubResource("StationFloorMesh")
-surface_material_override/0 = ExtResource("8")
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Station/CorridorWallNorth"]
+mesh = SubResource("CorridorWallSegmentMesh")
+surface_material_override/0 = ExtResource("7")
+
+[node name="CorridorWallSouth" type="StaticBody3D" parent="Station"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1.5, 1)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Station/CorridorWallSouth"]
+shape = SubResource("CorridorWallSegmentShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Station/CorridorWallSouth"]
+mesh = SubResource("CorridorWallSegmentMesh")
+surface_material_override/0 = ExtResource("7")
+
+[node name="ShipZoneCorridorEast" type="Area3D" parent="Station" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1.5, 0)
+script = ExtResource("14")
+ShipSimRef = NodePath("../ShipSim")
+Tile = Vector2i(6, 2)
+BuildTargetRef = NodePath("../Floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Station/ShipZoneCorridorEast"]
+shape = SubResource("CorridorZoneShape")
 
 [node name="RoomLight" type="OmniLight3D" parent="Station"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
@@ -984,13 +1047,13 @@ mesh = SubResource("ComputerMesh")
 surface_material_override/0 = SubResource("TradeConsoleMaterial")
 
 [node name="StationAirlock" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipARef", "ShipBRef", "SlabMesh", "SlabCollision") groups=["saveable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1.5, -0.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 1.5, -0.8)
 script = ExtResource("15")
 ShipARef = NodePath("../HomeShip/ShipSim")
 ShipBRef = NodePath("../Station/ShipSim")
 PowerFixtureId = "station_airlock_power"
-TileA = Vector2i(-3, 2)
-TileB = Vector2i(11, 2)
+TileA = Vector2i(-2, 2)
+TileB = Vector2i(7, 2)
 SlabMesh = NodePath("SlabMesh")
 SlabCollision = NodePath("SlabCollision")
 SaveId = "station_airlock"

@@ -292,11 +292,20 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// <summary>True only for the Home Ship's Floor — seeds its current boundary/interior wall
     /// layout (and, see <see cref="BatteryMesh"/>, its Battery/Switch/RechargeStation) as real,
     /// player-removable structure once at startup (see <see cref="SeedDefaultShipLayout"/>),
-    /// through the exact same helpers a save replay uses. The Derelict/Station keep their own
-    /// fixed, non-retrofitted geometry — this wasn't asked for there, and "already wrecked" fits
-    /// a fixed shape better than "player-built" does.</summary>
+    /// through the exact same helpers a save replay uses. The Derelict/Station don't use this
+    /// seeding — the Derelict's layout is hand-authored (it's "already wrecked", not player-
+    /// built), and Station never seeds or accepts any structural change at all (see
+    /// <see cref="AllowStructuralModification"/>).</summary>
     [Export]
     public bool SeedHomeShipDefaultLayout { get; set; }
+
+    /// <summary>False makes <see cref="ResolveAvailableVerbs"/> return nothing regardless of aim
+    /// state — for a ship the player is never meant to be able to alter (the Station:
+    /// thematically, tampering with it is a crime). True (the default) everywhere else. Doesn't
+    /// affect <see cref="GenerateFloorCeilingPanels"/> — Station still gets real per-tile panels
+    /// for a consistent look, it just never offers a verb to touch them.</summary>
+    [Export]
+    public bool AllowStructuralModification { get; set; } = true;
 
     // Battery/Switch/RechargeStation meshes/shapes/materials — only wired on ships that opted
     // into the machine-construction-part system (currently just the Home Ship), same "null means
@@ -394,8 +403,15 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         AddChild(_cycleTimer);
         _cycleTimer.Timeout += OnCycleComplete;
 
+        // ConduitMesh is optional (see GenerateFloorCeilingPanels's own PanelMesh-only gate) —
+        // a ship with no conduit system (e.g. Station) has nothing to preview, and a null Mesh
+        // has zero surfaces, so overriding surface 0 would throw.
         _ghost = new MeshInstance3D { Mesh = ConduitMesh, Visible = false };
-        _ghost.SetSurfaceOverrideMaterial(0, GhostMaterial);
+        if (ConduitMesh is not null)
+        {
+            _ghost.SetSurfaceOverrideMaterial(0, GhostMaterial);
+        }
+
         AddChild(_ghost);
 
         // Deferred: ShipSimRef's own Deck is built in its _Ready(), which may not have run yet
@@ -620,7 +636,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     private IReadOnlyList<Verb> ResolveAvailableVerbs()
     {
-        if (ShipSimRef is null)
+        if (ShipSimRef is null || !AllowStructuralModification)
         {
             return [];
         }
