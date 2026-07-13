@@ -657,8 +657,13 @@ public partial class Player : CharacterBody3D
 
         // A burning cell is real smoke, not just a number — it drains O2 faster (see
         // SuitResources.Tick's inSmoke case) and gets a screen overlay below so it's actually
-        // felt, not just read off the O2 bar.
-        var inSmoke = ShipSimRef?.Deck.IsOnFire(new CellCoord(_ambientTile.X, _ambientTile.Y)) ?? false;
+        // felt, not just read off the O2 bar. Checked across the player's whole current room
+        // (ComponentContaining), not just _ambientTile's own exact cell — _ambientTile is a
+        // zone's fixed representative tile for reading the room's lumped O2/pressure (correct for
+        // that, since the whole room shares one value), but a fire is a specific cell, which
+        // could easily be a different tile in the same room from the one the zone happens to use.
+        var currentCell = new CellCoord(_ambientTile.X, _ambientTile.Y);
+        var inSmoke = ShipSimRef?.Atmosphere?.ComponentContaining(currentCell).Any(ShipSimRef.Deck.IsOnFire) ?? false;
         if (_smokeOverlay is not null)
         {
             _smokeOverlay.Visible = inSmoke;
