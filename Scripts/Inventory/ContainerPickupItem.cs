@@ -31,7 +31,8 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget
         LinearDamp = ZeroGSettleDamp;
         AngularDamp = ZeroGSettleDamp;
 
-        // See PickupItem's own Freeze default for why — same reasoning applies here.
+        // See PickupItem's own Freeze/FreezeMode default for why — same reasoning applies here.
+        FreezeMode = FreezeModeEnum.Kinematic;
         Freeze = true;
     }
 

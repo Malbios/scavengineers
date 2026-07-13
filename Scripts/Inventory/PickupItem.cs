@@ -30,10 +30,19 @@ public partial class PickupItem : RigidBody3D, IVerbTarget
         LinearDamp = ZeroGSettleDamp;
         AngularDamp = ZeroGSettleDamp;
 
-        // Completely inert by default — byte-for-byte matching the old StaticBody3D behavior
-        // (immovable, no physics response at all), so there's zero risk of an interpenetration
-        // "pop" or a fall-through from any collision-generation timing race. Only
-        // ShipAtmosphereZone unfreezes this once its room is actually confirmed to be in vacuum.
+        // Completely inert by default — matching the old StaticBody3D behavior (immovable, no
+        // physics response at all), so there's zero risk of an interpenetration "pop" or a
+        // fall-through from any collision-generation timing race. Only ShipAtmosphereZone
+        // unfreezes this once its room is actually confirmed to be in vacuum.
+        //
+        // FreezeMode must be Kinematic, not the default Static — under this project's Jolt
+        // physics backend specifically, an Area3D's overlap detection (GetOverlappingBodies,
+        // body_entered) simply cannot see an already-frozen body at all when FreezeMode is
+        // Static, so ShipAtmosphereZone could never find this item again to unfreeze it
+        // (confirmed Godot/Jolt engine limitation: godotengine/godot#103767). Kinematic freeze
+        // still means immovable-except-by-script — Area3D detection is the only thing this
+        // changes.
+        FreezeMode = FreezeModeEnum.Kinematic;
         Freeze = true;
     }
 
