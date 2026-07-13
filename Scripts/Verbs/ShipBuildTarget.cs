@@ -299,6 +299,14 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public int ExcludedEdgeColumn { get; set; } = -1;
 
+    /// <summary>Ceiling height for every cell NOT in a west/east corridor strip (see
+    /// <see cref="IsCorridorCell"/>) — corridor cells always use the plain
+    /// <see cref="CeilingPanelHeight"/>. -1 (default) means "no override," matching
+    /// CeilingPanelHeight everywhere, same as every ship before Station needed a taller room than
+    /// its own corridor.</summary>
+    [Export]
+    public float TallCeilingHeight { get; set; } = -1f;
+
     /// <summary>True for any ship whose current boundary/interior wall layout (and, see
     /// <see cref="BatteryMesh"/>, its Battery/Switch/RechargeStation) should be seeded as real,
     /// player-removable structure once at startup (see <see cref="SeedDefaultShipLayout"/>),
@@ -477,7 +485,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
         var ceilingPanel = new MeshInstance3D { Mesh = PanelMesh };
         AddChild(ceilingPanel);
-        ceilingPanel.Position = ToLocal(TileWorldPosition(tile, CeilingPanelHeight));
+        ceilingPanel.Position = ToLocal(TileWorldPosition(tile, CeilingHeightFor(cell)));
         ceilingPanel.SetSurfaceOverrideMaterial(0, CeilingPanelMaterial);
 
         var ceilingCollision = new CollisionShape3D { Shape = PanelCollisionShape };
@@ -486,6 +494,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
         _ceilingPanels[cell] = (ceilingPanel, ceilingCollision);
     }
+
+    private bool IsCorridorCell(CellCoord cell) =>
+        ShipSimRef is not null && (cell.X < 0 || cell.X >= ShipSimRef.GridWidth);
+
+    private float CeilingHeightFor(CellCoord cell) =>
+        TallCeilingHeight > 0 && !IsCorridorCell(cell) ? TallCeilingHeight : CeilingPanelHeight;
 
     /// <summary>Claims a brand-new real Deck cell beyond the ship's existing footprint —
     /// genuine dynamic ship expansion, not just repairing an existing breached panel. The edge
