@@ -41,7 +41,19 @@ public sealed class Deck
 
     public void AddCell(CellCoord cell) => _cells.Add(cell);
 
-    public void RemoveCell(CellCoord cell) => _cells.Remove(cell);
+    /// <summary>Also purges every other set's entries for this coordinate (breaches, wall-edge
+    /// breaches, sealed edges, fixtures) — leaving them behind would let a removed cell's stale
+    /// data resurface as a phantom breach/fixture for any future consumer that doesn't separately
+    /// filter through <see cref="Cells"/> first, and would grow these sets unbounded across
+    /// repeated dynamic-expansion extend/remove cycles.</summary>
+    public void RemoveCell(CellCoord cell)
+    {
+        _cells.Remove(cell);
+        _breaches.RemoveWhere(b => b.Cell == cell);
+        _wallEdgeBreaches.RemoveWhere(e => e.Item1 == cell || e.Item2 == cell);
+        _sealedEdges.RemoveWhere(e => e.Item1 == cell || e.Item2 == cell);
+        _fixtures.RemoveAll(f => f.Tile == cell);
+    }
 
     public void SealEdge(CellCoord a, CellCoord b) => _sealedEdges.Add(Normalize(a, b));
 

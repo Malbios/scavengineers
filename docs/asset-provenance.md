@@ -12,3 +12,4 @@ AI-generated **textures, decals, and icons** are fine to log here. AI-generated 
 | `Assets/Textures/derelict_floor_{albedo,normal}.png` | Procedurally generated (custom C# script, not AI-generated) | Project-owned | 2026-07-10 | Worn/dingy panel pair, ~1m tiles, deep seam groove — Derelict floor |
 | `Assets/Textures/derelict_wall_{albedo,normal}.png` | Procedurally generated (custom C# script, not AI-generated) | Project-owned | 2026-07-10 | Worn/dingy panel pair, ~2m tiles, deep seam groove — Derelict walls |
 | `Assets/Textures/derelict_ceiling_{albedo,normal}.png` | Procedurally generated (custom C# script, not AI-generated) | Project-owned | 2026-07-10 | Worn/dingy panel pair, ~1.3m tiles, deep seam groove — Derelict ceiling |
+| `Shaders/starfield_sky.gdshader` | Procedurally generated (hand-authored GDShader, not AI-generated) | Project-owned | 2026-07-13 | Hash-noise starfield skybox — no baked texture, stars generated live per-pixel from EYEDIR |

@@ -1,6 +1,6 @@
 ---
 name: cq
-description: Spawns parallel subagents to review code quality/architecture adherence, find missing test coverage, and flag forward-looking risks (TODOs, localization/save/asset gaps) in this repo. Manually triggered only — not something to auto-invoke. Defaults to just what's changed since main; pass "full" to scan the whole repo, or a path to scope to one area.
+description: Spawns parallel subagents to review code quality/architecture adherence, find missing test coverage, and flag forward-looking risks (TODOs, localization/save/asset gaps) in this repo. Manually triggered only — not something to auto-invoke. Defaults to uncommitted changes, or everything since the last /cq run (tracked in .claude/skills/cq/last-run.txt) if nothing's uncommitted; pass "full" to scan the whole repo, or a path to scope to one area.
 disable-model-invocation: true
 ---
 
@@ -13,16 +13,23 @@ cloud review.
 
 Read the skill's `args`:
 
-- **No args, or args mention "changed"/"diff"** (default): find what's changed on the current
-  branch relative to `main` — `git fetch origin main --quiet` then
-  `git diff --name-only origin/main...HEAD` (fall back to local `main` if there's no remote
-  tracking branch). This is the file list every subagent scopes to.
-  - If the list is empty (already on `main`, nothing to compare), say so and ask whether to run
-    a full-repo pass instead rather than silently doing one.
-- **Args contain "full" or "repo"**: scope every subagent to the whole repository (skip the git
-  diff step entirely).
+- **Args contain "full" or "repo"**: scope every subagent to the whole repository (skip
+  everything below entirely).
 - **Args name a path** (e.g. `Scripts/Ship`, `Scavengineers.Sim`): scope every subagent to that
-  path specifically.
+  path specifically (skip everything below entirely).
+- **No args, or args mention "changed"/"diff"** (default): this project commits directly to
+  `main` constantly rather than working on long-lived branches, so "diff vs `main`" is almost
+  always empty. Scope instead like this:
+  - **Uncommitted changes exist** (`git status --porcelain` is non-empty): scope to those changed
+    files — this is a normal in-progress-work check.
+  - **Nothing uncommitted** (the common case): read `.claude/skills/cq/last-run.txt` (a single
+    commit SHA this skill writes after each run — see step 3). If it exists, scope to
+    `git diff --name-only <marker-sha>..HEAD`. If that range is empty (already reviewed
+    everything), say so plainly rather than silently running a full-repo pass.
+  - **No marker file exists yet** (first-ever run, or it's gone missing): ask the user what
+    should count as the starting point — don't guess silently, since "since last run" is
+    meaningless without one. Once they answer, proceed with that range for this run, then write
+    the marker per step 3 so future runs don't need to ask again.
 
 Always read `CLAUDE.md` (both this repo's and, if relevant, referenced `docs/architecture/*.md`
 extracts) before dispatching agents — every subagent prompt below needs the actual rule text
@@ -82,3 +89,10 @@ most-severe-first. Call `ReportFindings` once with the consolidated list — don
 findings as plain text, and don't call it per-lane. Set `level` to roughly match the scope size
 (`low`/`medium` for a diff-scoped run, `high` for a full-repo run). If a lane found nothing,
 that's fine — an empty findings array is a valid, useful result, not a failure.
+
+After reporting, write the current `HEAD` commit SHA to `.claude/skills/cq/last-run.txt`
+(overwrite, single line, no trailing content) so the next default-scoped run knows where this one
+left off — even when scoped to a specific path or "full" rather than the default marker range,
+still update the marker, since a review of everything up to `HEAD` covers everything a
+marker-based diff would have anyway. Skip this write only if the scope was a plain uncommitted-
+changes check (nothing new has landed on `HEAD` to mark).

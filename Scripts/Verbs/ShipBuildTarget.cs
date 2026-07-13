@@ -1434,9 +1434,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     }
 
     /// <summary>The world/local height of a wall conduit's given height slot, 0-indexed bottom to
-    /// top — slot count is derived from <see cref="WallHeight"/>, not fixed, so this stays correct
-    /// if that ever changes. Slot 1 of today's 3 lands exactly on <see cref="WallCenterHeight"/>,
-    /// matching where the single-slot system used to always place its one conduit.</summary>
+    /// top — slot count is derived from <see cref="WallHeight"/>, not fixed, so both the count
+    /// and each slot's actual height stay correct automatically if <see cref="WallHeight"/> ever
+    /// changes again (today: <see cref="WallSlotCount"/> is 2, matching a 2m wall).</summary>
     private static float SlotHeight(int slot) => (slot + 0.5f) * WallSlotHeight;
 
     /// <summary>Same edge position/rotation a wall segment would use, nudged toward whichever tile
@@ -1869,7 +1869,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         {
             var tile = new Vector2I(wallConduit.TileX, wallConduit.TileY);
             var neighbor = new CellCoord(wallConduit.NeighborX, wallConduit.NeighborY);
-            InstallConduit(new ConduitSlot(tile, neighbor, wallConduit.Slot));
+
+            // Clamp rather than trust the saved value as-is — a save written before a wall-height
+            // change (fewer/shorter slots today than when it was saved) could otherwise place a
+            // conduit above the current ceiling; live aiming already clamps the same way.
+            var slot = Mathf.Clamp(wallConduit.Slot, 0, WallSlotCount - 1);
+            InstallConduit(new ConduitSlot(tile, neighbor, slot));
         }
 
         foreach (var edge in state.Walls)

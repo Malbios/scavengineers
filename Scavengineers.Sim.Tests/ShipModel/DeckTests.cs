@@ -118,6 +118,27 @@ public class DeckTests
     }
 
     [Fact]
+    public void RemoveCell_AlsoPurgesBreachesSealedEdgesWallEdgeBreachesAndFixturesForThatCell()
+    {
+        var deck = new Deck();
+        var cell = new CellCoord(0, 0);
+        var neighbor = new CellCoord(1, 0);
+        deck.AddCell(cell);
+        deck.AddCell(neighbor);
+        deck.BreachHull(cell, StructuralSurface.Floor);
+        deck.SealEdge(cell, neighbor);
+        deck.BreachWallEdge(cell, new CellCoord(-1, 0));
+        deck.AddFixture(new ConduitFixture("conduit-1", cell, FixtureSurface.FloorUnderside));
+
+        deck.RemoveCell(cell);
+
+        Assert.False(deck.IsHullBreached(cell, StructuralSurface.Floor));
+        Assert.False(deck.IsEdgeSealed(cell, neighbor));
+        Assert.False(deck.IsWallEdgeBreached(cell, new CellCoord(-1, 0)));
+        Assert.DoesNotContain(deck.Fixtures, f => f.Tile == cell);
+    }
+
+    [Fact]
     public void AddFixture_IsRetrievableFromFixturesList()
     {
         var deck = new Deck();
