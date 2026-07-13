@@ -80,7 +80,7 @@ public readonly record struct TileCoord(int X, int Y);
 
 public readonly record struct EdgeCoord(int AX, int AY, int BX, int BY);
 
-/// <summary>Slot defaults to 1 (today's "Mid" height, 3 slots per wall) so a save written before
+/// <summary>Slot defaults to 1 (today's top height, 2 slots per wall) so a save written before
 /// wall conduits had height slots keeps its wire at the same visual height it was saved at.</summary>
 public readonly record struct WallConduitCoord(int TileX, int TileY, int NeighborX, int NeighborY, int Slot = 1);
 

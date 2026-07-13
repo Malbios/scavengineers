@@ -113,7 +113,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     // that edge instead of the tile itself — half of this margin on each side of every boundary.
     private const float EdgeMargin = 0.25f;
 
-    private const float WallCenterHeight = 1.5f;
+    private const float WallCenterHeight = 1.0f;
 
     // Half the conduit mesh's own 0.05 thickness above the floor's actual top surface (Y=0,
     // matching FloorPanelHeight's own surface-alignment note below) — resting flush on the
@@ -125,7 +125,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     // automatically rather than a hand-picked fixed count. WallHeight matches
     // WallSegmentShape/WallSegmentMesh's authored Y size (see World.tscn), the same
     // hand-kept-in-sync convention WallCenterHeight already uses for that same mesh.
-    private const float WallHeight = 3f;
+    private const float WallHeight = 2f;
     private const float TileSize = 1f;
     private static readonly int WallSlotCount = Mathf.RoundToInt(WallHeight / TileSize);
     private static readonly float WallSlotHeight = WallHeight / WallSlotCount;
@@ -136,7 +136,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     // (FloorConduitHeight) — sharing that height with conduits is what caused the panels to
     // z-fight with them.
     private const float FloorPanelHeight = -0.025f;
-    private const float CeilingPanelHeight = 3.025f;
+    private const float CeilingPanelHeight = 2.025f;
 
     // ConduitDropMesh's own authored length (see World.tscn) — BuildWallConduitVisual scales a
     // fresh instance of it to whatever the *actual* measured gap to the floor conduit turns out
