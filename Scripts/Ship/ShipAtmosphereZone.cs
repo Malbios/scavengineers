@@ -1,7 +1,6 @@
 using Godot;
 using Scavengineers.Scripts.Verbs;
 using Scavengineers.Sim.Grid;
-using PlayerScript = Scavengineers.Scripts.Player.Player;
 
 namespace Scavengineers.Scripts.Ship;
 
@@ -38,11 +37,6 @@ public partial class ShipAtmosphereZone : Area3D
     [Export]
     public ShipBuildTarget? BuildTargetRef { get; set; }
 
-    public override void _Ready()
-    {
-        BodyEntered += OnBodyEntered;
-    }
-
     public override void _PhysicsProcess(double delta)
     {
         if (ShipSimRef is null)
@@ -58,43 +52,44 @@ public partial class ShipAtmosphereZone : Area3D
         Gravity = 0f;
     }
 
-    /// <summary>Called from a loose pickup's own _PhysicsProcess to freeze/unfreeze itself based
-    /// on whichever zone it's currently standing in — the item queries space for its zone, rather
-    /// than the zone tracking the item via GetOverlappingBodies/BodyEntered, because Jolt's Area3D
-    /// overlap monitoring silently excludes static and frozen bodies by default (confirmed
-    /// Godot/Jolt engine limitation: godotengine/godot#103767) — a zone could never find an
-    /// already-frozen item again to unfreeze it. A direct space query isn't gated by that
-    /// monitoring optimization, since there's no "overlap pair" being cached: it asks "what's
-    /// here right now," which doesn't care whether the item making the query is frozen.</summary>
-    public static void UpdateFreezeState(RigidBody3D item)
+    /// <summary>Finds whichever zone's Area3D shape currently contains a world position, via a
+    /// direct physics-space point query rather than Area3D's own overlap-monitoring signals
+    /// (BodyEntered/GetOverlappingBodies). Those signals only fire on a discrete "entered"
+    /// transition, which is easy to miss: Jolt's monitoring silently excludes static/frozen bodies
+    /// by default (confirmed Godot/Jolt engine limitation: godotengine/godot#103767), and even a
+    /// normally-detected body can cross a thin shared boundary within a single physics tick
+    /// without ever registering as "entered." A direct query has no transition to miss — it asks
+    /// "what's here right now" — at the cost of running every frame instead of once per
+    /// crossing, negligible at this game's scale.</summary>
+    public static ShipAtmosphereZone? FindZoneAt(World3D world3D, Vector3 position)
     {
-        var spaceState = item.GetWorld3D().DirectSpaceState;
+        var spaceState = world3D.DirectSpaceState;
         var query = new PhysicsPointQueryParameters3D
         {
-            Position = item.GlobalPosition,
+            Position = position,
             CollideWithBodies = false,
             CollideWithAreas = true,
         };
 
         foreach (var result in spaceState.IntersectPoint(query))
         {
-            if (result["collider"].As<GodotObject>() is ShipAtmosphereZone { ShipSimRef: { } shipSim } zone)
+            if (result["collider"].As<GodotObject>() is ShipAtmosphereZone zone)
             {
-                var isVacuum = shipSim.VolumeAt(new CellCoord(zone.Tile.X, zone.Tile.Y)).O2Fraction <= ZeroGO2Threshold;
-                item.Freeze = !isVacuum;
-                return;
+                return zone;
             }
         }
+
+        return null;
     }
 
-    // Deliberately no BodyExited handler: the corridor between the two zones isn't its own
-    // simulated space, so leaving a zone just holds the last room's reading rather than
-    // clearing to nothing — entering the *other* zone is what overwrites it.
-    private void OnBodyEntered(Node3D body)
+    /// <summary>Called from a loose pickup's own _PhysicsProcess to freeze/unfreeze itself based
+    /// on whichever zone it's currently standing in.</summary>
+    public static void UpdateFreezeState(RigidBody3D item)
     {
-        if (body is PlayerScript player)
+        if (FindZoneAt(item.GetWorld3D(), item.GlobalPosition) is { ShipSimRef: { } shipSim } zone)
         {
-            player.SetAmbientShipSim(ShipSimRef, Tile, BuildTargetRef);
+            var isVacuum = shipSim.VolumeAt(new CellCoord(zone.Tile.X, zone.Tile.Y)).O2Fraction <= ZeroGO2Threshold;
+            item.Freeze = !isVacuum;
         }
     }
 }

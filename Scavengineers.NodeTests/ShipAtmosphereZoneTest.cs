@@ -1,3 +1,5 @@
+using System.Threading.Tasks;
+
 using GdUnit4;
 using Godot;
 using Scavengineers.Scripts.Ship;
@@ -50,5 +52,82 @@ public class ShipAtmosphereZoneTest
         zone._PhysicsProcess(0);
 
         AssertBool(zone.GravitySpaceOverride == Area3D.SpaceOverride.Disabled).IsTrue();
+    }
+
+    private static ShipAtmosphereZone MakeZoneWithShape(SceneTree sceneTree, ShipSim shipSim, Vector2I tile, Vector3 position, Vector3 shapeSize)
+    {
+        var zone = new ShipAtmosphereZone
+        {
+            ShipSimRef = shipSim,
+            Tile = tile,
+            Transform = new Transform3D(Basis.Identity, position),
+        };
+        sceneTree.Root.AddChild(zone);
+        var collision = new CollisionShape3D { Shape = new BoxShape3D { Size = shapeSize } };
+        zone.AddChild(collision);
+        return zone;
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task FindZoneAt_FindsTheZoneWhoseShapeContainsThePosition()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var shipSim = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(shipSim);
+
+        var zone = AutoFree(MakeZoneWithShape(
+            sceneTree, shipSim, new Vector2I(5, 5), new Vector3(10, 1, 0), new Vector3(4, 2, 2)));
+
+        // A newly-added CollisionShape3D only registers with the physics server on the next
+        // physics step — querying it in the same frame it was added finds nothing yet.
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+
+        var found = ShipAtmosphereZone.FindZoneAt(zone.GetWorld3D(), new Vector3(10, 1, 0));
+
+        AssertBool(ReferenceEquals(found, zone)).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void FindZoneAt_ReturnsNull_WhenNoZoneCoversThePosition()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var shipSim = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(shipSim);
+
+        var zone = AutoFree(MakeZoneWithShape(
+            sceneTree, shipSim, new Vector2I(5, 5), new Vector3(10, 1, 0), new Vector3(4, 2, 2)));
+
+        var found = ShipAtmosphereZone.FindZoneAt(zone.GetWorld3D(), new Vector3(1000, 1, 0));
+
+        AssertObject(found).IsNull();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task FindZoneAt_InOverlapBand_PicksWhicheverZonesShapeActuallyContainsThePosition()
+    {
+        // Mirrors the real airlock-threshold layout: two zones (e.g. one per ship) whose shapes
+        // deliberately overlap by a margin — the position itself, not "last entered", decides
+        // which zone answers, so there's no stale-tracking risk crossing between them.
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var shipA = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(shipA);
+        var shipB = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(shipB);
+
+        var zoneA = AutoFree(MakeZoneWithShape(
+            sceneTree, shipA, new Vector2I(1, 1), new Vector3(10, 1, 0), new Vector3(4, 2, 2))); // spans x[8,12]
+        var zoneB = AutoFree(MakeZoneWithShape(
+            sceneTree, shipB, new Vector2I(2, 2), new Vector3(12, 1, 0), new Vector3(4, 2, 2))); // spans x[10,14]
+
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+
+        var deepInA = ShipAtmosphereZone.FindZoneAt(zoneA.GetWorld3D(), new Vector3(8.5f, 1, 0));
+        var deepInB = ShipAtmosphereZone.FindZoneAt(zoneA.GetWorld3D(), new Vector3(13.5f, 1, 0));
+
+        AssertBool(ReferenceEquals(deepInA, zoneA)).IsTrue();
+        AssertBool(ReferenceEquals(deepInB, zoneB)).IsTrue();
     }
 }

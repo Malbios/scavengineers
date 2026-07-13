@@ -75,11 +75,22 @@ public partial class Player : CharacterBody3D
     /// decompression-pull hazard in the zero-g branch of _PhysicsProcess.</summary>
     private ShipBuildTarget? _ambientBuildTarget;
 
-    public void SetAmbientShipSim(ShipSim? shipSim, Vector2I tile, ShipBuildTarget? buildTarget = null)
+    /// <summary>Queries physics space for whichever ShipAtmosphereZone currently contains the
+    /// player, every physics frame, rather than caching whatever the last BodyEntered signal
+    /// said. That signal-based approach missed real transitions in practice — crossing a shared
+    /// zone boundary within a single physics tick never fires "entered" at all — leaving the
+    /// ambient O2 reading stuck on a stale ship/room (permanently wrong if that ship never
+    /// regenerates air). A live query can't go stale: if no zone is found (e.g. a true gap
+    /// between two rooms), the previous reading is deliberately left alone rather than cleared,
+    /// same "hold the last room's reading" behavior as before.</summary>
+    private void UpdateAmbientShipSim()
     {
-        ShipSimRef = shipSim;
-        _ambientTile = tile;
-        _ambientBuildTarget = buildTarget;
+        if (ShipAtmosphereZone.FindZoneAt(GetWorld3D(), GlobalPosition) is { } zone)
+        {
+            ShipSimRef = zone.ShipSimRef;
+            _ambientTile = zone.Tile;
+            _ambientBuildTarget = zone.BuildTargetRef;
+        }
     }
 
     private Node3D? _head;
@@ -577,6 +588,8 @@ public partial class Player : CharacterBody3D
             _busyTarget = null;
             _busyVerb = null;
         }
+
+        UpdateAmbientShipSim();
 
         // A vented/breached room reads as vacuum — read up front since it now also decides which
         // movement mode applies below, not just the suit-resource drain further down.
