@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 
 using Godot;
-using Scavengineers.Scripts.Ship;
 using Scavengineers.Scripts.Verbs;
 using PlayerScript = Scavengineers.Scripts.Player.Player;
 
@@ -36,7 +35,11 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget
         Freeze = true;
     }
 
-    public override void _PhysicsProcess(double delta) => ShipAtmosphereZone.UpdateFreezeState(this);
+    public override void _PhysicsProcess(double delta)
+    {
+        Freeze = false;
+        SetPhysicsProcess(false); // one-time — nothing else to do once past the startup race
+    }
 
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 

@@ -46,8 +46,9 @@ public partial class Player : CharacterBody3D
     // Placeholder/tunable — CharacterBody3D doesn't push RigidBody3D obstacles on its own
     // (MoveAndSlide resolves the character's own motion but never applies a reciprocal impulse to
     // whatever it collided with), so a loose item the player walks into would otherwise never
-    // move even once unfrozen/drifting in zero-g (see ShipAtmosphereZone). A frozen item (the
-    // normal-gravity default) just ignores the impulse, so this never needs its own zero-g check.
+    // move (see PickupItem). Only a briefly-frozen item (its own one-tick startup grace right
+    // after spawning) ignores the impulse — everything else is a live physics body, whether
+    // resting under normal gravity or drifting in zero-g.
     private const float ItemPushImpulse = 2f;
 
     // Decompression pull (placeholder/tunable) — an open floor/ceiling breach's own "unsecured
@@ -733,9 +734,8 @@ public partial class Player : CharacterBody3D
         Velocity = velocity;
         MoveAndSlide();
 
-        // Shove any unfrozen (i.e. actually drifting in zero-g) loose item the player collided
-        // with this frame — see ItemPushImpulse's own doc comment for why this doesn't happen
-        // automatically. A frozen item (normal gravity) just ignores the impulse.
+        // Shove any loose item the player collided with this frame — see ItemPushImpulse's own
+        // doc comment for why this doesn't happen automatically.
         for (var i = 0; i < GetSlideCollisionCount(); i++)
         {
             if (GetSlideCollision(i).GetCollider() is RigidBody3D { Freeze: false } rigidBody)

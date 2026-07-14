@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 
 using Godot;
-using Scavengineers.Scripts.Ship;
 using Scavengineers.Scripts.Verbs;
 
 namespace Scavengineers.Scripts.Inventory;
@@ -32,15 +31,23 @@ public partial class PickupItem : RigidBody3D, IVerbTarget
         LinearDamp = ZeroGSettleDamp;
         AngularDamp = ZeroGSettleDamp;
 
-        // Completely inert by default — matching the old StaticBody3D behavior (immovable, no
-        // physics response at all), so there's zero risk of an interpenetration "pop" or a
-        // fall-through from any collision-generation timing race. Only unfrozen once this item's
-        // own _PhysicsProcess (see ShipAtmosphereZone.UpdateFreezeState) confirms its current room
-        // is actually in vacuum.
+        // Starts frozen for exactly one physics tick — matching the old StaticBody3D behavior
+        // (immovable, no physics response at all) just long enough to dodge a one-time startup
+        // race: on the very first frame a ship's scene loads, a sibling's floor CollisionShape3D
+        // may not exist yet, since ShipBuildTarget.GenerateFloorCeilingPanels builds it via
+        // CallDeferred from its own _Ready(). By the time this item's own first _PhysicsProcess
+        // fires, Godot has already fully flushed that frame's deferred-call queue (same guarantee
+        // ShipSim.SeedVacuumFromInitialBreaches relies on), so it's safe to unfreeze there once
+        // and never touch Freeze again — real physics (gravity, friction, player pushes) from
+        // then on, regardless of room pressurization.
         Freeze = true;
     }
 
-    public override void _PhysicsProcess(double delta) => ShipAtmosphereZone.UpdateFreezeState(this);
+    public override void _PhysicsProcess(double delta)
+    {
+        Freeze = false;
+        SetPhysicsProcess(false); // one-time — nothing else to do once past the startup race
+    }
 
     public IReadOnlyList<Verb> AvailableVerbs { get; } = [PickUpVerb];
 

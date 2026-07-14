@@ -24,13 +24,13 @@ public partial class ShipAtmosphereZone : Area3D
     [Export]
     public ShipSim? ShipSimRef { get; set; }
 
-    /// <summary>Any tile within this zone's room — used as a fallback representative reading
-    /// (e.g. for the loose-pickup freeze check, and for the real physics gravity override below,
-    /// which is inherently zone-wide since Godot's Area3D gravity override can't vary per body
-    /// position). The player's own O2/zero-g reading no longer uses this: since atmosphere now
-    /// diffuses per-cell rather than equalizing a whole room instantly, different tiles in the
-    /// same room can genuinely disagree near a fresh breach, so the player reads its own actual
-    /// current tile instead — see <see cref="TileAt"/>.</summary>
+    /// <summary>Any tile within this zone's room — used as a fallback representative reading for
+    /// the real physics gravity override below, which is inherently zone-wide since Godot's
+    /// Area3D gravity override can't vary per body position. The player's own O2/zero-g reading
+    /// no longer uses this: since atmosphere now diffuses per-cell rather than equalizing a whole
+    /// room instantly, different tiles in the same room can genuinely disagree near a fresh
+    /// breach, so the player reads its own actual current tile instead — see
+    /// <see cref="TileAt"/>.</summary>
     [Export]
     public Vector2I Tile { get; set; }
 
@@ -99,14 +99,4 @@ public partial class ShipAtmosphereZone : Area3D
         return new Vector2I(Mathf.FloorToInt(local.X + 3), Mathf.FloorToInt(local.Z + 3));
     }
 
-    /// <summary>Called from a loose pickup's own _PhysicsProcess to freeze/unfreeze itself based
-    /// on whichever zone it's currently standing in.</summary>
-    public static void UpdateFreezeState(RigidBody3D item)
-    {
-        if (FindZoneAt(item.GetWorld3D(), item.GlobalPosition) is { ShipSimRef: { } shipSim } zone)
-        {
-            var isVacuum = shipSim.VolumeAt(new CellCoord(zone.Tile.X, zone.Tile.Y)).O2Fraction <= ZeroGO2Threshold;
-            item.Freeze = !isVacuum;
-        }
-    }
 }
