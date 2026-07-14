@@ -5,7 +5,7 @@ using Scavengineers.Scripts.Verbs;
 
 namespace Scavengineers.Scripts.Inventory;
 
-public partial class PickupItem : RigidBody3D, IVerbTarget
+public partial class PickupItem : RigidBody3D, IVerbTarget, IPhysicsPresenceAware
 {
     private static readonly Verb PickUpVerb = new("pick_up", "VERB_PICK_UP", DurationSeconds: 0f);
 
@@ -47,6 +47,29 @@ public partial class PickupItem : RigidBody3D, IVerbTarget
     {
         Freeze = false;
         SetPhysicsProcess(false); // one-time — nothing else to do once past the startup race
+    }
+
+    /// <summary>Called by TravelConsoleVerbTarget.SetShipPresence when this item's ship stops or
+    /// starts being physically present. Not present: freeze immediately and zero out any
+    /// velocity — nothing exists underneath it anymore once the ship's collision is disabled, so
+    /// a live body would fall forever. Present again: re-arm the exact same one-tick startup
+    /// grace _Ready uses (freeze, then unfreeze on the next physics tick), since the ship's
+    /// collision was just re-enabled and deserves the same one-frame settle this item already
+    /// trusts at initial spawn.</summary>
+    public void SetPhysicsPresence(bool present)
+    {
+        Freeze = true;
+
+        if (present)
+        {
+            SetPhysicsProcess(true);
+        }
+        else
+        {
+            LinearVelocity = Vector3.Zero;
+            AngularVelocity = Vector3.Zero;
+            SetPhysicsProcess(false); // don't let the one-shot _PhysicsProcess undo this freeze
+        }
     }
 
     public IReadOnlyList<Verb> AvailableVerbs { get; } = [PickUpVerb];

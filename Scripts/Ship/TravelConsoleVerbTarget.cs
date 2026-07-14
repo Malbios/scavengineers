@@ -137,9 +137,12 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         SetShipPresence(DerelictGroup, !atStation);
     }
 
-    /// <summary>Toggles both halves of "is this ship actually here": Node3D.Visible for
-    /// rendering, plus every descendant CollisionShape3D's own Disabled flag for physics — Visible
-    /// alone doesn't stop the player from walking/floating into a hidden ship's geometry.</summary>
+    /// <summary>Toggles all three halves of "is this ship actually here": Node3D.Visible for
+    /// rendering, every descendant CollisionShape3D's own Disabled flag for physics — Visible
+    /// alone doesn't stop the player from walking/floating into a hidden ship's geometry — and
+    /// every descendant IPhysicsPresenceAware (loose PickupItem/ContainerPickupItem pickups),
+    /// since a live RigidBody3D has nothing to rest on once this group's own collision is
+    /// disabled and would otherwise fall through the now-decollided floor forever.</summary>
     private static void SetShipPresence(Node3D? group, bool present)
     {
         if (group is null)
@@ -154,6 +157,14 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
             if (node is CollisionShape3D shape)
             {
                 shape.Disabled = !present;
+            }
+        }
+
+        foreach (var node in group.FindChildren("*", recursive: true, owned: false))
+        {
+            if (node is IPhysicsPresenceAware presenceAware)
+            {
+                presenceAware.SetPhysicsPresence(present);
             }
         }
     }
