@@ -253,8 +253,23 @@ public partial class ShipSim : Node
         _fire?.Tick(delta);
     }
 
-    public AtmosphereVolume VolumeAt(CellCoord cell) =>
-        _atmosphere?.VolumeAt(cell) ?? AtmosphereVolume.Breathable;
+    /// <summary>Breathable if this ship's atmosphere isn't wired up at all (e.g. queried before
+    /// _Ready), otherwise the modeled cell's real volume — or, if <paramref name="cell"/> isn't
+    /// one of this ship's own modeled Deck cells at all, Vacuum. That last case is reachable in
+    /// practice: a world-position-derived tile (see ShipAtmosphereZone.TileAt, used for the
+    /// player's own current-cell O2 read) can land in the unmodeled seam between two docked
+    /// ships' airlock corridors, just past this ship's own WestCorridorLength/EastCorridorLength
+    /// — treating that as open space is both physically sensible and avoids
+    /// AtmosphereSystem.VolumeAt's own hard KeyNotFoundException on an unrecognized cell.</summary>
+    public AtmosphereVolume VolumeAt(CellCoord cell)
+    {
+        if (_atmosphere is null)
+        {
+            return AtmosphereVolume.Breathable;
+        }
+
+        return Deck.Cells.Contains(cell) ? _atmosphere.VolumeAt(cell) : AtmosphereVolume.Vacuum;
+    }
 
     /// <summary>Topologically connected to a source AND (if this ship has a battery at all)
     /// that battery actually has charge — a ship with no battery (e.g. the Derelict, whose only
