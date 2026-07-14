@@ -1829,11 +1829,22 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             {
                 yield return TileWorldPosition(tile, CeilingPanelHeight);
             }
+
+            // Wall, per-CELL rather than per-edge (see Deck.BreachHull's own doc comment) — a
+            // direct "this whole cell is exposed to vacuum" event, e.g. AirlockDoorVerbTarget
+            // venting its adjacent cell to space while undocked. Distinct from the per-edge wall
+            // breaches below (a player-removed wall segment) — this one has no specific edge to
+            // point at, just the cell itself, so it uses the tile's own center at wall height.
+            if (ShipSimRef.Deck.IsHullBreached(cell, StructuralSurface.Wall))
+            {
+                yield return TileWorldPosition(tile, WallCenterHeight);
+            }
         }
 
-        // Floor/ceiling breaches are tracked per-cell (handled above); a breached/removed wall is
-        // tracked per-edge instead (Deck.WallEdgeBreaches, not the per-cell _breaches set), so it
-        // needs its own pass rather than fitting into IsHullBreached(cell, surface) above.
+        // Floor/ceiling/per-cell-wall breaches are tracked per-cell (handled above); a breached/
+        // removed wall SEGMENT is tracked per-edge instead (Deck.WallEdgeBreaches, not the
+        // per-cell _breaches set), so it needs its own pass rather than fitting into
+        // IsHullBreached(cell, surface) above.
         foreach (var (a, b) in ShipSimRef.Deck.WallEdgeBreaches)
         {
             yield return EdgeWorldPosition(a, b);

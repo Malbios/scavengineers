@@ -88,15 +88,29 @@ public partial class Player : CharacterBody3D
     /// Reads the zone's TileAt(GlobalPosition) — the player's own actual current cell — rather
     /// than the zone's fixed representative Tile: atmosphere now diffuses per-cell instead of
     /// equalizing a whole room instantly, so a cell right next to a fresh breach can genuinely
-    /// read very differently from one across the same room.</summary>
-    private void UpdateAmbientShipSim()
+    /// read very differently from one across the same room.
+    ///
+    /// Returns the zone actually found THIS frame (as opposed to the cached fields above, which
+    /// may still hold an older room's data) — the decompression-pull hazard needs this live
+    /// signal specifically: once the player has actually drifted out through a breach and left
+    /// the room's zone, continuing to pull toward that same fixed breach position from the far
+    /// side would pull them back inside, causing a pendulum (out, back in, out again) instead of
+    /// a clean exit. It also lets the pull tell "a breach in MY room" apart from "a breach in some
+    /// other room the atmosphere sim happens to still consider connected" (e.g. through a door
+    /// that's since been opened) — see the pull block's own same-zone check. Every other use of
+    /// the cached fields (O2 readout, suit drain) intentionally keeps holding the last known room
+    /// even outside a zone, so this doesn't change that.</summary>
+    private ShipAtmosphereZone? UpdateAmbientShipSim()
     {
         if (ShipAtmosphereZone.FindZoneAt(GetWorld3D(), GlobalPosition) is { } zone)
         {
             ShipSimRef = zone.ShipSimRef;
             _ambientTile = zone.TileAt(GlobalPosition);
             _ambientBuildTarget = zone.BuildTargetRef;
+            return zone;
         }
+
+        return null;
     }
 
     private Node3D? _head;
@@ -595,14 +609,24 @@ public partial class Player : CharacterBody3D
             _busyVerb = null;
         }
 
-        UpdateAmbientShipSim();
+        var ambientZone = UpdateAmbientShipSim();
+        var currentCell = new CellCoord(_ambientTile.X, _ambientTile.Y);
 
         // A vented/breached room reads as vacuum — read up front since it now also decides which
         // movement mode applies below, not just the suit-resource drain further down.
-        var roomVolume = ShipSimRef?.VolumeAt(new CellCoord(_ambientTile.X, _ambientTile.Y));
+        var roomVolume = ShipSimRef?.VolumeAt(currentCell);
         var inZeroG = (roomVolume?.O2Fraction ?? 0.21) <= ShipAtmosphereZone.ZeroGO2Threshold
             || (!IsOnFloor() && NoFloorBelow());
         MotionMode = inZeroG ? MotionModeEnum.Floating : MotionModeEnum.Grounded;
+
+        // A ship with no life support (e.g. the Derelict) never regenerates air, so a room's
+        // O2Fraction can stay at "reads as vacuum" forever even after its own breach is patched
+        // and it's properly sealed off again — inZeroG alone can't tell "still actively venting"
+        // apart from "permanently dead air, but sealed and safe now." The decompression-pull
+        // hazard specifically needs the real graph check instead, or it keeps pulling toward some
+        // other, unrelated breach elsewhere on the ship (through a closed, sealed door) just
+        // because it's within raw range — see the pull block below.
+        var isConnectedToOutside = ShipSimRef?.Atmosphere?.IsConnectedToOutside(currentCell) ?? false;
 
         // Read before this frame's _needs.Tick further down — one frame of staleness against a
         // drain that only moves per-second is irrelevant, and movement needs this before the
@@ -666,12 +690,42 @@ public partial class Player : CharacterBody3D
             }
 
             // Not gated on IsNearSurface/IsBusy like thrust above — decompression isn't
-            // something you opt into, it applies to anyone unsecured near an open breach.
-            if (_ambientBuildTarget is not null)
+            // something you opt into, it applies to anyone unsecured near an open breach. Full
+            // DecompressionPullAcceleration applies at a constant rate any time inZeroG is true
+            // (i.e. the room is actively vented) — NOT scaled by the room's current Pressure:
+            // whole-component venting (AtmosphereSystem.Vent) now drives Pressure to near-zero
+            // within about a second and it never recovers, so a Pressure-scaled pull would decay
+            // to an imperceptible force almost immediately rather than a sustained rushing-air
+            // pull for as long as the breach stays open.
+            //
+            // Also requires ambientZone (this frame's live lookup, not the cached fields below) —
+            // once actually through the hole and out of the room's zone, the cached breach
+            // position/room data would otherwise keep pulling from the far side, back inside,
+            // causing a pendulum instead of a clean exit (see UpdateAmbientShipSim's own doc).
+            //
+            // Also requires isConnectedToOutside (the real graph check, not just inZeroG) — on a
+            // ship with no life support, a sealed, already-patched room can still read as zero-g
+            // forever, and without this check the loop below would keep pulling toward some
+            // *other* breach elsewhere on the ship — including one behind a closed, sealed door —
+            // just because ActiveBreachPositions() lists every breach on the whole ship and the
+            // range check alone can't tell "actually reachable by air from here" apart from
+            // "happens to be within 5m in a straight line through solid walls."
+            if (_ambientBuildTarget is not null && ambientZone is not null && isConnectedToOutside)
             {
-                var pullStrength = Mathf.Clamp((float)((roomVolume?.Pressure ?? 0) / AtmosphereVolume.Breathable.Pressure), 0f, 1f);
                 foreach (var breachPosition in _ambientBuildTarget.ActiveBreachPositions())
                 {
+                    // Same reasoning as the range check below, but for room topology instead of
+                    // raw distance: atmosphere connectivity can span multiple rooms through an
+                    // open (unsealed) door, so a breach can be "connected" from here while still
+                    // being physically in a DIFFERENT room. A straight-line pull toward it would
+                    // cut through the dividing wall instead of following the doorway — only pull
+                    // toward a breach actually inside the same room/zone the player is standing
+                    // in right now.
+                    if (!ReferenceEquals(ShipAtmosphereZone.FindZoneAt(GetWorld3D(), breachPosition), ambientZone))
+                    {
+                        continue;
+                    }
+
                     var toBreach = breachPosition - GlobalPosition;
                     var distance = toBreach.Length();
                     if (distance > DecompressionPullRange || distance < 0.01f)
@@ -679,7 +733,7 @@ public partial class Player : CharacterBody3D
                         continue;
                     }
 
-                    velocity += toBreach.Normalized() * DecompressionPullAcceleration * pullStrength * (float)delta;
+                    velocity += toBreach.Normalized() * DecompressionPullAcceleration * (float)delta;
                 }
             }
 
@@ -766,7 +820,7 @@ public partial class Player : CharacterBody3D
         // zone's fixed representative tile for reading the room's lumped O2/pressure (correct for
         // that, since the whole room shares one value), but a fire is a specific cell, which
         // could easily be a different tile in the same room from the one the zone happens to use.
-        var currentCell = new CellCoord(_ambientTile.X, _ambientTile.Y);
+        // currentCell itself is computed once, up top, and reused here — same tile all tick.
         var inSmoke = ShipSimRef?.Atmosphere?.ComponentContaining(currentCell).Any(ShipSimRef.Deck.IsOnFire) ?? false;
         if (_smokeOverlay is not null)
         {

@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 
 using Godot;
+using Scavengineers.Scripts.Ship;
 using Scavengineers.Scripts.Verbs;
+using Scavengineers.Sim.Grid;
 
 namespace Scavengineers.Scripts.Inventory;
 
@@ -19,6 +21,25 @@ public partial class PickupItem : RigidBody3D, IVerbTarget, IPhysicsPresenceAwar
     // much time passes. Kept low so an intentional player shove still carries and glides for a
     // couple of seconds rather than stopping dead — 2f killed that momentum almost instantly.
     private const float ZeroGSettleDamp = 0.4f;
+
+    // Mirrors Player.cs's own DecompressionPullRange/DecompressionPullAcceleration exactly —
+    // duplicated rather than shared, matching this codebase's existing duplication convention
+    // between PickupItem and ContainerPickupItem (see ZeroGSettleDamp above).
+    private const float DecompressionPullRange = 5f;
+    private const float DecompressionPullAcceleration = 4f;
+
+    // Once this close to an active breach, the item has effectively reached the hole — eject it
+    // rather than let it keep accelerating into the hull geometry forever.
+    private const float BreachEjectDistance = 0.3f;
+
+    // How far past the breach, along the same pull direction, the ejected item comes to rest —
+    // just enough to clear the hull opening. Not a real "outside the ship" simulation (EVA/
+    // free-float movement is deferred — see docs/project-plan.md) — forward-compatible
+    // groundwork only: a frozen, physically-present marker for whenever EVA recovery ships later.
+    private const float BreachEjectOffset = 1f;
+
+    private bool _hasSettled;
+    private bool _ejected;
 
     [Export]
     public string ItemId { get; set; } = "";
@@ -45,8 +66,105 @@ public partial class PickupItem : RigidBody3D, IVerbTarget, IPhysicsPresenceAwar
 
     public override void _PhysicsProcess(double delta)
     {
-        Freeze = false;
-        SetPhysicsProcess(false); // one-time — nothing else to do once past the startup race
+        if (_ejected)
+        {
+            return; // permanently inert — SetPhysicsProcess(false) already stops the engine from
+                     // calling this on its own, but guard here too against a direct manual call.
+        }
+
+        if (!_hasSettled)
+        {
+            _hasSettled = true;
+            Freeze = false;
+            return; // one-time startup-race dodge only (see _Ready's own doc comment) — breach-
+                    // pull logic begins the following tick, once real physics has taken over.
+        }
+
+        UpdateBreachPull(delta);
+    }
+
+    /// <summary>Extends Player.cs's own decompression-pull hazard (see its _PhysicsProcess) to
+    /// loose items too — a breach doesn't just pull the player, it pulls anything unsecured
+    /// nearby. Reuses the exact same FindZoneAt/ActiveBreachPositions building blocks, applied as
+    /// LinearVelocity instead of the player's kinematic velocity. Not gated on anything
+    /// item-agency-related, matching Player's own "isn't something you opt into" framing. Full
+    /// DecompressionPullAcceleration applies at a constant rate any time inZeroG is true — NOT
+    /// scaled by the room's current Pressure (see Player.cs's own matching comment): whole-
+    /// component venting drives Pressure to near-zero within about a second and it never
+    /// recovers, so a Pressure-scaled pull would decay to an imperceptible force almost
+    /// immediately.</summary>
+    private void UpdateBreachPull(double delta)
+    {
+        var zone = ShipAtmosphereZone.FindZoneAt(GetWorld3D(), GlobalPosition);
+        if (zone?.BuildTargetRef is not { } buildTarget)
+        {
+            return; // no room found, or this ship has no floor/ceiling/wall breach tracking
+                    // (only the Home Ship does today — see ShipAtmosphereZone.BuildTargetRef)
+        }
+
+        var tile = zone.TileAt(GlobalPosition);
+        var cell = new CellCoord(tile.X, tile.Y);
+        var roomVolume = zone.ShipSimRef?.VolumeAt(cell);
+        var inZeroG = (roomVolume?.O2Fraction ?? 0.21) <= ShipAtmosphereZone.ZeroGO2Threshold;
+        if (!inZeroG)
+        {
+            return;
+        }
+
+        // A ship with no life support (e.g. the Derelict) never regenerates air, so a room's
+        // O2Fraction can stay at "reads as vacuum" forever even after its own breach is patched
+        // and it's properly sealed off again (see Player.cs's own matching comment) — without
+        // this check, an item in that now-sealed room would still get pulled toward some other,
+        // unrelated breach elsewhere on the ship (even behind a closed, sealed door) just because
+        // it's within raw range of ActiveBreachPositions(), which lists every breach on the ship.
+        if (!(zone.ShipSimRef?.Atmosphere?.IsConnectedToOutside(cell) ?? false))
+        {
+            return;
+        }
+
+        foreach (var breachPosition in buildTarget.ActiveBreachPositions())
+        {
+            // Same reasoning as Player.cs's own matching check: atmosphere connectivity can span
+            // multiple rooms through an open (unsealed) door, so a breach can be "connected" from
+            // here while still being physically in a DIFFERENT room. Only pull/eject toward a
+            // breach actually inside the same room/zone this item is currently in.
+            if (!ReferenceEquals(ShipAtmosphereZone.FindZoneAt(GetWorld3D(), breachPosition), zone))
+            {
+                continue;
+            }
+
+            var toBreach = breachPosition - GlobalPosition;
+            var distance = toBreach.Length();
+
+            if (distance < BreachEjectDistance)
+            {
+                Eject(breachPosition, toBreach);
+                return; // ejected — stop scanning any other breaches this tick
+            }
+
+            if (distance > DecompressionPullRange)
+            {
+                continue;
+            }
+
+            LinearVelocity += toBreach.Normalized() * DecompressionPullAcceleration * (float)delta;
+        }
+    }
+
+    /// <summary>Comes to rest just past the breach along the same direction it was already being
+    /// pulled — deliberately not full physics (no "outside the hull" space exists yet, EVA is
+    /// deferred): a frozen, inert marker only, forward-compatible groundwork for future EVA
+    /// recovery. Reusing the pull direction (rather than computing a hull normal) handles
+    /// floor/ceiling/wall breaches uniformly for free.</summary>
+    private void Eject(Vector3 breachPosition, Vector3 toBreach)
+    {
+        _ejected = true;
+        var direction = toBreach.LengthSquared() > 0.0001f ? toBreach.Normalized() : Vector3.Up;
+        GlobalPosition = breachPosition + direction * BreachEjectOffset;
+        LinearVelocity = Vector3.Zero;
+        AngularVelocity = Vector3.Zero;
+        Freeze = true;
+        SetPhysicsProcess(false); // permanently inert from here on
     }
 
     /// <summary>Called by TravelConsoleVerbTarget.SetShipPresence when this item's ship stops or
@@ -55,20 +173,28 @@ public partial class PickupItem : RigidBody3D, IVerbTarget, IPhysicsPresenceAwar
     /// a live body would fall forever. Present again: re-arm the exact same one-tick startup
     /// grace _Ready uses (freeze, then unfreeze on the next physics tick), since the ship's
     /// collision was just re-enabled and deserves the same one-frame settle this item already
-    /// trusts at initial spawn.</summary>
+    /// trusts at initial spawn. A no-op once ejected — permanently inert scenery at that point,
+    /// though in practice the Home Ship (the only ship breaches/ejection apply to) never actually
+    /// has its presence toggled, so this is cheap insurance rather than a live requirement.</summary>
     public void SetPhysicsPresence(bool present)
     {
+        if (_ejected)
+        {
+            return;
+        }
+
         Freeze = true;
 
         if (present)
         {
+            _hasSettled = false; // re-arm the one-tick startup grace, same as on initial spawn
             SetPhysicsProcess(true);
         }
         else
         {
             LinearVelocity = Vector3.Zero;
             AngularVelocity = Vector3.Zero;
-            SetPhysicsProcess(false); // don't let the one-shot _PhysicsProcess undo this freeze
+            SetPhysicsProcess(false);
         }
     }
 
