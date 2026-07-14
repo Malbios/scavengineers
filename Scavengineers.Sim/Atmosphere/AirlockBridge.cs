@@ -23,7 +23,12 @@ namespace Scavengineers.Sim.Atmosphere;
 /// shared average at a deceptively "safe" plateau indefinitely (confirmed via a throwaway probe
 /// before this fix — see AirlockBridgeTests). Pulling both sides toward the same fixed target,
 /// not a moving average, is what actually reproduces "the whole thing depressurizes together,"
-/// matching a real breach venting anything feeding it, source included.
+/// matching a real breach venting anything feeding it, source included. It also marks each
+/// system's drained cell via <see cref="AtmosphereSystem.MarkExternallyVented"/>, so that side's
+/// own life-support regen (if it has any) doesn't fight the drain — a whole-ship regen can
+/// otherwise out-compete this single-point pull purely through dilution once the ship is bigger
+/// than one cell (confirmed via a second throwaway probe at real ship scale — see
+/// AirlockBridgeTests).
 /// </summary>
 public sealed class AirlockBridge(AtmosphereSystem systemA, CellCoord cellA, AtmosphereSystem systemB, CellCoord cellB)
 {
@@ -63,6 +68,9 @@ public sealed class AirlockBridge(AtmosphereSystem systemA, CellCoord cellA, Atm
                 O2Fraction = Lerp(volumeB.O2Fraction, AtmosphereVolume.Vacuum.O2Fraction, factor),
                 Temperature = Lerp(volumeB.Temperature, AtmosphereVolume.Vacuum.Temperature, factor),
             });
+
+            systemA.MarkExternallyVented(cellA);
+            systemB.MarkExternallyVented(cellB);
 
             return;
         }

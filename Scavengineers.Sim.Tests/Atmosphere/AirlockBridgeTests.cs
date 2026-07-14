@@ -257,4 +257,53 @@ public class AirlockBridgeTests
             home.VolumeAt(doorwayCell).O2Fraction < 0.02,
             $"Home should have rapidly drained once bridged to a room with its own (indirect) breach, was {home.VolumeAt(doorwayCell).O2Fraction}");
     }
+
+    [Fact]
+    public void Open_WithLifeSupportAndAMultiCellHome_StillConvergesTowardVacuum_NotAPlateau()
+    {
+        // Regression for the whole-component Regenerate out-competing a single-point bridge
+        // drain: a single-cell Home (see the test above) can't reproduce this - Diffuse never
+        // triggers for it, so the bridge's 5.0/s trivially beats a 0.2/s regen on the very same
+        // cell. A multi-cell Home lets Diffuse spread the drain's loss across the room while
+        // Regenerate (pre-fix) pulled the WHOLE room back at once every tick, settling into a
+        // stable plateau (observed ~8% at t=15s, still climbing back up, in a probe mirroring the
+        // real ~74-cell Home Ship's actual grid/corridor dimensions - the fix eliminated that
+        // plateau, and at real ship scale the far end still converges to ~1.7% within 3 minutes).
+        // At this smaller, representative scale, both cells drop well past halfway within 15s
+        // (probed: doorway 0.62%, far cell 1.75%) with no sign of leveling off.
+        var doorwayCell = new CellCoord(0, 0);
+        var farCell = new CellCoord(7, 0);
+        var homeDeck = new Deck();
+        for (var i = 0; i < 8; i++) // representative corridor, not the real ~74-cell ship
+        {
+            homeDeck.AddCell(new CellCoord(i, 0));
+        }
+        var home = new AtmosphereSystem(homeDeck, hasLifeSupport: true);
+
+        var breachCell = new CellCoord(4, 0); // indirect breach, not at the doorway
+        var derelictDeck = new Deck();
+        for (var i = 0; i < 5; i++)
+        {
+            derelictDeck.AddCell(new CellCoord(i, 0));
+        }
+        derelictDeck.BreachHull(breachCell);
+        var derelict = new AtmosphereSystem(derelictDeck);
+
+        var bridge = new AirlockBridge(home, doorwayCell, derelict, new CellCoord(0, 0)) { IsOpen = true };
+
+        const double frameDt = 1.0 / 60.0;
+        for (var i = 0; i < 900; i++) // 15s
+        {
+            home.Tick(frameDt);
+            derelict.Tick(frameDt);
+            bridge.Tick(frameDt);
+        }
+
+        Assert.True(
+            home.VolumeAt(doorwayCell).O2Fraction < 0.02,
+            $"doorway should be near-vacuum by 15s, was {home.VolumeAt(doorwayCell).O2Fraction}");
+        Assert.True(
+            home.VolumeAt(farCell).O2Fraction < 0.05,
+            $"far cell should also be trending toward vacuum by 15s, not holding at a safe plateau, was {home.VolumeAt(farCell).O2Fraction}");
+    }
 }

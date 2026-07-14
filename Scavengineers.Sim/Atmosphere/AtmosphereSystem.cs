@@ -46,6 +46,7 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
     private readonly Deck _deck;
     private readonly Dictionary<CellCoord, AtmosphereVolume> _volumes;
     private readonly bool _hasLifeSupport;
+    private readonly HashSet<CellCoord> _externallyVented = new();
 
     /// <param name="hasLifeSupport">Whether a sealed (non-vented) component should drift back
     /// toward <see cref="AtmosphereVolume.Breathable"/> over time, representing always-on
@@ -163,11 +164,28 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
     /// with this game's existing deck sizes, not a new asymptotic cost.</summary>
     public bool IsConnectedToOutside(CellCoord cell) => RawComponentContaining(cell).Contains(AtmosphereNode.Outside);
 
+    /// <summary>Marks a cell as currently being drained by an open <see cref="AirlockBridge"/>
+    /// whose far side has its own path to Outside — for this tick only. Suppresses life-support
+    /// regen for this cell's whole connected component (see <see cref="Tick"/>), since the ship
+    /// is now effectively leaking through this cell even though its own internal connectivity
+    /// graph has no breach of its own (a bridge is a deliberate bolt-on, never merged into the
+    /// graph — see <see cref="AirlockBridge"/>'s own doc comment). Re-applied every tick the leak
+    /// condition holds (self-sustaining, no permanent state needed) and cleared unconditionally
+    /// at the end of every <see cref="Tick"/> call.</summary>
+    public void MarkExternallyVented(CellCoord cell) => _externallyVented.Add(cell);
+
     /// <summary>
     /// Advances the sim by <paramref name="dt"/> seconds: diffuses each connected component's
     /// scalars toward each cell's own neighbors (not an instant whole-component average), then
     /// vents any directly-breached cell in a component connected to the outside toward vacuum,
-    /// or regenerates a fully-sealed component with life support toward breathable.
+    /// or regenerates a fully-sealed component with life support toward breathable — unless a
+    /// cell in that component was marked via <see cref="MarkExternallyVented"/> this tick, in
+    /// which case regen is skipped entirely: a whole-component regen at
+    /// <see cref="LifeSupportRegenRatePerSecond"/> can otherwise out-compete an
+    /// <see cref="AirlockBridge"/>'s single-point drain purely through dilution (that one cell
+    /// keeps getting refilled by <see cref="Diffuse"/> from its many still-full neighbors faster
+    /// than the bridge can drain it), settling into a stable, deceptively-safe plateau instead of
+    /// ever converging toward vacuum.
     /// </summary>
     public void Tick(double dt)
     {
@@ -185,11 +203,13 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
             {
                 Vent(cells.Where(_deck.IsHullBreached).ToList(), dt);
             }
-            else if (_hasLifeSupport)
+            else if (_hasLifeSupport && !cells.Any(_externallyVented.Contains))
             {
                 Regenerate(cells, dt);
             }
         }
+
+        _externallyVented.Clear();
     }
 
     /// <summary>Each cell moves toward the average of its own unsealed neighbors' *previous*-tick
