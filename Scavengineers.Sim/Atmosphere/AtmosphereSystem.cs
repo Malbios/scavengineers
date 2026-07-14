@@ -124,27 +124,44 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
     /// </summary>
     public void ApplyExternalVolume(CellCoord cell, AtmosphereVolume volume) => _volumes[cell] = volume;
 
-    /// <summary>
-    /// Every cell currently connected to <paramref name="cell"/> (through unsealed edges, not
-    /// vented to Outside) — the hook <see cref="Scavengineers.Scripts.Player.Player"/> uses for
-    /// its own smoke-detection check ("is there a fire anywhere in my current room"). Airlock
-    /// bridging no longer needs this: since atmosphere spreads by per-cell diffusion now, an
-    /// airlock only exchanges its own two named cells directly (see <see cref="AirlockBridge"/>),
-    /// letting each side's own <see cref="Diffuse"/> carry the effect further on subsequent ticks.
-    /// </summary>
-    public IReadOnlySet<CellCoord> ComponentContaining(CellCoord cell)
+    /// <summary>The raw connectivity-graph component (cells plus the shared Outside sentinel, if
+    /// reachable) containing <paramref name="cell"/> — the shared traversal behind both <see
+    /// cref="ComponentContaining"/> (public, cell-only view) and <see
+    /// cref="IsConnectedToOutside"/> (does this component reach Outside), keeping both in
+    /// lockstep with how <see cref="Tick"/> itself partitions the deck via <see
+    /// cref="ConnectivitySolver.FindComponents"/>.</summary>
+    private IReadOnlySet<AtmosphereNode> RawComponentContaining(CellCoord cell)
     {
         var node = new AtmosphereNode(cell);
         foreach (var component in ConnectivitySolver.FindComponents(this))
         {
             if (component.Contains(node))
             {
-                return component.Where(n => !n.IsOutside).Select(n => n.Cell!.Value).ToHashSet();
+                return component;
             }
         }
 
-        return new HashSet<CellCoord> { cell };
+        return new HashSet<AtmosphereNode> { node };
     }
+
+    /// <summary>
+    /// Every cell currently connected to <paramref name="cell"/> (through unsealed edges, not
+    /// vented to Outside) — the hook <see cref="Scavengineers.Scripts.Player.Player"/> uses for
+    /// its own smoke-detection check ("is there a fire anywhere in my current room").
+    /// </summary>
+    public IReadOnlySet<CellCoord> ComponentContaining(CellCoord cell) =>
+        RawComponentContaining(cell).Where(n => !n.IsOutside).Select(n => n.Cell!.Value).ToHashSet();
+
+    /// <summary>Whether <paramref name="cell"/>'s current component includes the shared <see
+    /// cref="AtmosphereNode.Outside"/> sentinel — i.e. whether <see cref="Tick"/> would <see
+    /// cref="Vent"/> this component this tick. <see cref="AirlockBridge"/> uses this to decide
+    /// whether either side of an open airlock already has its own leak to vacuum: if so, the
+    /// airlock becomes part of that leak for both sides instead of just averaging the two cells
+    /// against each other (see AirlockBridge's own doc comment for why plain averaging isn't
+    /// enough there). Runs a full connectivity pass same as <see cref="ComponentContaining"/> —
+    /// called up to twice per AirlockBridge tick, on top of Tick's own per-system pass; in line
+    /// with this game's existing deck sizes, not a new asymptotic cost.</summary>
+    public bool IsConnectedToOutside(CellCoord cell) => RawComponentContaining(cell).Contains(AtmosphereNode.Outside);
 
     /// <summary>
     /// Advances the sim by <paramref name="dt"/> seconds: diffuses each connected component's

@@ -12,6 +12,18 @@ namespace Scavengineers.Sim.Atmosphere;
 /// <see cref="AtmosphereSystem"/> internal per-cell diffusion carries the effect further into
 /// that ship on subsequent ticks, the same way it would for a breach opening at that cell —
 /// no need to pool/average each side's entire connected component the way this used to.
+///
+/// Once either side already has its own path to Outside (its own hull breach reachable through
+/// its own diffusion graph — see <see cref="AtmosphereSystem.IsConnectedToOutside"/>), the bridge
+/// stops averaging the two cells and instead pulls both straight toward
+/// <see cref="AtmosphereVolume.Vacuum"/>, same rate, same target <see
+/// cref="AtmosphereSystem"/>'s own Vent uses. Averaging alone only pulls each side toward the
+/// *other's current value* — if the actual breach is several diffusion-hops from the airlock,
+/// its full strength never reaches the doorway, and a regenerating source room can hold the
+/// shared average at a deceptively "safe" plateau indefinitely (confirmed via a throwaway probe
+/// before this fix — see AirlockBridgeTests). Pulling both sides toward the same fixed target,
+/// not a moving average, is what actually reproduces "the whole thing depressurizes together,"
+/// matching a real breach venting anything feeding it, source included.
 /// </summary>
 public sealed class AirlockBridge(AtmosphereSystem systemA, CellCoord cellA, AtmosphereSystem systemB, CellCoord cellB)
 {
@@ -34,12 +46,30 @@ public sealed class AirlockBridge(AtmosphereSystem systemA, CellCoord cellA, Atm
 
         var volumeA = systemA.VolumeAt(cellA);
         var volumeB = systemB.VolumeAt(cellB);
+        var factor = Math.Clamp(EqualizeRatePerSecond * dt, 0, 1);
+
+        if (systemA.IsConnectedToOutside(cellA) || systemB.IsConnectedToOutside(cellB))
+        {
+            systemA.ApplyExternalVolume(cellA, volumeA with
+            {
+                Pressure = Lerp(volumeA.Pressure, AtmosphereVolume.Vacuum.Pressure, factor),
+                O2Fraction = Lerp(volumeA.O2Fraction, AtmosphereVolume.Vacuum.O2Fraction, factor),
+                Temperature = Lerp(volumeA.Temperature, AtmosphereVolume.Vacuum.Temperature, factor),
+            });
+
+            systemB.ApplyExternalVolume(cellB, volumeB with
+            {
+                Pressure = Lerp(volumeB.Pressure, AtmosphereVolume.Vacuum.Pressure, factor),
+                O2Fraction = Lerp(volumeB.O2Fraction, AtmosphereVolume.Vacuum.O2Fraction, factor),
+                Temperature = Lerp(volumeB.Temperature, AtmosphereVolume.Vacuum.Temperature, factor),
+            });
+
+            return;
+        }
 
         var averagePressure = (volumeA.Pressure + volumeB.Pressure) / 2;
         var averageO2 = (volumeA.O2Fraction + volumeB.O2Fraction) / 2;
         var averageTemperature = (volumeA.Temperature + volumeB.Temperature) / 2;
-
-        var factor = Math.Clamp(EqualizeRatePerSecond * dt, 0, 1);
 
         systemA.ApplyExternalVolume(cellA, volumeA with
         {
