@@ -10,15 +10,18 @@ using Scavengineers.Scripts.Verbs;
 namespace Scavengineers.Scripts.Ship;
 
 /// <summary>
-/// A real door between the Home Ship and one of its two possible docking targets (Station or
-/// Derelict) — replaces the old instant-teleport travel console. While the Home Ship is
-/// actually docked here, opening it links the two ships' independent <see cref="AtmosphereSystem"/>s
-/// via an <see cref="AirlockBridge"/> (docs/architecture/atmosphere-power-sim.md): a breached
-/// Derelict really does start pulling down the Home Ship's air while this is open. While
-/// undocked (the Home Ship is elsewhere — see <see cref="Docked"/>), there's nothing coupled on
-/// the other side, so opening it instead breaches both adjacent cells straight to vacuum,
-/// reusing the same hull-breach venting <see cref="ShipSim"/> already seeds for the Derelict — a
-/// real consequence for forcing the wrong door instead of using the travel console.
+/// A real door between the Home Ship and one of its possible docking targets — replaces the old
+/// instant-teleport travel console. The Station gets its own dedicated instance of this script;
+/// the "away mission" instance (see <see cref="RebindFarSide"/>) is shared across every Derelict,
+/// its far side repointed by TravelConsoleVerbTarget at whichever one is the current travel
+/// target. While the Home Ship is actually docked here, opening it links the two ships'
+/// independent <see cref="AtmosphereSystem"/>s via an <see cref="AirlockBridge"/>
+/// (docs/architecture/atmosphere-power-sim.md): a breached Derelict really does start pulling
+/// down the Home Ship's air while this is open. While undocked (the Home Ship is elsewhere — see
+/// <see cref="Docked"/>), there's nothing coupled on the other side, so opening it instead
+/// breaches both adjacent cells straight to vacuum, reusing the same hull-breach venting
+/// <see cref="ShipSim"/> already seeds for a Derelict — a real consequence for forcing the wrong
+/// door instead of using the travel console.
 ///
 /// This node itself is a persistent, always-visible/collidable frame sitting right at the
 /// doorway threshold — reachable by a raycast from either side without needing a mirrored
@@ -197,6 +200,29 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     {
         _isOpen = open;
         ApplyPhysicalState();
+    }
+
+    /// <summary>Reassigns this airlock's far side to a different ShipSim — the one physical
+    /// away-mission airlock is shared across every travel destination rather than each getting
+    /// its own always-wired door (see TravelConsoleVerbTarget's own doc comment). A no-op if the
+    /// far side isn't actually changing (repeat calls — e.g. every subsequent travel back to the
+    /// SAME destination — must not reset anything). When it really does change, the door is
+    /// forced shut first: an "open" state left over from the previous destination has no physical
+    /// meaning at a different one, and leaving it open would bridge/vent atmosphere against the
+    /// new ship before the caller sets Docked.</summary>
+    public void RebindFarSide(ShipSim newShipB)
+    {
+        if (ReferenceEquals(ShipBRef, newShipB))
+        {
+            return;
+        }
+
+        SetOpen(false);
+        ShipBRef = newShipB;
+
+        _bridge = ShipARef?.Atmosphere is { } atmosphereA && newShipB.Atmosphere is { } atmosphereB
+            ? new AirlockBridge(atmosphereA, new CellCoord(TileA.X, TileA.Y), atmosphereB, new CellCoord(TileB.X, TileB.Y))
+            : null;
     }
 
     /// <summary>Re-derives the door's entire physical effect — slab visibility, passability,

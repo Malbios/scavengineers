@@ -7,6 +7,7 @@ using Scavengineers.Sim.Grid;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Scripts.Ship;
+using Scavengineers.Scripts.Travel;
 using Scavengineers.Scripts.Verbs;
 
 namespace Scavengineers.Scripts.Player;
@@ -128,6 +129,8 @@ public partial class Player : CharacterBody3D
     private Control? _drillWindow;
     private Control? _flashlightWindow;
     private Control? _backpackWindow;
+    private TravelMapPanel? _travelMapPanel;
+    private TravelConsoleVerbTarget? _openTravelConsole;
     private Control? _backpackGrid;
     private InventorySlotUI? _backpackSlotTemplate;
     private readonly List<InventorySlotUI> _backpackSlotUIs = new();
@@ -177,6 +180,16 @@ public partial class Player : CharacterBody3D
     /// the panel doesn't also fire world interactions or yank the mouse back into captured mode
     /// mid-drag.</summary>
     private bool _inventoryOpen;
+
+    /// <summary>Whether the travel console's map screen is currently open — same "suppress
+    /// look/Interact/verb-cycling/mouse-recapture" gating as _inventoryOpen, via <see
+    /// cref="AnyPanelOpen"/>, so opening the map mid-game doesn't also let the player walk off or
+    /// interact with something else behind it.</summary>
+    private bool _travelMapOpen;
+
+    /// <summary>Any full-screen-ish HUD panel that should suppress normal gameplay input while
+    /// open — shared gate for every _Input branch that used to check _inventoryOpen alone.</summary>
+    private bool AnyPanelOpen => _inventoryOpen || _travelMapOpen;
 
     /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-9, 0) —
     /// also reused by StationConsoleVerbTarget as the set of things Buy can offer, since there's
@@ -272,6 +285,8 @@ public partial class Player : CharacterBody3D
         _flashlightWindow = GetNode<Control>("HUD/FlashlightWindow");
         _backpackWindow = GetNode<Control>("HUD/BackpackWindow");
         _backpackGrid = GetNode<Control>("HUD/BackpackWindow/Layout/BackpackGrid");
+        _travelMapPanel = GetNode<TravelMapPanel>("HUD/TravelMapPanel");
+        _travelMapPanel.PlayerRef = this;
 
         foreach (var child in GetNode("HUD/InventoryPanel/Layout/EquipSlots").GetChildren())
         {
@@ -314,7 +329,7 @@ public partial class Player : CharacterBody3D
 
     public override void _Input(InputEvent @event)
     {
-        if (@event is InputEventMouseMotion mouseMotion && Input.MouseMode == Input.MouseModeEnum.Captured && !IsBusy && !_inventoryOpen)
+        if (@event is InputEventMouseMotion mouseMotion && Input.MouseMode == Input.MouseModeEnum.Captured && !IsBusy && !AnyPanelOpen)
         {
             RotateY(-mouseMotion.Relative.X * MouseSensitivity);
 
@@ -324,15 +339,15 @@ public partial class Player : CharacterBody3D
                 _head.Rotation = new Vector3(_pitch, 0, 0);
             }
         }
-        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Right, Pressed: true } && !IsBusy && !_inventoryOpen)
+        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Right, Pressed: true } && !IsBusy && !AnyPanelOpen)
         {
             Interact();
         }
-        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.WheelUp, Pressed: true } && !IsBusy && !_inventoryOpen)
+        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.WheelUp, Pressed: true } && !IsBusy && !AnyPanelOpen)
         {
             CycleSelectedVerb(1);
         }
-        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.WheelDown, Pressed: true } && !IsBusy && !_inventoryOpen)
+        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.WheelDown, Pressed: true } && !IsBusy && !AnyPanelOpen)
         {
             CycleSelectedVerb(-1);
         }
@@ -349,11 +364,11 @@ public partial class Player : CharacterBody3D
             _busyVerb = null;
         }
         else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true }
-                 && Input.MouseMode != Input.MouseModeEnum.Captured && !_inventoryOpen)
+                 && Input.MouseMode != Input.MouseModeEnum.Captured && !AnyPanelOpen)
         {
             CaptureMouse();
         }
-        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy)
+        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy && !_travelMapOpen)
         {
             if (_inventoryOpen)
             {
@@ -366,7 +381,11 @@ public partial class Player : CharacterBody3D
         }
         else if (@event is InputEventKey { Keycode: Key.Escape, Pressed: true })
         {
-            if (_inventoryOpen)
+            if (_travelMapOpen)
+            {
+                CloseTravelMap();
+            }
+            else if (_inventoryOpen)
             {
                 CloseInventory();
             }
@@ -375,7 +394,7 @@ public partial class Player : CharacterBody3D
                 Input.MouseMode = Input.MouseModeEnum.Visible;
             }
         }
-        else if (@event is InputEventKey { Keycode: Key.F, Pressed: true } && !IsBusy && !_inventoryOpen)
+        else if (@event is InputEventKey { Keycode: Key.F, Pressed: true } && !IsBusy && !AnyPanelOpen)
         {
             UseHeldItem();
         }
@@ -578,6 +597,35 @@ public partial class Player : CharacterBody3D
         _flashlightWindow!.Visible = false;
         _backpackWindow!.Visible = false;
 
+        CaptureMouse();
+    }
+
+    /// <summary>Called by TravelConsoleVerbTarget.ExecuteVerb — opens the map instead of that
+    /// verb starting travel directly, same shape as OpenInventory but triggered from a world
+    /// interaction rather than a hotkey.</summary>
+    public void OpenTravelMap(TravelConsoleVerbTarget console)
+    {
+        _travelMapOpen = true;
+        _openTravelConsole = console;
+        _travelMapPanel!.Populate(console.BuildMapEntries(), console.CurrentDestinationId);
+        _travelMapPanel.Visible = true;
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+    }
+
+    /// <summary>Called by TravelMapPanel's Travel button — hands the chosen destination back to
+    /// whichever console opened the map, then closes it regardless of whether travel actually
+    /// started (BeginTravel itself no-ops for an already-current/out-of-range destination).</summary>
+    public void ConfirmTravel(int destinationId)
+    {
+        _openTravelConsole?.BeginTravel(destinationId);
+        CloseTravelMap();
+    }
+
+    public void CloseTravelMap()
+    {
+        _travelMapOpen = false;
+        _openTravelConsole = null;
+        _travelMapPanel!.Visible = false;
         CaptureMouse();
     }
 

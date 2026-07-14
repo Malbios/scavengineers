@@ -23,6 +23,7 @@
 [ext_resource type="Material" path="res://Assets/Materials/station_floor_material.tres" id="25"]
 [ext_resource type="Material" path="res://Assets/Materials/station_wall_material.tres" id="26"]
 [ext_resource type="Material" path="res://Assets/Materials/station_ceiling_material.tres" id="27"]
+[ext_resource type="PackedScene" path="res://Scenes/Derelict.tscn" id="28"]
 
 [sub_resource type="ShaderMaterial" id="StarfieldSkyMaterial"]
 shader = ExtResource("24")
@@ -372,14 +373,17 @@ shape = SubResource("FloorShape")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 omni_range = 8.0
 
-[node name="TravelConsole" type="StaticBody3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "StationAirlock", "DerelictAirlock", "StationGroup", "DerelictGroup") groups=["saveable"]]
+[node name="TravelConsole" type="StaticBody3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "StationAirlock", "DerelictAirlock", "StationGroup") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 1, -2.7)
 script = ExtResource("21")
 ShipSimRef = NodePath("../ShipSim")
 StationAirlock = NodePath("../../StationAirlock")
 DerelictAirlock = NodePath("../../DerelictAirlock")
 StationGroup = NodePath("../../Station")
-DerelictGroup = NodePath("../../Derelict")
+StationMapPosition = Vector2(220, 180)
+DerelictGroupPaths = Array[NodePath]([NodePath("../../Derelict1"), NodePath("../../Derelict2"), NodePath("../../Derelict3"), NodePath("../../Derelict4"), NodePath("../../Derelict5")])
+DerelictShipSimPaths = Array[NodePath]([NodePath("../../Derelict1/ShipSim"), NodePath("../../Derelict2/ShipSim"), NodePath("../../Derelict3/ShipSim"), NodePath("../../Derelict4/ShipSim"), NodePath("../../Derelict5/ShipSim")])
+DerelictMapPositions = Array[Vector2]([Vector2(300, 60), Vector2(420, 150), Vector2(380, 300), Vector2(180, 320), Vector2(80, 150)])
 SaveId = "travel_console"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/TravelConsole"]
@@ -436,294 +440,56 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
 mesh = SubResource("DoorSlabMesh")
 surface_material_override/0 = SubResource("AirlockDoorMaterial")
 
-[node name="Derelict" type="Node3D" parent="." unique_id=116891484]
+[node name="Derelict1" parent="." instance=ExtResource("28")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 0)
-
-[node name="ShipSim" type="Node" parent="Derelict" unique_id=709254306]
-script = ExtResource("3")
-HasFireHazard = true
-HasHullBreaches = true
-GridWidth = 18
-RoomSplitColumns = PackedInt32Array(6, 12)
-WestCorridorLength = 2
-
-[node name="ShipZoneRoom1" type="Area3D" parent="Derelict" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1.0, 0)
-script = ExtResource("14")
-ShipSimRef = NodePath("../ShipSim")
-Tile = Vector2i(2, 2)
-BuildTargetRef = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/ShipZoneRoom1"]
-shape = SubResource("ShipZoneWideShape")
-
-[node name="ShipZoneCorridorWest" type="Area3D" parent="Derelict" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.0, 0)
-script = ExtResource("14")
-ShipSimRef = NodePath("../ShipSim")
-Tile = Vector2i(-1, 2)
-BuildTargetRef = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/ShipZoneCorridorWest"]
-shape = SubResource("CorridorZoneShape")
-
-[node name="ShipZoneRoom2" type="Area3D" parent="Derelict" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 1.0, 0)
-script = ExtResource("14")
-ShipSimRef = NodePath("../ShipSim")
-Tile = Vector2i(8, 2)
-BuildTargetRef = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/ShipZoneRoom2"]
-shape = SubResource("ShipZoneNarrowShape")
-
-[node name="ShipZoneRoom3" type="Area3D" parent="Derelict" node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.1, 1.0, 0)
-script = ExtResource("14")
-ShipSimRef = NodePath("../ShipSim")
-Tile = Vector2i(14, 2)
-BuildTargetRef = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/ShipZoneRoom3"]
-shape = SubResource("ShipZoneNarrowShape")
-
-[node name="Floor" type="StaticBody3D" parent="Derelict" unique_id=1453566541 node_paths=PackedStringArray("ShipSimRef", "ShipRoot") groups=["saveable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, -0.1, 0)
-script = ExtResource("18")
-ShipSimRef = NodePath("../ShipSim")
-ShipRoot = NodePath("..")
-ConduitMesh = SubResource("ConduitSlotMesh")
-ConduitArmMesh = SubResource("ConduitArmMesh")
-ConduitDropMesh = SubResource("ConduitDropMesh")
-ConduitMaterial = SubResource("ConduitSlotWiredMaterial")
-WallConduitMesh = SubResource("WallConduitMesh")
-WallSegmentMesh = SubResource("WallSegmentMesh")
-WallSegmentShape = SubResource("WallSegmentShape")
-WallMaterial = ExtResource("10")
-PanelMesh = SubResource("PanelMesh")
-PanelCollisionShape = SubResource("PanelCollisionShape")
-FloorPanelMaterial = ExtResource("9")
-CeilingPanelMaterial = ExtResource("11")
-GhostMaterial = SubResource("ConduitGhostMaterial")
-ExcludedEdgeColumn = 6
-SeedDefaultLayout = true
-DroppedItemMesh = SubResource("PickupItemMesh")
-DroppedItemShape = SubResource("PickupItemShape")
-DroppedItemMaterial = SubResource("PickupItemMaterial")
-SaveId = "derelict_build_target"
-
-[node name="FloorAimHelper" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, -0.1, 0)
-collision_layer = 2
-collision_mask = 0
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/FloorAimHelper"]
-shape = SubResource("DerelictFloorShape")
-
-[node name="Ceiling" type="StaticBody3D" parent="Derelict" unique_id=1015045709 node_paths=PackedStringArray("BuildTarget")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 2.1, 0)
-collision_layer = 2
-collision_mask = 0
-script = ExtResource("20")
-BuildTarget = NodePath("../Floor")
-IsCeiling = true
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/Ceiling" unique_id=458212308]
-shape = SubResource("DerelictFloorShape")
-
-[node name="WallPanel1" type="RigidBody3D" parent="Derelict"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.15, -2)
-script = ExtResource("12")
-ItemId = "wall_panel"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/WallPanel1"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallPanel1"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("WallPanelPickupMaterial")
-
-[node name="WallPanel2" type="RigidBody3D" parent="Derelict"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.5, 0.15, -1)
-script = ExtResource("12")
-ItemId = "wall_panel"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/WallPanel2"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallPanel2"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("WallPanelPickupMaterial")
-
-[node name="ScrapMetal" type="RigidBody3D" parent="Derelict" unique_id=225809168]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0.15, -2)
-script = ExtResource("12")
-ItemId = "scrap_metal"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/ScrapMetal" unique_id=1503916654]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/ScrapMetal" unique_id=1778977634]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("ScrapMetalMaterial")
-
-[node name="ScrapMetal2" type="RigidBody3D" parent="Derelict"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.15, -0.5)
-script = ExtResource("12")
-ItemId = "scrap_metal"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/ScrapMetal2"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/ScrapMetal2"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("ScrapMetalMaterial")
-
-[node name="ScrapMetal3" type="RigidBody3D" parent="Derelict"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 0.15, 0.5)
-script = ExtResource("12")
-ItemId = "scrap_metal"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/ScrapMetal3"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/ScrapMetal3"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("ScrapMetalMaterial")
-
-[node name="SpareParts" type="RigidBody3D" parent="Derelict" unique_id=498314835]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.606081, 0.15, 2)
-script = ExtResource("12")
-ItemId = "spare_parts"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/SpareParts" unique_id=802464128]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/SpareParts" unique_id=1966985226]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("SparePartsMaterial")
-
-[node name="ScrapMetal4" type="RigidBody3D" parent="Derelict"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.15, -1.5)
-script = ExtResource("12")
-ItemId = "scrap_metal"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/ScrapMetal4"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/ScrapMetal4"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("ScrapMetalMaterial")
-
-[node name="ScrapMetal5" type="RigidBody3D" parent="Derelict"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0.15, 1.5)
-script = ExtResource("12")
-ItemId = "scrap_metal"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/ScrapMetal5"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/ScrapMetal5"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("ScrapMetalMaterial")
-
-[node name="SpareParts2" type="RigidBody3D" parent="Derelict"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.5, 0.15, 1)
-script = ExtResource("12")
-ItemId = "spare_parts"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/SpareParts2"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/SpareParts2"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("SparePartsMaterial")
-
-[node name="WallPanel3" type="RigidBody3D" parent="Derelict"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0.15, -1)
-script = ExtResource("12")
-ItemId = "wall_panel"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/WallPanel3"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/WallPanel3"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("WallPanelPickupMaterial")
-
-[node name="PowerCell1" type="RigidBody3D" parent="Derelict"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.5, 0.15, -2)
-script = ExtResource("12")
-ItemId = "power_cell"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/PowerCell1"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/PowerCell1"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("PowerCellMaterial")
-
-[node name="DamagedConduit" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("ShipSimRef", "Mesh", "Collider", "SmokeParticles") groups=["saveable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0.3, 0.5)
-script = ExtResource("17")
-ShipSimRef = NodePath("../ShipSim")
-Mesh = NodePath("MeshInstance3D")
-Collider = NodePath("CollisionShape3D")
-RepairingMaterial = SubResource("RepairingMaterial")
-RepairedMaterial = SubResource("RepairedConduitMaterial")
-BurningMaterial = SubResource("BurningConduitMaterial")
-SmokeParticles = NodePath("SmokeParticles")
-DroppedItemMesh = SubResource("PickupItemMesh")
-DroppedItemShape = SubResource("PickupItemShape")
-DroppedItemMaterial = SubResource("PickupItemMaterial")
+[node name="Floor" parent="Derelict1" index="5"]
+SaveId = "derelict_build_target_1"
+[node name="DamagedConduit" parent="Derelict1" index="19"]
 SaveId = "damaged_conduit_1"
+[node name="InteriorDoor" parent="Derelict1" index="20"]
+SaveId = "derelict_interior_door_1"
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Derelict/DamagedConduit"]
-shape = SubResource("BreachPatchShape")
+[node name="Derelict2" parent="." instance=ExtResource("28")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 0)
+[node name="Floor" parent="Derelict2" index="5"]
+SaveId = "derelict_build_target_2"
+[node name="DamagedConduit" parent="Derelict2" index="19"]
+SaveId = "damaged_conduit_2"
+[node name="InteriorDoor" parent="Derelict2" index="20"]
+SaveId = "derelict_interior_door_2"
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Derelict/DamagedConduit"]
-mesh = SubResource("BreachPatchMesh")
-surface_material_override/0 = SubResource("DamagedConduitMaterial")
+[node name="Derelict3" parent="." instance=ExtResource("28")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 0)
+[node name="Floor" parent="Derelict3" index="5"]
+SaveId = "derelict_build_target_3"
+[node name="DamagedConduit" parent="Derelict3" index="19"]
+SaveId = "damaged_conduit_3"
+[node name="InteriorDoor" parent="Derelict3" index="20"]
+SaveId = "derelict_interior_door_3"
 
-[node name="SmokeParticles" type="GPUParticles3D" parent="Derelict/DamagedConduit"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
-emitting = false
-amount = 12
-lifetime = 2.0
-process_material = SubResource("SmokeProcessMaterial")
-draw_pass_1 = SubResource("SmokeParticleMesh")
+[node name="Derelict4" parent="." instance=ExtResource("28")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 0)
+[node name="Floor" parent="Derelict4" index="5"]
+SaveId = "derelict_build_target_4"
+[node name="DamagedConduit" parent="Derelict4" index="19"]
+SaveId = "damaged_conduit_4"
+[node name="InteriorDoor" parent="Derelict4" index="20"]
+SaveId = "derelict_interior_door_4"
 
-[node name="InteriorDoor" type="StaticBody3D" parent="Derelict" node_paths=PackedStringArray("ShipSimRef", "SlabMesh", "SlabCollision") groups=["saveable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.0, -0.8)
-script = ExtResource("16")
-ShipSimRef = NodePath("../ShipSim")
-SlabMesh = NodePath("SlabMesh")
-SlabCollision = NodePath("SlabCollision")
-SaveId = "derelict_interior_door"
-
-[node name="FrameCollision" type="CollisionShape3D" parent="Derelict/InteriorDoor"]
-shape = SubResource("DoorFrameShape")
-
-[node name="FrameMesh" type="MeshInstance3D" parent="Derelict/InteriorDoor"]
-mesh = SubResource("DoorFrameMesh")
-surface_material_override/0 = SubResource("AirlockPanelMaterial")
-
-[node name="SlabCollision" type="CollisionShape3D" parent="Derelict/InteriorDoor"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
-shape = SubResource("DoorSlabShape")
-
-[node name="SlabMesh" type="MeshInstance3D" parent="Derelict/InteriorDoor"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
-mesh = SubResource("DoorSlabMesh")
-surface_material_override/0 = SubResource("AirlockDoorMaterial")
+[node name="Derelict5" parent="." instance=ExtResource("28")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 0)
+[node name="Floor" parent="Derelict5" index="5"]
+SaveId = "derelict_build_target_5"
+[node name="DamagedConduit" parent="Derelict5" index="19"]
+SaveId = "damaged_conduit_5"
+[node name="InteriorDoor" parent="Derelict5" index="20"]
+SaveId = "derelict_interior_door_5"
 
 [node name="DerelictAirlock" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipARef", "ShipBRef", "SlabMesh", "SlabCollision") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 1.0, -0.8)
 script = ExtResource("15")
 ShipARef = NodePath("../HomeShip/ShipSim")
-ShipBRef = NodePath("../Derelict/ShipSim")
+ShipBRef = NodePath("../Derelict1/ShipSim")
 PowerFixtureId = "derelict_airlock_power"
 TileA = Vector2i(13, 2)
 TileB = Vector2i(-2, 2)

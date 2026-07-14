@@ -47,4 +47,34 @@ public class AirlockDoorVerbTargetTest
         AssertThat(airlock.AvailableVerbs).HasSize(1);
         AssertThat(airlock.AvailableVerbs[0].Id).IsEqual("pry_airlock");
     }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void RebindFarSide_ToDifferentShip_ClosesDoorAndRetargetsBridge()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var airlock = CreateUnpoweredAirlock(sceneTree);
+        airlock.ApplySaveState(true); // open, docked at the original ShipBRef
+
+        var shipC = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(shipC);
+
+        airlock.RebindFarSide(shipC);
+
+        AssertBool(airlock.IsOpen).IsFalse();
+        AssertBool(ReferenceEquals(airlock.ShipBRef, shipC)).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void RebindFarSide_ToSameShip_IsNoOp()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var airlock = CreateUnpoweredAirlock(sceneTree);
+        airlock.ApplySaveState(true); // open
+
+        airlock.RebindFarSide(airlock.ShipBRef!);
+
+        AssertBool(airlock.IsOpen).IsTrue();
+    }
 }

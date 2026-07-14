@@ -1,0 +1,417 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" uid="uid://61vdtspe71v5" path="res://Scripts/Ship/ShipSim.cs" id="3"]
+[ext_resource type="Material" path="res://Assets/Materials/derelict_floor_material.tres" id="9"]
+[ext_resource type="Material" path="res://Assets/Materials/derelict_wall_material.tres" id="10"]
+[ext_resource type="Material" path="res://Assets/Materials/derelict_ceiling_material.tres" id="11"]
+[ext_resource type="Script" uid="uid://b3w78g4xa8w7i" path="res://Scripts/Inventory/PickupItem.cs" id="12"]
+[ext_resource type="Script" uid="uid://bqso6f6rldkhi" path="res://Scripts/Ship/ShipAtmosphereZone.cs" id="14"]
+[ext_resource type="Script" path="res://Scripts/Ship/InteriorDoorVerbTarget.cs" id="16"]
+[ext_resource type="Script" path="res://Scripts/Verbs/DamagedConduitVerbTarget.cs" id="17"]
+[ext_resource type="Script" path="res://Scripts/Verbs/ShipBuildTarget.cs" id="18"]
+[ext_resource type="Script" path="res://Scripts/Verbs/ShipBuildAimForwarder.cs" id="20"]
+
+[sub_resource type="BoxShape3D" id="ShipZoneWideShape"]
+size = Vector3(10, 2.2, 6.4)
+
+[sub_resource type="BoxShape3D" id="CorridorZoneShape"]
+size = Vector3(2.2, 2.2, 2.4)
+
+[sub_resource type="BoxShape3D" id="ShipZoneNarrowShape"]
+size = Vector3(6.2, 2.2, 6.4)
+
+[sub_resource type="BoxShape3D" id="DerelictFloorShape"]
+size = Vector3(18, 0.2, 6)
+
+[sub_resource type="BoxMesh" id="ConduitSlotMesh"]
+size = Vector3(0.5, 0.05, 0.5)
+
+[sub_resource type="BoxMesh" id="ConduitArmMesh"]
+size = Vector3(0.15, 0.05, 0.5)
+
+[sub_resource type="BoxMesh" id="ConduitDropMesh"]
+size = Vector3(0.08, 1.475, 0.08)
+
+[sub_resource type="StandardMaterial3D" id="ConduitSlotWiredMaterial"]
+albedo_color = Color(0.15, 0.75, 0.85, 1)
+
+[sub_resource type="BoxMesh" id="WallConduitMesh"]
+size = Vector3(0.4, 0.4, 0.08)
+
+[sub_resource type="BoxMesh" id="WallSegmentMesh"]
+size = Vector3(1, 2, 0.2)
+
+[sub_resource type="BoxShape3D" id="WallSegmentShape"]
+size = Vector3(1, 2, 0.2)
+
+[sub_resource type="BoxMesh" id="PanelMesh"]
+size = Vector3(0.98, 0.05, 0.98)
+
+[sub_resource type="BoxShape3D" id="PanelCollisionShape"]
+size = Vector3(1, 0.05, 1)
+
+[sub_resource type="StandardMaterial3D" id="ConduitGhostMaterial"]
+transparency = 1
+albedo_color = Color(0.15, 0.75, 0.85, 0.35)
+
+[sub_resource type="BoxMesh" id="PickupItemMesh"]
+size = Vector3(0.3, 0.3, 0.3)
+
+[sub_resource type="BoxShape3D" id="PickupItemShape"]
+size = Vector3(0.3, 0.3, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="PickupItemMaterial"]
+albedo_color = Color(0.15, 0.8, 0.2, 1)
+
+[sub_resource type="StandardMaterial3D" id="WallPanelPickupMaterial"]
+albedo_color = Color(0.35, 0.55, 0.75, 1)
+
+[sub_resource type="StandardMaterial3D" id="ScrapMetalMaterial"]
+albedo_color = Color(0.55, 0.55, 0.6, 1)
+
+[sub_resource type="StandardMaterial3D" id="SparePartsMaterial"]
+albedo_color = Color(0.85, 0.7, 0.15, 1)
+
+[sub_resource type="StandardMaterial3D" id="PowerCellMaterial"]
+albedo_color = Color(0.2, 0.702, 0.902, 1)
+
+[sub_resource type="StandardMaterial3D" id="RepairingMaterial"]
+albedo_color = Color(0.9, 0.85, 0.1, 1)
+
+[sub_resource type="StandardMaterial3D" id="RepairedConduitMaterial"]
+albedo_color = Color(0.5, 0.5, 0.55, 1)
+
+[sub_resource type="StandardMaterial3D" id="BurningConduitMaterial"]
+albedo_color = Color(1, 0.55, 0.05, 1)
+emission_enabled = true
+emission = Color(1, 0.45, 0.05, 1)
+emission_energy_multiplier = 2.5
+
+[sub_resource type="BoxShape3D" id="BreachPatchShape"]
+size = Vector3(0.4, 0.4, 0.1)
+
+[sub_resource type="BoxMesh" id="BreachPatchMesh"]
+size = Vector3(0.4, 0.4, 0.1)
+
+[sub_resource type="StandardMaterial3D" id="DamagedConduitMaterial"]
+albedo_color = Color(0.9, 0.15, 0.05, 1)
+
+[sub_resource type="StandardMaterial3D" id="SmokeParticleMaterial"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.3, 0.3, 0.32, 0.6)
+billboard_mode = 3
+
+[sub_resource type="QuadMesh" id="SmokeParticleMesh"]
+material = SubResource("SmokeParticleMaterial")
+size = Vector2(0.2, 0.2)
+
+[sub_resource type="ParticleProcessMaterial" id="SmokeProcessMaterial"]
+direction = Vector3(0, 1, 0)
+spread = 15.0
+initial_velocity_min = 0.15
+initial_velocity_max = 0.3
+gravity = Vector3(0, 0.2, 0)
+scale_min = 0.5
+scale_max = 1.0
+color = Color(0.3, 0.3, 0.32, 0.5)
+
+[sub_resource type="BoxShape3D" id="DoorFrameShape"]
+size = Vector3(0.2, 2, 0.4)
+
+[sub_resource type="BoxMesh" id="DoorFrameMesh"]
+size = Vector3(0.2, 2, 0.4)
+
+[sub_resource type="StandardMaterial3D" id="AirlockPanelMaterial"]
+albedo_color = Color(0.9, 0.65, 0.05, 1)
+
+[sub_resource type="BoxShape3D" id="DoorSlabShape"]
+size = Vector3(0.2, 2, 1.6)
+
+[sub_resource type="BoxMesh" id="DoorSlabMesh"]
+size = Vector3(0.2, 2, 1.6)
+
+[sub_resource type="StandardMaterial3D" id="AirlockDoorMaterial"]
+albedo_color = Color(0.85, 0.75, 0.15, 1)
+
+[node name="Derelict" type="Node3D"]
+
+[node name="ShipSim" type="Node" parent="." unique_id=709254306]
+script = ExtResource("3")
+HasFireHazard = true
+HasHullBreaches = true
+GridWidth = 18
+RoomSplitColumns = PackedInt32Array(6, 12)
+WestCorridorLength = 2
+
+[node name="ShipZoneRoom1" type="Area3D" parent="." node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1.0, 0)
+script = ExtResource("14")
+ShipSimRef = NodePath("../ShipSim")
+Tile = Vector2i(2, 2)
+BuildTargetRef = NodePath("../Floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ShipZoneRoom1"]
+shape = SubResource("ShipZoneWideShape")
+
+[node name="ShipZoneCorridorWest" type="Area3D" parent="." node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.0, 0)
+script = ExtResource("14")
+ShipSimRef = NodePath("../ShipSim")
+Tile = Vector2i(-1, 2)
+BuildTargetRef = NodePath("../Floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ShipZoneCorridorWest"]
+shape = SubResource("CorridorZoneShape")
+
+[node name="ShipZoneRoom2" type="Area3D" parent="." node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 1.0, 0)
+script = ExtResource("14")
+ShipSimRef = NodePath("../ShipSim")
+Tile = Vector2i(8, 2)
+BuildTargetRef = NodePath("../Floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ShipZoneRoom2"]
+shape = SubResource("ShipZoneNarrowShape")
+
+[node name="ShipZoneRoom3" type="Area3D" parent="." node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.1, 1.0, 0)
+script = ExtResource("14")
+ShipSimRef = NodePath("../ShipSim")
+Tile = Vector2i(14, 2)
+BuildTargetRef = NodePath("../Floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ShipZoneRoom3"]
+shape = SubResource("ShipZoneNarrowShape")
+
+[node name="Floor" type="StaticBody3D" parent="." unique_id=1453566541 node_paths=PackedStringArray("ShipSimRef", "ShipRoot") groups=["saveable"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, -0.1, 0)
+script = ExtResource("18")
+ShipSimRef = NodePath("../ShipSim")
+ShipRoot = NodePath("..")
+ConduitMesh = SubResource("ConduitSlotMesh")
+ConduitArmMesh = SubResource("ConduitArmMesh")
+ConduitDropMesh = SubResource("ConduitDropMesh")
+ConduitMaterial = SubResource("ConduitSlotWiredMaterial")
+WallConduitMesh = SubResource("WallConduitMesh")
+WallSegmentMesh = SubResource("WallSegmentMesh")
+WallSegmentShape = SubResource("WallSegmentShape")
+WallMaterial = ExtResource("10")
+PanelMesh = SubResource("PanelMesh")
+PanelCollisionShape = SubResource("PanelCollisionShape")
+FloorPanelMaterial = ExtResource("9")
+CeilingPanelMaterial = ExtResource("11")
+GhostMaterial = SubResource("ConduitGhostMaterial")
+ExcludedEdgeColumn = 6
+SeedDefaultLayout = true
+DroppedItemMesh = SubResource("PickupItemMesh")
+DroppedItemShape = SubResource("PickupItemShape")
+DroppedItemMaterial = SubResource("PickupItemMaterial")
+SaveId = "derelict_build_target"
+
+[node name="FloorAimHelper" type="StaticBody3D" parent="." node_paths=PackedStringArray("BuildTarget")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, -0.1, 0)
+collision_layer = 2
+collision_mask = 0
+script = ExtResource("20")
+BuildTarget = NodePath("../Floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FloorAimHelper"]
+shape = SubResource("DerelictFloorShape")
+
+[node name="Ceiling" type="StaticBody3D" parent="." unique_id=1015045709 node_paths=PackedStringArray("BuildTarget")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 2.1, 0)
+collision_layer = 2
+collision_mask = 0
+script = ExtResource("20")
+BuildTarget = NodePath("../Floor")
+IsCeiling = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ceiling" unique_id=458212308]
+shape = SubResource("DerelictFloorShape")
+
+[node name="WallPanel1" type="RigidBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.15, -2)
+script = ExtResource("12")
+ItemId = "wall_panel"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WallPanel1"]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WallPanel1"]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("WallPanelPickupMaterial")
+
+[node name="WallPanel2" type="RigidBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.5, 0.15, -1)
+script = ExtResource("12")
+ItemId = "wall_panel"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WallPanel2"]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WallPanel2"]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("WallPanelPickupMaterial")
+
+[node name="ScrapMetal" type="RigidBody3D" parent="." unique_id=225809168]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0.15, -2)
+script = ExtResource("12")
+ItemId = "scrap_metal"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ScrapMetal" unique_id=1503916654]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="ScrapMetal" unique_id=1778977634]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("ScrapMetalMaterial")
+
+[node name="ScrapMetal2" type="RigidBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.15, -0.5)
+script = ExtResource("12")
+ItemId = "scrap_metal"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ScrapMetal2"]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="ScrapMetal2"]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("ScrapMetalMaterial")
+
+[node name="ScrapMetal3" type="RigidBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 0.15, 0.5)
+script = ExtResource("12")
+ItemId = "scrap_metal"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ScrapMetal3"]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="ScrapMetal3"]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("ScrapMetalMaterial")
+
+[node name="SpareParts" type="RigidBody3D" parent="." unique_id=498314835]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.606081, 0.15, 2)
+script = ExtResource("12")
+ItemId = "spare_parts"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SpareParts" unique_id=802464128]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SpareParts" unique_id=1966985226]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("SparePartsMaterial")
+
+[node name="ScrapMetal4" type="RigidBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.15, -1.5)
+script = ExtResource("12")
+ItemId = "scrap_metal"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ScrapMetal4"]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="ScrapMetal4"]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("ScrapMetalMaterial")
+
+[node name="ScrapMetal5" type="RigidBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0.15, 1.5)
+script = ExtResource("12")
+ItemId = "scrap_metal"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ScrapMetal5"]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="ScrapMetal5"]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("ScrapMetalMaterial")
+
+[node name="SpareParts2" type="RigidBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.5, 0.15, 1)
+script = ExtResource("12")
+ItemId = "spare_parts"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SpareParts2"]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SpareParts2"]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("SparePartsMaterial")
+
+[node name="WallPanel3" type="RigidBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0.15, -1)
+script = ExtResource("12")
+ItemId = "wall_panel"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WallPanel3"]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WallPanel3"]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("WallPanelPickupMaterial")
+
+[node name="PowerCell1" type="RigidBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.5, 0.15, -2)
+script = ExtResource("12")
+ItemId = "power_cell"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PowerCell1"]
+shape = SubResource("PickupItemShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="PowerCell1"]
+mesh = SubResource("PickupItemMesh")
+surface_material_override/0 = SubResource("PowerCellMaterial")
+
+[node name="DamagedConduit" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipSimRef", "Mesh", "Collider", "SmokeParticles") groups=["saveable"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0.3, 0.5)
+script = ExtResource("17")
+ShipSimRef = NodePath("../ShipSim")
+Mesh = NodePath("MeshInstance3D")
+Collider = NodePath("CollisionShape3D")
+RepairingMaterial = SubResource("RepairingMaterial")
+RepairedMaterial = SubResource("RepairedConduitMaterial")
+BurningMaterial = SubResource("BurningConduitMaterial")
+SmokeParticles = NodePath("SmokeParticles")
+DroppedItemMesh = SubResource("PickupItemMesh")
+DroppedItemShape = SubResource("PickupItemShape")
+DroppedItemMaterial = SubResource("PickupItemMaterial")
+SaveId = "damaged_conduit_1"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DamagedConduit"]
+shape = SubResource("BreachPatchShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="DamagedConduit"]
+mesh = SubResource("BreachPatchMesh")
+surface_material_override/0 = SubResource("DamagedConduitMaterial")
+
+[node name="SmokeParticles" type="GPUParticles3D" parent="DamagedConduit"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+emitting = false
+amount = 12
+lifetime = 2.0
+process_material = SubResource("SmokeProcessMaterial")
+draw_pass_1 = SubResource("SmokeParticleMesh")
+
+[node name="InteriorDoor" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipSimRef", "SlabMesh", "SlabCollision") groups=["saveable"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.0, -0.8)
+script = ExtResource("16")
+ShipSimRef = NodePath("../ShipSim")
+SlabMesh = NodePath("SlabMesh")
+SlabCollision = NodePath("SlabCollision")
+SaveId = "derelict_interior_door"
+
+[node name="FrameCollision" type="CollisionShape3D" parent="InteriorDoor"]
+shape = SubResource("DoorFrameShape")
+
+[node name="FrameMesh" type="MeshInstance3D" parent="InteriorDoor"]
+mesh = SubResource("DoorFrameMesh")
+surface_material_override/0 = SubResource("AirlockPanelMaterial")
+
+[node name="SlabCollision" type="CollisionShape3D" parent="InteriorDoor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
+shape = SubResource("DoorSlabShape")
+
+[node name="SlabMesh" type="MeshInstance3D" parent="InteriorDoor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
+mesh = SubResource("DoorSlabMesh")
+surface_material_override/0 = SubResource("AirlockDoorMaterial")

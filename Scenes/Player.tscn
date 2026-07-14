@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://gtalqbepbiga" path="res://Scripts/Player/Crosshair.cs" id="2"]
 [ext_resource type="Script" path="res://Scripts/Player/InventorySlotUI.cs" id="3"]
 [ext_resource type="Script" path="res://Scripts/Player/DraggableWindow.cs" id="4"]
+[ext_resource type="Script" path="res://Scripts/Travel/TravelMapPanel.cs" id="5"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -637,4 +638,59 @@ custom_minimum_size = Vector2(0, 11)
 layout_mode = 2
 theme_override_styles/background = SubResource("HudLabelBackground")
 value = 100.0
+
+[node name="TravelMapPanel" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("MapArea", "SelectionLabel", "TravelButton", "CancelButton")]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -240.0
+offset_right = 280.0
+offset_bottom = 240.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("HudLabelBackground")
+script = ExtResource("5")
+MapArea = NodePath("Layout/MapArea")
+SelectionLabel = NodePath("Layout/SelectionLabel")
+TravelButton = NodePath("Layout/ButtonsRow/TravelButton")
+CancelButton = NodePath("Layout/ButtonsRow/CancelButton")
+
+[node name="Layout" type="VBoxContainer" parent="HUD/TravelMapPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TitleBar" type="Label" parent="HUD/TravelMapPanel/Layout"]
+layout_mode = 2
+mouse_filter = 0
+theme_override_styles/normal = SubResource("HudLabelBackground")
+text = "TRAVEL"
+horizontal_alignment = 1
+
+[node name="MapArea" type="Control" parent="HUD/TravelMapPanel/Layout"]
+custom_minimum_size = Vector2(540, 350)
+layout_mode = 2
+theme_override_styles/panel = SubResource("HudLabelBackground")
+
+[node name="SelectionLabel" type="Label" parent="HUD/TravelMapPanel/Layout"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("HudLabelBackground")
+horizontal_alignment = 1
+
+[node name="ButtonsRow" type="HBoxContainer" parent="HUD/TravelMapPanel/Layout"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 10
+
+[node name="TravelButton" type="Button" parent="HUD/TravelMapPanel/Layout/ButtonsRow"]
+layout_mode = 2
+disabled = true
+text = "TRAVEL"
+
+[node name="CancelButton" type="Button" parent="HUD/TravelMapPanel/Layout/ButtonsRow"]
+layout_mode = 2
+text = "CANCEL"
 show_percentage = false

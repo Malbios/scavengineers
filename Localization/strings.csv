@@ -43,6 +43,15 @@ VERB_SELL_SPARE_PARTS,Sell Spare Parts,Ersatzteile verkaufen
 VERB_SELL_WALL_PANEL,Sell Wall Panel,Wandpaneel verkaufen
 OBJECT_SHIP_CONSOLE,Ship Console,Schiffskonsole
 OBJECT_TRADE_CONSOLE,Trade Console,Handelskonsole
+OBJECT_STATION,Station,Station
+OBJECT_DERELICT_1,Derelict 1,Wrack 1
+OBJECT_DERELICT_2,Derelict 2,Wrack 2
+OBJECT_DERELICT_3,Derelict 3,Wrack 3
+OBJECT_DERELICT_4,Derelict 4,Wrack 4
+OBJECT_DERELICT_5,Derelict 5,Wrack 5
+HUD_TRAVEL_MAP_PROMPT,Select a destination,Ziel auswählen
+HUD_TRAVEL_MAP_SELECTED,Destination selected,Ziel ausgewählt
+HUD_TRAVEL_MAP_CANCEL,Cancel,Abbrechen
 HUD_CREDITS,Credits,Credits
 ITEM_POWER_CELL,Power Cell,Energiezelle
 VERB_BUY_POWER_CELL,Buy Power Cell,Energiezelle kaufen
