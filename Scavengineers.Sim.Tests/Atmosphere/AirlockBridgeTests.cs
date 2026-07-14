@@ -71,6 +71,9 @@ public class AirlockBridgeTests
 
         for (var i = 0; i < 100; i++)
         {
+            // home's own Tick is what actually consumes the bridge's mark and vents its
+            // component now — the bridge itself no longer mutates cell volumes directly.
+            home.Tick(1);
             derelict.Tick(1); // derelict keeps venting to outside independently
             bridge.Tick(1);
         }
@@ -79,12 +82,12 @@ public class AirlockBridgeTests
     }
 
     [Fact]
-    public void Open_OnlyDirectlyExchangesTheDoorwayCell_FarCellsLagBehindAndCatchUpLater()
+    public void Open_VentsTheWholeHomeShipTogether_NoDistanceBasedLag()
     {
-        // The bridge now only exchanges the two named cells directly (see AirlockBridge's own
-        // doc comment) — a far cell only feels the effect via the home ship's own internal
-        // per-cell diffusion carrying it inward, hop by hop. This is the intended replacement for
-        // the old "whole connected room moves in lockstep" behavior, not a regression of it.
+        // Once the doorway cell is marked externally vented, home's OWN Tick vents its whole
+        // connected component uniformly (see AtmosphereSystem's own Vent doc comment) - matching
+        // realistic depressurization, where internal pressure equalizes far faster than air
+        // escapes through a hole, so a far cell doesn't get a "moment of grace."
         var doorwayCell = new CellCoord(0, 0);
         var homeDeck = new Deck();
         for (var i = 0; i < 10; i++)
@@ -97,41 +100,26 @@ public class AirlockBridgeTests
         derelict.Tick(50); // derelict is now near-vacuum, isolated
 
         var bridge = new AirlockBridge(home, doorwayCell, derelict, derelictCell) { IsOpen = true };
-        var farCell = new CellCoord(9, 0); // 9 hops from the doorway
+        var farCell = new CellCoord(9, 0); // 9 hops from the doorway - shouldn't matter anymore
 
-        for (var i = 0; i < 20; i++)
+        for (var i = 0; i < 60; i++) // 1 second
         {
-            home.Tick(1); // the ship's own internal diffusion, every tick, same as ShipSim
-            derelict.Tick(1); // derelict keeps venting to outside independently, same as ShipSim
-            bridge.Tick(1);
+            home.Tick(1.0 / 60);
+            derelict.Tick(1.0 / 60);
+            bridge.Tick(1.0 / 60);
         }
 
-        // Shortly after opening, the doorway cell has dropped notably but the far cell has
-        // barely moved — this is the "keeps some air for a moment" behavior replacing the old
-        // "whole room reacts almost as fast as the doorway" bug.
-        Assert.True(home.VolumeAt(doorwayCell).Pressure < AtmosphereVolume.Breathable.Pressure * 0.5);
-        Assert.True(home.VolumeAt(farCell).Pressure > AtmosphereVolume.Breathable.Pressure * 0.9);
-
-        // Given enough total real time, diffusion eventually carries the effect the whole way
-        // down the corridor — the far cell isn't permanently immune, just delayed.
-        for (var i = 0; i < 500; i++)
-        {
-            derelict.Tick(1);
-            home.Tick(1);
-            bridge.Tick(1);
-        }
-
-        Assert.True(home.VolumeAt(farCell).Pressure < AtmosphereVolume.Breathable.Pressure * 0.5);
+        // Doorway and far cell have dropped together, not one lagging the other.
+        Assert.Equal(home.VolumeAt(doorwayCell).Pressure, home.VolumeAt(farCell).Pressure, precision: 3);
+        Assert.True(home.VolumeAt(farCell).Pressure < AtmosphereVolume.Breathable.Pressure * 0.1);
     }
 
     [Fact]
     public void Open_BreachedRoomRapidlySettlesNearVacuum_EvenAtRealisticFrameRates()
     {
-        // A brief mixing blip right as the airlock opens is expected (both sides are being pulled
-        // toward the same shared average), but it must settle back to near vacuum within a
-        // couple of seconds, not linger at an elevated shared value for as long as the airlock
-        // stays open — checked at a realistic per-physics-frame dt (60fps), not the large
-        // dt-per-Tick used elsewhere.
+        // Derelict already has its own real breach, so it vents via its own component regardless
+        // of the bridge — this just confirms that still holds at a realistic per-physics-frame dt
+        // (60fps), not the large dt-per-Tick used elsewhere.
         var (home, homeCell) = BreathableSystem();
         var (derelict, derelictCell) = BreachedSystem();
         derelict.Tick(50); // derelict starts fully vented, isolated
@@ -160,12 +148,10 @@ public class AirlockBridgeTests
         // room at all. The bridge's rate matches AtmosphereSystem's own vent rate, so the home
         // room's connected air drains just as fast as the breach itself.
         //
-        // Threshold re-verified after the "pull both sides toward Vacuum directly" fix (see
-        // AirlockBridge's own doc comment): since the derelict cell here is the breach cell
-        // itself, IsConnectedToOutside is true from the first tick, so the doorway cell is pulled
-        // straight toward Vacuum rather than toward a moving average with the derelict's own
-        // (already near-vacuum) reading — converges to ~3.6% within 3 seconds, well under the
-        // old ~0.10 (pre-fix, average-based) figure.
+        // Threshold re-verified after the whole-component-vent redesign: once marked, home's own
+        // Tick vents its entire 5-cell component uniformly at VentRatePerSecond, not just the
+        // doorway cell — converges to essentially zero (~3.6e-6 %) within 3 seconds, since a
+        // whole small component now empties just as fast as a single cell would.
         var doorwayCell = new CellCoord(0, 0);
         var homeDeck = new Deck();
         for (var i = 0; i < 5; i++)
@@ -188,7 +174,7 @@ public class AirlockBridgeTests
         }
 
         Assert.True(
-            home.VolumeAt(doorwayCell).O2Fraction < 0.05,
+            home.VolumeAt(doorwayCell).O2Fraction < 0.001,
             $"a few seconds with the airlock open should rapidly drain the home room too, was {home.VolumeAt(doorwayCell).O2Fraction}");
     }
 
@@ -209,7 +195,8 @@ public class AirlockBridgeTests
         derelict.Tick(50);
 
         var bridge = new AirlockBridge(home, doorwayCell, derelict, derelictCell) { IsOpen = true };
-        bridge.Tick(10);
+        bridge.Tick(10); // marks doorwayCell as externally vented
+        home.Tick(10); // home's own Tick vents the marked cell's component (sealedCell is separate)
 
         Assert.Equal(AtmosphereVolume.Breathable.Pressure, home.VolumeAt(sealedCell).Pressure);
         Assert.True(home.VolumeAt(doorwayCell).Pressure < AtmosphereVolume.Breathable.Pressure);
@@ -218,16 +205,12 @@ public class AirlockBridgeTests
     [Fact]
     public void Open_WithABreachElsewhereInTheDerelictRoom_StillRapidlyDrainsTheHomeShipToo()
     {
-        // The bug this branch exists for: a multi-cell derelict room whose hull breach is *not*
-        // at the doorway cell used to let the doorway-side average settle into a stable,
-        // deceptively-safe plateau — the breach only reached the doorway via Diffuse's much
-        // gentler rate, never Vent's full strength, so a regenerating Home Ship could hold it
-        // there indefinitely (confirmed via a throwaway probe reproducing exactly this setup,
-        // before this fix). IsConnectedToOutside means the bridge now treats the open airlock as
-        // part of that leak regardless of which cell in the derelict room the actual hole is in —
-        // per the explicit design call, the *source* (Home, full of air, with life support) must
-        // also rapidly drain, not sit safe. Home hits ~0.7% within 2s (probe) and stays there —
-        // asserting at 5s with a loose 2% bound leaves plenty of margin either way.
+        // IsConnectedToOutside checks the derelict's whole connected component, not just the
+        // bridged cell — so a breach anywhere in that component (not necessarily at the doorway)
+        // still marks Home's side as leaking, and Home's own Tick then vents its whole component
+        // uniformly. Per the explicit design call, the source (Home, full of air, with life
+        // support) must also rapidly drain, not sit safe just because the actual hole is
+        // elsewhere in the derelict.
         var doorwayCell = new CellCoord(0, 0);
         var breachCell = new CellCoord(4, 0); // several hops from the doorway, not the same cell
 
@@ -259,22 +242,19 @@ public class AirlockBridgeTests
     }
 
     [Fact]
-    public void Open_WithLifeSupportAndAMultiCellHome_StillConvergesTowardVacuum_NotAPlateau()
+    public void Open_WithLifeSupport_LifeSupportDoesNotBlockTheWholeComponentVent()
     {
-        // Regression for the whole-component Regenerate out-competing a single-point bridge
-        // drain: a single-cell Home (see the test above) can't reproduce this - Diffuse never
-        // triggers for it, so the bridge's 5.0/s trivially beats a 0.2/s regen on the very same
-        // cell. A multi-cell Home lets Diffuse spread the drain's loss across the room while
-        // Regenerate (pre-fix) pulled the WHOLE room back at once every tick, settling into a
-        // stable plateau (observed ~8% at t=15s, still climbing back up, in a probe mirroring the
-        // real ~74-cell Home Ship's actual grid/corridor dimensions - the fix eliminated that
-        // plateau, and at real ship scale the far end still converges to ~1.7% within 3 minutes).
-        // At this smaller, representative scale, both cells drop well past halfway within 15s
-        // (probed: doorway 0.62%, far cell 1.75%) with no sign of leveling off.
+        // Vent and Regenerate are mutually exclusive per component now (see Tick) - once marked,
+        // a component is vented, full stop, regardless of life support or room size. This
+        // confirms life support doesn't slow or block that at all: every cell in a multi-cell,
+        // life-support-equipped Home still converges to near-vacuum together with the doorway,
+        // not held at a safe plateau by regen (the old failure mode this branch used to guard
+        // against via Diffuse-dilution, which no longer applies since Diffuse never runs for a
+        // vented component).
         var doorwayCell = new CellCoord(0, 0);
         var farCell = new CellCoord(7, 0);
         var homeDeck = new Deck();
-        for (var i = 0; i < 8; i++) // representative corridor, not the real ~74-cell ship
+        for (var i = 0; i < 8; i++) // representative multi-cell ship, not just one cell
         {
             homeDeck.AddCell(new CellCoord(i, 0));
         }
@@ -292,7 +272,7 @@ public class AirlockBridgeTests
         var bridge = new AirlockBridge(home, doorwayCell, derelict, new CellCoord(0, 0)) { IsOpen = true };
 
         const double frameDt = 1.0 / 60.0;
-        for (var i = 0; i < 900; i++) // 15s
+        for (var i = 0; i < 180; i++) // 3s
         {
             home.Tick(frameDt);
             derelict.Tick(frameDt);
@@ -300,10 +280,8 @@ public class AirlockBridgeTests
         }
 
         Assert.True(
-            home.VolumeAt(doorwayCell).O2Fraction < 0.02,
-            $"doorway should be near-vacuum by 15s, was {home.VolumeAt(doorwayCell).O2Fraction}");
-        Assert.True(
-            home.VolumeAt(farCell).O2Fraction < 0.05,
-            $"far cell should also be trending toward vacuum by 15s, not holding at a safe plateau, was {home.VolumeAt(farCell).O2Fraction}");
+            home.VolumeAt(doorwayCell).O2Fraction < 0.001,
+            $"doorway should be near-vacuum by 3s despite life support, was {home.VolumeAt(doorwayCell).O2Fraction}");
+        Assert.Equal(home.VolumeAt(doorwayCell).O2Fraction, home.VolumeAt(farCell).O2Fraction, precision: 3);
     }
 }

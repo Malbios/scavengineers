@@ -12,12 +12,13 @@ namespace Scavengineers.Sim.Atmosphere;
 /// </summary>
 public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
 {
-    // Placeholder/tunable — must decisively outpace AirlockBridge's own EqualizeRatePerSecond
-    // (0.5). At equal rates, opening an airlock into a breached room let the bridge's push toward
-    // a shared average and this vent's pull toward vacuum settle into a tug-of-war equilibrium
-    // that held several percent O2 indefinitely — the room visibly "got a bit of air" the whole
-    // time the airlock stayed open, instead of just a brief moment. 10x the bridge's rate keeps
-    // that peak under 1% at realistic per-frame dt (see AirlockBridgeTests).
+    // Placeholder/tunable — applied uniformly to an entire vented component (see Vent), so this
+    // now sets how fast ANY size room/ship reaches near-vacuum once breached, not just a single
+    // cell's convergence speed: remaining fraction after t seconds ≈ e^(-VentRatePerSecond * t),
+    // so at 5.0, ~0.67% remains after 1 second — any breached component, regardless of its size,
+    // reaches near-vacuum in roughly 1-2s. This is a substantial pacing change from the old
+    // per-cell/diffusion-carried approach (minutes for a large ship) and needs an explicit
+    // playtest check, not a blind retune — see docs/architecture/atmosphere-power-sim.md.
     private const double VentRatePerSecond = 5.0;
     private const double LifeSupportRegenRatePerSecond = 0.2;
 
@@ -154,38 +155,43 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
         RawComponentContaining(cell).Where(n => !n.IsOutside).Select(n => n.Cell!.Value).ToHashSet();
 
     /// <summary>Whether <paramref name="cell"/>'s current component includes the shared <see
-    /// cref="AtmosphereNode.Outside"/> sentinel — i.e. whether <see cref="Tick"/> would <see
-    /// cref="Vent"/> this component this tick. <see cref="AirlockBridge"/> uses this to decide
-    /// whether either side of an open airlock already has its own leak to vacuum: if so, the
-    /// airlock becomes part of that leak for both sides instead of just averaging the two cells
-    /// against each other (see AirlockBridge's own doc comment for why plain averaging isn't
-    /// enough there). Runs a full connectivity pass same as <see cref="ComponentContaining"/> —
-    /// called up to twice per AirlockBridge tick, on top of Tick's own per-system pass; in line
-    /// with this game's existing deck sizes, not a new asymptotic cost.</summary>
+    /// cref="AtmosphereNode.Outside"/> sentinel — one of the two conditions (the other being <see
+    /// cref="MarkExternallyVented"/>) under which <see cref="Tick"/> would <see cref="Vent"/> this
+    /// component this tick. <see cref="AirlockBridge"/> uses this to decide whether either side of
+    /// an open airlock already has its own leak to vacuum: if so, the airlock becomes part of
+    /// that leak for both sides instead of just averaging the two cells against each other (see
+    /// AirlockBridge's own doc comment). Runs a full connectivity pass same as <see
+    /// cref="ComponentContaining"/> — called up to twice per AirlockBridge tick, on top of Tick's
+    /// own per-system pass; in line with this game's existing deck sizes, not a new asymptotic
+    /// cost.</summary>
     public bool IsConnectedToOutside(CellCoord cell) => RawComponentContaining(cell).Contains(AtmosphereNode.Outside);
 
     /// <summary>Marks a cell as currently being drained by an open <see cref="AirlockBridge"/>
-    /// whose far side has its own path to Outside — for this tick only. Suppresses life-support
-    /// regen for this cell's whole connected component (see <see cref="Tick"/>), since the ship
-    /// is now effectively leaking through this cell even though its own internal connectivity
-    /// graph has no breach of its own (a bridge is a deliberate bolt-on, never merged into the
-    /// graph — see <see cref="AirlockBridge"/>'s own doc comment). Re-applied every tick the leak
-    /// condition holds (self-sustaining, no permanent state needed) and cleared unconditionally
-    /// at the end of every <see cref="Tick"/> call.</summary>
+    /// whose far side has its own path to Outside — for this tick only. This is what makes <see
+    /// cref="Tick"/> treat this cell's whole connected component as vented (see <see
+    /// cref="Vent"/>), even though its own internal connectivity graph has no breach of its own (a
+    /// bridge is a deliberate bolt-on, never merged into the graph — see <see
+    /// cref="AirlockBridge"/>'s own doc comment); this also has the effect of suppressing
+    /// life-support regen for that component, since Vent and Regenerate are mutually exclusive per
+    /// component now. Re-applied every tick the leak condition holds (self-sustaining, no
+    /// permanent state needed) and cleared unconditionally at the end of every <see cref="Tick"/>
+    /// call — so consumption is deferred to whichever of this system's own <see cref="Tick"/>
+    /// calls runs *next*, not the same call that marked it (see <see cref="AirlockBridge.Tick"/>
+    /// for the ordering this relies on).</summary>
     public void MarkExternallyVented(CellCoord cell) => _externallyVented.Add(cell);
 
     /// <summary>
-    /// Advances the sim by <paramref name="dt"/> seconds: diffuses each connected component's
-    /// scalars toward each cell's own neighbors (not an instant whole-component average), then
-    /// vents any directly-breached cell in a component connected to the outside toward vacuum,
-    /// or regenerates a fully-sealed component with life support toward breathable — unless a
-    /// cell in that component was marked via <see cref="MarkExternallyVented"/> this tick, in
-    /// which case regen is skipped entirely: a whole-component regen at
-    /// <see cref="LifeSupportRegenRatePerSecond"/> can otherwise out-compete an
-    /// <see cref="AirlockBridge"/>'s single-point drain purely through dilution (that one cell
-    /// keeps getting refilled by <see cref="Diffuse"/> from its many still-full neighbors faster
-    /// than the bridge can drain it), settling into a stable, deceptively-safe plateau instead of
-    /// ever converging toward vacuum.
+    /// Advances the sim by <paramref name="dt"/> seconds. Each connected component gets exactly
+    /// one of two treatments, never both: if it's connected to Outside (a direct hull breach) or
+    /// has any cell marked via <see cref="MarkExternallyVented"/> this tick (an open <see
+    /// cref="AirlockBridge"/> leaking into vacuum on the far side), the whole component is vented
+    /// uniformly — matching real depressurization, where internal pressure equalizes at the speed
+    /// of sound, vastly faster than air escaping through a hole, so a connected volume has no time
+    /// to develop a distance-based gradient (see docs/architecture/atmosphere-power-sim.md).
+    /// Otherwise the component diffuses (each cell moving toward its own unsealed neighbors,
+    /// gradually) and, if it has life support, is regenerated toward Breathable — this remaining
+    /// path is for two sealed, non-vented rooms mixing through an open door, which has no external
+    /// vacuum driving force and stays legitimately gradual.
     /// </summary>
     public void Tick(double dt)
     {
@@ -197,15 +203,19 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
                 continue;
             }
 
-            Diffuse(cells, dt);
+            var isVented = component.Contains(AtmosphereNode.Outside) || cells.Any(_externallyVented.Contains);
 
-            if (component.Contains(AtmosphereNode.Outside))
+            if (isVented)
             {
-                Vent(cells.Where(_deck.IsHullBreached).ToList(), dt);
+                Vent(cells, dt);
             }
-            else if (_hasLifeSupport && !cells.Any(_externallyVented.Contains))
+            else
             {
-                Regenerate(cells, dt);
+                Diffuse(cells, dt);
+                if (_hasLifeSupport)
+                {
+                    Regenerate(cells, dt);
+                }
             }
         }
 
@@ -214,12 +224,14 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
 
     /// <summary>Each cell moves toward the average of its own unsealed neighbors' *previous*-tick
     /// values (a simultaneous/"Jacobi" step, not a sequential one — see the snapshot below) —
-    /// replaces the old instant whole-component average so distance/hop-count now genuinely
-    /// matters: a cell several hops from a breach only feels the effect once it's propagated
-    /// neighbor-by-neighbor, rather than every cell in a room updating in lockstep the same
-    /// tick. Runs unconditionally for every multi-cell component (breached or not) — two sealed
-    /// rooms joined by an open door still gradually mix toward each other, just now over several
-    /// ticks instead of instantly.</summary>
+    /// reserved now for sealed, non-vented multi-cell components only (e.g. two rooms joined by an
+    /// open door, neither with its own path to Outside). Never runs for a vented component: a real
+    /// breach's pressure equalizes across the whole connected volume far faster than air escapes
+    /// through the hole, so there's no physical distance-based lag to model there — see <see
+    /// cref="Vent"/> and docs/architecture/atmosphere-power-sim.md. Kept here only because two
+    /// sealed rooms mixing through an open, unbreached door genuinely has no external vacuum
+    /// forcing an instant equalization, so a gradual multi-tick mix is still the right model for
+    /// that case.</summary>
     private void Diffuse(IReadOnlyList<CellCoord> cells, double dt)
     {
         if (cells.Count < 2)
@@ -259,15 +271,17 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
         }
     }
 
-    /// <summary>Vents only the cell(s) directly exposed to a hull breach — everywhere else in the
-    /// component only feels this via <see cref="Diffuse"/> carrying the drop outward tick by
-    /// tick, which is what creates the "a few cells away keeps some air for a moment"
-    /// distance-based delay.</summary>
-    private void Vent(IReadOnlyList<CellCoord> breachedCells, double dt)
+    /// <summary>Vents every cell in a component connected to Outside (or externally vented via
+    /// <see cref="MarkExternallyVented"/>) toward vacuum, uniformly and independently — no cell
+    /// lags another, since each gets the same Lerp toward the same target from a component that
+    /// started at the same values. Matches real depressurization: internal pressure equalizes far
+    /// faster than air escapes through a hole, so the whole connected volume drops together at a
+    /// rate set by the hole, not by hop-count from it.</summary>
+    private void Vent(IReadOnlyList<CellCoord> cells, double dt)
     {
         var factor = Math.Clamp(VentRatePerSecond * dt, 0, 1);
 
-        foreach (var cell in breachedCells)
+        foreach (var cell in cells)
         {
             var current = _volumes[cell];
             _volumes[cell] = current with

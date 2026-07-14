@@ -175,10 +175,11 @@ public class AtmosphereSystemTests
 
         system.Tick(1); // must not throw KeyNotFoundException for the freshly-extended cell
 
-        // extended is directly breached, origin isn't — under diffusion they no longer move in
-        // lockstep, so extended drops further/faster than origin, not equal to it.
-        Assert.True(system.VolumeAt(extended).Pressure < system.VolumeAt(origin).Pressure);
-        Assert.Equal(AtmosphereVolume.Breathable.Pressure, system.VolumeAt(origin).Pressure);
+        // extended is directly breached and adjacent to origin (unsealed), so they're one vented
+        // component now — both drop together, not one lagging the other (see Vent's whole-
+        // component semantics).
+        Assert.True(system.VolumeAt(extended).Pressure < AtmosphereVolume.Breathable.Pressure);
+        Assert.Equal(system.VolumeAt(extended).Pressure, system.VolumeAt(origin).Pressure, precision: 6);
     }
 
     [Fact]
@@ -222,8 +223,13 @@ public class AtmosphereSystemTests
     }
 
     [Fact]
-    public void BreachedCorridor_FarCellRetainsMoreO2ThanNearCellBeforeEventuallyConverging()
+    public void BreachedCorridor_AllCellsVentTogether_NoDistanceBasedLag()
     {
+        // Realistic depressurization: internal pressure equalizes far faster than air escapes
+        // through the hole, so a connected volume has no time to develop a distance-based
+        // gradient — every cell in a breached corridor vents in lockstep, not hop-by-hop delayed
+        // (see Vent's own doc comment). Near and far cells start identical and get the identical
+        // Lerp toward the identical target every tick, so they stay exactly equal, not just close.
         var deck = new Deck();
         const int corridorLength = 16;
         for (var i = 0; i < corridorLength; i++)
@@ -233,30 +239,18 @@ public class AtmosphereSystemTests
 
         var breachCell = new CellCoord(0, 0);
         var nearCell = new CellCoord(1, 0); // 1 hop from the breach
-        var farCell = new CellCoord(10, 0); // 10 hops from the breach
+        var farCell = new CellCoord(10, 0); // 10 hops from the breach — shouldn't matter anymore
         deck.BreachHull(breachCell);
         var system = new AtmosphereSystem(deck);
 
         const double frameDt = 1.0 / 60.0;
-        for (var i = 0; i < 120; i++) // 2 seconds
+        for (var i = 0; i < 60; i++) // 1 second
         {
             system.Tick(frameDt);
         }
 
-        // A couple of seconds in: the breach cell itself is well depleted, a near cell has
-        // started following, but a cell 10 hops away has barely moved — exactly the "keeps some
-        // air for a moment" behavior instant whole-component equalize couldn't express.
-        Assert.True(system.VolumeAt(breachCell).O2Fraction < system.VolumeAt(nearCell).O2Fraction);
-        Assert.True(system.VolumeAt(nearCell).O2Fraction < system.VolumeAt(farCell).O2Fraction);
-        Assert.True(system.VolumeAt(farCell).O2Fraction > AtmosphereVolume.Breathable.O2Fraction * 0.8);
-
-        for (var i = 0; i < 2880; i++) // 48 more seconds (50s total)
-        {
-            system.Tick(frameDt);
-        }
-
-        // Given enough total time, the whole corridor converges near vacuum — the delay is a
-        // lag, not a permanent immunity.
-        Assert.True(system.VolumeAt(farCell).O2Fraction < 0.05);
+        Assert.Equal(system.VolumeAt(breachCell).O2Fraction, system.VolumeAt(nearCell).O2Fraction, precision: 6);
+        Assert.Equal(system.VolumeAt(nearCell).O2Fraction, system.VolumeAt(farCell).O2Fraction, precision: 6);
+        Assert.True(system.VolumeAt(farCell).O2Fraction < AtmosphereVolume.Breathable.O2Fraction * 0.1);
     }
 }

@@ -4,7 +4,7 @@ Full detail: `docs/project-plan.md` §5 "Architectural notes", Appendix A6-A7, �
 
 ## Settled
 
-- **Atmosphere = lumped per-cell scalars with neighbor-to-neighbor diffusion, never per-tile CFD.** Each cell holds its own pressure/O₂ fraction/temperature; a breach vents only the directly-exposed cell toward vacuum, and diffusion (each cell moving toward the average of its own unsealed neighbors, one hop per tick) carries that effect outward — this is what makes distance/graph-hop-count matter (a cell several hops from a breach keeps some air for a moment) without simulating velocity, momentum, or advection. This ceiling is still deliberate — do not let it "improve" into real fluid dynamics.
+- **Atmosphere = lumped per-cell scalars, never per-tile CFD.** Each cell holds its own pressure/O₂ fraction/temperature. A breach (or an open airlock bridging to a room that has one) vents its *entire* connected-to-outside component uniformly, toward vacuum, at the same rate for every cell — matching real depressurization, where internal pressure equalizes at the speed of sound, vastly faster than air escapes through a hole, so a connected volume never develops a distance-based gradient in practice. Neighbor-to-neighbor diffusion still exists, but only for sealed, non-vented components (e.g. two rooms mixing through an open door with no external vacuum driving force) — it never runs for a vented component. This ceiling is still deliberate — do not let it "improve" into real fluid dynamics (no velocity/momentum/advection).
 - **The one-solver trick (A6):** atmosphere, power, data/signal (later), and room-detection all reduce to the *same* connectivity engine reading the ship's structural tier:
 
   | System | "Network" is… | Flow blocked by… |
