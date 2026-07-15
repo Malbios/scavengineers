@@ -29,8 +29,13 @@ public partial class TravelMapPanel : PanelContainer
     /// and manage this panel's own button-click plumbing.</summary>
     public PlayerScript? PlayerRef { get; set; }
 
+    // Placeholder/tunable — tints the selected destination's icon so it's visually obvious at a
+    // glance which one you've picked, not just inferable from the (generic) selection label text.
+    private static readonly Color SelectedColor = Colors.Gold;
+
     private int? _selectedId;
-    private readonly List<Button> _spawnedIcons = new();
+    private readonly Dictionary<int, Button> _spawnedIcons = new();
+    private readonly Dictionary<int, TravelMapEntry> _entriesById = new();
 
     public override void _Ready()
     {
@@ -47,14 +52,14 @@ public partial class TravelMapPanel : PanelContainer
     /// avoids tracking incremental diffs against whatever the console reported last time.</summary>
     public void Populate(IReadOnlyList<TravelMapEntry> entries, int currentId)
     {
-        foreach (var icon in _spawnedIcons)
+        foreach (var icon in _spawnedIcons.Values)
         {
             icon.QueueFree();
         }
 
         _spawnedIcons.Clear();
+        _entriesById.Clear();
         _selectedId = null;
-        UpdateSelectionUi();
 
         foreach (var entry in entries)
         {
@@ -68,8 +73,11 @@ public partial class TravelMapPanel : PanelContainer
             var id = entry.DestinationId;
             button.Pressed += () => OnDestinationPressed(id);
             MapArea!.AddChild(button);
-            _spawnedIcons.Add(button);
+            _spawnedIcons[id] = button;
+            _entriesById[id] = entry;
         }
+
+        UpdateSelectionUi();
     }
 
     private void OnDestinationPressed(int id)
@@ -86,9 +94,20 @@ public partial class TravelMapPanel : PanelContainer
         }
     }
 
+    /// <summary>Both the destination map's own selection label AND each icon's own color reflect
+    /// the current pick — the label alone ("Destination selected") didn't say WHICH one, and
+    /// nothing on the map itself distinguished the selected icon from every other one.</summary>
     private void UpdateSelectionUi()
     {
         TravelButton!.Disabled = _selectedId is null;
-        SelectionLabel!.Text = _selectedId is not null ? Tr("HUD_TRAVEL_MAP_SELECTED") : Tr("HUD_TRAVEL_MAP_PROMPT");
+
+        foreach (var (id, icon) in _spawnedIcons)
+        {
+            icon.Modulate = id == _selectedId ? SelectedColor : Colors.White;
+        }
+
+        SelectionLabel!.Text = _selectedId is { } selectedId && _entriesById.TryGetValue(selectedId, out var selectedEntry)
+            ? Tr("HUD_TRAVEL_MAP_SELECTED") + $": {Tr(selectedEntry.DisplayNameKey)}"
+            : Tr("HUD_TRAVEL_MAP_PROMPT");
     }
 }
