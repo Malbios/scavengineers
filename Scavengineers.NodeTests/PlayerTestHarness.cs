@@ -19,6 +19,12 @@ public static class PlayerTestHarness
 {
     public static PlayerScript CreateAttached(SceneTree sceneTree)
     {
+        // GdUnit4's own test runner is a real, non-headless window (Vulkan-rendered) — without
+        // this, every test built on this harness would capture the developer's actual OS mouse
+        // into that window for the run's duration (Player._Ready() calls CaptureMouse()
+        // unconditionally). See Player.SuppressMouseCaptureForTests's own doc comment.
+        PlayerScript.SuppressMouseCaptureForTests = true;
+
         var player = AutoFree(new PlayerScript());
 
         var head = new Node3D { Name = "Head" };

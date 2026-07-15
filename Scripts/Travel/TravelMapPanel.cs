@@ -35,7 +35,6 @@ public partial class TravelMapPanel : PanelContainer
 
     private int? _selectedId;
     private readonly Dictionary<int, Button> _spawnedIcons = new();
-    private readonly Dictionary<int, TravelMapEntry> _entriesById = new();
 
     public override void _Ready()
     {
@@ -58,7 +57,6 @@ public partial class TravelMapPanel : PanelContainer
         }
 
         _spawnedIcons.Clear();
-        _entriesById.Clear();
         _selectedId = null;
 
         foreach (var entry in entries)
@@ -74,7 +72,6 @@ public partial class TravelMapPanel : PanelContainer
             button.Pressed += () => OnDestinationPressed(id);
             MapArea!.AddChild(button);
             _spawnedIcons[id] = button;
-            _entriesById[id] = entry;
         }
 
         UpdateSelectionUi();
@@ -94,9 +91,9 @@ public partial class TravelMapPanel : PanelContainer
         }
     }
 
-    /// <summary>Both the destination map's own selection label AND each icon's own color reflect
-    /// the current pick — the label alone ("Destination selected") didn't say WHICH one, and
-    /// nothing on the map itself distinguished the selected icon from every other one.</summary>
+    /// <summary>The selected icon's own gold tint is the "which one is selected" signal now —
+    /// the label just prompts before anything's picked, and goes quiet once it is, rather than
+    /// repeating what the icon color already shows.</summary>
     private void UpdateSelectionUi()
     {
         TravelButton!.Disabled = _selectedId is null;
@@ -106,8 +103,6 @@ public partial class TravelMapPanel : PanelContainer
             icon.Modulate = id == _selectedId ? SelectedColor : Colors.White;
         }
 
-        SelectionLabel!.Text = _selectedId is { } selectedId && _entriesById.TryGetValue(selectedId, out var selectedEntry)
-            ? Tr("HUD_TRAVEL_MAP_SELECTED") + $": {Tr(selectedEntry.DisplayNameKey)}"
-            : Tr("HUD_TRAVEL_MAP_PROMPT");
+        SelectionLabel!.Text = _selectedId is null ? Tr("HUD_TRAVEL_MAP_PROMPT") : "";
     }
 }

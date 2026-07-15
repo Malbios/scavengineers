@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # New: the travel console's destination map now shows which target you've currently selected - the selected icon tints gold (was indistinguishable from the others), and the selection label under the map now names the destination ("Destination selected: Derelict 1") instead of just a generic "Destination selected". Checklist: (1) open the travel console's map, click a destination icon - confirm that icon turns gold and the label below names it; (2) click a different destination - confirm the old one goes back to white and the new one turns gold, label updates to the new name; (3) the Travel button enables only once something's selected, same as before.
+$scene = "res://Scenes/World.tscn" # Tweak: dropped the "Destination selected: ..." label text under the travel map - the gold icon highlight alone now indicates the pick, the label just shows the "Select a destination" prompt beforehand and goes blank once something's selected. Checklist: (1) open the travel console's map, click a destination - confirm the icon turns gold and the label below goes blank (no "Destination selected" text); (2) click a different destination - confirm the highlight moves and the label stays blank; (3) Travel button still enables only once something's selected.
 
 & $godotExe --path $projectPath $scene

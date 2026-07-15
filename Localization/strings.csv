@@ -45,7 +45,6 @@ OBJECT_DERELICT_3,Derelict 3,Wrack 3
 OBJECT_DERELICT_4,Derelict 4,Wrack 4
 OBJECT_DERELICT_5,Derelict 5,Wrack 5
 HUD_TRAVEL_MAP_PROMPT,Select a destination,Ziel auswählen
-HUD_TRAVEL_MAP_SELECTED,Destination selected,Ziel ausgewählt
 HUD_TRAVEL_MAP_CANCEL,Cancel,Abbrechen
 HUD_SHOP_CLOSE,Close,Schließen
 HUD_CREDITS,Credits,Credits

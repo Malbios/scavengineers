@@ -679,11 +679,26 @@ public partial class Player : CharacterBody3D
         return (Vector3)result["position"] + (Vector3)result["normal"] * 0.05f;
     }
 
+    /// <summary>Test harnesses that instantiate a real Player (see
+    /// Scavengineers.NodeTests/PlayerTestHarness.cs) run inside a real, non-headless Godot
+    /// window (GdUnit4's own test runner) — without this, every such test would capture the
+    /// developer's actual OS mouse into that window for the run's duration. Off by default; only
+    /// ever set by test code.</summary>
+    public static bool SuppressMouseCaptureForTests { get; set; }
+
     // Instance method, not static: the FocusEntered connection below is then tied to this
     // Player's lifetime, so Godot auto-disconnects it when this instance is freed (e.g. on a
     // scene change). A static method's connection has no instance to track, so travelling
     // between scenes would try to reconnect the exact same callable and hit "already connected."
-    private void CaptureMouse() => Input.MouseMode = Input.MouseModeEnum.Captured;
+    private void CaptureMouse()
+    {
+        if (SuppressMouseCaptureForTests)
+        {
+            return;
+        }
+
+        Input.MouseMode = Input.MouseModeEnum.Captured;
+    }
 
     private void OpenInventory()
     {
