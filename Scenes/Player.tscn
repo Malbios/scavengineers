@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://Scripts/Travel/TravelMapPanel.cs" id="5"]
 [ext_resource type="Script" path="res://Scripts/Travel/StarfieldBackground.cs" id="6"]
 [ext_resource type="Script" path="res://Scripts/Shop/ShopPanel.cs" id="7"]
+[ext_resource type="Script" path="res://Scripts/Player/WorldDropZone.cs" id="8"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -178,6 +179,15 @@ top_level = true
 z_index = 10
 mouse_filter = 2
 theme_override_styles/normal = SubResource("HudLabelBackground")
+
+[node name="WorldDropZone" type="Control" parent="HUD"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("8")
 
 [node name="InventoryPanel" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar")]
 visible = false

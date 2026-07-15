@@ -117,6 +117,7 @@ public partial class Player : CharacterBody3D
 
     private Node3D? _head;
     private RayCast3D? _interactRay;
+    private Camera3D? _camera;
     private Label? _targetNameLabel;
     private Label? _verbLabel;
     private ProgressBar? _verbProgressBar;
@@ -134,6 +135,7 @@ public partial class Player : CharacterBody3D
     private TravelConsoleVerbTarget? _openTravelConsole;
     private ShopPanel? _shopPanel;
     private StationConsoleVerbTarget? _openShopConsole;
+    private WorldDropZone? _worldDropZone;
     private Control? _backpackGrid;
     private InventorySlotUI? _backpackSlotTemplate;
     private readonly List<InventorySlotUI> _backpackSlotUIs = new();
@@ -269,6 +271,7 @@ public partial class Player : CharacterBody3D
     {
         _head = GetNode<Node3D>("Head");
         _interactRay = GetNode<RayCast3D>("Head/Camera3D/InteractRay");
+        _camera = GetNode<Camera3D>("Head/Camera3D");
         _targetNameLabel = GetNode<Label>("HUD/TargetNameLabel");
         _verbLabel = GetNode<Label>("HUD/VerbLabel");
         _verbProgressBar = GetNode<ProgressBar>("HUD/VerbProgressBar");
@@ -298,6 +301,8 @@ public partial class Player : CharacterBody3D
         _travelMapPanel.PlayerRef = this;
         _shopPanel = GetNode<ShopPanel>("HUD/ShopPanel");
         _shopPanel.PlayerRef = this;
+        _worldDropZone = GetNode<WorldDropZone>("HUD/WorldDropZone");
+        _worldDropZone.PlayerRef = this;
 
         foreach (var child in GetNode("HUD/InventoryPanel/Layout/EquipSlots").GetChildren())
         {
@@ -582,6 +587,82 @@ public partial class Player : CharacterBody3D
         pickup.AddChild(new CollisionShape3D { Shape = DroppedItemShape });
     }
 
+    // Placeholder/tunable — how far you can reach to place a dropped item.
+    private const float MaxDropReachMeters = 3.0f;
+
+    /// <summary>Called by the world-drop zone (see WorldDropZone._DropData) once a drag ends
+    /// outside every existing panel/slot Control. A no-op for the drill/flashlight battery slots
+    /// (not supported this pass) or if nothing solid is within reach in the drop's screen
+    /// direction.</summary>
+    public void TryDropInWorld(InventorySlotUI source, Vector2 screenPosition)
+    {
+        if (source.IsDrillBatterySlot || source.IsFlashlightBatterySlot)
+        {
+            return;
+        }
+
+        if (ResolveWorldDropPosition(screenPosition) is not { } position)
+        {
+            return;
+        }
+
+        if (source.IsBackSlot)
+        {
+            DropBackpackInWorld(position);
+            return;
+        }
+
+        if (source.Container is not { } container || source.SlotIndex < 0 || source.SlotIndex >= container.Slots.Count
+            || container.Slots[source.SlotIndex] is not { } slot)
+        {
+            return;
+        }
+
+        container.SetSlot(source.SlotIndex, null);
+        InventoryOverflow.DropAt(this, slot.ItemId, slot.Count, DroppedItemMesh!, DroppedItemShape!, DroppedItemMaterial, position);
+    }
+
+    /// <summary>Always drops the backpack (empty or not) at `position` — unlike
+    /// TryUnequipBackpack's onto-a-hand-slot gesture, which prefers stashing an empty backpack
+    /// back into a hand instead. Dragging it out into the world is a deliberate "put it down," so
+    /// it always ends up loose.</summary>
+    private void DropBackpackInWorld(Vector3 position)
+    {
+        if (_inventory.Backpack is not { } backpack)
+        {
+            return;
+        }
+
+        _inventory.ClearBackpack();
+        SpawnDroppedContainer(backpack.ItemId, backpack.Contents, position);
+    }
+
+    /// <summary>Projects a ray from the camera through the drop's screen position — the first
+    /// mouse-position-based raycast in this codebase (InteractRay is a fixed forward crosshair
+    /// ray). Returns null (refuse the drop) if nothing solid is within MaxDropReachMeters, e.g.
+    /// aiming out an open breach or off a platform's edge.</summary>
+    private Vector3? ResolveWorldDropPosition(Vector2 screenPosition)
+    {
+        if (_camera is null)
+        {
+            return null;
+        }
+
+        var from = _camera.ProjectRayOrigin(screenPosition);
+        var direction = _camera.ProjectRayNormal(screenPosition);
+        var query = PhysicsRayQueryParameters3D.Create(from, from + direction * MaxDropReachMeters, _interactRay!.CollisionMask,
+            new Godot.Collections.Array<Rid> { GetRid() });
+        var result = GetWorld3D().DirectSpaceState.IntersectRay(query);
+
+        if (result.Count == 0)
+        {
+            return null;
+        }
+
+        // Nudge off the surface along its normal so the item doesn't spawn half-embedded.
+        return (Vector3)result["position"] + (Vector3)result["normal"] * 0.05f;
+    }
+
     // Instance method, not static: the FocusEntered connection below is then tied to this
     // Player's lifetime, so Godot auto-disconnects it when this instance is freed (e.g. on a
     // scene change). A static method's connection has no instance to track, so travelling
@@ -596,6 +677,7 @@ public partial class Player : CharacterBody3D
             _inventoryPanel.Visible = true;
         }
 
+        _worldDropZone!.Visible = true;
         Input.MouseMode = Input.MouseModeEnum.Visible;
     }
 
@@ -611,6 +693,7 @@ public partial class Player : CharacterBody3D
         _drillWindow!.Visible = false;
         _flashlightWindow!.Visible = false;
         _backpackWindow!.Visible = false;
+        _worldDropZone!.Visible = false;
 
         CaptureMouse();
     }
