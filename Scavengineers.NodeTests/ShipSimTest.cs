@@ -130,6 +130,39 @@ public class ShipSimTest
 
     [TestCase]
     [RequireGodotRuntime]
+    public void ProcedurallyGenerate_ProducesAValidRandomShip_RespectingTheColumn6Invariant()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var shipSim = AutoFree(new ShipSim { ProcedurallyGenerate = true });
+        sceneTree.Root.AddChild(shipSim);
+
+        AssertBool(shipSim.Deck.Cells.Count > 0).IsTrue();
+        AssertInt(shipSim.RoomSplitColumns[0]).IsEqual(6);
+        // Room 1 (columns 0-5) must always be a real, sealed-off room regardless of what the
+        // rest of the ship rolled.
+        AssertBool(shipSim.Deck.IsEdgeSealed(new CellCoord(5, 0), new CellCoord(6, 0))).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void ProcedurallyGenerate_WinsOverLayoutId_WhenBothAreSet()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var shipSim = AutoFree(new ShipSim { ProcedurallyGenerate = true, LayoutId = "derelict_1" });
+        sceneTree.Root.AddChild(shipSim);
+
+        // NodeTests' own isolated res:// has no Data/Ships/layouts.json (see the
+        // project_nodetests_isolated_project memory), so ShipLayoutCatalog.TryGet("derelict_1")
+        // would always return null there — if LayoutId's path had won instead, ApplyLayout(null)
+        // is a no-op and HasHullBreaches would stay false forever. The generator always sets
+        // HasHullBreaches = true, so this is a fully deterministic (not probabilistic) signal
+        // that ProcedurallyGenerate actually took priority.
+        AssertBool(shipSim.HasHullBreaches).IsTrue();
+        AssertInt(shipSim.RoomSplitColumns[0]).IsEqual(6);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
     public void LayoutId_LeftUnset_KeepsTodaysOriginalHardcodedHazardPlacement()
     {
         // Guards against a future accidental default-value edit silently changing the

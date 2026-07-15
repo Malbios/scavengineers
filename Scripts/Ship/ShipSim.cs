@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -85,6 +86,13 @@ public partial class ShipSim : Node
     [Export]
     public string LayoutId { get; set; } = "";
 
+    /// <summary>Rolls a random <see cref="ShipLayoutGenerator"/> layout instead of reading
+    /// <see cref="LayoutId"/> from the catalog — wins over <see cref="LayoutId"/> if both are
+    /// somehow set. No save persistence yet (see docs on the seed itself, added in a later
+    /// stage) — every boot currently rolls fresh.</summary>
+    [Export]
+    public bool ProcedurallyGenerate { get; set; }
+
     /// <summary>This ship's own procedurally-generated loot list, if any — empty unless
     /// <see cref="ApplyGeneratedLayout"/> was called. Read by ShipBuildTarget.SpawnGeneratedLoot;
     /// spawning itself lives there since it already owns the tile-to-world conversion and the
@@ -137,7 +145,16 @@ public partial class ShipSim : Node
 
     public override void _Ready()
     {
-        if (!string.IsNullOrEmpty(LayoutId))
+        if (ProcedurallyGenerate)
+        {
+            if (!string.IsNullOrEmpty(LayoutId))
+            {
+                GD.PushWarning($"[ShipSim] Both ProcedurallyGenerate and LayoutId ('{LayoutId}') are set on the same ship — ProcedurallyGenerate wins.");
+            }
+
+            ApplyGeneratedLayout(ShipLayoutGenerator.Generate(new Random().Next()));
+        }
+        else if (!string.IsNullOrEmpty(LayoutId))
         {
             ApplyLayout(ShipLayoutCatalog.TryGet(LayoutId));
         }

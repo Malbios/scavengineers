@@ -486,7 +486,10 @@ SaveId = "derelict_interior_door_2"
 
 [node name="Derelict3" parent="." instance=ExtResource("28")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 0)
+[node name="ShipSim" parent="Derelict3" index="0"]
+ProcedurallyGenerate = true
 [node name="Floor" parent="Derelict3" index="5"]
+GenerateLoot = true
 SaveId = "derelict_build_target_3"
 [node name="DamagedConduit" parent="Derelict3" index="19"]
 SaveId = "damaged_conduit_3"
