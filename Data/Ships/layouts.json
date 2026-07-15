@@ -12,5 +12,18 @@
     ],
     "fireGeneratorCell": { "x": 1, "y": 4 },
     "damagedConduitCell": { "x": 1, "y": 3 }
+  },
+  {
+    "id": "derelict_small",
+    "gridWidth": 12,
+    "roomSplitColumns": [6],
+    "eastCorridorLength": 0,
+    "hasHullBreaches": true,
+    "hasFireHazard": true,
+    "initialBreaches": [
+      { "cellX": 9, "cellY": 5, "outsideX": 9, "outsideY": 6 }
+    ],
+    "fireGeneratorCell": { "x": 1, "y": 4 },
+    "damagedConduitCell": { "x": 1, "y": 3 }
   }
 ]

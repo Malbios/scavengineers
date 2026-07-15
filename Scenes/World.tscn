@@ -475,6 +475,8 @@ SaveId = "derelict_interior_door_1"
 
 [node name="Derelict2" parent="." instance=ExtResource("28")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 0)
+[node name="ShipSim" parent="Derelict2" index="0"]
+LayoutId = "derelict_small"
 [node name="Floor" parent="Derelict2" index="5"]
 SaveId = "derelict_build_target_2"
 [node name="DamagedConduit" parent="Derelict2" index="19"]
