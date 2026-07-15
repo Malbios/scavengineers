@@ -95,7 +95,13 @@ public partial class InventorySlotUI : Control
             return;
         }
 
-        if (CurrentSlot() is { } slot)
+        if (BatteryCharge() is { } charge)
+        {
+            // A battery slot's Count is always the synthetic "1" from CurrentSlot() — showing
+            // charge instead is the actually useful number here (how much is left), not how many.
+            Tooltip.Text = $"{Tr("ITEM_BATTERY")}: {Mathf.RoundToInt(charge * 100)}%";
+        }
+        else if (CurrentSlot() is { } slot)
         {
             Tooltip.Text = $"{Tr("ITEM_" + slot.ItemId.ToUpperInvariant())}: {slot.Count}";
         }
@@ -110,6 +116,24 @@ public partial class InventorySlotUI : Control
 
         Tooltip.Visible = true;
         Tooltip.GlobalPosition = GetGlobalMousePosition() + new Vector2(16, 16);
+    }
+
+    /// <summary>Charge fraction (0-1) for the drill/flashlight battery slots specifically — null
+    /// for every other slot, including a battery-less drill/flashlight (that case already falls
+    /// through to CurrentSlot() returning null, i.e. "empty slot" tooltip handling).</summary>
+    private float? BatteryCharge()
+    {
+        if (IsDrillBatterySlot)
+        {
+            return PlayerRef?.Inventory.Drill is { HasBattery: true } drill ? drill.Charge : null;
+        }
+
+        if (IsFlashlightBatterySlot)
+        {
+            return PlayerRef?.Inventory.Flashlight is { HasBattery: true } flashlight ? flashlight.Charge : null;
+        }
+
+        return null;
     }
 
     private void OnMouseExited()
