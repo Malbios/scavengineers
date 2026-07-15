@@ -19,6 +19,14 @@ public sealed class SaveData
 
     public Dictionary<string, string> ObjectStringStates { get; set; } = new();
 
+    /// <summary>A procedurally-generated ship's own resolved seed (see IShipLayoutSaveable) —
+    /// keyed by the ship's ShipSim.SaveId. Purely additive: empty for any save predating
+    /// procedural ship generation, same "missing = default" convention every other collection
+    /// field here already uses. Read directly by ShipSim itself (see
+    /// SaveManager.TryReadShipLayoutSeeds), not through the normal ApplySaveState callback — by
+    /// the time that would fire, the ship's Deck already exists.</summary>
+    public Dictionary<string, int> ShipLayoutSeeds { get; set; } = new();
+
     /// <summary>Full backpacks (or other containers, later) sitting loose in the world — not
     /// tied to any ShipBuildTarget, so none of the lists above fit. Scanned/respawned by
     /// SaveManager via the "dropped_container" group (see ContainerPickupItem).</summary>

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 using Godot;
+using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Sim.Atmosphere;
 using Scavengineers.Sim.Grid;
 using Scavengineers.Sim.Hazards;
@@ -20,7 +21,7 @@ namespace Scavengineers.Scripts.Ship;
 /// data-driven ship layouts (arbitrary footprints) are still separate, larger future work —
 /// this is a fixed-shape stand-in, just no longer a single abstract cell.
 /// </summary>
-public partial class ShipSim : Node
+public partial class ShipSim : Node, IShipLayoutSaveable
 {
     // Public so ShipBuildTarget.SeedDefaultShipLayout can size its own corridor-wall seeding off
     // the same single source of truth instead of re-hardcoding it.
@@ -88,10 +89,26 @@ public partial class ShipSim : Node
 
     /// <summary>Rolls a random <see cref="ShipLayoutGenerator"/> layout instead of reading
     /// <see cref="LayoutId"/> from the catalog — wins over <see cref="LayoutId"/> if both are
-    /// somehow set. No save persistence yet (see docs on the seed itself, added in a later
-    /// stage) — every boot currently rolls fresh.</summary>
+    /// somehow set. The resolved <see cref="LayoutSeed"/> is read from (and persisted to) the
+    /// save file directly — see IShipLayoutSaveable's own doc comment for why that can't go
+    /// through the normal ApplySaveState callback.</summary>
     [Export]
     public bool ProcedurallyGenerate { get; set; }
+
+    /// <summary>Only meaningful alongside <see cref="ProcedurallyGenerate"/> — every ship that
+    /// sets it needs its own stable id, same rule as every other SaveId in this project.</summary>
+    [Export]
+    public string SaveId { get; set; } = "";
+
+    /// <summary>Test-only seam: points the seed read at a temp file instead of the player's real
+    /// save data. Every production ship leaves this unset and reads
+    /// <see cref="SaveManager.DefaultSavePath"/>.</summary>
+    [Export]
+    public string? SavePathOverride { get; set; }
+
+    /// <summary>This ship's resolved procedural-generation seed — null for a ship that isn't
+    /// <see cref="ProcedurallyGenerate"/> at all. See IShipLayoutSaveable.</summary>
+    public int? LayoutSeed { get; private set; }
 
     /// <summary>This ship's own procedurally-generated loot list, if any — empty unless
     /// <see cref="ApplyGeneratedLayout"/> was called. Read by ShipBuildTarget.SpawnGeneratedLoot;
@@ -152,7 +169,13 @@ public partial class ShipSim : Node
                 GD.PushWarning($"[ShipSim] Both ProcedurallyGenerate and LayoutId ('{LayoutId}') are set on the same ship — ProcedurallyGenerate wins.");
             }
 
-            ApplyGeneratedLayout(ShipLayoutGenerator.Generate(new Random().Next()));
+            var savePath = SavePathOverride ?? SaveManager.DefaultSavePath;
+            var savedSeeds = SaveManager.TryReadShipLayoutSeeds(savePath);
+            LayoutSeed = savedSeeds is not null && savedSeeds.TryGetValue(SaveId, out var savedSeed)
+                ? savedSeed
+                : new Random().Next();
+
+            ApplyGeneratedLayout(ShipLayoutGenerator.Generate(LayoutSeed.Value));
         }
         else if (!string.IsNullOrEmpty(LayoutId))
         {

@@ -8,6 +8,7 @@ using GdUnit4;
 using Godot;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
+using Scavengineers.Scripts.Ship;
 using PlayerScript = Scavengineers.Scripts.Player.Player;
 
 using static GdUnit4.Assertions;
@@ -121,6 +122,48 @@ public class SaveManagerTest
             var dropped = sceneTree.Root.GetChildren().OfType<ContainerPickupItem>().FirstOrDefault(c => c.ItemId == "backpack");
             AssertBool(dropped is not null).IsTrue();
             AssertBool(dropped!.Contents!.CountOf("scrap_metal") == 3).IsTrue();
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void ProcedurallyGeneratedShip_RollsFreshOnFirstBoot_ThenReadsTheSameSeedBackAfterSaving()
+    {
+        var tempPath = Path.GetTempFileName();
+        try
+        {
+            var sceneTree = (SceneTree)Engine.GetMainLoop();
+            var (player, manager) = MakeHarness(tempPath);
+
+            var firstBoot = AutoFree(new ShipSim
+            {
+                ProcedurallyGenerate = true,
+                SaveId = "test_procedural_ship",
+                SavePathOverride = tempPath,
+            });
+            firstBoot.AddToGroup("saveable");
+            sceneTree.Root.AddChild(firstBoot);
+
+            AssertBool(firstBoot.LayoutSeed.HasValue).IsTrue();
+            var rolledSeed = firstBoot.LayoutSeed!.Value;
+            var rolledGridWidth = firstBoot.GridWidth;
+
+            manager.Save();
+
+            var secondBoot = AutoFree(new ShipSim
+            {
+                ProcedurallyGenerate = true,
+                SaveId = "test_procedural_ship",
+                SavePathOverride = tempPath,
+            });
+            sceneTree.Root.AddChild(secondBoot);
+
+            AssertBool(secondBoot.LayoutSeed == rolledSeed).IsTrue();
+            AssertBool(secondBoot.GridWidth == rolledGridWidth).IsTrue();
         }
         finally
         {

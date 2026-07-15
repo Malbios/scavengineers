@@ -17,9 +17,15 @@ namespace Scavengineers.Scripts.SaveLoad;
 /// </summary>
 public partial class SaveManager : Node
 {
+    /// <summary>Shared default, also used directly by ShipSim.ProcedurallyGenerate to read its
+    /// own seed off disk (see IShipLayoutSaveable's own doc comment for why that read can't go
+    /// through the normal ApplySaveState callback). A ShipSim has no reference to this node — the
+    /// path itself is the only thing that needs to be shared, not a NodePath wiring.</summary>
+    public static readonly string DefaultSavePath = ProjectSettings.GlobalizePath("user://savegame.json");
+
     /// <summary>Instance property (not a static constant) so a test can point this at a temp file
     /// instead of the player's real save data — every production caller just uses the default.</summary>
-    public string SavePath { get; set; } = ProjectSettings.GlobalizePath("user://savegame.json");
+    public string SavePath { get; set; } = DefaultSavePath;
 
     [Export]
     public PlayerScript? PlayerRef { get; set; }
@@ -64,6 +70,14 @@ public partial class SaveManager : Node
         foreach (var stateSaveable in FindSaveables<IStateSaveable>())
         {
             data.ObjectStringStates[stateSaveable.SaveId] = stateSaveable.GetSaveState();
+        }
+
+        foreach (var shipLayoutSaveable in FindSaveables<IShipLayoutSaveable>())
+        {
+            if (shipLayoutSaveable.LayoutSeed is { } seed)
+            {
+                data.ShipLayoutSeeds[shipLayoutSaveable.SaveId] = seed;
+            }
         }
 
         foreach (var node in GetTree().GetNodesInGroup("dropped_container"))
@@ -188,6 +202,29 @@ public partial class SaveManager : Node
 
         GD.Print("[SaveManager] Loaded.");
         return true;
+    }
+
+    /// <summary>Reads just the ShipLayoutSeeds dictionary off disk, synchronously — called
+    /// directly by ShipSim.ProcedurallyGenerate at the very top of its own _Ready(), before this
+    /// (or any) SaveManager instance necessarily exists yet. Null for a missing/unreadable file,
+    /// same "can't load, fall back" shape as <see cref="Load"/>'s own file-read guard — a
+    /// caller finding no seed for its own SaveId (or this returning null entirely) both correctly
+    /// mean "roll a fresh one."</summary>
+    public static Dictionary<string, int>? TryReadShipLayoutSeeds(string savePath)
+    {
+        if (!File.Exists(savePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<SaveData>(File.ReadAllText(savePath))?.ShipLayoutSeeds;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private List<T> FindSaveables<T>() where T : class =>
