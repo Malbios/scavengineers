@@ -24,7 +24,7 @@
 [ext_resource type="Material" path="res://Assets/Materials/station_wall_material.tres" id="26"]
 [ext_resource type="Material" path="res://Assets/Materials/station_ceiling_material.tres" id="27"]
 [ext_resource type="PackedScene" path="res://Scenes/Derelict.tscn" id="28"]
-[ext_resource type="Script" path="res://Scripts/Environment/IdleSway.cs" id="29"]
+[ext_resource type="Script" path="res://Scripts/Environment/BreathingIdle.cs" id="29"]
 
 [sub_resource type="ShaderMaterial" id="StarfieldSkyMaterial"]
 shader = ExtResource("24")
