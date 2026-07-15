@@ -100,13 +100,23 @@ public partial class ShipAtmosphereZone : Area3D
 
     /// <summary>How deep <paramref name="worldPosition"/> sits inside this zone's own box
     /// collision shape — the smallest of its three local-axis margins (distance to the nearest
-    /// face). Used by <see cref="FindZoneAt"/> to break ties when two zones' shapes genuinely
-    /// overlap (e.g. right at a docked airlock threshold, where the Home Ship's and the docked
-    /// ship's corridor zones are deliberately built with a small overlap margin so a live
-    /// per-frame query never leaves a gap): the zone the point sits most centrally inside wins,
-    /// rather than whichever IntersectPoint happened to enumerate first (an order Godot doesn't
-    /// guarantee) — this is what let a player standing right at a closed airlock door read the
-    /// far (docked) ship's atmosphere instead of their own.</summary>
+    /// face), each expressed as a *fraction* of that axis's own half-size, not a raw world-unit
+    /// distance. Used by <see cref="FindZoneAt"/> to break ties when two zones' shapes genuinely
+    /// overlap: the zone the point sits most centrally inside (relative to that zone's own size)
+    /// wins, rather than whichever IntersectPoint happened to enumerate first (an order Godot
+    /// doesn't guarantee).
+    ///
+    /// Normalizing matters: an earlier, un-normalized version of this (raw world-unit margin)
+    /// was systematically biased toward whichever zone's shape was physically bigger, regardless
+    /// of which one the point actually "belonged" to. That's what let a docked Derelict's own
+    /// (much larger) room zone win against the Home Ship's own, much smaller corridor zone clear
+    /// across most of that corridor's own length — not just at the boundary edge — since a large
+    /// shape can post a bigger raw margin even from a relatively worse (further-from-center)
+    /// position. Confirmed against a real bug report: a Derelict's ShipZoneRoom1
+    /// (ShipZoneWideShape, 10 units wide) sitting right next to its own docking corridor spans far
+    /// enough past its own hull to reach across the docking seam into the Home Ship's corridor
+    /// entirely, at raw-margin values that beat the Home Ship's own much tighter corridor zone
+    /// everywhere except right at the very edge.</summary>
     private float ContainmentMargin(Vector3 worldPosition)
     {
         // Found by type, not by a literal "CollisionShape3D" name — every zone in this game's
@@ -119,7 +129,11 @@ public partial class ShipAtmosphereZone : Area3D
 
         var local = collisionShape.GlobalTransform.AffineInverse() * worldPosition;
         var halfSize = box.Size / 2f;
-        return Mathf.Min(halfSize.X - Mathf.Abs(local.X), Mathf.Min(halfSize.Y - Mathf.Abs(local.Y), halfSize.Z - Mathf.Abs(local.Z)));
+        return Mathf.Min(
+            (halfSize.X - Mathf.Abs(local.X)) / halfSize.X,
+            Mathf.Min(
+                (halfSize.Y - Mathf.Abs(local.Y)) / halfSize.Y,
+                (halfSize.Z - Mathf.Abs(local.Z)) / halfSize.Z));
     }
 
     /// <summary>Converts a world position into this zone's ship's own grid tile coordinate — the

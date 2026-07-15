@@ -162,6 +162,43 @@ public class ShipAtmosphereZoneTest
         AssertBool(ReferenceEquals(inOverlap, zoneA)).IsTrue();
     }
 
+    /// <summary>Regression coverage for a real bug this project hit: a docked Derelict's own room
+    /// zone (ShipZoneWideShape, 10 units wide) sitting right next to its docking corridor spans
+    /// far enough past its own hull to reach clear across the docking seam into the Home Ship's
+    /// own (much smaller, ~2.2-unit) corridor zone — and an un-normalized (raw world-unit)
+    /// containment margin is systematically biased toward whichever shape is physically bigger,
+    /// so the small, correct zone lost almost everywhere except right at the very edge. Mirrors
+    /// the real sizes/positions: a small zone (matching the Home Ship's corridor) at world x=10,
+    /// half-width 1.1, vs a big zone (matching the Derelict's room) at world x=14, half-width 5 —
+    /// their spans overlap over x∈[9,11.1]. A point deep inside the SMALL zone's own span, but
+    /// only shallowly not-quite-central for the BIG zone, must still resolve to the small zone.</summary>
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task FindZoneAt_WhenASmallZoneOverlapsAMuchBiggerOne_StillPicksTheSmallZoneWhenDeeperInsideIt()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var smallShip = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(smallShip);
+        var bigShip = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(bigShip);
+
+        var smallZone = AutoFree(MakeZoneWithShape(
+            sceneTree, smallShip, new Vector2I(1, 1), new Vector3(10, 1, 0), new Vector3(2.2f, 2.2f, 2.4f))); // spans x[8.9,11.1]
+        var bigZone = AutoFree(MakeZoneWithShape(
+            sceneTree, bigShip, new Vector2I(2, 2), new Vector3(14, 1, 0), new Vector3(10, 2.2f, 6.4f))); // spans x[9,19]
+
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+
+        // 9.1: near the small zone's own edge (10% of its own half-width in) but very shallow
+        // (2%) for the big zone — small zone should still win, being relatively deeper inside it.
+        var nearSmallZonesOwnEdge = ShipAtmosphereZone.FindZoneAt(smallZone.GetWorld3D(), new Vector3(9.1f, 1, 0));
+        AssertBool(ReferenceEquals(nearSmallZonesOwnEdge, smallZone)).IsTrue();
+
+        // 10.5: about halfway across the small zone's own span, still clearly inside it.
+        var midSmallZone = ShipAtmosphereZone.FindZoneAt(smallZone.GetWorld3D(), new Vector3(10.5f, 1, 0));
+        AssertBool(ReferenceEquals(midSmallZone, smallZone)).IsTrue();
+    }
+
     [TestCase]
     [RequireGodotRuntime]
     public void TileAt_ConvertsWorldPositionToTileUsingTheParentShipRootsLocalSpace()
