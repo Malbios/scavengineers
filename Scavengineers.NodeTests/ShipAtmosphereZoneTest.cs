@@ -199,6 +199,41 @@ public class ShipAtmosphereZoneTest
         AssertBool(ReferenceEquals(midSmallZone, smallZone)).IsTrue();
     }
 
+    /// <summary>Regression coverage for a second real bug found debugging the same airlock issue:
+    /// the very first version of the size-normalized tie-break above still failed in the real
+    /// game, because it compared ALL THREE axes (X/Y/Z) — and every room-type zone in this game
+    /// shares roughly the same vertical (Y) span (floor-to-ceiling, centered around Y≈1), so a
+    /// real player position near the floor (Y≈0) sits far enough from that shared center that Y
+    /// becomes the smallest (binding) margin for EVERY candidate almost equally, collapsing the
+    /// tie-break back to arbitrary IntersectPoint order. Confirmed via real in-game debug
+    /// logging: three overlapping zones all reported the identical 0.092 margin at once. Only the
+    /// horizontal (X/Z) axes should ever decide "which room" — this test queries at Y=0 (floor
+    /// level) against zones centered at Y=1, deliberately NOT aligned with the zone's own
+    /// vertical center, which is exactly what the previous "same zone sizes" tests above never
+    /// exercised (they queried at Y=1, matching every zone's own center perfectly).</summary>
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task FindZoneAt_QueriedNearTheFloor_StillPicksByHorizontalContainment_NotVerticalOffset()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var smallShip = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(smallShip);
+        var bigShip = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(bigShip);
+
+        var smallZone = AutoFree(MakeZoneWithShape(
+            sceneTree, smallShip, new Vector2I(1, 1), new Vector3(10, 1, 0), new Vector3(2.2f, 2.2f, 2.4f))); // spans x[8.9,11.1]
+        var bigZone = AutoFree(MakeZoneWithShape(
+            sceneTree, bigShip, new Vector2I(2, 2), new Vector3(14, 1, 0), new Vector3(10, 2.2f, 6.4f))); // spans x[9,19]
+
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+
+        // Floor-level query (Y≈0), far from both zones' shared Y=1 center — must still resolve
+        // to the small zone, matching the real reported bug's exact position.
+        var atFloorLevel = ShipAtmosphereZone.FindZoneAt(smallZone.GetWorld3D(), new Vector3(9.49f, 0.001f, 0.03f));
+        AssertBool(ReferenceEquals(atFloorLevel, smallZone)).IsTrue();
+    }
+
     [TestCase]
     [RequireGodotRuntime]
     public void TileAt_ConvertsWorldPositionToTileUsingTheParentShipRootsLocalSpace()

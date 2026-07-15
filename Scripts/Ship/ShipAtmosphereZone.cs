@@ -99,24 +99,26 @@ public partial class ShipAtmosphereZone : Area3D
     }
 
     /// <summary>How deep <paramref name="worldPosition"/> sits inside this zone's own box
-    /// collision shape — the smallest of its three local-axis margins (distance to the nearest
-    /// face), each expressed as a *fraction* of that axis's own half-size, not a raw world-unit
-    /// distance. Used by <see cref="FindZoneAt"/> to break ties when two zones' shapes genuinely
-    /// overlap: the zone the point sits most centrally inside (relative to that zone's own size)
-    /// wins, rather than whichever IntersectPoint happened to enumerate first (an order Godot
-    /// doesn't guarantee).
+    /// collision shape, on the HORIZONTAL plane only (local X/Z) — the smaller of those two
+    /// axes' margins (distance to the nearest face), each expressed as a *fraction* of that
+    /// axis's own half-size, not a raw world-unit distance. Used by <see cref="FindZoneAt"/> to
+    /// break ties when two zones' shapes genuinely overlap: the zone the point sits most
+    /// centrally inside (relative to that zone's own footprint) wins, rather than whichever
+    /// IntersectPoint happened to enumerate first (an order Godot doesn't guarantee).
     ///
-    /// Normalizing matters: an earlier, un-normalized version of this (raw world-unit margin)
+    /// Deliberately ignores the vertical (Y) axis. Every room-type zone in this game shares
+    /// roughly the same height/vertical-center convention (floor-to-ceiling coverage, centered
+    /// around Y≈1) — so Y barely varies between candidate zones and carries none of the "which
+    /// room am I actually in" signal, yet a real player position (near the floor, Y≈0) sits far
+    /// enough from that shared vertical center that Y becomes the smallest (i.e. binding) axis
+    /// for EVERY candidate almost equally, collapsing the tie-break back to arbitrary
+    /// IntersectPoint order — confirmed via real in-game debug logging (three overlapping zones
+    /// all reporting the identical 0.092 margin). Horizontal-only comparison is what actually
+    /// distinguishes "which room's footprint do I belong to."
+    ///
+    /// Normalizing (rather than a raw world-unit margin) also matters: an un-normalized version
     /// was systematically biased toward whichever zone's shape was physically bigger, regardless
-    /// of which one the point actually "belonged" to. That's what let a docked Derelict's own
-    /// (much larger) room zone win against the Home Ship's own, much smaller corridor zone clear
-    /// across most of that corridor's own length — not just at the boundary edge — since a large
-    /// shape can post a bigger raw margin even from a relatively worse (further-from-center)
-    /// position. Confirmed against a real bug report: a Derelict's ShipZoneRoom1
-    /// (ShipZoneWideShape, 10 units wide) sitting right next to its own docking corridor spans far
-    /// enough past its own hull to reach across the docking seam into the Home Ship's corridor
-    /// entirely, at raw-margin values that beat the Home Ship's own much tighter corridor zone
-    /// everywhere except right at the very edge.</summary>
+    /// of which one the point actually "belonged" to — see the "size bias" test below.</summary>
     private float ContainmentMargin(Vector3 worldPosition)
     {
         // Found by type, not by a literal "CollisionShape3D" name — every zone in this game's
@@ -131,9 +133,7 @@ public partial class ShipAtmosphereZone : Area3D
         var halfSize = box.Size / 2f;
         return Mathf.Min(
             (halfSize.X - Mathf.Abs(local.X)) / halfSize.X,
-            Mathf.Min(
-                (halfSize.Y - Mathf.Abs(local.Y)) / halfSize.Y,
-                (halfSize.Z - Mathf.Abs(local.Z)) / halfSize.Z));
+            (halfSize.Z - Mathf.Abs(local.Z)) / halfSize.Z);
     }
 
     /// <summary>Converts a world position into this zone's ship's own grid tile coordinate — the
