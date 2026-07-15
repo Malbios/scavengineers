@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 using Scavengineers.Scripts.Inventory;
 
@@ -36,7 +37,15 @@ public sealed class DroppedContainerSaveData
 
     public string ItemId { get; set; } = "";
 
+    /// <summary>Legacy pre-per-item-state format (itemId → aggregate count, no per-slot Charge) —
+    /// no longer written by SaveManager.Save, kept only so a save from before <see cref="Slots"/>
+    /// existed can still be read (SaveManager.Load falls back to this when Slots is empty).</summary>
     public Dictionary<string, int> Contents { get; set; } = new();
+
+    /// <summary>Replaces <see cref="Contents"/> — each slot by position, carrying its own real
+    /// Charge (see SlotSaveData). Empty for a save predating this; SaveManager.Load falls back to
+    /// replaying the legacy Contents dict in that case.</summary>
+    public List<SlotSaveData?> Slots { get; set; } = new();
 }
 
 /// <summary>Everything a ShipBuildTarget places dynamically — no fixed scene node to hang the
@@ -96,6 +105,43 @@ public readonly record struct MachineCoord(string Type, int EdgeAX, int EdgeAY, 
 /// absent" unambiguously means "never moved / predates this feature."</summary>
 public readonly record struct WindowPosition(float X, float Y);
 
+/// <summary>One inventory slot's full save state — mirrors SlotContainer's own per-slot
+/// (ItemId, Count, Charge) shape, so a battery's real remaining charge (or any future per-item
+/// state) survives save/load instead of collapsing into a bare itemId-count pair. Charge is 1f
+/// (full) and meaningless for every item except "battery", same as the live slot's own field.</summary>
+public sealed class SlotSaveData
+{
+    public string ItemId { get; set; } = "";
+
+    public int Count { get; set; }
+
+    public float Charge { get; set; } = 1f;
+}
+
+/// <summary>Converts between a live SlotContainer and its saved List&lt;SlotSaveData?&gt; form —
+/// shared by PlayerSaveData's hand/backpack slots and DroppedContainerSaveData's own contents, so
+/// the capture/restore logic isn't duplicated across Player.cs and SaveManager.cs.</summary>
+public static class SlotSaveDataConverter
+{
+    public static List<SlotSaveData?> Capture(SlotContainer container) =>
+        container.Slots
+            .Select(slot => slot is { } s ? new SlotSaveData { ItemId = s.ItemId, Count = s.Count, Charge = s.Charge } : null)
+            .ToList();
+
+    /// <summary>Applies each saved slot onto `container` by position — a null entry, or running
+    /// past the saved list's length, leaves that slot empty. Assumes `container` starts empty.</summary>
+    public static void Restore(SlotContainer container, List<SlotSaveData?> slots)
+    {
+        for (var i = 0; i < slots.Count && i < container.Slots.Count; i++)
+        {
+            if (slots[i] is { } slot)
+            {
+                container.SetSlot(i, (slot.ItemId, slot.Count, slot.Charge));
+            }
+        }
+    }
+}
+
 public sealed class PlayerSaveData
 {
     public float PosX { get; set; }
@@ -124,7 +170,18 @@ public sealed class PlayerSaveData
 
     public float EnergyPercent { get; set; } = 100f;
 
+    /// <summary>Legacy pre-per-item-state format (itemId → aggregate count, no hand position, no
+    /// per-slot Charge) — no longer written by CapturePlayerState, kept only so a save from
+    /// before <see cref="HandSlots"/> existed can still be read (ApplyPlayerState falls back to
+    /// this when HandSlots is empty).</summary>
     public Dictionary<string, int> Inventory { get; set; } = new();
+
+    /// <summary>Replaces <see cref="Inventory"/> — index 0/1 = left/right hand (see
+    /// PlayerInventory.LeftHandSlotIndex/RightHandSlotIndex), each carrying its own real Charge
+    /// (see SlotSaveData). A real capture always has exactly PlayerInventory.HandCount entries
+    /// (even all-null for empty hands), so an empty list here unambiguously means "predates this
+    /// field" — ApplyPlayerState falls back to replaying the legacy Inventory dict in that case.</summary>
+    public List<SlotSaveData?> HandSlots { get; set; } = new();
 
     public int Credits { get; set; }
 
@@ -132,7 +189,13 @@ public sealed class PlayerSaveData
     /// backpack-contents-free either way (see Player.CapturePlayerState/ApplyPlayerState).</summary>
     public string? BackpackItemId { get; set; }
 
+    /// <summary>Legacy pre-per-item-state format — same story as <see cref="Inventory"/>, just
+    /// for the worn backpack's own contents.</summary>
     public Dictionary<string, int> BackpackContents { get; set; } = new();
+
+    /// <summary>Replaces <see cref="BackpackContents"/> — same shape/fallback story as
+    /// <see cref="HandSlots"/>.</summary>
+    public List<SlotSaveData?> BackpackSlots { get; set; } = new();
 
     /// <summary>Defaulted to the normal backpack's own size — an old save missing this field
     /// (predates the debug backpack's different slot count) reconstructs at the size every

@@ -77,7 +77,7 @@ public partial class SaveManager : Node
                 PosY = container.GlobalPosition.Y,
                 PosZ = container.GlobalPosition.Z,
                 ItemId = container.ItemId,
-                Contents = new Dictionary<string, int>(contents.Counts),
+                Slots = SlotSaveDataConverter.Capture(contents),
             });
         }
 
@@ -168,9 +168,17 @@ public partial class SaveManager : Node
         foreach (var dropped in data.DroppedContainers)
         {
             var contents = new SlotContainer(PlayerInventory.BackpackSlotCount);
-            foreach (var (itemId, count) in dropped.Contents)
+            if (dropped.Slots.Count > 0)
             {
-                contents.Add(itemId, count);
+                SlotSaveDataConverter.Restore(contents, dropped.Slots);
+            }
+            else
+            {
+                // Legacy save predating per-slot state (see DroppedContainerSaveData.Slots).
+                foreach (var (itemId, count) in dropped.Contents)
+                {
+                    contents.Add(itemId, count);
+                }
             }
 
             _player!.SpawnDroppedContainer(dropped.ItemId, contents, new Vector3(dropped.PosX, dropped.PosY, dropped.PosZ));

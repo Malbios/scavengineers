@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
 
 namespace Scavengineers.Scripts.Tests.SaveLoad;
@@ -24,9 +25,20 @@ public class SaveDataSerializationTests
                 O2Percent = 87.5f,
                 HealthPercent = 66f,
                 Inventory = new Dictionary<string, int> { ["scrap_metal"] = 5 },
+                HandSlots = new List<SlotSaveData?>
+                {
+                    new SlotSaveData { ItemId = "battery", Count = 1, Charge = 0.42f },
+                    null,
+                },
                 Credits = 20,
                 BackpackItemId = "backpack",
                 BackpackContents = new Dictionary<string, int> { ["wall_panel"] = 3 },
+                BackpackSlots = new List<SlotSaveData?>
+                {
+                    new SlotSaveData { ItemId = "wall_panel", Count = 3, Charge = 1f },
+                    null,
+                    null,
+                },
                 BackpackSlotCount = 24,
                 HasDrill = true,
                 DrillHasBattery = true,
@@ -49,6 +61,11 @@ public class SaveDataSerializationTests
             PosZ = 3,
             ItemId = "backpack",
             Contents = new Dictionary<string, int> { ["power_cell"] = 2 },
+            Slots = new List<SlotSaveData?>
+            {
+                new SlotSaveData { ItemId = "power_cell", Count = 2, Charge = 1f },
+                null,
+            },
         });
 
         var roundTripped = JsonSerializer.Deserialize<SaveData>(JsonSerializer.Serialize(data));
@@ -59,6 +76,13 @@ public class SaveDataSerializationTests
         Assert.Equal(data.Player.BackpackItemId, roundTripped.Player.BackpackItemId);
         Assert.Equal(data.Player.BackpackSlotCount, roundTripped.Player.BackpackSlotCount);
         Assert.Equal(data.Player.Inventory, roundTripped.Player.Inventory);
+        Assert.Equal(2, roundTripped.Player.HandSlots.Count);
+        Assert.Equal("battery", roundTripped.Player.HandSlots[0]!.ItemId);
+        Assert.Equal(0.42f, roundTripped.Player.HandSlots[0]!.Charge);
+        Assert.Null(roundTripped.Player.HandSlots[1]);
+        Assert.Equal(3, roundTripped.Player.BackpackSlots.Count);
+        Assert.Equal("wall_panel", roundTripped.Player.BackpackSlots[0]!.ItemId);
+        Assert.Null(roundTripped.Player.BackpackSlots[1]);
         Assert.True(roundTripped.Player.HasDrill);
         Assert.True(roundTripped.Player.DrillHasBattery);
         Assert.Equal(data.Player.DrillCharge, roundTripped.Player.DrillCharge);
@@ -74,6 +98,25 @@ public class SaveDataSerializationTests
         Assert.Equal(data.ObjectStringStates, roundTripped.ObjectStringStates);
         Assert.Single(roundTripped.DroppedContainers);
         Assert.Equal("backpack", roundTripped.DroppedContainers[0].ItemId);
+        Assert.Equal(2, roundTripped.DroppedContainers[0].Slots.Count);
+        Assert.Equal("power_cell", roundTripped.DroppedContainers[0].Slots[0]!.ItemId);
+        Assert.Null(roundTripped.DroppedContainers[0].Slots[1]);
+    }
+
+    [Fact]
+    public void SlotSaveDataConverter_RoundTrips_ChargeAndEmptySlotPositions()
+    {
+        var container = new SlotContainer(3);
+        container.SetSlot(0, ("battery", 1, 0.42f));
+        container.SetSlot(2, ("scrap_metal", 5, 1f));
+
+        var captured = SlotSaveDataConverter.Capture(container);
+        var restored = new SlotContainer(3);
+        SlotSaveDataConverter.Restore(restored, captured);
+
+        Assert.Equal(("battery", 1, 0.42f), restored.Slots[0]);
+        Assert.Null(restored.Slots[1]);
+        Assert.Equal(("scrap_metal", 5, 1f), restored.Slots[2]);
     }
 
     [Fact]

@@ -1315,12 +1315,12 @@ public partial class Player : CharacterBody3D
             HungerPercent = _needs.HungerPercent,
             ThirstPercent = _needs.ThirstPercent,
             EnergyPercent = _needs.EnergyPercent,
-            Inventory = new Dictionary<string, int>(_inventory.Hands.Counts),
+            HandSlots = SlotSaveDataConverter.Capture(_inventory.Hands),
             Credits = _credits,
             BackpackItemId = _inventory.Backpack?.ItemId,
-            BackpackContents = _inventory.Backpack is { } backpack
-                ? new Dictionary<string, int>(backpack.Contents.Counts)
-                : new Dictionary<string, int>(),
+            BackpackSlots = _inventory.Backpack is { } backpack
+                ? SlotSaveDataConverter.Capture(backpack.Contents)
+                : new List<SlotSaveData?>(),
             BackpackSlotCount = _inventory.Backpack?.Contents.Slots.Count ?? PlayerInventory.BackpackSlotCount,
             HasDrill = _inventory.Drill is not null,
             DrillHasBattery = _inventory.Drill?.HasBattery ?? false,
@@ -1350,9 +1350,18 @@ public partial class Player : CharacterBody3D
         _needs.RestoreFrom(data.HungerPercent, data.ThirstPercent, data.EnergyPercent);
 
         _inventory.Clear();
-        foreach (var (itemId, count) in data.Inventory)
+        if (data.HandSlots.Count > 0)
         {
-            _inventory.Add(itemId, count);
+            SlotSaveDataConverter.Restore(_inventory.Hands, data.HandSlots);
+        }
+        else
+        {
+            // Legacy save predating per-slot state (see PlayerSaveData.HandSlots) — replay the
+            // old aggregate dict instead.
+            foreach (var (itemId, count) in data.Inventory)
+            {
+                _inventory.Add(itemId, count);
+            }
         }
 
         // Backpack is reconstructed after the body replay above (still null at that point, so
@@ -1361,9 +1370,17 @@ public partial class Player : CharacterBody3D
         if (data.BackpackItemId is { } backpackItemId)
         {
             var contents = new SlotContainer(data.BackpackSlotCount);
-            foreach (var (itemId, count) in data.BackpackContents)
+            if (data.BackpackSlots.Count > 0)
             {
-                contents.Add(itemId, count);
+                SlotSaveDataConverter.Restore(contents, data.BackpackSlots);
+            }
+            else
+            {
+                // Legacy save predating per-slot state (see PlayerSaveData.BackpackSlots).
+                foreach (var (itemId, count) in data.BackpackContents)
+                {
+                    contents.Add(itemId, count);
+                }
             }
 
             _inventory.EquipContainerDirectly(backpackItemId, contents);
