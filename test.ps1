@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # Tweak: moved the travel map's "Select a destination" prompt label - now sits between the TRAVEL title bar and the map area itself, instead of below the map. Checklist: (1) open the travel console - confirm the layout top-to-bottom is: title bar, then the prompt label, then the map, then the Travel/Cancel buttons; (2) click a destination - confirm the label (now above the map) goes blank and the icon turns gold, same behavior as before, just relocated.
+$scene = "res://Scenes/World.tscn" # Tweak: the Derelict's atmosphere zones (per-room O2/zero-g) are now generated procedurally from ShipSim's own grid shape instead of hand-placed in the scene -- same geometry, different mechanism. Checklist: (1) travel to any Derelict, cross the airlock from the Home Ship both directions, confirming O2/temperature read correctly at every step, especially standing right at the closed door on either side (the exact bug fixed earlier this session); (2) walk between the Derelict's own rooms, confirming each room's O2/zero-g (near the two hull breaches) reads correctly and zero-g kicks in only in the breached room(s), not the whole ship.
 
 & $godotExe --path $projectPath $scene

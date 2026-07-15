@@ -5,20 +5,10 @@
 [ext_resource type="Material" path="res://Assets/Materials/derelict_wall_material.tres" id="10"]
 [ext_resource type="Material" path="res://Assets/Materials/derelict_ceiling_material.tres" id="11"]
 [ext_resource type="Script" uid="uid://b3w78g4xa8w7i" path="res://Scripts/Inventory/PickupItem.cs" id="12"]
-[ext_resource type="Script" uid="uid://bqso6f6rldkhi" path="res://Scripts/Ship/ShipAtmosphereZone.cs" id="14"]
 [ext_resource type="Script" path="res://Scripts/Ship/InteriorDoorVerbTarget.cs" id="16"]
 [ext_resource type="Script" path="res://Scripts/Verbs/DamagedConduitVerbTarget.cs" id="17"]
 [ext_resource type="Script" path="res://Scripts/Verbs/ShipBuildTarget.cs" id="18"]
 [ext_resource type="Script" path="res://Scripts/Verbs/ShipBuildAimForwarder.cs" id="20"]
-
-[sub_resource type="BoxShape3D" id="ShipZoneWideShape"]
-size = Vector3(10, 2.2, 6.4)
-
-[sub_resource type="BoxShape3D" id="CorridorZoneShape"]
-size = Vector3(2.2, 2.2, 2.4)
-
-[sub_resource type="BoxShape3D" id="ShipZoneNarrowShape"]
-size = Vector3(6.2, 2.2, 6.4)
 
 [sub_resource type="BoxShape3D" id="DerelictFloorShape"]
 size = Vector3(18, 0.2, 6)
@@ -144,46 +134,6 @@ GridWidth = 18
 RoomSplitColumns = PackedInt32Array(6, 12)
 WestCorridorLength = 2
 
-[node name="ShipZoneRoom1" type="Area3D" parent="." node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1.0, 0)
-script = ExtResource("14")
-ShipSimRef = NodePath("../ShipSim")
-Tile = Vector2i(2, 2)
-BuildTargetRef = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="ShipZoneRoom1"]
-shape = SubResource("ShipZoneWideShape")
-
-[node name="ShipZoneCorridorWest" type="Area3D" parent="." node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.0, 0)
-script = ExtResource("14")
-ShipSimRef = NodePath("../ShipSim")
-Tile = Vector2i(-1, 2)
-BuildTargetRef = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="ShipZoneCorridorWest"]
-shape = SubResource("CorridorZoneShape")
-
-[node name="ShipZoneRoom2" type="Area3D" parent="." node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 1.0, 0)
-script = ExtResource("14")
-ShipSimRef = NodePath("../ShipSim")
-Tile = Vector2i(8, 2)
-BuildTargetRef = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="ShipZoneRoom2"]
-shape = SubResource("ShipZoneNarrowShape")
-
-[node name="ShipZoneRoom3" type="Area3D" parent="." node_paths=PackedStringArray("ShipSimRef", "BuildTargetRef")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.1, 1.0, 0)
-script = ExtResource("14")
-ShipSimRef = NodePath("../ShipSim")
-Tile = Vector2i(14, 2)
-BuildTargetRef = NodePath("../Floor")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="ShipZoneRoom3"]
-shape = SubResource("ShipZoneNarrowShape")
-
 [node name="Floor" type="StaticBody3D" parent="." unique_id=1453566541 node_paths=PackedStringArray("ShipSimRef", "ShipRoot") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, -0.1, 0)
 script = ExtResource("18")
@@ -204,6 +154,7 @@ CeilingPanelMaterial = ExtResource("11")
 GhostMaterial = SubResource("ConduitGhostMaterial")
 ExcludedEdgeColumn = 6
 SeedDefaultLayout = true
+GenerateAtmosphereZones = true
 DroppedItemMesh = SubResource("PickupItemMesh")
 DroppedItemShape = SubResource("PickupItemShape")
 DroppedItemMaterial = SubResource("PickupItemMaterial")

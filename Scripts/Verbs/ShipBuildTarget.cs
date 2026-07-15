@@ -138,6 +138,27 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private const float FloorPanelHeight = -0.025f;
     private const float CeilingPanelHeight = 2.025f;
 
+    // Atmosphere-zone generation (see GenerateAtmosphereZonesFromRoomLayout): generic overlap
+    // margin so adjacent zones' box shapes touch/slightly overlap rather than leaving a gap at
+    // their shared boundary — ShipAtmosphereZone.FindZoneAt's containment-margin tie-break
+    // already resolves any such overlap correctly. Values match the real hand-authored zones'
+    // own Y/Z padding (still spawned by hand on the Home Ship) exactly; X reproduces the
+    // corridor zone's own symmetric pad rather than the room zones' own slightly asymmetric one
+    // (an authoring artifact with no functional significance — both give the same ~0.2 total
+    // overlap at a shared room/room boundary).
+    private const float ZoneWidthOverlapMargin = 0.1f;
+    private const float ZoneDepthOverlapMargin = 0.2f;
+    private const float ZoneHeightOverlapMargin = 0.1f;
+
+    /// <summary>Extra X-axis margin (replacing, not adding to, <see cref="ZoneWidthOverlapMargin"/>)
+    /// on the specific edge of the band adjacent to a nonzero west/east airlock corridor length —
+    /// reproduces the real, deliberately oversized Room1 zone from this session's own earlier
+    /// zone-tie-break bug fixes (guards the docking seam where a Derelict's corridor meets the
+    /// Home Ship's own). Not a "clean" theoretical value — measured directly against
+    /// Derelict.tscn's real, already-working ShipZoneRoom1 box (center -2, width 10 vs a clean
+    /// center 0, width 6).</summary>
+    private const float CorridorSeamOverlapMargin = 4.0f;
+
     // ConduitDropMesh's own authored length (see World.tscn) — BuildWallConduitVisual scales a
     // fresh instance of it to whatever the *actual* measured gap to the floor conduit turns out
     // to be, rather than assuming a fixed distance (an earlier version did that and got it
@@ -332,6 +353,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public bool SeedDefaultLayout { get; set; }
 
+    /// <summary>True spawns one <see cref="ShipAtmosphereZone"/> per room band (between
+    /// consecutive <see cref="ShipSim.RoomSplitColumns"/> entries) plus one for the west/east
+    /// airlock corridor, procedurally from this ship's own current grid shape — see
+    /// <see cref="GenerateAtmosphereZones"/>. Currently opt-in for the Derelict only: the Home
+    /// Ship's zones are already hand-placed and working, and touching them adds regression risk
+    /// for a system this project has already spent real debugging time getting right, for zero
+    /// payoff toward the "different derelicts need different zone layouts" problem this exists
+    /// to solve.</summary>
+    [Export]
+    public bool GenerateAtmosphereZones { get; set; }
+
     /// <summary>False makes <see cref="ResolveAvailableVerbs"/> return nothing regardless of aim
     /// state — for a ship the player is never meant to be able to alter (the Station:
     /// thematically, tampering with it is a crime). True (the default) everywhere else. Doesn't
@@ -462,6 +494,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         {
             CallDeferred(nameof(SeedDefaultShipLayout));
         }
+
+        if (GenerateAtmosphereZones)
+        {
+            CallDeferred(nameof(GenerateAtmosphereZonesFromRoomLayout));
+        }
     }
 
     private void GenerateFloorCeilingPanels()
@@ -508,6 +545,106 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         ceilingCollision.Position = ceilingPanel.Position;
 
         _ceilingPanels[cell] = (ceilingPanel, ceilingCollision);
+    }
+
+    /// <summary>Spawns one <see cref="ShipAtmosphereZone"/> per room band (the span between
+    /// consecutive <see cref="ShipSim.RoomSplitColumns"/> entries, or the ship's full
+    /// west/east boundary when there are none) plus one for each nonzero airlock corridor —
+    /// replacing what today is hand-placed per scene (see the Home Ship's own zones, left as-is).
+    /// Each zone is added as a sibling of this Floor node (a child of the ship's own spatial
+    /// root), matching <see cref="ShipAtmosphereZone.TileAt"/>'s own assumption that its parent
+    /// is always that root, not this Floor node's own (differently transformed) local space.</summary>
+    private void GenerateAtmosphereZonesFromRoomLayout()
+    {
+        if (ShipSimRef is null)
+        {
+            return;
+        }
+
+        var shipRoot = ShipRoot ?? GetParent<Node3D>();
+        var gridWidth = ShipSimRef.GridWidth;
+        var gridDepth = ShipSim.GridDepth;
+
+        var boundaries = new List<int> { 0 };
+        boundaries.AddRange(ShipSimRef.RoomSplitColumns.OrderBy(column => column));
+        boundaries.Add(gridWidth);
+
+        var roomDepthCenter = (-3f + (gridDepth - 3f)) / 2f;
+        var roomDepthSize = gridDepth + 2 * ZoneDepthOverlapMargin;
+
+        for (var i = 0; i < boundaries.Count - 1; i++)
+        {
+            var start = boundaries[i];
+            var end = boundaries[i + 1];
+
+            var leftPad = i == 0 && ShipSimRef.WestCorridorLength > 0
+                ? CorridorSeamOverlapMargin
+                : ZoneWidthOverlapMargin;
+            var rightPad = i == boundaries.Count - 2 && ShipSimRef.EastCorridorLength > 0
+                ? CorridorSeamOverlapMargin
+                : ZoneWidthOverlapMargin;
+
+            var left = start - 3f - leftPad;
+            var right = end - 3f + rightPad;
+
+            SpawnAtmosphereZone(
+                shipRoot,
+                tile: new Vector2I((start + end - 1) / 2, DoorwayRows[0]),
+                centerX: (left + right) / 2f,
+                sizeX: right - left,
+                centerZ: roomDepthCenter,
+                sizeZ: roomDepthSize);
+        }
+
+        var doorwayTop = DoorwayRows.Min() - 3f;
+        var doorwayBottom = DoorwayRows.Max() - 3f + 1f;
+        var corridorDepthCenter = (doorwayTop + doorwayBottom) / 2f;
+        var corridorDepthSize = (doorwayBottom - doorwayTop) + 2 * ZoneDepthOverlapMargin;
+
+        if (ShipSimRef.WestCorridorLength > 0)
+        {
+            var left = -ShipSimRef.WestCorridorLength - 3f - ZoneWidthOverlapMargin;
+            var right = -1 - 3f + 1f + ZoneWidthOverlapMargin;
+
+            SpawnAtmosphereZone(
+                shipRoot,
+                tile: new Vector2I(-1, DoorwayRows[0]),
+                centerX: (left + right) / 2f,
+                sizeX: right - left,
+                centerZ: corridorDepthCenter,
+                sizeZ: corridorDepthSize);
+        }
+
+        if (ShipSimRef.EastCorridorLength > 0)
+        {
+            var left = gridWidth - 3f - ZoneWidthOverlapMargin;
+            var right = gridWidth + ShipSimRef.EastCorridorLength - 3f + ZoneWidthOverlapMargin;
+
+            SpawnAtmosphereZone(
+                shipRoot,
+                tile: new Vector2I(gridWidth, DoorwayRows[0]),
+                centerX: (left + right) / 2f,
+                sizeX: right - left,
+                centerZ: corridorDepthCenter,
+                sizeZ: corridorDepthSize);
+        }
+    }
+
+    private void SpawnAtmosphereZone(Node3D shipRoot, Vector2I tile, float centerX, float sizeX, float centerZ, float sizeZ)
+    {
+        var zone = new ShipAtmosphereZone
+        {
+            ShipSimRef = ShipSimRef,
+            BuildTargetRef = this,
+            Tile = tile,
+            Transform = new Transform3D(Basis.Identity, new Vector3(centerX, WallCenterHeight, centerZ)),
+        };
+        shipRoot.AddChild(zone);
+
+        zone.AddChild(new CollisionShape3D
+        {
+            Shape = new BoxShape3D { Size = new Vector3(sizeX, WallHeight + 2 * ZoneHeightOverlapMargin, sizeZ) },
+        });
     }
 
     private bool IsCorridorCell(CellCoord cell) =>
