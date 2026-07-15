@@ -3,6 +3,7 @@ VERB_TOGGLE,Toggle,Umschalten
 VERB_REPAIR,Repair,Reparieren
 VERB_PICK_UP,Pick Up,Aufheben
 VERB_TRAVEL,Travel,Reisen
+VERB_TRADE,Trade,Handeln
 VERB_RECHARGE,Recharge,Aufladen
 HUD_ROOM_O2,Room O2,Raum-O2
 HUD_BACK_SLOT,Backpack,Rucksack
@@ -35,12 +36,6 @@ ITEM_WALL_PANEL,Wall Panel,Wandpaneel
 VERB_BUILD_WALL,Build Wall,Wand bauen
 VERB_REMOVE_WALL,Remove Wall,Wand entfernen
 VERB_SCRAP,Scrap,Verschrotten
-VERB_BUY_SCRAP_METAL,Buy Scrap Metal,Schrott kaufen
-VERB_BUY_SPARE_PARTS,Buy Spare Parts,Ersatzteile kaufen
-VERB_BUY_WALL_PANEL,Buy Wall Panel,Wandpaneel kaufen
-VERB_SELL_SCRAP_METAL,Sell Scrap Metal,Schrott verkaufen
-VERB_SELL_SPARE_PARTS,Sell Spare Parts,Ersatzteile verkaufen
-VERB_SELL_WALL_PANEL,Sell Wall Panel,Wandpaneel verkaufen
 OBJECT_SHIP_CONSOLE,Ship Console,Schiffskonsole
 OBJECT_TRADE_CONSOLE,Trade Console,Handelskonsole
 OBJECT_STATION,Station,Station
@@ -52,10 +47,9 @@ OBJECT_DERELICT_5,Derelict 5,Wrack 5
 HUD_TRAVEL_MAP_PROMPT,Select a destination,Ziel auswählen
 HUD_TRAVEL_MAP_SELECTED,Destination selected,Ziel ausgewählt
 HUD_TRAVEL_MAP_CANCEL,Cancel,Abbrechen
+HUD_SHOP_CLOSE,Close,Schließen
 HUD_CREDITS,Credits,Credits
 ITEM_POWER_CELL,Power Cell,Energiezelle
-VERB_BUY_POWER_CELL,Buy Power Cell,Energiezelle kaufen
-VERB_SELL_POWER_CELL,Sell Power Cell,Energiezelle verkaufen
 VERB_RECHARGE_BATTERY,Recharge Battery,Batterie aufladen
 OBJECT_BATTERY,Battery,Batterie
 VERB_INSTALL_FLOOR,Install Floor Panel,Bodenplatte einbauen
@@ -75,20 +69,8 @@ VERB_SCRAP_SWITCH,Scrap Switch,Schalter verschrotten
 VERB_INSTALL_RECHARGE_STATION,Install Recharge Station,Ladestation einbauen
 VERB_UNINSTALL_RECHARGE_STATION,Uninstall Recharge Station,Ladestation ausbauen
 VERB_SCRAP_RECHARGE_STATION,Scrap Recharge Station,Ladestation verschrotten
-VERB_BUY_BATTERY,Buy Battery,Batterie kaufen
-VERB_SELL_BATTERY,Sell Battery,Batterie verkaufen
-VERB_BUY_SWITCH,Buy Switch,Schalter kaufen
-VERB_SELL_SWITCH,Sell Switch,Schalter verkaufen
-VERB_BUY_RECHARGE_STATION,Buy Recharge Station,Ladestation kaufen
-VERB_SELL_RECHARGE_STATION,Sell Recharge Station,Ladestation verkaufen
 ITEM_BACKPACK,Backpack,Rucksack
-VERB_BUY_BACKPACK,Buy Backpack,Rucksack kaufen
-VERB_SELL_BACKPACK,Sell Backpack,Rucksack verkaufen
 ITEM_RATION_BAR,Ration Bar,Nahrungsriegel
-VERB_BUY_RATION_BAR,Buy Ration Bar,Nahrungsriegel kaufen
-VERB_SELL_RATION_BAR,Sell Ration Bar,Nahrungsriegel verkaufen
 ITEM_WATER_BOTTLE,Water Bottle,Wasserflasche
-VERB_BUY_WATER_BOTTLE,Buy Water Bottle,Wasserflasche kaufen
-VERB_SELL_WATER_BOTTLE,Sell Water Bottle,Wasserflasche verkaufen
 VERB_SLEEP,Sleep,Schlafen
 OBJECT_BUNK,Bunk,Schlafkoje

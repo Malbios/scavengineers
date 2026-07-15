@@ -7,6 +7,7 @@ using Scavengineers.Sim.Grid;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Scripts.Ship;
+using Scavengineers.Scripts.Shop;
 using Scavengineers.Scripts.Travel;
 using Scavengineers.Scripts.Verbs;
 
@@ -131,6 +132,8 @@ public partial class Player : CharacterBody3D
     private Control? _backpackWindow;
     private TravelMapPanel? _travelMapPanel;
     private TravelConsoleVerbTarget? _openTravelConsole;
+    private ShopPanel? _shopPanel;
+    private StationConsoleVerbTarget? _openShopConsole;
     private Control? _backpackGrid;
     private InventorySlotUI? _backpackSlotTemplate;
     private readonly List<InventorySlotUI> _backpackSlotUIs = new();
@@ -187,9 +190,15 @@ public partial class Player : CharacterBody3D
     /// interact with something else behind it.</summary>
     private bool _travelMapOpen;
 
+    /// <summary>Whether the station trade console's shop screen is currently open — same
+    /// suppress-everything gating as _inventoryOpen/_travelMapOpen, via <see cref="AnyPanelOpen"/>.
+    /// Interact() is already gated by AnyPanelOpen, so Shop and the travel map can never both be
+    /// open at once — there's no ordering to get wrong between them.</summary>
+    private bool _shopOpen;
+
     /// <summary>Any full-screen-ish HUD panel that should suppress normal gameplay input while
     /// open — shared gate for every _Input branch that used to check _inventoryOpen alone.</summary>
-    private bool AnyPanelOpen => _inventoryOpen || _travelMapOpen;
+    private bool AnyPanelOpen => _inventoryOpen || _travelMapOpen || _shopOpen;
 
     /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-9, 0) —
     /// also reused by StationConsoleVerbTarget as the set of things Buy can offer, since there's
@@ -287,6 +296,8 @@ public partial class Player : CharacterBody3D
         _backpackGrid = GetNode<Control>("HUD/BackpackWindow/Layout/BackpackGrid");
         _travelMapPanel = GetNode<TravelMapPanel>("HUD/TravelMapPanel");
         _travelMapPanel.PlayerRef = this;
+        _shopPanel = GetNode<ShopPanel>("HUD/ShopPanel");
+        _shopPanel.PlayerRef = this;
 
         foreach (var child in GetNode("HUD/InventoryPanel/Layout/EquipSlots").GetChildren())
         {
@@ -368,7 +379,7 @@ public partial class Player : CharacterBody3D
         {
             CaptureMouse();
         }
-        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy && !_travelMapOpen)
+        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy && !_travelMapOpen && !_shopOpen)
         {
             if (_inventoryOpen)
             {
@@ -384,6 +395,10 @@ public partial class Player : CharacterBody3D
             if (_travelMapOpen)
             {
                 CloseTravelMap();
+            }
+            else if (_shopOpen)
+            {
+                CloseShop();
             }
             else if (_inventoryOpen)
             {
@@ -626,6 +641,48 @@ public partial class Player : CharacterBody3D
         _travelMapOpen = false;
         _openTravelConsole = null;
         _travelMapPanel!.Visible = false;
+        CaptureMouse();
+    }
+
+    /// <summary>Called by StationConsoleVerbTarget.ExecuteVerb — opens the shop panel instead of
+    /// the old per-item Buy/Sell verb-cycling, same shape as OpenTravelMap.</summary>
+    public void OpenShop(StationConsoleVerbTarget console)
+    {
+        _shopOpen = true;
+        _openShopConsole = console;
+        RefreshShop();
+        _shopPanel!.Visible = true;
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+    }
+
+    /// <summary>Called by ShopPanel's row buttons — buys/sells one unit and immediately refreshes
+    /// the panel's rows (price/affordability/ownership all shift after every transaction), rather
+    /// than closing the panel like a one-shot travel confirmation would.</summary>
+    public void BuyItem(string itemId)
+    {
+        _openShopConsole?.TryBuy(itemId);
+        RefreshShop();
+    }
+
+    public void SellItem(string itemId)
+    {
+        _openShopConsole?.TrySell(itemId);
+        RefreshShop();
+    }
+
+    private void RefreshShop()
+    {
+        if (_openShopConsole is not null)
+        {
+            _shopPanel!.Populate(_openShopConsole.BuildBuyEntries(), _openShopConsole.BuildSellEntries());
+        }
+    }
+
+    public void CloseShop()
+    {
+        _shopOpen = false;
+        _openShopConsole = null;
+        _shopPanel!.Visible = false;
         CaptureMouse();
     }
 

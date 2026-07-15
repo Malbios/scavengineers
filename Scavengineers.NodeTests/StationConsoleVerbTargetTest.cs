@@ -1,0 +1,157 @@
+using System.Collections.Generic;
+using System.Linq;
+
+using GdUnit4;
+using Godot;
+using Scavengineers.Scripts.Ship;
+using Scavengineers.Scripts.Shop;
+using PlayerScript = Scavengineers.Scripts.Player.Player;
+
+using static GdUnit4.Assertions;
+
+namespace Scavengineers.NodeTests;
+
+/// <summary>Regression coverage for the shop's Buy/Sell entry-building and transaction methods.
+/// All four depend on resolving the player via the "player" group (same lookup
+/// ContainerPickupItem.GetPlayer already uses elsewhere), which needs a real PlayerScript
+/// instance — Credits/Inventory are plain field-initialized state, unaffected by _Ready(), so a
+/// minimal subclass that overrides _Ready() to skip the real one's dozens of HUD GetNode calls
+/// (and its debug stipend) gives a clean, fully isolated Player without loading Player.tscn — this
+/// test project (Scavengineers.NodeTests) is its own separate Godot project with no Scenes/ of
+/// its own, so the real scene isn't even loadable here.
+/// wall_panel (10cr Buy / 4cr Sell) is used as a "known-empty, not part of any stipend" item
+/// throughout, since the test player's inventory starts genuinely empty.</summary>
+[TestSuite]
+public partial class StationConsoleVerbTargetTest
+{
+    private partial class TestPlayer : PlayerScript
+    {
+        public override void _Ready()
+        {
+            AddToGroup("player");
+        }
+    }
+
+    private static (StationConsoleVerbTarget Console, PlayerScript Player) CreateConsoleWithPlayer(SceneTree sceneTree)
+    {
+        var player = AutoFree(new TestPlayer());
+        sceneTree.Root.AddChild(player);
+
+        var console = AutoFree(new StationConsoleVerbTarget());
+        sceneTree.Root.AddChild(console);
+
+        return (console, player);
+    }
+
+    private static ShopEntry FindEntry(IReadOnlyList<ShopEntry> entries, string itemId) => entries.First(e => e.ItemId == itemId);
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void BuildBuyEntries_DisabledWhenUnaffordable()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (console, _) = CreateConsoleWithPlayer(sceneTree);
+
+        // battery costs 40cr — well above the starting stipend.
+        var battery = FindEntry(console.BuildBuyEntries(), "battery");
+
+        AssertBool(battery.Disabled).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void BuildBuyEntries_EnabledWhenAffordableWithRoom()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (console, _) = CreateConsoleWithPlayer(sceneTree);
+
+        var wallPanel = FindEntry(console.BuildBuyEntries(), "wall_panel");
+
+        AssertBool(wallPanel.Disabled).IsFalse();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void BuildSellEntries_DisabledWhenNotOwned()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (console, _) = CreateConsoleWithPlayer(sceneTree);
+
+        var wallPanel = FindEntry(console.BuildSellEntries(), "wall_panel");
+
+        AssertBool(wallPanel.Disabled).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void BuildSellEntries_EnabledWhenOwned()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (console, player) = CreateConsoleWithPlayer(sceneTree);
+        player.Inventory.Add("scrap_metal", 1);
+
+        var scrapMetal = FindEntry(console.BuildSellEntries(), "scrap_metal");
+
+        AssertBool(scrapMetal.Disabled).IsFalse();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TryBuy_SpendsCreditsAndAddsItem()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (console, player) = CreateConsoleWithPlayer(sceneTree);
+        var creditsBefore = player.Credits;
+
+        var bought = console.TryBuy("wall_panel");
+
+        AssertBool(bought).IsTrue();
+        AssertBool(player.Credits == creditsBefore - 10).IsTrue();
+        AssertBool(player.Inventory.Has("wall_panel", 1)).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TryBuy_FailsCleanlyWhenUnaffordable()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (console, player) = CreateConsoleWithPlayer(sceneTree);
+        player.TrySpendCredits(player.Credits); // drain to 0
+
+        var bought = console.TryBuy("wall_panel");
+
+        AssertBool(bought).IsFalse();
+        AssertBool(player.Credits == 0).IsTrue();
+        AssertBool(player.Inventory.Has("wall_panel", 1)).IsFalse();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TrySell_GrantsCreditsAndRemovesItem()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (console, player) = CreateConsoleWithPlayer(sceneTree);
+        player.Inventory.Add("scrap_metal", 1);
+        var creditsBefore = player.Credits;
+
+        var sold = console.TrySell("scrap_metal");
+
+        AssertBool(sold).IsTrue();
+        AssertBool(player.Credits == creditsBefore + 2).IsTrue();
+        AssertBool(player.Inventory.Has("scrap_metal", 1)).IsFalse();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TrySell_FailsCleanlyWhenNotOwned()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (console, player) = CreateConsoleWithPlayer(sceneTree);
+        var creditsBefore = player.Credits;
+
+        var sold = console.TrySell("wall_panel");
+
+        AssertBool(sold).IsFalse();
+        AssertBool(player.Credits == creditsBefore).IsTrue();
+    }
+}

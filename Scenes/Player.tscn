@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://Scripts/Player/DraggableWindow.cs" id="4"]
 [ext_resource type="Script" path="res://Scripts/Travel/TravelMapPanel.cs" id="5"]
 [ext_resource type="Script" path="res://Scripts/Travel/StarfieldBackground.cs" id="6"]
+[ext_resource type="Script" path="res://Scripts/Shop/ShopPanel.cs" id="7"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -22,7 +23,7 @@ corner_radius_top_right = 3
 corner_radius_bottom_right = 3
 corner_radius_bottom_left = 3
 
-[sub_resource type="StyleBoxFlat" id="TravelMapBackground"]
+[sub_resource type="StyleBoxFlat" id="OpaquePanelBackground"]
 bg_color = Color(0, 0, 0, 1)
 content_margin_left = 4.0
 content_margin_top = 1.0
@@ -664,7 +665,7 @@ offset_right = 280.0
 offset_bottom = 240.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("TravelMapBackground")
+theme_override_styles/panel = SubResource("OpaquePanelBackground")
 script = ExtResource("5")
 MapArea = NodePath("Layout/MapArea")
 SelectionLabel = NodePath("Layout/SelectionLabel")
@@ -714,3 +715,58 @@ text = "TRAVEL"
 layout_mode = 2
 text = "CANCEL"
 show_percentage = false
+
+[node name="ShopPanel" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("BuyList", "SellList", "CloseButton")]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -240.0
+offset_right = 280.0
+offset_bottom = 240.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("OpaquePanelBackground")
+script = ExtResource("7")
+BuyList = NodePath("Layout/Tabs/Buy/BuyList")
+SellList = NodePath("Layout/Tabs/Sell/SellList")
+CloseButton = NodePath("Layout/CloseButton")
+
+[node name="Layout" type="VBoxContainer" parent="HUD/ShopPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TitleBar" type="Label" parent="HUD/ShopPanel/Layout"]
+layout_mode = 2
+mouse_filter = 0
+theme_override_styles/normal = SubResource("HudLabelBackground")
+text = "SHOP"
+horizontal_alignment = 1
+
+[node name="Tabs" type="TabContainer" parent="HUD/ShopPanel/Layout"]
+custom_minimum_size = Vector2(540, 350)
+layout_mode = 2
+
+[node name="Buy" type="ScrollContainer" parent="HUD/ShopPanel/Layout/Tabs"]
+layout_mode = 2
+
+[node name="BuyList" type="VBoxContainer" parent="HUD/ShopPanel/Layout/Tabs/Buy"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="Sell" type="ScrollContainer" parent="HUD/ShopPanel/Layout/Tabs"]
+visible = false
+layout_mode = 2
+
+[node name="SellList" type="VBoxContainer" parent="HUD/ShopPanel/Layout/Tabs/Sell"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="CloseButton" type="Button" parent="HUD/ShopPanel/Layout"]
+layout_mode = 2
+text = "CLOSE"
