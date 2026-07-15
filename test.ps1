@@ -8,6 +8,6 @@ clear
 
 $godotExe = "C:\Tools\Godot v4.7\Godot_v4.7-stable_mono_win64_console.exe"
 $projectPath = "C:\dev\scavengineers"
-$scene = "res://Scenes/World.tscn" # Tweak: dropped the "Destination selected: ..." label text under the travel map - the gold icon highlight alone now indicates the pick, the label just shows the "Select a destination" prompt beforehand and goes blank once something's selected. Checklist: (1) open the travel console's map, click a destination - confirm the icon turns gold and the label below goes blank (no "Destination selected" text); (2) click a different destination - confirm the highlight moves and the label stays blank; (3) Travel button still enables only once something's selected.
+$scene = "res://Scenes/World.tscn" # Tweak: moved the travel map's "Select a destination" prompt label - now sits between the TRAVEL title bar and the map area itself, instead of below the map. Checklist: (1) open the travel console - confirm the layout top-to-bottom is: title bar, then the prompt label, then the map, then the Travel/Cancel buttons; (2) click a destination - confirm the label (now above the map) goes blank and the icon turns gold, same behavior as before, just relocated.
 
 & $godotExe --path $projectPath $scene

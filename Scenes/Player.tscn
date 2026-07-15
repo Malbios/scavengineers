@@ -692,6 +692,11 @@ theme_override_styles/normal = SubResource("HudLabelBackground")
 text = "TRAVEL"
 horizontal_alignment = 1
 
+[node name="SelectionLabel" type="Label" parent="HUD/TravelMapPanel/Layout"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("HudLabelBackground")
+horizontal_alignment = 1
+
 [node name="MapArea" type="Control" parent="HUD/TravelMapPanel/Layout"]
 custom_minimum_size = Vector2(540, 350)
 layout_mode = 2
@@ -704,11 +709,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("6")
-
-[node name="SelectionLabel" type="Label" parent="HUD/TravelMapPanel/Layout"]
-layout_mode = 2
-theme_override_styles/normal = SubResource("HudLabelBackground")
-horizontal_alignment = 1
 
 [node name="ButtonsRow" type="HBoxContainer" parent="HUD/TravelMapPanel/Layout"]
 layout_mode = 2
