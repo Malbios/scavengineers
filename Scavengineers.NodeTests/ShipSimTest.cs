@@ -30,21 +30,67 @@ public class ShipSimTest
 
     [TestCase]
     [RequireGodotRuntime]
-    public void VolumeAt_ReturnsVacuum_ForACellPastThisShipsOwnModeledCorridorLength()
+    public void VolumeAt_ForACellPastThisShipsOwnModeledCorridorLength_ReadsTheNearestModeledNeighbor()
     {
         // Reproduces the crash hit crossing a live airlock: ShipAtmosphereZone.TileAt derives a
         // tile straight from world position, and the physical corridor/threshold mesh between two
-        // docked ships can extend one tile past whichever ship's own WestCorridorLength/
-        // EastCorridorLength the player is currently standing over. AtmosphereSystem.VolumeAt
-        // throws KeyNotFoundException for a cell it never modeled at all — ShipSim.VolumeAt must
-        // catch that case itself rather than let it reach the caller.
+        // docked ships (including a closed door's own boundary edge) can land one tile past
+        // whichever ship's own WestCorridorLength/EastCorridorLength the player is currently
+        // standing over. AtmosphereSystem.VolumeAt throws KeyNotFoundException for a cell it never
+        // modeled at all — ShipSim.VolumeAt must catch that case itself rather than let it reach
+        // the caller. It must also read as this ship's own real (breathable) air here, not a
+        // blanket Vacuum — the earlier "always Vacuum" fallback was what caused a real bug
+        // (standing at a closed door misreading 0% O2 from the ship on the other side).
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var shipSim = AutoFree(new ShipSim { WestCorridorLength = 2 });
         sceneTree.Root.AddChild(shipSim);
 
         var oneCellPastTheCorridor = new CellCoord(-3, 3);
+        var nearestModeledNeighbor = new CellCoord(-2, 3);
 
         AssertBool(shipSim.Deck.Cells.Contains(oneCellPastTheCorridor)).IsFalse();
-        AssertBool(shipSim.VolumeAt(oneCellPastTheCorridor).O2Fraction == AtmosphereVolume.Vacuum.O2Fraction).IsTrue();
+        AssertBool(shipSim.Deck.Cells.Contains(nearestModeledNeighbor)).IsTrue();
+        AssertFloat(shipSim.VolumeAt(oneCellPastTheCorridor).O2Fraction)
+            .IsEqual(shipSim.VolumeAt(nearestModeledNeighbor).O2Fraction);
+        AssertFloat(shipSim.VolumeAt(oneCellPastTheCorridor).O2Fraction)
+            .IsEqual(AtmosphereVolume.Breathable.O2Fraction);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void VolumeAt_ReturnsVacuum_WhenNoModeledNeighborExistsEither()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var shipSim = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(shipSim);
+
+        var farFromAnyModeledCell = new CellCoord(50, 50);
+
+        AssertBool(shipSim.Deck.Cells.Contains(farFromAnyModeledCell)).IsFalse();
+        AssertFloat(shipSim.VolumeAt(farFromAnyModeledCell).O2Fraction).IsEqual(AtmosphereVolume.Vacuum.O2Fraction);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void VolumeAt_AtTheSeamNextToABreach_StillReadsVacuum()
+    {
+        // Confirms the original crash-prevention scenario doesn't regress: when the nearest
+        // modeled neighbor is itself vented (a real breach nearby), the seam cell still correctly
+        // reads Vacuum — same observable result as the old blanket-Vacuum fallback gave for this
+        // case, just via the neighbor's own real (also-Vacuum) state instead of a hardcoded value.
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var shipSim = AutoFree(new ShipSim { WestCorridorLength = 2 });
+        sceneTree.Root.AddChild(shipSim);
+
+        var nearestModeledNeighbor = new CellCoord(-2, 3);
+        shipSim.Deck.BreachHull(nearestModeledNeighbor);
+        for (var i = 0; i < 50; i++)
+        {
+            shipSim.Atmosphere!.Tick(1);
+        }
+
+        var oneCellPastTheCorridor = new CellCoord(-3, 3);
+
+        AssertFloat(shipSim.VolumeAt(oneCellPastTheCorridor).O2Fraction).IsEqual(AtmosphereVolume.Vacuum.O2Fraction);
     }
 }

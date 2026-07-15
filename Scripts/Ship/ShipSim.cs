@@ -231,12 +231,17 @@ public partial class ShipSim : Node
 
     /// <summary>Breathable if this ship's atmosphere isn't wired up at all (e.g. queried before
     /// _Ready), otherwise the modeled cell's real volume — or, if <paramref name="cell"/> isn't
-    /// one of this ship's own modeled Deck cells at all, Vacuum. That last case is reachable in
-    /// practice: a world-position-derived tile (see ShipAtmosphereZone.TileAt, used for the
-    /// player's own current-cell O2 read) can land in the unmodeled seam between two docked
-    /// ships' airlock corridors, just past this ship's own WestCorridorLength/EastCorridorLength
-    /// — treating that as open space is both physically sensible and avoids
-    /// AtmosphereSystem.VolumeAt's own hard KeyNotFoundException on an unrecognized cell.</summary>
+    /// one of this ship's own modeled Deck cells at all, whichever orthogonal neighbor IS modeled
+    /// (falling back to Vacuum only if none are). That unmodeled case is reachable in practice: a
+    /// world-position-derived tile (see ShipAtmosphereZone.TileAt, used for the player's own
+    /// current-cell O2 read) can land in the unmodeled seam between two docked ships' airlock
+    /// corridors, just past this ship's own WestCorridorLength/EastCorridorLength — including
+    /// right at a *closed* door's own boundary edge, where TileAt's floor-based conversion can
+    /// round one tile too far even though the player never left this ship. Reading the nearest
+    /// modeled neighbor instead of blanket Vacuum gets that case right (this ship's own real air)
+    /// while still avoiding AtmosphereSystem.VolumeAt's own hard KeyNotFoundException on a truly
+    /// unrecognized cell, and still reads Vacuum when the neighbor is genuinely vented too (the
+    /// original crash-prevention scenario this fallback exists for).</summary>
     public AtmosphereVolume VolumeAt(CellCoord cell)
     {
         if (_atmosphere is null)
@@ -244,7 +249,20 @@ public partial class ShipSim : Node
             return AtmosphereVolume.Breathable;
         }
 
-        return Deck.Cells.Contains(cell) ? _atmosphere.VolumeAt(cell) : AtmosphereVolume.Vacuum;
+        if (Deck.Cells.Contains(cell))
+        {
+            return _atmosphere.VolumeAt(cell);
+        }
+
+        foreach (var neighbor in cell.OrthogonalNeighbors())
+        {
+            if (Deck.Cells.Contains(neighbor))
+            {
+                return _atmosphere.VolumeAt(neighbor);
+            }
+        }
+
+        return AtmosphereVolume.Vacuum;
     }
 
     /// <summary>Topologically connected to a source AND (if this ship has a battery at all)
