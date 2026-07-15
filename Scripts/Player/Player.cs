@@ -593,18 +593,32 @@ public partial class Player : CharacterBody3D
     private const float MaxDropReachMeters = 3.0f;
 
     /// <summary>Called by the world-drop zone (see WorldDropZone._DropData) once a drag ends
-    /// outside every existing panel/slot Control. A no-op for the drill/flashlight battery slots
-    /// (not supported this pass) or if nothing solid is within reach in the drop's screen
-    /// direction.</summary>
+    /// outside every existing panel/slot Control. A no-op if nothing solid is within reach in the
+    /// drop's screen direction.</summary>
     public void TryDropInWorld(InventorySlotUI source, Vector2 screenPosition)
     {
-        if (source.IsDrillBatterySlot || source.IsFlashlightBatterySlot)
+        if (ResolveWorldDropPosition(screenPosition) is not { } position)
         {
             return;
         }
 
-        if (ResolveWorldDropPosition(screenPosition) is not { } position)
+        if (source.IsDrillBatterySlot)
         {
+            if (_inventory.EjectDrillBatteryForWorld() is { } drillCharge)
+            {
+                InventoryOverflow.DropAt(this, "battery", 1, DroppedItemMesh!, DroppedItemShape!, DroppedItemMaterial, position, drillCharge);
+            }
+
+            return;
+        }
+
+        if (source.IsFlashlightBatterySlot)
+        {
+            if (_inventory.EjectFlashlightBatteryForWorld() is { } flashlightCharge)
+            {
+                InventoryOverflow.DropAt(this, "battery", 1, DroppedItemMesh!, DroppedItemShape!, DroppedItemMaterial, position, flashlightCharge);
+            }
+
             return;
         }
 

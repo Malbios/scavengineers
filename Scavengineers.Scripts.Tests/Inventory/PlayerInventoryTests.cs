@@ -182,6 +182,41 @@ public class PlayerInventoryTests : IDisposable
     }
 
     [Fact]
+    public void EjectDrillBatteryForWorld_ReturnsRealChargeAndClearsTheDrillsBattery_WithNoInventoryDestination()
+    {
+        var inventory = new PlayerInventory();
+        inventory.AttachDrill(hasBattery: true, charge: 0.42f);
+
+        var charge = inventory.EjectDrillBatteryForWorld();
+
+        Assert.Equal(0.42f, charge);
+        Assert.False(inventory.Drill!.HasBattery);
+        Assert.Equal(0, inventory.CountOf("battery")); // nothing landed in a hand/backpack slot
+    }
+
+    [Fact]
+    public void EjectDrillBatteryForWorld_ReturnsNull_WhenNoBatteryIsInstalled()
+    {
+        var inventory = new PlayerInventory();
+        inventory.AttachDrill(hasBattery: false, charge: 0f);
+
+        Assert.Null(inventory.EjectDrillBatteryForWorld());
+    }
+
+    [Fact]
+    public void EjectFlashlightBatteryForWorld_ReturnsRealChargeAndClearsTheFlashlightsBattery_WithNoInventoryDestination()
+    {
+        var inventory = new PlayerInventory();
+        inventory.AttachFlashlight(hasBattery: true, charge: 0.7f);
+
+        var charge = inventory.EjectFlashlightBatteryForWorld();
+
+        Assert.Equal(0.7f, charge);
+        Assert.False(inventory.Flashlight!.HasBattery);
+        Assert.Equal(0, inventory.CountOf("battery"));
+    }
+
+    [Fact]
     public void EjectFlashlightBattery_PreservesItsRealChargeInTheResultingItem()
     {
         var inventory = new PlayerInventory();

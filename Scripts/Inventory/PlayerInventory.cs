@@ -312,6 +312,24 @@ public sealed class PlayerInventory
         return true;
     }
 
+    /// <summary>Same battery-state mutation as <see cref="EjectDrillBattery"/>, but with no
+    /// inventory destination at all — used when the player drags the drill's battery slot straight
+    /// into the world (see Player.TryDropInWorld), which spawns a loose world pickup instead of
+    /// placing it in a slot. Returns the battery's real charge, or null if there's no installed
+    /// battery to eject.</summary>
+    public float? EjectDrillBatteryForWorld()
+    {
+        if (Drill is not { HasBattery: true })
+        {
+            return null;
+        }
+
+        var charge = Drill.Charge;
+        Drill.HasBattery = false;
+        Drill.Charge = 0f;
+        return charge;
+    }
+
     /// <summary>Same battery-state mutation as <see cref="EjectDrillBattery"/>, but places the
     /// ejected battery into a specific target slot instead of wherever <see cref="Add"/> finds
     /// room — used when the player drags the drill's battery onto a particular hand/backpack slot
@@ -363,6 +381,21 @@ public sealed class PlayerInventory
         Flashlight.Charge = 0f;
         Add("battery", 1, charge);
         return true;
+    }
+
+    /// <summary>Same battery-state mutation as <see cref="EjectFlashlightBattery"/>, but with no
+    /// inventory destination — mirrors <see cref="EjectDrillBatteryForWorld"/> exactly.</summary>
+    public float? EjectFlashlightBatteryForWorld()
+    {
+        if (Flashlight is not { HasBattery: true })
+        {
+            return null;
+        }
+
+        var charge = Flashlight.Charge;
+        Flashlight.HasBattery = false;
+        Flashlight.Charge = 0f;
+        return charge;
     }
 
     /// <summary>Same battery-state mutation as <see cref="EjectFlashlightBattery"/>, but places
