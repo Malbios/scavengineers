@@ -515,7 +515,6 @@ visible = false
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 script = ExtResource("3")
-EmptySlotNameKey = "HUD_BACKPACK_SLOT"
 Tooltip = NodePath("../../../../InventoryTooltip")
 
 [node name="Background" type="Panel" parent="HUD/BackpackWindow/Layout/BackpackGrid/SlotTemplate"]

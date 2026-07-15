@@ -11,9 +11,9 @@ namespace Scavengineers.Scripts.Inventory;
 /// </summary>
 public static class InventoryOverflow
 {
-    public static void DropAt(Node3D near, string itemId, int count, Mesh mesh, Shape3D shape, Material? material, Vector3? position = null)
+    public static void DropAt(Node3D near, string itemId, int count, Mesh mesh, Shape3D shape, Material? material, Vector3? position = null, float charge = 1f)
     {
-        var pickup = new PickupItem { ItemId = itemId, Count = count };
+        var pickup = new PickupItem { ItemId = itemId, Count = count, Charge = charge };
 
         // Parented at the world/ship root (mirrors Player.SpawnDroppedContainer), not under
         // `near` itself — `near` is the producing verb target (a ShipBuildTarget, a damaged

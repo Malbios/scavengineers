@@ -12,22 +12,26 @@ namespace Scavengineers.Scripts.Inventory;
 /// </summary>
 public sealed class SlotContainer
 {
-    private readonly (string ItemId, int Count)?[] _slots;
+    // Charge is 1f (full) and meaningless for every item except "battery" — the same "meaningless
+    // unless a condition holds" shape PlayerInventory.DrillState/FlashlightState.Charge already
+    // use, just carried on the slot itself so a loose/dropped battery has somewhere to keep its
+    // real remaining charge instead of it being discarded the moment it leaves a device.
+    private readonly (string ItemId, int Count, float Charge)?[] _slots;
 
     public SlotContainer(int slotCount)
     {
-        _slots = new (string, int)?[slotCount];
+        _slots = new (string, int, float)?[slotCount];
     }
 
     /// <summary>The raw per-slot view the inventory panel UI reads (see InventorySlotUI) — index
     /// identity matters here (which physical slot holds what), unlike <see cref="Counts"/>'s
     /// aggregated view for the plain-text HUD summary.</summary>
-    public IReadOnlyList<(string ItemId, int Count)?> Slots => _slots;
+    public IReadOnlyList<(string ItemId, int Count, float Charge)?> Slots => _slots;
 
     /// <summary>Direct slot assignment, bypassing the fill/merge logic in <see cref="Add"/> and
     /// <see cref="MoveSlot"/> — used by PlayerInventory's hand-unequip flow, which needs to clear
     /// a specific slot outright before topping up the body range from its old contents.</summary>
-    public void SetSlot(int index, (string ItemId, int Count)? value) => _slots[index] = value;
+    public void SetSlot(int index, (string ItemId, int Count, float Charge)? value) => _slots[index] = value;
 
     public IReadOnlyDictionary<string, int> Counts =>
         _slots.Where(s => s is not null)
@@ -60,17 +64,20 @@ public sealed class SlotContainer
     /// <summary>Adds up to `count`, respecting both this item's own stack limit
     /// (<see cref="ItemCatalog.MaxStackSize"/>) and the number of free slots — returns how much
     /// actually fit (0..count). A caller whose item has nowhere else to fall back to (a refund,
-    /// a purchase) must handle a partial result itself; see InventoryOverflow.</summary>
-    public int Add(string itemId, int count = 1) => AddWithinRange(itemId, count, 0, _slots.Length);
+    /// a purchase) must handle a partial result itself; see InventoryOverflow. `charge` only
+    /// matters for a freshly-created "battery" slot — every other item ignores it.</summary>
+    public int Add(string itemId, int count = 1, float charge = 1f) => AddWithinRange(itemId, count, 0, _slots.Length, charge);
 
     /// <summary>Adds within a sub-range of slots only — used by PlayerInventory to target just
     /// the body range (e.g. unequipping a hand without spilling into the *other* hand).</summary>
-    public int AddWithinRange(string itemId, int count, int startInclusive, int endExclusive)
+    public int AddWithinRange(string itemId, int count, int startInclusive, int endExclusive, float charge = 1f)
     {
         var remaining = count;
         var maxStack = ItemCatalog.MaxStackSize(itemId);
 
-        // Top up existing stacks of the same item first.
+        // Top up existing stacks of the same item first — keeps that slot's own Charge (moot for
+        // battery specifically, since its maxStackSize of 1 means this branch never actually
+        // applies to it).
         for (var i = startInclusive; i < endExclusive && remaining > 0; i++)
         {
             if (_slots[i] is not { } slot || slot.ItemId != itemId)
@@ -85,7 +92,7 @@ public sealed class SlotContainer
             }
 
             var added = Math.Min(room, remaining);
-            _slots[i] = (itemId, slot.Count + added);
+            _slots[i] = (itemId, slot.Count + added, slot.Charge);
             remaining -= added;
         }
 
@@ -98,7 +105,7 @@ public sealed class SlotContainer
             }
 
             var added = Math.Min(maxStack, remaining);
-            _slots[i] = (itemId, added);
+            _slots[i] = (itemId, added, charge);
             remaining -= added;
         }
 
@@ -142,9 +149,9 @@ public sealed class SlotContainer
         }
 
         var moved = Math.Min(room, source.Count);
-        _slots[to] = (dest.ItemId, dest.Count + moved);
+        _slots[to] = (dest.ItemId, dest.Count + moved, dest.Charge);
         var remaining = source.Count - moved;
-        _slots[from] = remaining > 0 ? (source.ItemId, remaining) : null;
+        _slots[from] = remaining > 0 ? (source.ItemId, remaining, source.Charge) : null;
     }
 
     /// <summary>Same drag-and-drop mutation as <see cref="MoveSlot"/>, but for two different
@@ -189,9 +196,9 @@ public sealed class SlotContainer
         }
 
         var moved = Math.Min(room, source.Count);
-        to._slots[toIndex] = (dest.ItemId, dest.Count + moved);
+        to._slots[toIndex] = (dest.ItemId, dest.Count + moved, dest.Charge);
         var remaining = source.Count - moved;
-        from._slots[fromIndex] = remaining > 0 ? (source.ItemId, remaining) : null;
+        from._slots[fromIndex] = remaining > 0 ? (source.ItemId, remaining, source.Charge) : null;
     }
 
     public void Clear()
@@ -219,7 +226,7 @@ public sealed class SlotContainer
 
             var removed = Math.Min(slot.Count, remaining);
             var newCount = slot.Count - removed;
-            _slots[i] = newCount > 0 ? (itemId, newCount) : null;
+            _slots[i] = newCount > 0 ? (itemId, newCount, slot.Charge) : null;
             remaining -= removed;
         }
 

@@ -70,7 +70,7 @@ public sealed class PlayerInventory
     /// <summary>The raw per-slot view of the two hands (see InventorySlotUI) — a worn
     /// backpack's own contents are addressed separately via <see cref="Backpack"/>.Contents,
     /// never merged in here.</summary>
-    public IReadOnlyList<(string ItemId, int Count)?> Slots => _hands.Slots;
+    public IReadOnlyList<(string ItemId, int Count, float Charge)?> Slots => _hands.Slots;
 
     public IReadOnlyDictionary<string, int> Counts
     {
@@ -102,17 +102,18 @@ public sealed class PlayerInventory
     /// <summary>Adds up to `count`: tops up/fills the worn backpack's own contents first, then
     /// falls back to a hand only if the backpack doesn't exist or doesn't have room — a passive
     /// pickup never bumps something you're deliberately holding, and never fills an empty hand
-    /// as long as the bag can take it. Returns how much actually fit (0..count).</summary>
-    public int Add(string itemId, int count = 1)
+    /// as long as the bag can take it. Returns how much actually fit (0..count). `charge` only
+    /// matters for a freshly-created "battery" slot — every other item ignores it.</summary>
+    public int Add(string itemId, int count = 1, float charge = 1f)
     {
-        var addedToBackpack = Backpack?.Contents.Add(itemId, count) ?? 0;
+        var addedToBackpack = Backpack?.Contents.Add(itemId, count, charge) ?? 0;
         var remaining = count - addedToBackpack;
         if (remaining <= 0)
         {
             return addedToBackpack;
         }
 
-        return addedToBackpack + _hands.Add(itemId, remaining);
+        return addedToBackpack + _hands.Add(itemId, remaining, charge);
     }
 
     /// <summary>Removes up to `count`, preferring the backpack's bulk stock over what's actively
@@ -178,9 +179,9 @@ public sealed class PlayerInventory
         }
 
         _hands.SetSlot(handIndex, null);
-        var added = Backpack?.Contents.Add(occupied.ItemId, occupied.Count) ?? 0;
+        var added = Backpack?.Contents.Add(occupied.ItemId, occupied.Count, occupied.Charge) ?? 0;
         var leftover = occupied.Count - added;
-        _hands.SetSlot(handIndex, leftover > 0 ? (occupied.ItemId, leftover) : null);
+        _hands.SetSlot(handIndex, leftover > 0 ? (occupied.ItemId, leftover, occupied.Charge) : null);
         return leftover == 0;
     }
 
@@ -197,7 +198,7 @@ public sealed class PlayerInventory
         }
 
         var remaining = occupied.Count - count;
-        _hands.SetSlot(handIndex, remaining > 0 ? (occupied.ItemId, remaining) : null);
+        _hands.SetSlot(handIndex, remaining > 0 ? (occupied.ItemId, remaining, occupied.Charge) : null);
         return true;
     }
 
@@ -244,25 +245,59 @@ public sealed class PlayerInventory
     /// and by save/load restore, mirroring <see cref="EquipContainerDirectly"/>'s shape.</summary>
     public void AttachDrill(bool hasBattery, float charge) => Drill = new DrillState { HasBattery = hasBattery, Charge = charge };
 
-    /// <summary>Loads a spare "battery" item (wherever it currently sits) into the drill — always
-    /// a fresh full charge, no partial-charge carry-in, matching ShipSim.InstallBattery's own
-    /// "installed battery always starts at Condition 1f" precedent. No-op/false if there's no
-    /// drill, it's already loaded, or no spare battery is available.</summary>
+    /// <summary>Finds and removes one "battery" item — preferring the backpack over a held hand
+    /// (same order <see cref="TryRemove"/> already uses) — and reports its real <c>Charge</c>
+    /// instead of just discarding which specific instance it was, the way a plain
+    /// <see cref="TryRemove"/>+hardcoded-1f would. Scans, then removes from that exact same slot
+    /// (same read-then-remove-from-the-same-container shape as <see cref="Equip"/> above), so it
+    /// can't drift onto a different battery than the one it reported. Null if no battery exists
+    /// anywhere in the inventory.</summary>
+    private float? TryRemoveBattery()
+    {
+        if (Backpack is not null)
+        {
+            foreach (var slot in Backpack.Contents.Slots)
+            {
+                if (slot is { ItemId: "battery" } found)
+                {
+                    Backpack.Contents.TryRemove("battery", 1);
+                    return found.Charge;
+                }
+            }
+        }
+
+        foreach (var slot in _hands.Slots)
+        {
+            if (slot is { ItemId: "battery" } found)
+            {
+                _hands.TryRemove("battery", 1);
+                return found.Charge;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Loads a spare "battery" item (wherever it currently sits) into the drill, honoring
+    /// whichever specific battery instance came up first (see <see cref="TryRemoveBattery"/>) —
+    /// no forced-full-charge simplification anymore, a used battery installs used. No-op/false if
+    /// there's no drill, it's already loaded, or no spare battery is available.</summary>
     public bool InsertDrillBattery()
     {
-        if (Drill is not { HasBattery: false } || !TryRemove("battery", 1))
+        if (Drill is not { HasBattery: false } || TryRemoveBattery() is not { } charge)
         {
             return false;
         }
 
         Drill.HasBattery = true;
-        Drill.Charge = 1f;
+        Drill.Charge = charge;
         return true;
     }
 
-    /// <summary>Ejects the drill's battery back into inventory as a plain fungible "battery" item
-    /// — remaining charge is discarded, mirroring ShipSim.RemoveBattery's own precedent of not
-    /// preserving partial charge either. No-op/false if there's no drill or it's already empty.</summary>
+    /// <summary>Ejects the drill's battery back into inventory as a "battery" item carrying its
+    /// real remaining charge (see SlotContainer's Charge field) — no longer discarded on eject,
+    /// so a used battery genuinely stays used until replaced. No-op/false if there's no drill or
+    /// it's already empty.</summary>
     public bool EjectDrillBattery()
     {
         if (Drill is not { HasBattery: true })
@@ -270,9 +305,10 @@ public sealed class PlayerInventory
             return false;
         }
 
+        var charge = Drill.Charge;
         Drill.HasBattery = false;
         Drill.Charge = 0f;
-        Add("battery", 1);
+        Add("battery", 1, charge);
         return true;
     }
 
@@ -288,9 +324,10 @@ public sealed class PlayerInventory
             return false;
         }
 
+        var charge = Drill.Charge;
         Drill.HasBattery = false;
         Drill.Charge = 0f;
-        container.SetSlot(slotIndex, ("battery", 1));
+        container.SetSlot(slotIndex, ("battery", 1, charge));
         return true;
     }
 
@@ -299,21 +336,21 @@ public sealed class PlayerInventory
     public void AttachFlashlight(bool hasBattery, float charge) => Flashlight = new FlashlightState { HasBattery = hasBattery, Charge = charge };
 
     /// <summary>Loads a spare "battery" item into the flashlight — mirrors
-    /// <see cref="InsertDrillBattery"/> exactly (always a fresh full charge, no partial carry-in).</summary>
+    /// <see cref="InsertDrillBattery"/> exactly (honors the specific battery's real charge).</summary>
     public bool InsertFlashlightBattery()
     {
-        if (Flashlight is not { HasBattery: false } || !TryRemove("battery", 1))
+        if (Flashlight is not { HasBattery: false } || TryRemoveBattery() is not { } charge)
         {
             return false;
         }
 
         Flashlight.HasBattery = true;
-        Flashlight.Charge = 1f;
+        Flashlight.Charge = charge;
         return true;
     }
 
     /// <summary>Ejects the flashlight's battery back into inventory — mirrors
-    /// <see cref="EjectDrillBattery"/> exactly (remaining charge discarded, not preserved).</summary>
+    /// <see cref="EjectDrillBattery"/> exactly (real remaining charge preserved).</summary>
     public bool EjectFlashlightBattery()
     {
         if (Flashlight is not { HasBattery: true })
@@ -321,9 +358,10 @@ public sealed class PlayerInventory
             return false;
         }
 
+        var charge = Flashlight.Charge;
         Flashlight.HasBattery = false;
         Flashlight.Charge = 0f;
-        Add("battery", 1);
+        Add("battery", 1, charge);
         return true;
     }
 
@@ -337,9 +375,10 @@ public sealed class PlayerInventory
             return false;
         }
 
+        var charge = Flashlight.Charge;
         Flashlight.HasBattery = false;
         Flashlight.Charge = 0f;
-        container.SetSlot(slotIndex, ("battery", 1));
+        container.SetSlot(slotIndex, ("battery", 1, charge));
         return true;
     }
 

@@ -11,6 +11,7 @@ public class PlayerInventoryTests : IDisposable
         {
             ["widget"] = new() { Id = "widget", MaxStackSize = 1 },
             ["backpack"] = new() { Id = "backpack", MaxStackSize = 1 },
+            ["battery"] = new() { Id = "battery", MaxStackSize = 1 },
         });
     }
 
@@ -56,7 +57,7 @@ public class PlayerInventoryTests : IDisposable
         var inventory = new PlayerInventory();
         Assert.True(inventory.EquipContainerDirectly("backpack", new SlotContainer(2)));
         inventory.Backpack!.Contents.Add("widget", 2);
-        inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1));
+        inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1, 1f));
 
         var removed = inventory.TryRemove("widget", 2);
 
@@ -92,8 +93,8 @@ public class PlayerInventoryTests : IDisposable
     {
         var inventory = new PlayerInventory();
         Assert.True(inventory.EquipContainerDirectly("backpack", new SlotContainer(1)));
-        inventory.Backpack!.Contents.SetSlot(0, ("widget", 1)); // fill the only backpack slot
-        inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1));
+        inventory.Backpack!.Contents.SetSlot(0, ("widget", 1, 1f)); // fill the only backpack slot
+        inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1, 1f));
 
         var result = inventory.Unequip(PlayerInventory.LeftHandSlotIndex);
 
@@ -106,7 +107,7 @@ public class PlayerInventoryTests : IDisposable
     {
         var inventory = new PlayerInventory();
         Assert.True(inventory.EquipContainerDirectly("backpack", new SlotContainer(2)));
-        inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1));
+        inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1, 1f));
 
         var result = inventory.Unequip(PlayerInventory.LeftHandSlotIndex);
 
@@ -127,7 +128,7 @@ public class PlayerInventoryTests : IDisposable
     public void EquipBackpackFromHand_ConsumesTheBackpackItem_AndClearBackpackDetachesIt()
     {
         var inventory = new PlayerInventory();
-        inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("backpack", 1));
+        inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("backpack", 1, 1f));
 
         var equipped = inventory.EquipBackpackFromHand();
 
@@ -153,5 +154,55 @@ public class PlayerInventoryTests : IDisposable
 
         Assert.False(second);
         Assert.Equal("backpack-a", inventory.Backpack!.ItemId);
+    }
+
+    [Fact]
+    public void EjectDrillBattery_PreservesItsRealChargeInTheResultingItem()
+    {
+        var inventory = new PlayerInventory();
+        inventory.AttachDrill(hasBattery: true, charge: 0.42f);
+
+        Assert.True(inventory.EjectDrillBattery());
+
+        Assert.False(inventory.Drill!.HasBattery);
+        var ejected = inventory.Hands.Slots.First(s => s?.ItemId == "battery");
+        Assert.Equal(0.42f, ejected!.Value.Charge);
+    }
+
+    [Fact]
+    public void InsertDrillBattery_HonorsTheSpareBatterysRealCharge_NotRefillingToFull()
+    {
+        var inventory = new PlayerInventory();
+        inventory.AttachDrill(hasBattery: true, charge: 0.42f);
+        inventory.EjectDrillBattery(); // drill now empty; a 42%-charged battery sits in a hand
+
+        Assert.True(inventory.InsertDrillBattery());
+
+        Assert.Equal(0.42f, inventory.Drill!.Charge);
+    }
+
+    [Fact]
+    public void EjectFlashlightBattery_PreservesItsRealChargeInTheResultingItem()
+    {
+        var inventory = new PlayerInventory();
+        inventory.AttachFlashlight(hasBattery: true, charge: 0.7f);
+
+        Assert.True(inventory.EjectFlashlightBattery());
+
+        Assert.False(inventory.Flashlight!.HasBattery);
+        var ejected = inventory.Hands.Slots.First(s => s?.ItemId == "battery");
+        Assert.Equal(0.7f, ejected!.Value.Charge);
+    }
+
+    [Fact]
+    public void InsertFlashlightBattery_HonorsTheSpareBatterysRealCharge_NotRefillingToFull()
+    {
+        var inventory = new PlayerInventory();
+        inventory.AttachFlashlight(hasBattery: true, charge: 0.7f);
+        inventory.EjectFlashlightBattery(); // flashlight now empty; a 70%-charged battery sits in a hand
+
+        Assert.True(inventory.InsertFlashlightBattery());
+
+        Assert.Equal(0.7f, inventory.Flashlight!.Charge);
     }
 }

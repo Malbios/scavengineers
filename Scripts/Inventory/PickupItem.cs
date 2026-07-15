@@ -47,6 +47,12 @@ public partial class PickupItem : RigidBody3D, IVerbTarget, IPhysicsPresenceAwar
     [Export]
     public int Count { get; set; } = 1;
 
+    /// <summary>0-1; meaningless except for ItemId == "battery" — same shape as
+    /// PlayerInventory.DrillState/FlashlightState.Charge and SlotContainer's own per-slot Charge,
+    /// just carried on the loose world item instead.</summary>
+    [Export]
+    public float Charge { get; set; } = 1f;
+
     public override void _Ready()
     {
         LinearDamp = ZeroGSettleDamp;
@@ -215,7 +221,7 @@ public partial class PickupItem : RigidBody3D, IVerbTarget, IPhysicsPresenceAwar
         // than vanishing, no special handling needed since this object already IS the world
         // representation of "some of this item is sitting here" (unlike a refund/scrap yield,
         // which has no such object to fall back to — see InventoryOverflow).
-        var added = inventory.Add(ItemId, Count);
+        var added = inventory.Add(ItemId, Count, Charge);
         Count -= added;
         if (Count <= 0)
         {

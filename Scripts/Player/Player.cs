@@ -621,7 +621,7 @@ public partial class Player : CharacterBody3D
         }
 
         container.SetSlot(source.SlotIndex, null);
-        InventoryOverflow.DropAt(this, slot.ItemId, slot.Count, DroppedItemMesh!, DroppedItemShape!, DroppedItemMaterial, position);
+        InventoryOverflow.DropAt(this, slot.ItemId, slot.Count, DroppedItemMesh!, DroppedItemShape!, DroppedItemMaterial, position, slot.Charge);
     }
 
     /// <summary>Always drops the backpack (empty or not) at `position` — unlike
@@ -1263,7 +1263,11 @@ public partial class Player : CharacterBody3D
         // Conduit" even while you're not holding spare parts, not go blank.
         if (target?.DisplayNameKey is { } displayNameKey)
         {
-            _targetNameLabel!.Text = Tr(displayNameKey);
+            // A loose battery's real charge is worth surfacing here too, same "label (suffix)"
+            // shape the verb label below already uses for Verb.DisplaySuffix.
+            _targetNameLabel!.Text = target is PickupItem { ItemId: "battery" } batteryPickup
+                ? $"{Tr(displayNameKey)} ({Mathf.RoundToInt(batteryPickup.Charge * 100)}%)"
+                : Tr(displayNameKey);
             _targetNameLabel.Visible = true;
         }
         else

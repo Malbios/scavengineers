@@ -43,7 +43,7 @@ public class SlotContainerTests : IDisposable
     {
         var container = new SlotContainer(2);
         container.Add("scrap", 1);
-        container.SetSlot(1, ("wall_panel", 1));
+        container.SetSlot(1, ("wall_panel", 1, 1f));
 
         container.MoveSlot(0, 1);
 
@@ -55,8 +55,8 @@ public class SlotContainerTests : IDisposable
     public void MoveSlot_MergesSameItem_LeavingRemainderInSource()
     {
         var container = new SlotContainer(2);
-        container.SetSlot(0, ("scrap", 2));
-        container.SetSlot(1, ("scrap", 2));
+        container.SetSlot(0, ("scrap", 2, 1f));
+        container.SetSlot(1, ("scrap", 2, 1f));
 
         container.MoveSlot(0, 1);
 
@@ -68,8 +68,8 @@ public class SlotContainerTests : IDisposable
     {
         var from = new SlotContainer(1);
         var to = new SlotContainer(1);
-        from.SetSlot(0, ("scrap", 2));
-        to.SetSlot(0, ("scrap", 2));
+        from.SetSlot(0, ("scrap", 2, 1f));
+        to.SetSlot(0, ("scrap", 2, 1f));
 
         SlotContainer.MoveBetween(from, 0, to, 0);
 
@@ -93,10 +93,45 @@ public class SlotContainerTests : IDisposable
     public void RoomFor_ReflectsFreeSlotsAndPartialStacks()
     {
         var container = new SlotContainer(2);
-        container.SetSlot(0, ("scrap", 1)); // 2 more room here, plus a whole empty slot (3)
+        container.SetSlot(0, ("scrap", 1, 1f)); // 2 more room here, plus a whole empty slot (3)
 
         Assert.Equal(5, container.RoomFor("scrap"));
         Assert.True(container.HasRoomFor("scrap", 5));
         Assert.False(container.HasRoomFor("scrap", 6));
+    }
+
+    [Fact]
+    public void TryRemove_PreservesChargeOnTheRemainingSlot()
+    {
+        var container = new SlotContainer(1);
+        container.SetSlot(0, ("scrap", 3, 0.5f));
+
+        container.TryRemove("scrap", 1);
+
+        Assert.Equal(0.5f, container.Slots[0]!.Value.Charge);
+    }
+
+    [Fact]
+    public void Add_ToppingUpAnExistingStack_KeepsThatSlotsOwnCharge()
+    {
+        var container = new SlotContainer(1);
+        container.SetSlot(0, ("scrap", 1, 0.5f));
+
+        container.Add("scrap", 1, charge: 1f); // ignored — tops up, doesn't create a new slot
+
+        Assert.Equal(0.5f, container.Slots[0]!.Value.Charge);
+    }
+
+    [Fact]
+    public void MoveSlot_MergingSameItem_PreservesChargeOnBothTheDestAndTheRemainder()
+    {
+        var container = new SlotContainer(2);
+        container.SetSlot(0, ("scrap", 2, 0.3f));
+        container.SetSlot(1, ("scrap", 2, 0.7f));
+
+        container.MoveSlot(0, 1);
+
+        Assert.Equal(0.7f, container.Slots[1]!.Value.Charge); // dest keeps its own charge
+        Assert.Equal(0.3f, container.Slots[0]!.Value.Charge); // remainder keeps the source's charge
     }
 }

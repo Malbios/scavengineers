@@ -118,9 +118,11 @@ public partial class InventorySlotUI : Control
         Tooltip.GlobalPosition = GetGlobalMousePosition() + new Vector2(16, 16);
     }
 
-    /// <summary>Charge fraction (0-1) for the drill/flashlight battery slots specifically — null
-    /// for every other slot, including a battery-less drill/flashlight (that case already falls
-    /// through to CurrentSlot() returning null, i.e. "empty slot" tooltip handling).</summary>
+    /// <summary>Charge fraction (0-1) for the drill/flashlight battery slots specifically, or for
+    /// an ordinary hand/backpack slot that happens to hold a loose "battery" item (see
+    /// SlotContainer's own per-slot Charge) — null for every other slot, including a
+    /// battery-less drill/flashlight (that case already falls through to CurrentSlot() returning
+    /// null, i.e. "empty slot" tooltip handling).</summary>
     private float? BatteryCharge()
     {
         if (IsDrillBatterySlot)
@@ -133,7 +135,9 @@ public partial class InventorySlotUI : Control
             return PlayerRef?.Inventory.Flashlight is { HasBattery: true } flashlight ? flashlight.Charge : null;
         }
 
-        return null;
+        return Container is { } c && SlotIndex >= 0 && SlotIndex < c.Slots.Count && c.Slots[SlotIndex] is { ItemId: "battery" } slot
+            ? slot.Charge
+            : null;
     }
 
     private void OnMouseExited()
@@ -278,6 +282,8 @@ public partial class InventorySlotUI : Control
             return PlayerRef?.Inventory.Flashlight is { HasBattery: true } ? ("battery", 1) : null;
         }
 
-        return Container is { } c && SlotIndex >= 0 && SlotIndex < c.Slots.Count ? c.Slots[SlotIndex] : null;
+        return Container is { } c && SlotIndex >= 0 && SlotIndex < c.Slots.Count && c.Slots[SlotIndex] is { } slot
+            ? (slot.ItemId, slot.Count)
+            : null;
     }
 }
