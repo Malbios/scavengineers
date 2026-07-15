@@ -24,6 +24,7 @@
 [ext_resource type="Material" path="res://Assets/Materials/station_wall_material.tres" id="26"]
 [ext_resource type="Material" path="res://Assets/Materials/station_ceiling_material.tres" id="27"]
 [ext_resource type="PackedScene" path="res://Scenes/Derelict.tscn" id="28"]
+[ext_resource type="Script" path="res://Scripts/Environment/IdleSway.cs" id="29"]
 
 [sub_resource type="ShaderMaterial" id="StarfieldSkyMaterial"]
 shader = ExtResource("24")
@@ -249,6 +250,27 @@ size = Vector3(1.8, 0.5, 0.6)
 
 [sub_resource type="StandardMaterial3D" id="BunkMaterial"]
 albedo_color = Color(0.35, 0.4, 0.5, 1)
+
+[sub_resource type="BoxShape3D" id="FigureBodyShape"]
+size = Vector3(0.6, 1.8, 0.35)
+
+[sub_resource type="BoxMesh" id="FigureLegsMesh"]
+size = Vector3(0.5, 0.9, 0.3)
+
+[sub_resource type="BoxMesh" id="FigureTorsoMesh"]
+size = Vector3(0.55, 0.6, 0.3)
+
+[sub_resource type="BoxMesh" id="FigureHeadMesh"]
+size = Vector3(0.3, 0.3, 0.3)
+
+[sub_resource type="BoxMesh" id="FigureArmMesh"]
+size = Vector3(0.18, 0.6, 0.18)
+
+[sub_resource type="StandardMaterial3D" id="FigureSuitMaterial"]
+albedo_color = Color(0.25, 0.35, 0.3, 1)
+
+[sub_resource type="StandardMaterial3D" id="FigureHeadMaterial"]
+albedo_color = Color(0.75, 0.6, 0.5, 1)
 
 [node name="World" type="Node3D" unique_id=474587780]
 
@@ -657,6 +679,41 @@ shape = SubResource("ComputerShape")
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Station/StationConsole"]
 mesh = SubResource("ComputerMesh")
 surface_material_override/0 = SubResource("TradeConsoleMaterial")
+
+[node name="ShopFigure" type="StaticBody3D" parent="Station"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.0, 0, -2.4)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Station/ShopFigure"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("FigureBodyShape")
+
+[node name="Visual" type="Node3D" parent="Station/ShopFigure"]
+script = ExtResource("29")
+
+[node name="Legs" type="MeshInstance3D" parent="Station/ShopFigure/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+mesh = SubResource("FigureLegsMesh")
+surface_material_override/0 = SubResource("FigureSuitMaterial")
+
+[node name="Torso" type="MeshInstance3D" parent="Station/ShopFigure/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+mesh = SubResource("FigureTorsoMesh")
+surface_material_override/0 = SubResource("FigureSuitMaterial")
+
+[node name="Head" type="MeshInstance3D" parent="Station/ShopFigure/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.65, 0)
+mesh = SubResource("FigureHeadMesh")
+surface_material_override/0 = SubResource("FigureHeadMaterial")
+
+[node name="ArmLeft" type="MeshInstance3D" parent="Station/ShopFigure/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.36, 1.15, 0)
+mesh = SubResource("FigureArmMesh")
+surface_material_override/0 = SubResource("FigureSuitMaterial")
+
+[node name="ArmRight" type="MeshInstance3D" parent="Station/ShopFigure/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.36, 1.15, 0)
+mesh = SubResource("FigureArmMesh")
+surface_material_override/0 = SubResource("FigureSuitMaterial")
 
 [node name="StationAirlock" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipARef", "ShipBRef", "SlabMesh", "SlabCollision") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 1.0, -0.8)
