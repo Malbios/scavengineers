@@ -131,6 +131,37 @@ public class ShipAtmosphereZoneTest
         AssertBool(ReferenceEquals(deepInB, zoneB)).IsTrue();
     }
 
+    /// <summary>Regression coverage for the airlock bug where standing right at a closed docked
+    /// airlock read the far (docked) ship's atmosphere instead of the Home Ship's own: the
+    /// previous test above only ever queried points exclusively inside one zone's range (8.5 is
+    /// outside zoneB's [10,14], 13.5 is outside zoneA's [8,12]) — it never actually exercised a
+    /// point genuinely inside BOTH shapes at once, which is exactly what a real docked airlock
+    /// threshold produces (see ShipAtmosphereZone.ContainmentMargin's own doc comment for the
+    /// real-scene numbers). x=10.5 sits inside both zoneA's [8,12] and zoneB's [10,14] — margin
+    /// 1.5 into zoneA (center 10) vs only 0.5 into zoneB (center 12), so the more-centrally-
+    /// contained zone (A) must win, not whichever IntersectPoint enumerates first.</summary>
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task FindZoneAt_WhenGenuinelyInsideBothShapes_PicksTheMoreCentrallyContainedZone()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var shipA = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(shipA);
+        var shipB = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(shipB);
+
+        var zoneA = AutoFree(MakeZoneWithShape(
+            sceneTree, shipA, new Vector2I(1, 1), new Vector3(10, 1, 0), new Vector3(4, 2, 2))); // spans x[8,12]
+        var zoneB = AutoFree(MakeZoneWithShape(
+            sceneTree, shipB, new Vector2I(2, 2), new Vector3(12, 1, 0), new Vector3(4, 2, 2))); // spans x[10,14]
+
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+
+        var inOverlap = ShipAtmosphereZone.FindZoneAt(zoneA.GetWorld3D(), new Vector3(10.5f, 1, 0));
+
+        AssertBool(ReferenceEquals(inOverlap, zoneA)).IsTrue();
+    }
+
     [TestCase]
     [RequireGodotRuntime]
     public void TileAt_ConvertsWorldPositionToTileUsingTheParentShipRootsLocalSpace()

@@ -1,3 +1,5 @@
+using System.Linq;
+
 using Godot;
 using Scavengineers.Scripts.Verbs;
 using Scavengineers.Sim.Grid;
@@ -75,15 +77,49 @@ public partial class ShipAtmosphereZone : Area3D
             CollideWithAreas = true,
         };
 
+        ShipAtmosphereZone? best = null;
+        var bestMargin = float.NegativeInfinity;
+
         foreach (var result in spaceState.IntersectPoint(query))
         {
-            if (result["collider"].As<GodotObject>() is ShipAtmosphereZone zone)
+            if (result["collider"].As<GodotObject>() is not ShipAtmosphereZone zone)
             {
-                return zone;
+                continue;
+            }
+
+            var margin = zone.ContainmentMargin(position);
+            if (margin > bestMargin)
+            {
+                bestMargin = margin;
+                best = zone;
             }
         }
 
-        return null;
+        return best;
+    }
+
+    /// <summary>How deep <paramref name="worldPosition"/> sits inside this zone's own box
+    /// collision shape — the smallest of its three local-axis margins (distance to the nearest
+    /// face). Used by <see cref="FindZoneAt"/> to break ties when two zones' shapes genuinely
+    /// overlap (e.g. right at a docked airlock threshold, where the Home Ship's and the docked
+    /// ship's corridor zones are deliberately built with a small overlap margin so a live
+    /// per-frame query never leaves a gap): the zone the point sits most centrally inside wins,
+    /// rather than whichever IntersectPoint happened to enumerate first (an order Godot doesn't
+    /// guarantee) — this is what let a player standing right at a closed airlock door read the
+    /// far (docked) ship's atmosphere instead of their own.</summary>
+    private float ContainmentMargin(Vector3 worldPosition)
+    {
+        // Found by type, not by a literal "CollisionShape3D" name — every zone in this game's
+        // real scenes happens to use that exact child name, but nothing guarantees it always
+        // will, and a name-independent lookup is no more expensive for the one shape a zone has.
+        if (GetChildren().OfType<CollisionShape3D>().FirstOrDefault() is not { Shape: BoxShape3D box } collisionShape)
+        {
+            return 0f;
+        }
+
+        var local = collisionShape.GlobalTransform.AffineInverse() * worldPosition;
+        var halfSize = box.Size / 2f;
+        return Mathf.Min(halfSize.X - Mathf.Abs(local.X), Mathf.Min(halfSize.Y - Mathf.Abs(local.Y), halfSize.Z - Mathf.Abs(local.Z)));
     }
 
     /// <summary>Converts a world position into this zone's ship's own grid tile coordinate — the
