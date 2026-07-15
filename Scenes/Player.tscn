@@ -5,6 +5,7 @@
 [ext_resource type="Script" path="res://Scripts/Player/InventorySlotUI.cs" id="3"]
 [ext_resource type="Script" path="res://Scripts/Player/DraggableWindow.cs" id="4"]
 [ext_resource type="Script" path="res://Scripts/Travel/TravelMapPanel.cs" id="5"]
+[ext_resource type="Script" path="res://Scripts/Travel/StarfieldBackground.cs" id="6"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -684,7 +685,15 @@ horizontal_alignment = 1
 [node name="MapArea" type="Control" parent="HUD/TravelMapPanel/Layout"]
 custom_minimum_size = Vector2(540, 350)
 layout_mode = 2
-theme_override_styles/panel = SubResource("TravelMapBackground")
+
+[node name="SpaceBackground" type="Control" parent="HUD/TravelMapPanel/Layout/MapArea"]
+mouse_filter = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("6")
 
 [node name="SelectionLabel" type="Label" parent="HUD/TravelMapPanel/Layout"]
 layout_mode = 2
