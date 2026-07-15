@@ -59,6 +59,12 @@ public static class ItemCatalog
     public static float ThirstRestore(string itemId) =>
         Items.TryGetValue(itemId, out var item) ? item.ThirstRestore : 0f;
 
+    /// <summary>Whether this item is a light source Player.UseHeldItem's F-key toggle should turn
+    /// on/off — false (the default) for anything that isn't one, same safe-fallback spirit as
+    /// <see cref="MaxStackSize"/>.</summary>
+    public static bool IsToggleableLight(string itemId) =>
+        Items.TryGetValue(itemId, out var item) && item.IsToggleableLight;
+
     private static Dictionary<string, ItemDefinition> Items => _items ??= Load();
 
     /// <summary>Test-only seam: lets Scavengineers.Scripts.Tests seed the catalog directly,
@@ -98,5 +104,8 @@ public static class ItemCatalog
 
         [JsonPropertyName("thirstRestore")]
         public float ThirstRestore { get; set; }
+
+        [JsonPropertyName("isToggleableLight")]
+        public bool IsToggleableLight { get; set; }
     }
 }

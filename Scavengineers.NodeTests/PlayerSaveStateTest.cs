@@ -1,0 +1,96 @@
+using System.Collections.Generic;
+using System.Linq;
+
+using GdUnit4;
+using Godot;
+using Scavengineers.Scripts.Inventory;
+using Scavengineers.Scripts.Player;
+using Scavengineers.Scripts.SaveLoad;
+
+using static GdUnit4.Assertions;
+
+namespace Scavengineers.NodeTests;
+
+/// <summary>Regression coverage for two of Player.cs's riskiest, previously-untested branches:
+/// ApplyPlayerState's legacy-save fallback (the exact path a save from before per-slot inventory
+/// state runs through) and TryDropInWorld's battery-eject-to-world routing (dragging the drill/
+/// flashlight's battery slot straight into the world). Uses PlayerTestHarness since this project
+/// has no res://Scenes/Player.tscn to load from.</summary>
+[TestSuite]
+public class PlayerSaveStateTest
+{
+    [TestCase]
+    [RequireGodotRuntime]
+    public void ApplyPlayerState_WithLegacyInventoryDict_ReplaysItIntoHandSlots()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+
+        var data = new PlayerSaveData
+        {
+            // HandSlots/BackpackSlots deliberately left at their default empty lists — the exact
+            // shape of a save predating per-slot state. Two distinct items (not one stacked
+            // count) — this project's isolated ItemCatalog can't load the real Data/items.json
+            // (see PlayerTestHarness), so every item falls back to a stack size of 1; this keeps
+            // the test independent of that unrelated fallback behavior.
+            Inventory = new Dictionary<string, int> { ["scrap_metal"] = 1, ["spare_parts"] = 1 },
+        };
+
+        player.ApplyPlayerState(data);
+
+        AssertBool(player.Inventory.CountOf("scrap_metal") == 1).IsTrue();
+        AssertBool(player.Inventory.CountOf("spare_parts") == 1).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void ApplyPlayerState_WithHandSlots_RestoresPositionally_IgnoringTheLegacyDict()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+
+        var data = new PlayerSaveData
+        {
+            // Both populated, disagreeing — the new-format list must win.
+            HandSlots = new List<SlotSaveData?>
+            {
+                new() { ItemId = "battery", Count = 1, Charge = 0.55f },
+                null,
+            },
+            Inventory = new Dictionary<string, int> { ["scrap_metal"] = 99 },
+        };
+
+        player.ApplyPlayerState(data);
+
+        AssertBool(player.Inventory.CountOf("scrap_metal") == 0).IsTrue(); // legacy dict ignored
+        var restored = player.Inventory.Slots[PlayerInventory.LeftHandSlotIndex];
+        AssertBool(restored is { ItemId: "battery", Count: 1, Charge: 0.55f }).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TryDropInWorld_DrillBatterySlot_SpawnsALooseBatteryWithRealChargeAndClearsTheDrill()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        player.Inventory.AttachDrill(hasBattery: true, charge: 0.37f);
+
+        // A solid target within reach, straight ahead of the camera's default forward (-Z), so
+        // Player.ResolveWorldDropPosition's raycast actually has something to hit.
+        var wall = AutoFree(new StaticBody3D { Position = new Vector3(0, 0, -1.5f) });
+        wall.AddChild(new CollisionShape3D { Shape = new BoxShape3D() });
+        sceneTree.Root.AddChild(wall);
+
+        var source = AutoFree(new InventorySlotUI { IsDrillBatterySlot = true });
+        var viewportCenter = player.GetViewport().GetVisibleRect().GetCenter();
+
+        player.TryDropInWorld(source, viewportCenter);
+
+        AssertBool(player.Inventory.Drill!.HasBattery).IsFalse();
+        var dropped = sceneTree.Root.GetChildren().OfType<PickupItem>().FirstOrDefault(p => p.ItemId == "battery");
+        AssertBool(dropped is not null).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(dropped!.Charge, 0.37f)).IsTrue();
+
+        AutoFree(dropped);
+    }
+}

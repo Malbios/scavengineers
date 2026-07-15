@@ -95,7 +95,7 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
     /// about adjacency) and by Diffuse itself.</summary>
     private IEnumerable<CellCoord> UnsealedCellNeighbors(CellCoord cell)
     {
-        foreach (var neighbor in AdjacentCells(cell))
+        foreach (var neighbor in cell.OrthogonalNeighbors())
         {
             if (_deck.Cells.Contains(neighbor) && !_deck.IsEdgeSealed(cell, neighbor))
             {
@@ -165,6 +165,26 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
     /// own per-system pass; in line with this game's existing deck sizes, not a new asymptotic
     /// cost.</summary>
     public bool IsConnectedToOutside(CellCoord cell) => RawComponentContaining(cell).Contains(AtmosphereNode.Outside);
+
+    /// <summary>All deck cells whose current connected component reaches <see
+    /// cref="AtmosphereNode.Outside"/> (i.e. what the very next <see cref="Tick"/> would <see
+    /// cref="Vent"/>) — a single <see cref="ConnectivitySolver.FindComponents"/> pass, so a caller
+    /// seeding a freshly-breached ship's cells to <see cref="AtmosphereVolume.Vacuum"/> immediately
+    /// (see <see cref="Scavengineers.Scripts.Ship.ShipSim"/>) doesn't need its own second flood-fill
+    /// over this same graph. Since Outside is one shared sentinel connected to every hull breach at
+    /// once, every breached room ends up in this one component — there's never more than one.</summary>
+    public IReadOnlySet<CellCoord> CellsConnectedToOutside()
+    {
+        foreach (var component in ConnectivitySolver.FindComponents(this))
+        {
+            if (component.Contains(AtmosphereNode.Outside))
+            {
+                return component.Where(n => !n.IsOutside).Select(n => n.Cell!.Value).ToHashSet();
+            }
+        }
+
+        return new HashSet<CellCoord>();
+    }
 
     /// <summary>Marks a cell as currently being drained by an open <see cref="AirlockBridge"/>
     /// whose far side has its own path to Outside — for this tick only. This is what makes <see
@@ -310,12 +330,4 @@ public sealed class AtmosphereSystem : IConnectivityGraph<AtmosphereNode>
     }
 
     private static double Lerp(double from, double to, double factor) => from + (to - from) * factor;
-
-    private static IEnumerable<CellCoord> AdjacentCells(CellCoord cell)
-    {
-        yield return cell with { X = cell.X + 1 };
-        yield return cell with { X = cell.X - 1 };
-        yield return cell with { Y = cell.Y + 1 };
-        yield return cell with { Y = cell.Y - 1 };
-    }
 }

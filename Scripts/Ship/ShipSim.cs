@@ -207,6 +207,9 @@ public partial class ShipSim : Node
         }
     }
 
+    // Reuses AtmosphereSystem's own CellsConnectedToOutside (one ConnectivitySolver.FindComponents
+    // pass over the same graph Tick() already partitions every frame) instead of hand-rolling a
+    // second flood-fill here — see CLAUDE.md's "one solver" rule.
     private void SeedVacuumFromInitialBreaches()
     {
         if (_atmosphere is null)
@@ -214,37 +217,10 @@ public partial class ShipSim : Node
             return;
         }
 
-        var visited = new HashSet<CellCoord>();
-        var queue = new Queue<CellCoord>();
-        foreach (var breach in Deck.HullBreaches)
+        foreach (var cell in _atmosphere.CellsConnectedToOutside())
         {
-            if (visited.Add(breach))
-            {
-                queue.Enqueue(breach);
-            }
-        }
-
-        while (queue.Count > 0)
-        {
-            var cell = queue.Dequeue();
             _atmosphere.ApplyExternalVolume(cell, AtmosphereVolume.Vacuum);
-
-            foreach (var neighbor in AdjacentCells(cell))
-            {
-                if (Deck.Cells.Contains(neighbor) && !Deck.IsEdgeSealed(cell, neighbor) && visited.Add(neighbor))
-                {
-                    queue.Enqueue(neighbor);
-                }
-            }
         }
-    }
-
-    private static IEnumerable<CellCoord> AdjacentCells(CellCoord cell)
-    {
-        yield return cell with { X = cell.X + 1 };
-        yield return cell with { X = cell.X - 1 };
-        yield return cell with { Y = cell.Y + 1 };
-        yield return cell with { Y = cell.Y - 1 };
     }
 
     public override void _PhysicsProcess(double delta)

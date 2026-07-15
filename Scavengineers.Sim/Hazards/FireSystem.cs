@@ -34,7 +34,7 @@ public sealed class FireSystem(Deck deck, AtmosphereSystem atmosphere, PowerSyst
     {
         foreach (var burningCell in deck.Fires)
         {
-            foreach (var cell in AdjacentCells(burningCell).Append(burningCell))
+            foreach (var cell in burningCell.OrthogonalNeighbors().Append(burningCell))
             {
                 if (cell != burningCell && (!deck.Cells.Contains(cell) || deck.IsEdgeSealed(burningCell, cell)))
                 {
@@ -89,13 +89,5 @@ public sealed class FireSystem(Deck deck, AtmosphereSystem atmosphere, PowerSyst
                 Temperature = volume.Temperature + HeatGainPerSecond * dt,
             });
         }
-    }
-
-    private static IEnumerable<CellCoord> AdjacentCells(CellCoord cell)
-    {
-        yield return cell with { X = cell.X + 1 };
-        yield return cell with { X = cell.X - 1 };
-        yield return cell with { Y = cell.Y + 1 };
-        yield return cell with { Y = cell.Y - 1 };
     }
 }

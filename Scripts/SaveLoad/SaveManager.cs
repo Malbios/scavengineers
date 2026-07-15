@@ -17,7 +17,9 @@ namespace Scavengineers.Scripts.SaveLoad;
 /// </summary>
 public partial class SaveManager : Node
 {
-    private static readonly string SavePath = ProjectSettings.GlobalizePath("user://savegame.json");
+    /// <summary>Instance property (not a static constant) so a test can point this at a temp file
+    /// instead of the player's real save data — every production caller just uses the default.</summary>
+    public string SavePath { get; set; } = ProjectSettings.GlobalizePath("user://savegame.json");
 
     [Export]
     public PlayerScript? PlayerRef { get; set; }

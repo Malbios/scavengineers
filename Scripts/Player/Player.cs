@@ -455,7 +455,7 @@ public partial class Player : CharacterBody3D
             return;
         }
 
-        if (LeftHandItemId == "flashlight" || RightHandItemId == "flashlight" || _inventory.Has("debug_flashlight", 1))
+        if (LeftHandItemId == "flashlight" || RightHandItemId == "flashlight" || _inventory.HasAny(ItemCatalog.IsToggleableLight))
         {
             _flashlightOn = !_flashlightOn;
         }
@@ -1011,6 +1011,11 @@ public partial class Player : CharacterBody3D
         // not something you hold, and it has no battery to drain.
         var holdingFlashlight = LeftHandItemId == "flashlight" || RightHandItemId == "flashlight";
         var realFlashlightOn = _flashlightOn && holdingFlashlight && _inventory.Flashlight is { HasBattery: true, Charge: > 0f };
+        // Deliberately still keyed to the literal debug item, not ItemCatalog.IsToggleableLight —
+        // that flag only means "the F-key toggle applies to this item," not "bypasses hand/battery
+        // gating entirely, on merely carrying it." Those are different properties that happen to
+        // both be true for this one dev-only item; generalizing this specific check would make an
+        // unheld real flashlight sitting in the backpack incorrectly project a beam too.
         var debugFlashlightOn = _flashlightOn && _inventory.Has("debug_flashlight", 1);
         _flashlightSpot!.Visible = realFlashlightOn || debugFlashlightOn;
 

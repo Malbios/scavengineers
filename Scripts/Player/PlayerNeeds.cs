@@ -7,8 +7,9 @@ namespace Scavengineers.Scripts.Player;
 /// <see cref="SuitResources"/>'s short-horizon EVA budget (O2/power drain over minutes; these
 /// drain over a much longer span, matching the home-ship-loop pressure docs/project-plan.md's
 /// time-acceleration note already anticipates: "fatigue, hunger, suit O2, power all tick").
-/// Constant-rate drain only, no consequence at 0% yet — same "later system" deferral
-/// SuitResources' own O2/power already use.
+/// Constant-rate drain; hitting 0% on any of the three applies a real movement-speed debuff
+/// (see Player.NeedsDebuffMoveMultiplier) — no longer the unconsequenced "later system" deferral
+/// SuitResources' own O2/power once were.
 /// </summary>
 public sealed class PlayerNeeds
 {

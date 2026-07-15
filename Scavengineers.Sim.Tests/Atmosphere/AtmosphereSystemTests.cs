@@ -57,6 +57,25 @@ public class AtmosphereSystemTests
     }
 
     [Fact]
+    public void CellsConnectedToOutside_ReturnsEveryBreachedRoomsCells_AcrossDisconnectedRooms()
+    {
+        var roomACell = new CellCoord(0, 0);
+        var roomBCell = new CellCoord(10, 10); // far enough away to never be adjacent to roomACell
+        var sealedCell = new CellCoord(20, 20); // no breach — must not appear in the result
+        var deck = DeckWithCells(roomACell, roomBCell, sealedCell);
+        deck.BreachHull(roomACell);
+        deck.BreachHull(roomBCell);
+        var system = new AtmosphereSystem(deck);
+
+        var connected = system.CellsConnectedToOutside();
+
+        Assert.Equal(2, connected.Count);
+        Assert.Contains(roomACell, connected);
+        Assert.Contains(roomBCell, connected);
+        Assert.DoesNotContain(sealedCell, connected);
+    }
+
+    [Fact]
     public void BreachedHull_ApproachesVacuumAsTimeAccumulates()
     {
         var cell = new CellCoord(0, 0);

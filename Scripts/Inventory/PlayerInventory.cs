@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Scavengineers.Scripts.Inventory;
 
@@ -92,6 +93,14 @@ public sealed class PlayerInventory
     public int CountOf(string itemId) => _hands.CountOf(itemId) + (Backpack?.Contents.CountOf(itemId) ?? 0);
 
     public bool Has(string itemId, int count) => CountOf(itemId) >= count;
+
+    /// <summary>Whether any item anywhere in inventory (hands or worn backpack) matches
+    /// `predicate` — e.g. Player's flashlight toggle uses this against
+    /// ItemCatalog.IsToggleableLight to find a never-held toggleable light (like the debug
+    /// flashlight) without hardcoding its item id.</summary>
+    public bool HasAny(Func<string, bool> predicate) =>
+        _hands.Slots.Any(slot => slot is { } s && predicate(s.ItemId))
+        || (Backpack?.Contents.Slots.Any(slot => slot is { } s && predicate(s.ItemId)) ?? false);
 
     /// <summary>Whether `count` more of this item would fit right now, across the worn
     /// backpack's contents (if any) and empty/matching hands, without actually adding

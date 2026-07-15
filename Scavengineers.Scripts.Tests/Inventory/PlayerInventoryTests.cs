@@ -18,6 +18,21 @@ public class PlayerInventoryTests : IDisposable
     public void Dispose() => ItemCatalog.ResetForTests();
 
     [Fact]
+    public void HasAny_FindsAMatchInAHandSlotOrTheBackpack_AndFalseWhenNoSlotMatches()
+    {
+        var inventory = new PlayerInventory();
+        Assert.True(inventory.EquipContainerDirectly("backpack", new SlotContainer(2)));
+        inventory.Backpack!.Contents.Add("battery", 1);
+
+        Assert.True(inventory.HasAny(itemId => itemId == "battery"));
+        Assert.False(inventory.HasAny(itemId => itemId == "widget"));
+
+        inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1, 1f));
+
+        Assert.True(inventory.HasAny(itemId => itemId == "widget"));
+    }
+
+    [Fact]
     public void Add_ReturnsPartialFit_WhenNoBackpackAndHandsFull()
     {
         var inventory = new PlayerInventory();
@@ -239,5 +254,44 @@ public class PlayerInventoryTests : IDisposable
         Assert.True(inventory.InsertFlashlightBattery());
 
         Assert.Equal(0.7f, inventory.Flashlight!.Charge);
+    }
+
+    [Fact]
+    public void EjectDrillBatteryTo_MovesTheRealChargeIntoTheGivenSlot_AndClearsTheDrill()
+    {
+        var inventory = new PlayerInventory();
+        inventory.AttachDrill(hasBattery: true, charge: 0.42f);
+        var container = new SlotContainer(1);
+
+        Assert.True(inventory.EjectDrillBatteryTo(container, 0));
+
+        Assert.False(inventory.Drill!.HasBattery);
+        Assert.Equal(("battery", 1, 0.42f), container.Slots[0]);
+    }
+
+    [Fact]
+    public void EjectDrillBatteryTo_ReturnsFalse_WhenTheTargetSlotIsAlreadyOccupied()
+    {
+        var inventory = new PlayerInventory();
+        inventory.AttachDrill(hasBattery: true, charge: 0.42f);
+        var container = new SlotContainer(1);
+        container.SetSlot(0, ("widget", 1, 1f));
+
+        Assert.False(inventory.EjectDrillBatteryTo(container, 0));
+
+        Assert.True(inventory.Drill!.HasBattery); // untouched — the eject never happened
+    }
+
+    [Fact]
+    public void EjectFlashlightBatteryTo_MovesTheRealChargeIntoTheGivenSlot_AndClearsTheFlashlight()
+    {
+        var inventory = new PlayerInventory();
+        inventory.AttachFlashlight(hasBattery: true, charge: 0.7f);
+        var container = new SlotContainer(1);
+
+        Assert.True(inventory.EjectFlashlightBatteryTo(container, 0));
+
+        Assert.False(inventory.Flashlight!.HasBattery);
+        Assert.Equal(("battery", 1, 0.7f), container.Slots[0]);
     }
 }
