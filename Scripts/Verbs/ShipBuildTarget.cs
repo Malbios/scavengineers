@@ -138,6 +138,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private const float FloorPanelHeight = -0.025f;
     private const float CeilingPanelHeight = 2.025f;
 
+    // Matches Derelict.tscn's own hand-placed pickups' resting height (e.g. WallPanel1/ScrapMetal
+    // both sit at Y=0.15) — a bit more clearance than the purely-visual conduit mount since a
+    // spawned RigidBody3D pickup needs room to settle physically without floor interpenetration.
+    private const float LootRestHeight = 0.15f;
+
     // Atmosphere-zone generation (see GenerateAtmosphereZonesFromRoomLayout): generic overlap
     // margin so adjacent zones' box shapes touch/slightly overlap rather than leaving a gap at
     // their shared boundary — ShipAtmosphereZone.FindZoneAt's containment-margin tie-break
@@ -364,6 +369,15 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public bool GenerateAtmosphereZones { get; set; }
 
+    /// <summary>True spawns this ship's own ShipSim.LootSpawns as real world PickupItems (see
+    /// <see cref="SpawnGeneratedLoot"/>) — the procedural-generation counterpart to
+    /// Derelict.tscn's hand-placed pickups, which aren't (and can't be) tied to a data-driven
+    /// layout's own footprint. Only ever set for a ship whose LootSpawns is actually populated
+    /// (a procedurally-generated ship — see ShipSim.ProcedurallyGenerate); a no-op otherwise
+    /// since ShipSimRef.LootSpawns is empty by default.</summary>
+    [Export]
+    public bool GenerateLoot { get; set; }
+
     /// <summary>False makes <see cref="ResolveAvailableVerbs"/> return nothing regardless of aim
     /// state — for a ship the player is never meant to be able to alter (the Station:
     /// thematically, tampering with it is a crime). True (the default) everywhere else. Doesn't
@@ -498,6 +512,29 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         if (GenerateAtmosphereZones)
         {
             CallDeferred(nameof(GenerateAtmosphereZonesFromRoomLayout));
+        }
+
+        if (GenerateLoot)
+        {
+            CallDeferred(nameof(SpawnGeneratedLoot));
+        }
+    }
+
+    /// <summary>Turns ShipSimRef's own procedurally-generated LootSpawns into real world
+    /// PickupItems — reuses InventoryOverflow.DropAt (already used for refund/scrap-yield
+    /// overflow) with the same DroppedItemMesh/Shape/Material every ship scene already wires, so
+    /// this needs no new visual/spawn code of its own.</summary>
+    private void SpawnGeneratedLoot()
+    {
+        if (ShipSimRef is null || DroppedItemMesh is null || DroppedItemShape is null)
+        {
+            return;
+        }
+
+        foreach (var loot in ShipSimRef.LootSpawns)
+        {
+            var worldPosition = TileWorldPosition(new Vector2I(loot.TileX, loot.TileY), LootRestHeight);
+            InventoryOverflow.DropAt(this, loot.ItemId, loot.Count, DroppedItemMesh, DroppedItemShape, DroppedItemMaterial, worldPosition);
         }
     }
 

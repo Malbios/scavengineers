@@ -85,6 +85,12 @@ public partial class ShipSim : Node
     [Export]
     public string LayoutId { get; set; } = "";
 
+    /// <summary>This ship's own procedurally-generated loot list, if any — empty unless
+    /// <see cref="ApplyGeneratedLayout"/> was called. Read by ShipBuildTarget.SpawnGeneratedLoot;
+    /// spawning itself lives there since it already owns the tile-to-world conversion and the
+    /// generic dropped-item mesh/shape/material every ship scene already wires.</summary>
+    public IReadOnlyList<LootSpawn> LootSpawns { get; private set; } = [];
+
     public const string BatteryFixtureId = "battery";
     public const string SwitchFixtureId = "switch";
     public const string RechargeFixtureId = "recharge_station";
@@ -254,6 +260,16 @@ public partial class ShipSim : Node
         {
             DamagedConduitCell = new CellCoord(damagedConduitCell.X, damagedConduitCell.Y);
         }
+    }
+
+    /// <summary>Applies a procedurally-generated layout (see <see cref="ShipLayoutGenerator"/>) —
+    /// reuses <see cref="ApplyLayout"/> for the grid-shape/hazard half, and additionally records
+    /// this ship's own loot list. Must run at the same point <see cref="ApplyLayout"/> does, for
+    /// the same reason.</summary>
+    public void ApplyGeneratedLayout(GeneratedShipLayout generated)
+    {
+        ApplyLayout(generated.Layout);
+        LootSpawns = generated.Loot;
     }
 
     // Reuses AtmosphereSystem's own CellsConnectedToOutside (one ConnectivitySolver.FindComponents
