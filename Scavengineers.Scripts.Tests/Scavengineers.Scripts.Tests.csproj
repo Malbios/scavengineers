@@ -33,6 +33,7 @@
     <Compile Include="..\Scripts\Inventory\PlayerInventory.cs" Link="Scripts\Inventory\PlayerInventory.cs" />
     <Compile Include="..\Scripts\Inventory\SlotContainer.cs" Link="Scripts\Inventory\SlotContainer.cs" />
     <Compile Include="..\Scripts\Inventory\ItemCatalog.cs" Link="Scripts\Inventory\ItemCatalog.cs" />
+    <Compile Include="..\Scripts\Ship\ShipLayoutCatalog.cs" Link="Scripts\Ship\ShipLayoutCatalog.cs" />
     <Compile Include="..\Scripts\Verbs\Verb.cs" Link="Scripts\Verbs\Verb.cs" />
     <Compile Include="..\Scripts\Verbs\IVerbTarget.cs" Link="Scripts\Verbs\IVerbTarget.cs" />
     <Compile Include="..\Scripts\SaveLoad\ISaveable.cs" Link="Scripts\SaveLoad\ISaveable.cs" />

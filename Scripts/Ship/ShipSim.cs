@@ -51,27 +51,39 @@ public partial class ShipSim : Node
     // conduits via ShipBuildTarget's free-form placement to connect any of them to the battery.
     // Battery/Switch/RechargeStation cells used to live here too, but they're now player-
     // install/uninstall-able construction parts (see ShipBuildTarget's MachineType) — their
-    // cells moved there, since only it needs them now (for the default-seed replay).
+    // cells moved there, since only it needs them now (for the default-seed replay). These stay
+    // static/shared, not per-layout data: they only ever fire under HasPowerGrid, which today
+    // only the Home Ship sets.
     private static readonly CellCoord TravelConsoleCell = new(0, 0);
     private static readonly CellCoord InteriorDoorCell = new(5, 2);
     private static readonly CellCoord StationAirlockCell = new(0, 2);
     private static readonly CellCoord DerelictAirlockCell = new(11, 2);
 
-    // The Derelict's two starting hull breaches — a real gap cut into the wall mesh at these
-    // edges, repaired via ShipBuildTarget's generic wall-building (docs/project-plan.md
-    // Appendix A7/A8) rather than a dedicated repair object. Paired with each edge's "outside"
-    // neighbor since a wall breach is per-edge (Deck.BreachWallEdge), not per-cell — (6,5) is on
-    // the south boundary row (GridDepth - 1), (3,0) is on the north boundary row.
-    private static readonly (CellCoord Cell, CellCoord Outside)[] InitialBreaches =
+    /// <summary>The Derelict's starting hull breaches — a real gap cut into the wall mesh at
+    /// these edges, repaired via ShipBuildTarget's generic wall-building (docs/project-plan.md
+    /// Appendix A7/A8) rather than a dedicated repair object. Paired with each edge's "outside"
+    /// neighbor since a wall breach is per-edge (Deck.BreachWallEdge), not per-cell. Instance
+    /// property (not the static default this used to be) so <see cref="ApplyLayout"/> can give
+    /// different derelicts different breach positions — the field default below is today's
+    /// exact original value, so a ship with no <see cref="LayoutId"/> behaves identically to
+    /// before this became data-driven.</summary>
+    public (CellCoord Cell, CellCoord Outside)[] InitialBreaches { get; set; } =
         [(new(6, 5), new(6, 6)), (new(3, 0), new(3, -1))];
 
-    // Room 1, clear of the Derelict's wall-panel pickup (1,1) and breach (3,0) — a minimal,
-    // switch-less power source just to energize one already-damaged conduit (docs/project-plan.md
-    // Appendix A7's fire loop), kept deliberately separate from HasPowerGrid's home-ship-shaped
-    // generator/switch/recharge chain. Room 1 rather than Room 2 so each room carries one
-    // distinct hazard instead of stacking the conduit alongside Room 2's own breach.
-    private static readonly CellCoord FireGeneratorCell = new(1, 4);
-    private static readonly CellCoord DamagedConduitCell = new(1, 3);
+    /// <summary>A minimal, switch-less power source just to energize one already-damaged
+    /// conduit (docs/project-plan.md Appendix A7's fire loop), kept deliberately separate from
+    /// HasPowerGrid's home-ship-shaped generator/switch/recharge chain. Instance property (see
+    /// <see cref="InitialBreaches"/>'s own doc comment for why); default matches the original
+    /// Room 1 placement.</summary>
+    public CellCoord FireGeneratorCell { get; set; } = new(1, 4);
+
+    public CellCoord DamagedConduitCell { get; set; } = new(1, 3);
+
+    /// <summary>Opt-in id into <see cref="ShipLayoutCatalog"/> — empty (the default) means this
+    /// ship keeps whatever its own exported fields/defaults already say, exactly as before this
+    /// existed. Only Derelict-style ships are expected to ever set this.</summary>
+    [Export]
+    public string LayoutId { get; set; } = "";
 
     public const string BatteryFixtureId = "battery";
     public const string SwitchFixtureId = "switch";
@@ -119,6 +131,11 @@ public partial class ShipSim : Node
 
     public override void _Ready()
     {
+        if (!string.IsNullOrEmpty(LayoutId))
+        {
+            ApplyLayout(ShipLayoutCatalog.TryGet(LayoutId));
+        }
+
         Deck = new Deck();
         for (var i = 0; i < GridWidth; i++)
         {
@@ -204,6 +221,38 @@ public partial class ShipSim : Node
             _power.MarkSource(new PowerNodeId(FireGeneratorFixtureId));
 
             _fire = new FireSystem(Deck, _atmosphere, _power);
+        }
+    }
+
+    /// <summary>Overwrites this ship's grid shape and hazard placement from a loaded
+    /// <see cref="ShipLayoutCatalog"/> entry — public (not private) so NodeTests can call it
+    /// directly with a hand-built <see cref="ShipLayoutCatalog.ShipLayoutDefinition"/>, without
+    /// needing to seed or file-load the static catalog at all. A null layout (unset/unknown
+    /// LayoutId) is a no-op. Must run before the Deck-building loop in <see cref="_Ready"/>.</summary>
+    public void ApplyLayout(ShipLayoutCatalog.ShipLayoutDefinition? layout)
+    {
+        if (layout is null)
+        {
+            return;
+        }
+
+        GridWidth = layout.GridWidth;
+        RoomSplitColumns = layout.RoomSplitColumns;
+        EastCorridorLength = layout.EastCorridorLength;
+        HasHullBreaches = layout.HasHullBreaches;
+        HasFireHazard = layout.HasFireHazard;
+        InitialBreaches = layout.InitialBreaches
+            .Select(b => (new CellCoord(b.CellX, b.CellY), new CellCoord(b.OutsideX, b.OutsideY)))
+            .ToArray();
+
+        if (layout.FireGeneratorCell is { } fireGeneratorCell)
+        {
+            FireGeneratorCell = new CellCoord(fireGeneratorCell.X, fireGeneratorCell.Y);
+        }
+
+        if (layout.DamagedConduitCell is { } damagedConduitCell)
+        {
+            DamagedConduitCell = new CellCoord(damagedConduitCell.X, damagedConduitCell.Y);
         }
     }
 

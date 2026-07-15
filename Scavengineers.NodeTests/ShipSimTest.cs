@@ -1,3 +1,5 @@
+using System.Linq;
+
 using GdUnit4;
 using Godot;
 using Scavengineers.Scripts.Ship;
@@ -92,5 +94,57 @@ public class ShipSimTest
         var oneCellPastTheCorridor = new CellCoord(-3, 3);
 
         AssertFloat(shipSim.VolumeAt(oneCellPastTheCorridor).O2Fraction).IsEqual(AtmosphereVolume.Vacuum.O2Fraction);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void ApplyLayout_OverwritesGridShapeAndHazards_FromAGivenDefinition()
+    {
+        // Constructed directly (not via ShipLayoutCatalog) — NodeTests is a separate assembly
+        // that can neither reach res://Data/Ships/layouts.json nor call the catalog's internal
+        // SeedForTests, so ShipLayoutDefinition is public specifically so this test can build
+        // one by hand (see ShipLayoutCatalog's own doc comment).
+        var layout = new ShipLayoutCatalog.ShipLayoutDefinition
+        {
+            Id = "test_small",
+            GridWidth = 12,
+            RoomSplitColumns = [6],
+            HasHullBreaches = true,
+            HasFireHazard = true,
+            InitialBreaches = [new() { CellX = 9, CellY = 5, OutsideX = 9, OutsideY = 6 }],
+            FireGeneratorCell = new() { X = 2, Y = 4 },
+            DamagedConduitCell = new() { X = 2, Y = 3 },
+        };
+
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var shipSim = AutoFree(new ShipSim { GridWidth = 18, RoomSplitColumns = [6, 12] });
+        shipSim.ApplyLayout(layout);
+        sceneTree.Root.AddChild(shipSim);
+
+        AssertBool(shipSim.Deck.Cells.Contains(new CellCoord(15, 3))).IsFalse();
+        AssertBool(shipSim.Deck.Cells.Contains(new CellCoord(9, 3))).IsTrue();
+        AssertBool(shipSim.Deck.IsWallEdgeBreached(new CellCoord(9, 5), new CellCoord(9, 6))).IsTrue();
+        AssertBool(shipSim.Deck.IsWallEdgeBreached(new CellCoord(6, 5), new CellCoord(6, 6))).IsFalse();
+        AssertObject(shipSim.Deck.Fixtures.FirstOrDefault(f => f.Id == ShipSim.FireGeneratorFixtureId)).IsNotNull();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void LayoutId_LeftUnset_KeepsTodaysOriginalHardcodedHazardPlacement()
+    {
+        // Guards against a future accidental default-value edit silently changing the
+        // no-LayoutId fallback — every existing scene (Home Ship, Station, and any Derelict
+        // instance without a LayoutId override) must keep behaving exactly as before this
+        // system existed.
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var shipSim = AutoFree(new ShipSim { HasHullBreaches = true, HasFireHazard = true });
+        sceneTree.Root.AddChild(shipSim);
+
+        AssertBool(shipSim.Deck.IsWallEdgeBreached(new CellCoord(6, 5), new CellCoord(6, 6))).IsTrue();
+        AssertBool(shipSim.Deck.IsWallEdgeBreached(new CellCoord(3, 0), new CellCoord(3, -1))).IsTrue();
+        AssertObject(shipSim.Deck.Fixtures.FirstOrDefault(f => f.Id == ShipSim.FireGeneratorFixtureId)?.Tile)
+            .IsEqual(new CellCoord(1, 4));
+        AssertObject(shipSim.Deck.Fixtures.FirstOrDefault(f => f.Id == ShipSim.DamagedConduitFixtureId)?.Tile)
+            .IsEqual(new CellCoord(1, 3));
     }
 }
