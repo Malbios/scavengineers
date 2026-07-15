@@ -1,0 +1,16 @@
+[
+  {
+    "id": "derelict_1",
+    "gridWidth": 18,
+    "roomSplitColumns": [6, 12],
+    "eastCorridorLength": 0,
+    "hasHullBreaches": true,
+    "hasFireHazard": true,
+    "initialBreaches": [
+      { "cellX": 6, "cellY": 5, "outsideX": 6, "outsideY": 6 },
+      { "cellX": 3, "cellY": 0, "outsideX": 3, "outsideY": -1 }
+    ],
+    "fireGeneratorCell": { "x": 1, "y": 4 },
+    "damagedConduitCell": { "x": 1, "y": 3 }
+  }
+]

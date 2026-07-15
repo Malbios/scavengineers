@@ -464,6 +464,8 @@ surface_material_override/0 = SubResource("AirlockDoorMaterial")
 
 [node name="Derelict1" parent="." instance=ExtResource("28")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 0)
+[node name="ShipSim" parent="Derelict1" index="0"]
+LayoutId = "derelict_1"
 [node name="Floor" parent="Derelict1" index="5"]
 SaveId = "derelict_build_target_1"
 [node name="DamagedConduit" parent="Derelict1" index="19"]
