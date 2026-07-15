@@ -91,6 +91,40 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, IStat
         _actionTimer.Timeout += OnActionComplete;
 
         _idleMaterial = Mesh?.GetSurfaceOverrideMaterial(0);
+
+        // Deferred: ShipSimRef's own DamagedConduitCell/HasFireHazard are only final once its
+        // _Ready() has run (may not have happened yet at this exact point depending on scene-tree
+        // sibling order — the same established fix used elsewhere in this project, e.g. ShipSim's
+        // own deferred vacuum seeding).
+        CallDeferred(nameof(ApplyGeneratedPlacement));
+    }
+
+    /// <summary>This node's own hand-authored world Transform is fixed regardless of which cell
+    /// ShipSim.DamagedConduitCell actually resolves to — harmless while every ship's conduit sat
+    /// at the same hardcoded cell, but wrong for any layout (catalog-loaded or procedurally
+    /// generated) that moves it. A direct child of the ship root, so its own Position is already
+    /// in ship-root-local space (same "-3+0.5" convention ShipBuildTarget.TileWorldPosition uses)
+    /// — no ToLocal/ToGlobal needed. Only X/Z move; the hand-authored Y (mount height/room
+    /// offset) is left untouched. Hidden and made non-interactive entirely for a layout with no
+    /// fire hazard at all, rather than dangling inertly in whatever room cell (0,0) happens to be.</summary>
+    private void ApplyGeneratedPlacement()
+    {
+        if (ShipSimRef is null)
+        {
+            return;
+        }
+
+        var cell = ShipSimRef.DamagedConduitCell;
+        Position = new Vector3(cell.X - 3 + 0.5f, Position.Y, cell.Y - 3 + 0.5f);
+
+        if (!ShipSimRef.HasFireHazard)
+        {
+            Visible = false;
+            if (Collider is not null)
+            {
+                Collider.Disabled = true;
+            }
+        }
     }
 
     public override void _PhysicsProcess(double delta)
