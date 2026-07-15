@@ -40,4 +40,8 @@ These require explicit user sign-off, plan mode, and a passing test + editor smo
 
 ## Current status
 
-Phase 0 (setup & risk spikes) has not started yet. No test harness or test command exists — added once Spike 2 (headless sim) sets it up (likely GdUnit4/GUT + xUnit per the plan). CI is intentionally deferred until Spike 1/2 produce real, buildable/testable code — don't add a CI workflow yet.
+Phase 0 (setup & risk spikes) is complete — all three spikes (grounded movement/interaction, headless atmosphere/power sim, free-float feel) and localization scaffolding are committed. Phase 1 (greybox vertical slice) is well underway: home ship + derelict travel, suit resources, inventory/install/repair/consume, save/load, hull breach and power hazards, airlocks, a station shop, and multi-derelict navigation all exist and work. No formal Phase 1 exit-gate check (`docs/project-plan.md` §7) has been done yet, though functionality already extends past a minimal single-wreck slice.
+
+A real test harness exists and runs today across three projects: `Scavengineers.Sim.Tests` (pure C# sim logic, xUnit), `Scavengineers.Scripts.Tests` (Godot-adjacent C# logic, xUnit), and `Scavengineers.NodeTests` (GdUnit4, Godot node/scene-level tests). Run headless via `GODOT_BIN=<path> dotnet test <project>`.
+
+CI is still intentionally deferred — no `.github/workflows` exists yet. Add one only when explicitly asked.
