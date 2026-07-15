@@ -581,7 +581,7 @@ public partial class Player : CharacterBody3D
         pickup.GlobalPosition = position;
 
         var meshInstance = new MeshInstance3D { Mesh = DroppedItemMesh };
-        meshInstance.SetSurfaceOverrideMaterial(0, DroppedItemMaterial);
+        meshInstance.SetSurfaceOverrideMaterial(0, ItemCatalog.TintedMaterial(itemId, DroppedItemMaterial));
         pickup.AddChild(meshInstance);
 
         pickup.AddChild(new CollisionShape3D { Shape = DroppedItemShape });

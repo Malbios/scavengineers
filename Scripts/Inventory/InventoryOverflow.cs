@@ -25,7 +25,7 @@ public static class InventoryOverflow
         pickup.GlobalPosition = position ?? near.GlobalPosition;
 
         var meshInstance = new MeshInstance3D { Mesh = mesh };
-        meshInstance.SetSurfaceOverrideMaterial(0, material);
+        meshInstance.SetSurfaceOverrideMaterial(0, ItemCatalog.TintedMaterial(itemId, material));
         pickup.AddChild(meshInstance);
 
         pickup.AddChild(new CollisionShape3D { Shape = shape });

@@ -37,6 +37,18 @@ public static class ItemCatalog
             ? new Color(hex)
             : DefaultColor;
 
+    /// <summary>Duplicates `template` (so callers sharing one exported material resource don't all
+    /// recolor together — Godot Resources are reference types) and tints the copy to this item's
+    /// own <see cref="Color"/> — used by every code-spawned world pickup (InventoryOverflow.DropAt,
+    /// Player.SpawnDroppedContainer) so a dropped item's world visual always matches its inventory
+    /// slot color, regardless of which shared "generic pickup" material it was spawned with.</summary>
+    public static Material TintedMaterial(string itemId, Material? template)
+    {
+        var material = template is StandardMaterial3D standard ? (StandardMaterial3D)standard.Duplicate() : new StandardMaterial3D();
+        material.AlbedoColor = Color(itemId);
+        return material;
+    }
+
     /// <summary>How much Player.UseHeldItem's Eat restores when this item is consumed — 0 (the
     /// default) for a non-food item, same safe-fallback spirit as <see cref="MaxStackSize"/>.</summary>
     public static float HungerRestore(string itemId) =>
