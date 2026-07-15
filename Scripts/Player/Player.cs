@@ -334,6 +334,7 @@ public partial class Player : CharacterBody3D
         _inventory.Add("flashlight", 1);
         _inventory.AttachFlashlight(hasBattery: true, charge: 1f);
         _inventory.Add("debug_flashlight", 1);
+        _flashlightOn = true; // starts on, same as before this was toggleable, but F now turns it off too
 
         CaptureMouse();
         // Setting MouseMode here alone is unreliable if the window doesn't yet have OS
@@ -444,8 +445,9 @@ public partial class Player : CharacterBody3D
 
     /// <summary>Direct hotbar-style action on whatever's held, not a raycast-targeted verb, since
     /// there's no world object involved. Eats/drinks a consumable (left hand first, then right)
-    /// if one's held; otherwise toggles a held flashlight on/off. A no-op if neither hand holds
-    /// either.</summary>
+    /// if one's held; otherwise toggles the flashlight on/off — a held real flashlight, or the
+    /// debug flashlight if it's in inventory (it's never "held," so it has no hand-slot check of
+    /// its own). A no-op if neither applies.</summary>
     private void UseHeldItem()
     {
         if (TryConsumeHand(PlayerInventory.LeftHandSlotIndex) || TryConsumeHand(PlayerInventory.RightHandSlotIndex))
@@ -453,7 +455,7 @@ public partial class Player : CharacterBody3D
             return;
         }
 
-        if (LeftHandItemId == "flashlight" || RightHandItemId == "flashlight")
+        if (LeftHandItemId == "flashlight" || RightHandItemId == "flashlight" || _inventory.Has("debug_flashlight", 1))
         {
             _flashlightOn = !_flashlightOn;
         }
@@ -990,11 +992,13 @@ public partial class Player : CharacterBody3D
         // battery still has charge — unequipping/swapping it out of hand turns it off
         // automatically without touching _flashlightOn, and an empty battery just as silently
         // stops it lighting (same "Charge: > 0f" gating IsAffordable already uses for the drill).
-        // The debug flashlight (see fresh-game stipend) forces the beam on regardless — a testing
-        // convenience, not something you hold, and it has no battery to drain either.
+        // The debug flashlight (see fresh-game stipend) shares the same _flashlightOn toggle so it
+        // can be switched off too, but skips the held/battery gating — it's a testing convenience,
+        // not something you hold, and it has no battery to drain.
         var holdingFlashlight = LeftHandItemId == "flashlight" || RightHandItemId == "flashlight";
         var realFlashlightOn = _flashlightOn && holdingFlashlight && _inventory.Flashlight is { HasBattery: true, Charge: > 0f };
-        _flashlightSpot!.Visible = realFlashlightOn || _inventory.Has("debug_flashlight", 1);
+        var debugFlashlightOn = _flashlightOn && _inventory.Has("debug_flashlight", 1);
+        _flashlightSpot!.Visible = realFlashlightOn || debugFlashlightOn;
 
         if (realFlashlightOn)
         {
