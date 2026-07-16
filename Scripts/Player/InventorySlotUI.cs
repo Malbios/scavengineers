@@ -292,6 +292,15 @@ public partial class InventorySlotUI : Control
             return;
         }
 
+        // An item that doesn't fit storage (see ItemCatalog.FitsInStorage — currently just the
+        // EVA suit's torso piece) can only ever land in a hand, never a backpack/pocket slot.
+        if (!ReferenceEquals(Container, PlayerRef.Inventory.Hands)
+            && source.Container.Slots[source.SlotIndex] is { } draggedItem
+            && !ItemCatalog.FitsInStorage(draggedItem.ItemId))
+        {
+            return;
+        }
+
         SlotContainer.MoveBetween(source.Container, source.SlotIndex, Container, SlotIndex);
     }
 

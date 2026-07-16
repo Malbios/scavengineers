@@ -199,22 +199,27 @@ public sealed class PlayerInventory
     /// order — back before torso, matching this codebase's original "backpack before hand"
     /// behavior when only a backpack is worn), then falls back to a hand only if no worn
     /// container exists or has room — a passive pickup never bumps something you're deliberately
-    /// holding, and never fills an empty hand as long as a worn container can take it. Returns
-    /// how much actually fit (0..count). `charge` only matters for a freshly-created "battery"
-    /// slot — every other item ignores it.</summary>
+    /// holding, and never fills an empty hand as long as a worn container can take it. Skips every
+    /// worn container entirely for an item that doesn't fit storage (see
+    /// ItemCatalog.FitsInStorage) — it can only ever land in a hand. Returns how much actually
+    /// fit (0..count). `charge` only matters for a freshly-created "battery" slot — every other
+    /// item ignores it.</summary>
     public int Add(string itemId, int count = 1, float charge = 1f)
     {
         var added = 0;
-        foreach (var key in ContainerPriority)
+        if (ItemCatalog.FitsInStorage(itemId))
         {
-            if (added >= count)
+            foreach (var key in ContainerPriority)
             {
-                break;
-            }
+                if (added >= count)
+                {
+                    break;
+                }
 
-            if (_equippedContainers.TryGetValue(key, out var container))
-            {
-                added += container.Contents.Add(itemId, count - added, charge);
+                if (_equippedContainers.TryGetValue(key, out var container))
+                {
+                    added += container.Contents.Add(itemId, count - added, charge);
+                }
             }
         }
 

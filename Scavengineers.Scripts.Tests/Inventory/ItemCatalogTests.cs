@@ -12,8 +12,9 @@ public class ItemCatalogTests : IDisposable
             ["flashlight"] = new() { Id = "flashlight", MaxStackSize = 1, IsToggleableLight = true },
             ["debug_flashlight"] = new() { Id = "debug_flashlight", MaxStackSize = 1, IsToggleableLight = true },
             ["widget"] = new() { Id = "widget", MaxStackSize = 1 },
-            ["eva_torso_suit"] = new() { Id = "eva_torso_suit", MaxStackSize = 1, EquipSlot = "torso" },
+            ["eva_torso_suit"] = new() { Id = "eva_torso_suit", MaxStackSize = 1, EquipSlot = "torso", FitsInStorage = false },
             ["eva_helmet"] = new() { Id = "eva_helmet", MaxStackSize = 1, EquipSlot = "head" },
+            ["backpack"] = new() { Id = "backpack", MaxStackSize = 1 },
         });
     }
 
@@ -37,5 +38,16 @@ public class ItemCatalogTests : IDisposable
     public void EquipSlot_ReturnsTheDeclaredSlot_NullForAnythingNotEquippableThatWay(string itemId, string? expected)
     {
         Assert.Equal(expected, ItemCatalog.EquipSlot(itemId));
+    }
+
+    [Theory]
+    [InlineData("eva_torso_suit", false)]
+    [InlineData("eva_helmet", true)]
+    [InlineData("backpack", true)]
+    [InlineData("widget", true)]
+    [InlineData("unknown_item", true)]
+    public void FitsInStorage_IsFalseOnlyForTheEvaTorsoSuit_TrueForEverythingElseIncludingUnknownIds(string itemId, bool expected)
+    {
+        Assert.Equal(expected, ItemCatalog.FitsInStorage(itemId));
     }
 }

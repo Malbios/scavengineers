@@ -13,6 +13,7 @@ public class PlayerInventoryTests : IDisposable
             ["backpack"] = new() { Id = "backpack", MaxStackSize = 1 },
             ["battery"] = new() { Id = "battery", MaxStackSize = 1 },
             ["o2_tank"] = new() { Id = "o2_tank", MaxStackSize = 1 },
+            ["eva_torso_suit"] = new() { Id = "eva_torso_suit", MaxStackSize = 1, FitsInStorage = false },
         });
     }
 
@@ -65,6 +66,19 @@ public class PlayerInventoryTests : IDisposable
 
         Assert.True(inventory.HasRoomFor("widget", 4)); // 2 backpack + 2 hands
         Assert.False(inventory.HasRoomFor("widget", 5));
+    }
+
+    [Fact]
+    public void Add_SkipsWornContainersEntirely_ForAnItemThatDoesNotFitStorage()
+    {
+        var inventory = new PlayerInventory();
+        Assert.True(inventory.EquipContainerDirectly("back", "backpack", new SlotContainer(2)));
+
+        var added = inventory.Add("eva_torso_suit", 1);
+
+        Assert.Equal(1, added);
+        Assert.Equal(0, inventory.Backpack!.Contents.CountOf("eva_torso_suit")); // never offered to the backpack
+        Assert.Equal(1, inventory.Hands.CountOf("eva_torso_suit")); // landed in a hand instead
     }
 
     [Fact]

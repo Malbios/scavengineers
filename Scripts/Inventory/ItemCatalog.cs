@@ -72,6 +72,14 @@ public static class ItemCatalog
     public static string? EquipSlot(string itemId) =>
         Items.TryGetValue(itemId, out var item) ? item.EquipSlot : null;
 
+    /// <summary>Whether this item can be placed into an ordinary storage slot (a backpack, or
+    /// any future non-hand container) — true (the default, and the fallback for an unknown item
+    /// id) for almost everything; the EVA suit's torso piece is the one exception (too bulky to
+    /// pocket, but still holdable in a hand). Checked by InventorySlotUI's drag-and-drop and
+    /// PlayerInventory.Add's passive-fill loop before letting an item land anywhere but Hands.</summary>
+    public static bool FitsInStorage(string itemId) =>
+        !Items.TryGetValue(itemId, out var item) || item.FitsInStorage;
+
     private static Dictionary<string, ItemDefinition> Items => _items ??= Load();
 
     /// <summary>Test-only seam: lets Scavengineers.Scripts.Tests seed the catalog directly,
@@ -117,5 +125,8 @@ public static class ItemCatalog
 
         [JsonPropertyName("equipSlot")]
         public string? EquipSlot { get; set; }
+
+        [JsonPropertyName("fitsInStorage")]
+        public bool FitsInStorage { get; set; } = true;
     }
 }
