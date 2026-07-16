@@ -236,4 +236,44 @@ public sealed class PlayerSaveData
     public WindowPosition? FlashlightWindow { get; set; }
 
     public WindowPosition? BackpackWindow { get; set; }
+
+    /// <summary>Null when no helmet is worn — same nullable-item-id shape as
+    /// <see cref="BackpackItemId"/>.</summary>
+    public string? HeadItemId { get; set; }
+
+    /// <summary>Null when no EVA suit torso piece is worn — same nullable-item-id shape as
+    /// <see cref="BackpackItemId"/>.</summary>
+    public string? TorsoItemId { get; set; }
+
+    /// <summary>The torso's own 2 pocket slots — same SlotSaveData shape as
+    /// <see cref="HandSlots"/>/<see cref="BackpackSlots"/>, no legacy-dict fallback needed since
+    /// this is a brand-new field (nothing predates it to fall back from).</summary>
+    public List<SlotSaveData?> TorsoSlots { get; set; } = new();
+
+    public int TorsoSlotCount { get; set; } = PlayerInventory.TorsoSlotCount;
+
+    /// <summary>Whether a tank/filter/battery is actually loaded in the corresponding suit
+    /// sub-slot — same DrillHasBattery/DrillCharge shape and reasoning, once per sub-slot.
+    /// Meaningless (both default false/0) unless <see cref="TorsoItemId"/> is also non-null.</summary>
+    public bool HasSuitO2Tank { get; set; }
+
+    public float SuitO2Charge { get; set; }
+
+    public bool HasSuitN2Tank { get; set; }
+
+    public float SuitN2Charge { get; set; }
+
+    public bool HasSuitFilter { get; set; }
+
+    public float SuitFilterCharge { get; set; }
+
+    public bool HasSuitBattery { get; set; }
+
+    public float SuitBatteryCharge { get; set; }
+
+    /// <summary>Defaults to 0 — no old save ever had CO2 buildup, since the stat didn't exist
+    /// before the EVA suit.</summary>
+    public float CO2Percent { get; set; }
+
+    public WindowPosition? SuitWindow { get; set; }
 }

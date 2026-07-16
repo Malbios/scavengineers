@@ -1506,6 +1506,22 @@ public partial class Player : CharacterBody3D
             DrillWindow = new WindowPosition(_drillWindow!.Position.X, _drillWindow.Position.Y),
             FlashlightWindow = new WindowPosition(_flashlightWindow!.Position.X, _flashlightWindow.Position.Y),
             BackpackWindow = new WindowPosition(_backpackWindow!.Position.X, _backpackWindow.Position.Y),
+            HeadItemId = _inventory.Head?.ItemId,
+            TorsoItemId = _inventory.Torso?.ItemId,
+            TorsoSlots = _inventory.Torso is { } torso
+                ? SlotSaveDataConverter.Capture(torso.Contents)
+                : new List<SlotSaveData?>(),
+            TorsoSlotCount = _inventory.Torso?.Contents.Slots.Count ?? PlayerInventory.TorsoSlotCount,
+            HasSuitO2Tank = _inventory.SuitO2?.HasItem ?? false,
+            SuitO2Charge = _inventory.SuitO2?.Charge ?? 0f,
+            HasSuitN2Tank = _inventory.SuitN2?.HasItem ?? false,
+            SuitN2Charge = _inventory.SuitN2?.Charge ?? 0f,
+            HasSuitFilter = _inventory.SuitFilter?.HasItem ?? false,
+            SuitFilterCharge = _inventory.SuitFilter?.Charge ?? 0f,
+            HasSuitBattery = _inventory.SuitBattery?.HasItem ?? false,
+            SuitBatteryCharge = _inventory.SuitBattery?.Charge ?? 0f,
+            CO2Percent = _suitResources.CO2Percent,
+            SuitWindow = new WindowPosition(_suitWindow!.Position.X, _suitWindow.Position.Y),
         };
     }
 
@@ -1520,7 +1536,7 @@ public partial class Player : CharacterBody3D
             _head.Rotation = new Vector3(_pitch, 0, 0);
         }
 
-        _suitResources.RestoreFrom(data.O2Percent, data.HealthPercent);
+        _suitResources.RestoreFrom(data.O2Percent, data.HealthPercent, data.CO2Percent);
         _needs.RestoreFrom(data.HungerPercent, data.ThirstPercent, data.EnergyPercent);
 
         _inventory.Clear();
@@ -1570,6 +1586,27 @@ public partial class Player : CharacterBody3D
             _inventory.AttachSpecializedSlot("flashlight_battery", data.FlashlightHasBattery, data.FlashlightCharge);
         }
 
+        // Torso reconstructed the same two-phase way as the backpack above — fresh SlotContainer
+        // first, then the 4 tank/filter/battery sub-slots attached afterward (mirroring the real
+        // equip flow in Player.TryEquipItemFromHand), so a torso-with-tanks round-trips exactly
+        // as it was, not just its 2 pocket slots.
+        if (data.TorsoItemId is { } torsoItemId)
+        {
+            var torsoContents = new SlotContainer(data.TorsoSlotCount);
+            SlotSaveDataConverter.Restore(torsoContents, data.TorsoSlots);
+            _inventory.EquipContainerDirectly("torso", torsoItemId, torsoContents);
+
+            _inventory.AttachSpecializedSlot("suit_o2", data.HasSuitO2Tank, data.SuitO2Charge);
+            _inventory.AttachSpecializedSlot("suit_n2", data.HasSuitN2Tank, data.SuitN2Charge);
+            _inventory.AttachSpecializedSlot("suit_filter", data.HasSuitFilter, data.SuitFilterCharge);
+            _inventory.AttachSpecializedSlot("suit_battery", data.HasSuitBattery, data.SuitBatteryCharge);
+        }
+
+        if (data.HeadItemId is { } headItemId)
+        {
+            _inventory.EquipContainerDirectly("head", headItemId, new SlotContainer(0));
+        }
+
         // Only applied when present — an old save predating this feature leaves every window at
         // its scene-authored default position.
         if (data.InventoryWindow is { } inventoryWindowPos)
@@ -1590,6 +1627,11 @@ public partial class Player : CharacterBody3D
         if (data.BackpackWindow is { } backpackWindowPos)
         {
             _backpackWindow!.Position = new Vector2(backpackWindowPos.X, backpackWindowPos.Y);
+        }
+
+        if (data.SuitWindow is { } suitWindowPos)
+        {
+            _suitWindow!.Position = new Vector2(suitWindowPos.X, suitWindowPos.Y);
         }
 
         _credits = data.Credits;

@@ -50,6 +50,24 @@ public class SaveDataSerializationTests
                 DrillWindow = new WindowPosition(-30f, 40f),
                 FlashlightWindow = new WindowPosition(50f, 60f),
                 BackpackWindow = new WindowPosition(70f, 80f),
+                HeadItemId = "eva_helmet",
+                TorsoItemId = "eva_torso_suit",
+                TorsoSlots = new List<SlotSaveData?>
+                {
+                    new SlotSaveData { ItemId = "scrap_metal", Count = 1, Charge = 1f },
+                    null,
+                },
+                TorsoSlotCount = 2,
+                HasSuitO2Tank = true,
+                SuitO2Charge = 0.75f,
+                HasSuitN2Tank = true,
+                SuitN2Charge = 0.5f,
+                HasSuitFilter = true,
+                SuitFilterCharge = 0.9f,
+                HasSuitBattery = true,
+                SuitBatteryCharge = 0.6f,
+                CO2Percent = 42f,
+                SuitWindow = new WindowPosition(90f, 100f),
             },
             ObjectStates = new Dictionary<string, bool> { ["door-1"] = true },
             ObjectStringStates = new Dictionary<string, string> { ["conduit-1"] = "repaired" },
@@ -94,6 +112,22 @@ public class SaveDataSerializationTests
         Assert.Equal(data.Player.DrillWindow, roundTripped.Player.DrillWindow);
         Assert.Equal(data.Player.FlashlightWindow, roundTripped.Player.FlashlightWindow);
         Assert.Equal(data.Player.BackpackWindow, roundTripped.Player.BackpackWindow);
+        Assert.Equal(data.Player.HeadItemId, roundTripped.Player.HeadItemId);
+        Assert.Equal(data.Player.TorsoItemId, roundTripped.Player.TorsoItemId);
+        Assert.Equal(2, roundTripped.Player.TorsoSlots.Count);
+        Assert.Equal("scrap_metal", roundTripped.Player.TorsoSlots[0]!.ItemId);
+        Assert.Null(roundTripped.Player.TorsoSlots[1]);
+        Assert.Equal(data.Player.TorsoSlotCount, roundTripped.Player.TorsoSlotCount);
+        Assert.True(roundTripped.Player.HasSuitO2Tank);
+        Assert.Equal(data.Player.SuitO2Charge, roundTripped.Player.SuitO2Charge);
+        Assert.True(roundTripped.Player.HasSuitN2Tank);
+        Assert.Equal(data.Player.SuitN2Charge, roundTripped.Player.SuitN2Charge);
+        Assert.True(roundTripped.Player.HasSuitFilter);
+        Assert.Equal(data.Player.SuitFilterCharge, roundTripped.Player.SuitFilterCharge);
+        Assert.True(roundTripped.Player.HasSuitBattery);
+        Assert.Equal(data.Player.SuitBatteryCharge, roundTripped.Player.SuitBatteryCharge);
+        Assert.Equal(data.Player.CO2Percent, roundTripped.Player.CO2Percent);
+        Assert.Equal(data.Player.SuitWindow, roundTripped.Player.SuitWindow);
         Assert.Equal(data.ObjectStates, roundTripped.ObjectStates);
         Assert.Equal(data.ObjectStringStates, roundTripped.ObjectStringStates);
         Assert.Single(roundTripped.DroppedContainers);

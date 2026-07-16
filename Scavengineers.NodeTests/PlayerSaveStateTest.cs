@@ -118,4 +118,65 @@ public class PlayerSaveStateTest
 
         AutoFree(dropped);
     }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void ApplyThenCapturePlayerState_RoundTripsAFullySuitedPlayer_TanksHelmetAndCo2Included()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+
+        var data = new PlayerSaveData
+        {
+            TorsoItemId = "eva_torso_suit",
+            TorsoSlots = new List<SlotSaveData?> { new() { ItemId = "scrap_metal", Count = 1, Charge = 1f }, null },
+            TorsoSlotCount = 2,
+            HasSuitO2Tank = true,
+            SuitO2Charge = 0.75f,
+            HasSuitN2Tank = true,
+            SuitN2Charge = 0.5f,
+            HasSuitFilter = true,
+            SuitFilterCharge = 0.9f,
+            HasSuitBattery = true,
+            SuitBatteryCharge = 0.6f,
+            HeadItemId = "eva_helmet",
+            CO2Percent = 42f,
+        };
+
+        player.ApplyPlayerState(data);
+        var roundTripped = player.CapturePlayerState();
+
+        AssertBool(roundTripped.TorsoItemId == "eva_torso_suit").IsTrue();
+        AssertBool(roundTripped.TorsoSlots.Any(s => s?.ItemId == "scrap_metal")).IsTrue();
+        AssertBool(roundTripped.HeadItemId == "eva_helmet").IsTrue();
+        AssertBool(roundTripped.HasSuitO2Tank).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(roundTripped.SuitO2Charge, 0.75f)).IsTrue();
+        AssertBool(roundTripped.HasSuitN2Tank).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(roundTripped.SuitN2Charge, 0.5f)).IsTrue();
+        AssertBool(roundTripped.HasSuitFilter).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(roundTripped.SuitFilterCharge, 0.9f)).IsTrue();
+        AssertBool(roundTripped.HasSuitBattery).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(roundTripped.SuitBatteryCharge, 0.6f)).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(roundTripped.CO2Percent, 42f)).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void ApplyPlayerState_WithEveryFieldAtItsJsonMissingDefault_LoadsAsNoSuitAndNoCo2Buildup()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+
+        player.ApplyPlayerState(new PlayerSaveData()); // every suit-related field at its default
+
+        AssertBool(player.Inventory.Torso is null).IsTrue();
+        AssertBool(player.Inventory.Head is null).IsTrue();
+        AssertBool(player.Inventory.SuitO2 is null).IsTrue();
+        AssertBool(player.Inventory.SuitN2 is null).IsTrue();
+        AssertBool(player.Inventory.SuitFilter is null).IsTrue();
+        AssertBool(player.Inventory.SuitBattery is null).IsTrue();
+
+        var captured = player.CapturePlayerState();
+        AssertBool(captured.CO2Percent == 0f).IsTrue();
+    }
 }
