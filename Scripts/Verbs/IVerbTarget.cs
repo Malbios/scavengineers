@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
+
+using Godot;
 using Scavengineers.Scripts.Inventory;
 
 namespace Scavengineers.Scripts.Verbs;
@@ -29,4 +32,14 @@ public interface IVerbTarget
     /// health concept at all (most targets; a Fixture-backed or structural-surface-backed one
     /// overrides this with its real Deck-tracked value, see WearSystem).</summary>
     float? Condition => null;
+
+    /// <summary>The visual node to isolate onto the PDA scan-mode highlight render layer while
+    /// this target is currently aimed at — every real implementer is a Node, so the default finds
+    /// its own first VisualInstance3D child (covers the overwhelming majority: a mesh added as a
+    /// direct child, whether hand-authored in a .tscn or spawned by ShipBuildTarget's own
+    /// Install* methods). Override only when that default is wrong — ShipBuildTarget's floor/
+    /// wall/ceiling aim has no single fixed child mesh to find this way (see its own
+    /// override).</summary>
+    VisualInstance3D? HighlightVisual =>
+        this is Node node ? node.GetChildren().OfType<VisualInstance3D>().FirstOrDefault() : null;
 }

@@ -544,6 +544,16 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private bool _cycling;
     private Verb? _previewVerb;
 
+    /// <summary>A second, dedicated mesh purely for the PDA scan-mode highlight (see
+    /// HighlightVisual) — kept separate from _ghost, whose own visibility/shape is tied to the
+    /// currently-selected install-preview verb specifically, not to "is anything sensible aimed
+    /// at right now" in general (Maintain/Repair, or a fully-healthy tile with no verb selected
+    /// at all, would otherwise never show a ghost). Starts on no render layer at all (Layers = 0,
+    /// overriding MeshInstance3D's own default of 1) — invisible in the main view always; Player
+    /// is the only thing that ever sets its highlight-layer bit, only while this instance is the
+    /// current scan-mode target.</summary>
+    private MeshInstance3D? _highlightGhost;
+
     private AimKind _aimKind;
     private Vector2I _aimedTile;
     private CellCoord _edgeA;
@@ -613,6 +623,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
     }
 
+    /// <summary>Overrides IVerbTarget's default (which looks for a fixed child mesh) — floor/
+    /// wall/ceiling has no single mesh to point at, so this dynamically-repositioned dedicated
+    /// mesh (see UpdateHighlightGhostTransform, kept in sync with the aim point) stands in for
+    /// whichever surface is currently aimed at.</summary>
+    public VisualInstance3D? HighlightVisual => _aimKind == AimKind.None ? null : _highlightGhost;
+
     public override void _Ready()
     {
         _cycleTimer = new Timer { OneShot = true, WaitTime = InstallConduitVerb.DurationSeconds };
@@ -629,6 +645,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
 
         AddChild(_ghost);
+
+        _highlightGhost = new MeshInstance3D { Visible = true, Layers = 0 };
+        AddChild(_highlightGhost);
 
         // Deferred: ShipSimRef's own Deck is built in its _Ready(), which may not have run yet
         // at this exact point depending on scene-tree sibling order (the established fix for
@@ -974,6 +993,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         {
             _aimKind = AimKind.None;
             UpdateGhostTransform();
+            UpdateHighlightGhostTransform();
             return;
         }
 
@@ -1029,6 +1049,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
 
         UpdateGhostTransform();
+        UpdateHighlightGhostTransform();
     }
 
     /// <summary>Ceiling aim is always tile-scoped (there's no "edge" concept looking straight up)
@@ -1041,6 +1062,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         _aimedTile = new Vector2I(tile.X, tile.Y);
         _aimKind = ShipSimRef is not null && ShipSimRef.Deck.Cells.Contains(tile) ? AimKind.Ceiling : AimKind.None;
         UpdateGhostTransform();
+        UpdateHighlightGhostTransform();
     }
 
     /// <summary>Which install verb (if any) is currently highlighted — Player calls this every
@@ -2291,6 +2313,39 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             default:
                 _ghost!.Visible = false;
                 break;
+        }
+    }
+
+    /// <summary>Keeps the dedicated highlight mesh (see HighlightVisual) tracking the current aim
+    /// point — unconditional on _previewVerb/install-preview state, unlike UpdateGhostTransform,
+    /// since scan mode needs a silhouette regardless of which (if any) verb happens to be
+    /// selected. A ship with no PanelMesh/ConduitMesh/WallSegmentMesh configured (hasn't opted
+    /// into that system) just ends up with a null Mesh here — no crash, simply nothing to
+    /// outline.</summary>
+    private void UpdateHighlightGhostTransform()
+    {
+        switch (_aimKind)
+        {
+            case AimKind.Tile:
+                _highlightGhost!.Mesh = PanelMesh ?? ConduitMesh;
+                _highlightGhost.RotationDegrees = Vector3.Zero;
+                _highlightGhost.Position = ToLocal(TileWorldPosition(_aimedTile, FloorPanelHeight));
+                break;
+
+            case AimKind.Ceiling:
+                _highlightGhost!.Mesh = PanelMesh;
+                _highlightGhost.RotationDegrees = Vector3.Zero;
+                _highlightGhost.Position = ToLocal(TileWorldPosition(_aimedTile, CeilingPanelHeight));
+                break;
+
+            case AimKind.Edge:
+            {
+                _highlightGhost!.Mesh = WallSegmentMesh;
+                var (position, rotationDegrees) = EdgeTransform(_edgeA, _edgeB);
+                _highlightGhost.Position = position;
+                _highlightGhost.RotationDegrees = rotationDegrees;
+                break;
+            }
         }
     }
 

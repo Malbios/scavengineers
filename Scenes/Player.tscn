@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://Scripts/Travel/StarfieldBackground.cs" id="6"]
 [ext_resource type="Script" path="res://Scripts/Shop/ShopPanel.cs" id="7"]
 [ext_resource type="Script" path="res://Scripts/Player/WorldDropZone.cs" id="8"]
+[ext_resource type="Shader" path="res://Shaders/scan_highlight.gdshader" id="9"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -38,6 +39,9 @@ corner_radius_bottom_left = 3
 [sub_resource type="Theme" id="HudTheme"]
 default_font_size = 12
 
+[sub_resource type="ShaderMaterial" id="ScanHighlightMaterial"]
+shader = ExtResource("9")
+
 [node name="Player" type="CharacterBody3D" unique_id=66675123]
 script = ExtResource("1")
 
@@ -60,6 +64,12 @@ visible = false
 light_energy = 2.5
 spot_range = 10.0
 spot_angle = 30.0
+
+[node name="ScanHighlightViewport" type="SubViewport" parent="."]
+transparent_bg = true
+size = Vector2i(1920, 1080)
+
+[node name="ScanHighlightCamera" type="Camera3D" parent="ScanHighlightViewport"]
 
 [node name="HUD" type="CanvasLayer" parent="." unique_id=1671283592]
 
@@ -1368,3 +1378,13 @@ theme_override_constants/separation = 4
 [node name="CloseButton" type="Button" parent="HUD/ShopPanel/Layout"]
 layout_mode = 2
 text = "CLOSE"
+
+[node name="ScanHighlightOverlay" type="ColorRect" parent="HUD"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+material = SubResource("ScanHighlightMaterial")
+color = Color(1, 1, 1, 1)

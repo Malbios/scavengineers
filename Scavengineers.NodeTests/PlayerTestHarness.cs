@@ -34,9 +34,14 @@ public static class PlayerTestHarness
         head.AddChild(camera);
         player.AddChild(head);
 
+        var scanHighlightViewport = new SubViewport { Name = "ScanHighlightViewport" };
+        scanHighlightViewport.AddChild(new Camera3D { Name = "ScanHighlightCamera" });
+        player.AddChild(scanHighlightViewport);
+
         var hud = new CanvasLayer { Name = "HUD" };
         player.AddChild(hud);
 
+        hud.AddChild(new ColorRect { Name = "ScanHighlightOverlay" });
         hud.AddChild(new Label { Name = "TargetNameLabel" });
         hud.AddChild(new Label { Name = "VerbLabel" });
         hud.AddChild(new ProgressBar { Name = "VerbProgressBar" });

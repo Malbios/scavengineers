@@ -148,6 +148,19 @@ public partial class Player : CharacterBody3D
     private Node3D? _head;
     private RayCast3D? _interactRay;
     private Camera3D? _camera;
+
+    // PDA scan-mode highlight (see IVerbTarget.HighlightVisual) — a dedicated SubViewport/Camera3D
+    // pair renders ONLY whatever currently has ScanHighlightLayerBit set (a silhouette mask),
+    // which a full-screen shader on _scanHighlightOverlay turns into a pulsing outline. Reserved
+    // render layer 20 (1-indexed in the editor, hence the -1 below) — picked as a layer nothing
+    // else in this project uses, so setting/clearing it never affects normal rendering.
+    private const int ScanHighlightLayer = 20;
+    private static readonly uint ScanHighlightLayerBit = 1u << (ScanHighlightLayer - 1);
+    private SubViewport? _scanHighlightViewport;
+    private Camera3D? _scanHighlightCamera;
+    private ColorRect? _scanHighlightOverlay;
+    private VisualInstance3D? _highlightedVisual;
+
     private Label? _targetNameLabel;
     private Label? _verbLabel;
     private ProgressBar? _verbProgressBar;
@@ -349,6 +362,14 @@ public partial class Player : CharacterBody3D
         _head = GetNode<Node3D>("Head");
         _interactRay = GetNode<RayCast3D>("Head/Camera3D/InteractRay");
         _camera = GetNode<Camera3D>("Head/Camera3D");
+
+        _scanHighlightViewport = GetNode<SubViewport>("ScanHighlightViewport");
+        _scanHighlightViewport.RenderTargetUpdateMode = SubViewport.UpdateMode.Always;
+        _scanHighlightCamera = GetNode<Camera3D>("ScanHighlightViewport/ScanHighlightCamera");
+        _scanHighlightCamera.CullMask = ScanHighlightLayerBit;
+        _scanHighlightOverlay = GetNode<ColorRect>("HUD/ScanHighlightOverlay");
+        (_scanHighlightOverlay.Material as ShaderMaterial)?.SetShaderParameter("mask_texture", _scanHighlightViewport.GetTexture());
+
         _targetNameLabel = GetNode<Label>("HUD/TargetNameLabel");
         _verbLabel = GetNode<Label>("HUD/VerbLabel");
         _verbProgressBar = GetNode<ProgressBar>("HUD/VerbProgressBar");
@@ -1633,6 +1654,8 @@ public partial class Player : CharacterBody3D
             _lastTarget = target;
         }
 
+        UpdateScanHighlight(target);
+
         // A verb already in progress on this exact target keeps showing/counting down as-is —
         // its Requirements were already deducted to start it, so re-checking affordability here
         // would hide the HUD partway through an already-succeeding action.
@@ -1707,6 +1730,27 @@ public partial class Player : CharacterBody3D
         }
 
         UpdateInventoryHud();
+    }
+
+    /// <summary>Keeps the scan-mode highlight camera framing the same view as the real one every
+    /// frame (so its silhouette mask lines up pixel-for-pixel with the live scene), and moves the
+    /// highlight render layer bit onto whichever target's HighlightVisual is current — cleared
+    /// entirely the moment scan mode is off or nothing valid is aimed at, so the shader's mask
+    /// (and therefore its outline) goes empty rather than lingering on a stale target.</summary>
+    private void UpdateScanHighlight(IVerbTarget? target)
+    {
+        _scanHighlightCamera!.GlobalTransform = _camera!.GlobalTransform;
+        _scanHighlightCamera.Fov = _camera.Fov;
+
+        var desired = _scanModeOn ? target?.HighlightVisual : null;
+        if (desired == _highlightedVisual)
+        {
+            return;
+        }
+
+        _highlightedVisual?.SetLayerMaskValue(ScanHighlightLayer, false);
+        desired?.SetLayerMaskValue(ScanHighlightLayer, true);
+        _highlightedVisual = desired;
     }
 
     /// <summary>Which backpack-type item (if any) the player owns anywhere — worn, merely held,
