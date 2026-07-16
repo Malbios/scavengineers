@@ -18,5 +18,8 @@
   { "id": "eva_helmet", "maxStackSize": 1, "color": "#3A5A6B", "equipSlot": "head" },
   { "id": "o2_tank", "maxStackSize": 1, "color": "#3399FF" },
   { "id": "n2_tank", "maxStackSize": 1, "color": "#66CC66" },
-  { "id": "co2_filter", "maxStackSize": 1, "color": "#996633" }
+  { "id": "co2_filter", "maxStackSize": 1, "color": "#996633" },
+  { "id": "wrench", "maxStackSize": 1, "color": "#B3B3B3" },
+  { "id": "pda", "maxStackSize": 1, "color": "#4D4D66", "equipSlot": "pda" },
+  { "id": "health_scan_cartridge", "maxStackSize": 1, "color": "#33CC99" }
 ]

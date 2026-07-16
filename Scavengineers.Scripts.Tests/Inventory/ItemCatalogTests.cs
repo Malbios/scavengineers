@@ -15,6 +15,7 @@ public class ItemCatalogTests : IDisposable
             ["eva_torso_suit"] = new() { Id = "eva_torso_suit", MaxStackSize = 1, EquipSlot = "torso", FitsInStorage = false },
             ["eva_helmet"] = new() { Id = "eva_helmet", MaxStackSize = 1, EquipSlot = "head" },
             ["backpack"] = new() { Id = "backpack", MaxStackSize = 1 },
+            ["pda"] = new() { Id = "pda", MaxStackSize = 1, EquipSlot = "pda" },
         });
     }
 
@@ -33,6 +34,7 @@ public class ItemCatalogTests : IDisposable
     [Theory]
     [InlineData("eva_torso_suit", "torso")]
     [InlineData("eva_helmet", "head")]
+    [InlineData("pda", "pda")]
     [InlineData("widget", null)]
     [InlineData("unknown_item", null)]
     public void EquipSlot_ReturnsTheDeclaredSlot_NullForAnythingNotEquippableThatWay(string itemId, string? expected)
