@@ -156,6 +156,122 @@ public class DeckTests
     }
 
     [Fact]
+    public void RemoveCell_AlsoPurgesFloorCeilingAndWallHealthForThatCell()
+    {
+        var deck = new Deck();
+        var cell = new CellCoord(0, 0);
+        var neighbor = new CellCoord(1, 0);
+        deck.AddCell(cell);
+        deck.AddCell(neighbor);
+        deck.DamageFloor(cell, 0.4f);
+        deck.DamageCeiling(cell, 0.4f);
+        deck.DamageWall(cell, neighbor, 0.4f);
+
+        deck.RemoveCell(cell);
+
+        Assert.Equal(1f, deck.FloorHealth(cell));
+        Assert.Equal(1f, deck.CeilingHealth(cell));
+        Assert.Equal(1f, deck.WallHealth(cell, neighbor));
+    }
+
+    [Fact]
+    public void FloorCeilingWallHealth_DefaultToFull_WhenNeverDamaged()
+    {
+        var deck = new Deck();
+        var a = new CellCoord(0, 0);
+        var b = new CellCoord(1, 0);
+
+        Assert.Equal(1f, deck.FloorHealth(a));
+        Assert.Equal(1f, deck.CeilingHealth(a));
+        Assert.Equal(1f, deck.WallHealth(a, b));
+    }
+
+    [Fact]
+    public void DamageFloor_ReducesHealth_ButDoesNotBreachAboveZero()
+    {
+        var deck = new Deck();
+        var cell = new CellCoord(0, 0);
+
+        deck.DamageFloor(cell, 0.3f);
+
+        Assert.Equal(0.7f, deck.FloorHealth(cell), precision: 5);
+        Assert.False(deck.IsHullBreached(cell, StructuralSurface.Floor));
+    }
+
+    [Fact]
+    public void DamageFloor_ReachingExactlyZero_TriggersTheExistingBreachMechanic()
+    {
+        var deck = new Deck();
+        var cell = new CellCoord(0, 0);
+
+        deck.DamageFloor(cell, 1f);
+
+        Assert.Equal(0f, deck.FloorHealth(cell));
+        Assert.True(deck.IsHullBreached(cell, StructuralSurface.Floor));
+    }
+
+    [Fact]
+    public void DamageFloor_ClampsAtZero_OvershootingDamageDoesNotGoNegative()
+    {
+        var deck = new Deck();
+        var cell = new CellCoord(0, 0);
+
+        deck.DamageFloor(cell, 5f);
+
+        Assert.Equal(0f, deck.FloorHealth(cell));
+    }
+
+    [Fact]
+    public void DamageCeiling_ReachingExactlyZero_TriggersTheExistingBreachMechanic()
+    {
+        var deck = new Deck();
+        var cell = new CellCoord(0, 0);
+
+        deck.DamageCeiling(cell, 1f);
+
+        Assert.True(deck.IsHullBreached(cell, StructuralSurface.Ceiling));
+    }
+
+    [Fact]
+    public void DamageWall_IsSymmetric_RegardlessOfArgumentOrder_AndReachingZeroBreachesTheEdge()
+    {
+        var deck = new Deck();
+        var a = new CellCoord(0, 0);
+        var b = new CellCoord(-1, 0);
+
+        deck.DamageWall(a, b, 0.3f);
+        Assert.Equal(0.7f, deck.WallHealth(a, b), precision: 5);
+        Assert.Equal(0.7f, deck.WallHealth(b, a), precision: 5);
+
+        deck.DamageWall(a, b, 1f);
+        Assert.True(deck.IsWallEdgeBreached(a, b));
+    }
+
+    [Fact]
+    public void RepairFloorCeilingWall_RestoreFullHealth_WithoutClearingAnExistingBreach()
+    {
+        var deck = new Deck();
+        var cell = new CellCoord(0, 0);
+        var neighbor = new CellCoord(1, 0);
+        deck.DamageFloor(cell, 1f);
+        deck.DamageCeiling(cell, 1f);
+        deck.DamageWall(cell, neighbor, 1f);
+
+        deck.RepairFloor(cell);
+        deck.RepairCeiling(cell);
+        deck.RepairWall(cell, neighbor);
+
+        Assert.Equal(1f, deck.FloorHealth(cell));
+        Assert.Equal(1f, deck.CeilingHealth(cell));
+        Assert.Equal(1f, deck.WallHealth(cell, neighbor));
+        // Repairing health alone doesn't clear the breach it caused — that's the existing,
+        // separate Install-verb responsibility (see ShipBuildTarget's own repair path).
+        Assert.True(deck.IsHullBreached(cell, StructuralSurface.Floor));
+        Assert.True(deck.IsHullBreached(cell, StructuralSurface.Ceiling));
+        Assert.True(deck.IsWallEdgeBreached(cell, neighbor));
+    }
+
+    [Fact]
     public void AddFixture_IsRetrievableFromFixturesList()
     {
         var deck = new Deck();

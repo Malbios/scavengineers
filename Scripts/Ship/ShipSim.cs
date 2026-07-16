@@ -158,6 +158,7 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     private AtmosphereSystem? _atmosphere;
     private PowerSystem? _power;
     private FireSystem? _fire;
+    private WearSystem? _wear;
     private BatteryFixture? _battery;
 
     public override void _Ready()
@@ -222,6 +223,11 @@ public partial class ShipSim : Node, IShipLayoutSaveable
         // real AtmosphereSystem to bridge against once an AirlockDoorVerbTarget links the two
         // ships' atmospheres. A never-breached deck just sits at Breathable and never changes.
         _atmosphere = new AtmosphereSystem(Deck, hasLifeSupport: HasLifeSupport);
+
+        // Always present, same "every ship gets one regardless of its other hazard flags" shape
+        // as _atmosphere above — passive wear applies everywhere, not just to ships that opted
+        // into a specific hazard.
+        _wear = new WearSystem(Deck);
 
         if (HasHullBreaches)
         {
@@ -332,6 +338,7 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     {
         _atmosphere?.Tick(delta);
         _fire?.Tick(delta);
+        _wear?.Tick(delta);
     }
 
     /// <summary>Breathable if this ship's atmosphere isn't wired up at all (e.g. queried before

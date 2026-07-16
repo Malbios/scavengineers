@@ -27,6 +27,9 @@ public sealed class Deck
     private readonly HashSet<(CellCoord, CellCoord)> _wallEdgeBreaches = [];
     private readonly HashSet<CellCoord> _fires = [];
     private readonly List<Fixture> _fixtures = [];
+    private readonly Dictionary<CellCoord, float> _floorHealth = new();
+    private readonly Dictionary<CellCoord, float> _ceilingHealth = new();
+    private readonly Dictionary<(CellCoord, CellCoord), float> _wallHealth = new();
 
     public IReadOnlySet<CellCoord> Cells => _cells;
 
@@ -58,6 +61,12 @@ public sealed class Deck
         _wallEdgeBreaches.RemoveWhere(e => e.Item1 == cell || e.Item2 == cell);
         _sealedEdges.RemoveWhere(e => e.Item1 == cell || e.Item2 == cell);
         _fixtures.RemoveAll(f => f.Tile == cell);
+        _floorHealth.Remove(cell);
+        _ceilingHealth.Remove(cell);
+        foreach (var edge in _wallHealth.Keys.Where(e => e.Item1 == cell || e.Item2 == cell).ToList())
+        {
+            _wallHealth.Remove(edge);
+        }
     }
 
     public void SealEdge(CellCoord a, CellCoord b) => _sealedEdges.Add(Normalize(a, b));
@@ -94,6 +103,63 @@ public sealed class Deck
     public void RepairWallEdge(CellCoord a, CellCoord b) => _wallEdgeBreaches.Remove(Normalize(a, b));
 
     public bool IsWallEdgeBreached(CellCoord a, CellCoord b) => _wallEdgeBreaches.Contains(Normalize(a, b));
+
+    /// <summary>Structural health, 0-1 per cell/edge — missing means full health (1.0), same
+    /// "absence is the default" convention <see cref="_sealedEdges"/>/<see cref="_breaches"/>
+    /// already use, so every existing cell needs no explicit seeding. Decayed by
+    /// <see cref="Hazards.WearSystem"/>'s passive tick; repaired via
+    /// <see cref="RepairFloor"/>/<see cref="RepairCeiling"/>/<see cref="RepairWall"/> (see
+    /// ShipBuildTarget's own Maintain/Repair verbs).</summary>
+    public float FloorHealth(CellCoord cell) => _floorHealth.GetValueOrDefault(cell, 1f);
+
+    public float CeilingHealth(CellCoord cell) => _ceilingHealth.GetValueOrDefault(cell, 1f);
+
+    public float WallHealth(CellCoord a, CellCoord b) => _wallHealth.GetValueOrDefault(Normalize(a, b), 1f);
+
+    /// <summary>Reduces floor health by `amount` (clamped at 0) — reaching exactly 0 calls the
+    /// *existing* <see cref="BreachHull"/> automatically, so decay is just a new cause feeding the
+    /// same breach mechanic every other consumer (atmosphere, movement, panels) already reads;
+    /// nothing downstream needs to know health exists at all.</summary>
+    public void DamageFloor(CellCoord cell, float amount)
+    {
+        var health = Math.Max(0f, FloorHealth(cell) - amount);
+        _floorHealth[cell] = health;
+        if (health <= 0f)
+        {
+            BreachHull(cell, StructuralSurface.Floor);
+        }
+    }
+
+    public void DamageCeiling(CellCoord cell, float amount)
+    {
+        var health = Math.Max(0f, CeilingHealth(cell) - amount);
+        _ceilingHealth[cell] = health;
+        if (health <= 0f)
+        {
+            BreachHull(cell, StructuralSurface.Ceiling);
+        }
+    }
+
+    public void DamageWall(CellCoord a, CellCoord b, float amount)
+    {
+        var edge = Normalize(a, b);
+        var health = Math.Max(0f, WallHealth(a, b) - amount);
+        _wallHealth[edge] = health;
+        if (health <= 0f)
+        {
+            BreachWallEdge(a, b);
+        }
+    }
+
+    /// <summary>Resets health to full — does *not* itself clear a breach (repairing is only ever
+    /// offered while a surface isn't breached; a genuinely breached surface needs the existing,
+    /// more expensive Install verb instead, which resets health as part of installing a fresh
+    /// panel).</summary>
+    public void RepairFloor(CellCoord cell) => _floorHealth[cell] = 1f;
+
+    public void RepairCeiling(CellCoord cell) => _ceilingHealth[cell] = 1f;
+
+    public void RepairWall(CellCoord a, CellCoord b) => _wallHealth[Normalize(a, b)] = 1f;
 
     public void IgniteFire(CellCoord cell) => _fires.Add(cell);
 
