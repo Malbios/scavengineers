@@ -47,25 +47,69 @@ public sealed class PlayerInventory
     /// worn container takes while equipped (a backpack, the EVA suit's torso piece, or a
     /// container-less item like the helmet, which simply carries a 0-slot container). Which
     /// items are containers is hardcoded per equip slot (see EquipBackpackFromHand) rather than
-    /// a speculative "which items are containers" lookup.</summary>
+    /// a speculative "which items are containers" lookup. Constructed fresh on each read (see
+    /// <see cref="GetEquippedContainer"/>) — <see cref="Contents"/> is still the one real shared
+    /// instance underneath, so mutating it is visible everywhere; only this wrapper record is
+    /// recreated each time.</summary>
     public sealed record EquippedContainer(string ItemId, SlotContainer Contents);
 
-    private readonly Dictionary<string, EquippedContainer> _equippedContainers = new();
+    // Which item (if any) currently occupies each equip slot ("back", "torso", "head").
+    private readonly Dictionary<string, string> _equippedItemIds = new();
 
-    public EquippedContainer? Backpack => _equippedContainers.GetValueOrDefault("back");
+    // Permanent per-item sub-inventory for container-carrying items ("backpack",
+    // "debug_backpack", "eva_torso_suit") — created once, the first time that item is ever
+    // equipped, and never destroyed by ordinary equip/unequip (only a genuine world-discard
+    // removes an entry — see Player.TryDropInWorld). This is what lets a worn item's contents
+    // survive being taken off into a hand, instead of being tied to "currently worn."
+    private readonly Dictionary<string, SlotContainer> _persistentContents = new();
 
-    public EquippedContainer? Torso => _equippedContainers.GetValueOrDefault("torso");
+    public EquippedContainer? Backpack => GetEquippedContainer("back");
 
-    public EquippedContainer? Head => _equippedContainers.GetValueOrDefault("head");
+    public EquippedContainer? Torso => GetEquippedContainer("torso");
+
+    public EquippedContainer? Head => GetEquippedContainer("head");
 
     /// <summary>Generic lookup by equip-slot name — used by Player.cs's generalized
     /// TryEquipItemFrom/TryUnequipItem so a new equip slot (beyond the named
-    /// Backpack/Torso/Head convenience properties above) needs no new code here.</summary>
-    public EquippedContainer? GetEquippedContainer(string slotName) => _equippedContainers.GetValueOrDefault(slotName);
+    /// Backpack/Torso/Head convenience properties above) needs no new code here. Every
+    /// container-carrying item (even a 0-slot one like the helmet) gets a persistent-contents
+    /// entry once equipped — falls back to a fresh 0-slot container in the (should never happen)
+    /// case one's somehow missing, so callers never see a null Contents.</summary>
+    public EquippedContainer? GetEquippedContainer(string slotName)
+    {
+        if (!_equippedItemIds.TryGetValue(slotName, out var itemId))
+        {
+            return null;
+        }
 
-    /// <summary>Detaches whatever's worn in `slotName` with no fungible fallback — the caller
-    /// decides what happens to what was equipped (see Player.TryUnequipItem).</summary>
-    public void ClearEquippedContainer(string slotName) => _equippedContainers.Remove(slotName);
+        var contents = _persistentContents.GetValueOrDefault(itemId) ?? new SlotContainer(0);
+        return new EquippedContainer(itemId, contents);
+    }
+
+    /// <summary>The permanent sub-inventory for a container-carrying item, keyed by item id
+    /// rather than equip slot — reachable whether the item is currently worn, just held in a
+    /// hand, or (for anything that fits storage) sitting in a backpack slot. This is what makes
+    /// "preview an item's contents while just carrying it" possible.</summary>
+    public SlotContainer? GetPersistentContents(string itemId) => _persistentContents.GetValueOrDefault(itemId);
+
+    /// <summary>Which worn container (if any) is in `slotName`'s equip slot — a small helper the
+    /// aggregate methods below (Add/TryRemove/Counts/...) use instead of repeating the two-step
+    /// "look up the item id, then its persistent contents" lookup themselves.</summary>
+    private SlotContainer? GetWornContents(string slotName) =>
+        _equippedItemIds.TryGetValue(slotName, out var itemId) ? _persistentContents.GetValueOrDefault(itemId) : null;
+
+    /// <summary>Un-wears whatever's in `slotName` — the caller decides what happens to the bare
+    /// item token (see Player.TryUnequipItem). Deliberately does NOT touch
+    /// <see cref="_persistentContents"/> — that's the whole point of the persistent-contents
+    /// model: taking something off doesn't destroy or relocate what's inside it.</summary>
+    public void ClearEquippedContainer(string slotName) => _equippedItemIds.Remove(slotName);
+
+    /// <summary>Fully forgets an item's persistent contents — the one place they're actually
+    /// removed rather than just left dormant while unworn. Used by a genuine world-discard (see
+    /// Player.TryDropInWorld) once a dropped world pickup takes ownership of the contents
+    /// instead, and by test setup that needs "this item was never acquired" rather than just
+    /// "isn't currently worn."</summary>
+    public void DiscardPersistentContents(string itemId) => _persistentContents.Remove(itemId);
 
     /// <summary>A device's own swappable battery/tank — the shape a power drill's, flashlight's,
     /// or (later) an EVA suit tank's per-instance state takes. Deliberately not a generic
@@ -165,9 +209,14 @@ public sealed class PlayerInventory
         get
         {
             var counts = new Dictionary<string, int>(_hands.Counts);
-            foreach (var container in _equippedContainers.Values)
+            foreach (var key in ContainerPriority)
             {
-                foreach (var (itemId, count) in container.Contents.Counts)
+                if (GetWornContents(key) is not { } contents)
+                {
+                    continue;
+                }
+
+                foreach (var (itemId, count) in contents.Counts)
                 {
                     counts[itemId] = counts.GetValueOrDefault(itemId) + count;
                 }
@@ -178,7 +227,7 @@ public sealed class PlayerInventory
     }
 
     public int CountOf(string itemId) =>
-        _hands.CountOf(itemId) + _equippedContainers.Values.Sum(c => c.Contents.CountOf(itemId));
+        _hands.CountOf(itemId) + ContainerPriority.Sum(key => GetWornContents(key)?.CountOf(itemId) ?? 0);
 
     public bool Has(string itemId, int count) => CountOf(itemId) >= count;
 
@@ -188,12 +237,12 @@ public sealed class PlayerInventory
     /// flashlight) without hardcoding its item id.</summary>
     public bool HasAny(Func<string, bool> predicate) =>
         _hands.Slots.Any(slot => slot is { } s && predicate(s.ItemId))
-        || _equippedContainers.Values.Any(c => c.Contents.Slots.Any(slot => slot is { } s && predicate(s.ItemId)));
+        || ContainerPriority.Any(key => GetWornContents(key)?.Slots.Any(slot => slot is { } s && predicate(s.ItemId)) ?? false);
 
     /// <summary>Whether `count` more of this item would fit right now, across every worn
     /// container's contents and empty/matching hands, without actually adding anything.</summary>
     public bool HasRoomFor(string itemId, int count) =>
-        _equippedContainers.Values.Sum(c => c.Contents.RoomFor(itemId)) + _hands.RoomFor(itemId) >= count;
+        ContainerPriority.Sum(key => GetWornContents(key)?.RoomFor(itemId) ?? 0) + _hands.RoomFor(itemId) >= count;
 
     /// <summary>Adds up to `count`: tops up/fills worn containers first (in <see cref="ContainerPriority"/>
     /// order — back before torso, matching this codebase's original "backpack before hand"
@@ -216,9 +265,9 @@ public sealed class PlayerInventory
                     break;
                 }
 
-                if (_equippedContainers.TryGetValue(key, out var container))
+                if (GetWornContents(key) is { } contents)
                 {
-                    added += container.Contents.Add(itemId, count - added, charge);
+                    added += contents.Add(itemId, count - added, charge);
                 }
             }
         }
@@ -249,15 +298,15 @@ public sealed class PlayerInventory
                 break;
             }
 
-            if (!_equippedContainers.TryGetValue(key, out var container))
+            if (GetWornContents(key) is not { } contents)
             {
                 continue;
             }
 
-            var fromContainer = Math.Min(container.Contents.CountOf(itemId), remaining);
+            var fromContainer = Math.Min(contents.CountOf(itemId), remaining);
             if (fromContainer > 0)
             {
-                container.Contents.TryRemove(itemId, fromContainer);
+                contents.TryRemove(itemId, fromContainer);
                 remaining -= fromContainer;
             }
         }
@@ -282,16 +331,16 @@ public sealed class PlayerInventory
     {
         foreach (var key in ContainerPriority)
         {
-            if (!_equippedContainers.TryGetValue(key, out var container))
+            if (GetWornContents(key) is not { } contents)
             {
                 continue;
             }
 
-            for (var i = 0; i < container.Contents.Slots.Count; i++)
+            for (var i = 0; i < contents.Slots.Count; i++)
             {
-                if (container.Contents.Slots[i]?.ItemId == itemId)
+                if (contents.Slots[i]?.ItemId == itemId)
                 {
-                    SlotContainer.MoveBetween(container.Contents, i, _hands, handIndex);
+                    SlotContainer.MoveBetween(contents, i, _hands, handIndex);
                     return true;
                 }
             }
@@ -322,9 +371,9 @@ public sealed class PlayerInventory
                 break;
             }
 
-            if (_equippedContainers.TryGetValue(key, out var container))
+            if (GetWornContents(key) is { } contents)
             {
-                remaining -= container.Contents.Add(occupied.ItemId, remaining, occupied.Charge);
+                remaining -= contents.Add(occupied.ItemId, remaining, occupied.Charge);
             }
         }
 
@@ -364,32 +413,43 @@ public sealed class PlayerInventory
             return false;
         }
 
-        _equippedContainers["back"] = new EquippedContainer("backpack", new SlotContainer(slotCount));
+        EquipContainerDirectly("back", "backpack", new SlotContainer(slotCount));
         return true;
     }
 
     /// <summary>Detaches the worn backpack with no fungible fallback — the caller decides what
-    /// happens to what was equipped (see Player.TryUnequipBackpack).</summary>
-    public void ClearBackpack() => _equippedContainers.Remove("back");
+    /// happens to what was equipped (see Player.TryUnequipBackpack). Its persistent contents are
+    /// untouched (see ClearEquippedContainer).</summary>
+    public void ClearBackpack() => ClearEquippedContainer("back");
 
     /// <summary>Attaches an already-built container directly to `slotName`, bypassing the
     /// hand-consume step in <see cref="EquipBackpackFromHand"/> — used by save/load restoration
     /// and by picking a full worn container back up off the ground (see ContainerPickupItem).
-    /// Fails (no-op, returns false) if that slot is already occupied.</summary>
+    /// Fails (no-op, returns false) if that slot is already occupied. If `itemId` already has a
+    /// persistent-contents entry (re-equipping something taken off earlier), that existing entry
+    /// is reused and `contents` is discarded — first acquisition wins; only a genuine world-discard
+    /// (see Player.TryDropInWorld) ever removes an entry, so by the time a load-restore path calls
+    /// this after <see cref="Clear"/>, there's nothing to reuse and the restored `contents` become
+    /// the new canonical entry.</summary>
     public bool EquipContainerDirectly(string slotName, string itemId, SlotContainer contents)
     {
-        if (_equippedContainers.ContainsKey(slotName))
+        if (_equippedItemIds.ContainsKey(slotName))
         {
             return false;
         }
 
-        _equippedContainers[slotName] = new EquippedContainer(itemId, contents);
+        _equippedItemIds[slotName] = itemId;
+        if (!_persistentContents.ContainsKey(itemId))
+        {
+            _persistentContents[itemId] = contents;
+        }
+
         return true;
     }
 
     /// <summary>Whether `slotName` currently has nothing worn in it — used by ContainerPickupItem
     /// to gate its Pick Up verb the same way the backpack's own equip flow already does.</summary>
-    public bool IsContainerSlotFree(string slotName) => !_equippedContainers.ContainsKey(slotName);
+    public bool IsContainerSlotFree(string slotName) => !_equippedItemIds.ContainsKey(slotName);
 
     /// <summary>Attaches a specialized sub-slot's state directly — used by the fresh-game
     /// stipend (fully charged) and by save/load restore, mirroring
@@ -413,16 +473,16 @@ public sealed class PlayerInventory
     {
         foreach (var key in ContainerPriority)
         {
-            if (!_equippedContainers.TryGetValue(key, out var container))
+            if (GetWornContents(key) is not { } contents)
             {
                 continue;
             }
 
-            foreach (var slot in container.Contents.Slots)
+            foreach (var slot in contents.Slots)
             {
                 if (slot is { } found && found.ItemId == itemId)
                 {
-                    container.Contents.TryRemove(itemId, 1);
+                    contents.TryRemove(itemId, 1);
                     return found.Charge;
                 }
             }
@@ -532,7 +592,8 @@ public sealed class PlayerInventory
     public void Clear()
     {
         _hands.Clear();
-        _equippedContainers.Clear();
+        _equippedItemIds.Clear();
+        _persistentContents.Clear();
         Drill = null;
         Flashlight = null;
         SuitO2 = null;

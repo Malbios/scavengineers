@@ -24,11 +24,18 @@ public class PlayerEquipSlotTest
     /// <summary>The harness's fresh-game stipend really runs in _Ready() and now includes a
     /// starter EVA suit (torso+helmet, fully suited) — undo that first so a test that wants to
     /// exercise its own from-scratch equip/unequip scenario isn't fighting the stipend's own
-    /// already-worn suit.</summary>
+    /// already-worn suit. Also discards the stipend's persistent-contents entries for the suit
+    /// pieces (not just unwearing them) — under the persistent-contents model, an item's inner
+    /// contents survive being unworn, so a test that re-equips "eva_torso_suit" with its own
+    /// fresh container would otherwise silently get the stipend's leftover (empty) one back.</summary>
     private static void ResetTorsoAndHeadFromStipend(PlayerInventory inventory)
     {
+        var torsoItemId = inventory.Torso?.ItemId;
+        var headItemId = inventory.Head?.ItemId;
         inventory.ClearEquippedContainer("torso");
         inventory.ClearEquippedContainer("head");
+        if (torsoItemId is not null) inventory.DiscardPersistentContents(torsoItemId);
+        if (headItemId is not null) inventory.DiscardPersistentContents(headItemId);
         inventory.DetachSpecializedSlot("suit_o2");
         inventory.DetachSpecializedSlot("suit_n2");
         inventory.DetachSpecializedSlot("suit_filter");

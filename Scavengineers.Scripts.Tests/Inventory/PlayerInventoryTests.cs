@@ -207,6 +207,49 @@ public class PlayerInventoryTests : IDisposable
     }
 
     [Fact]
+    public void ClearEquippedContainer_LeavesPersistentContentsIntact_ReachableByItemIdWhileUnworn()
+    {
+        var inventory = new PlayerInventory();
+        Assert.True(inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2)));
+        inventory.Torso!.Contents.Add("battery", 1);
+
+        inventory.ClearEquippedContainer("torso");
+
+        Assert.Null(inventory.Torso);
+        Assert.Equal(1, inventory.GetPersistentContents("eva_torso_suit")!.CountOf("battery"));
+    }
+
+    [Fact]
+    public void EquipContainerDirectly_ReEquippingTheSameItemId_ReusesItsExistingPersistentContents()
+    {
+        var inventory = new PlayerInventory();
+        Assert.True(inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2)));
+        inventory.Torso!.Contents.Add("battery", 1);
+        inventory.ClearEquippedContainer("torso");
+
+        // A fresh, empty container is passed here — it should be discarded in favor of the
+        // existing one, since the item was never genuinely discarded (see DiscardPersistentContents).
+        Assert.True(inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2)));
+
+        Assert.Equal(1, inventory.Torso!.Contents.CountOf("battery"));
+    }
+
+    [Fact]
+    public void DiscardPersistentContents_RemovesTheEntryEntirely_SoReEquippingStartsFresh()
+    {
+        var inventory = new PlayerInventory();
+        Assert.True(inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2)));
+        inventory.Torso!.Contents.Add("battery", 1);
+        inventory.ClearEquippedContainer("torso");
+
+        inventory.DiscardPersistentContents("eva_torso_suit");
+
+        Assert.Null(inventory.GetPersistentContents("eva_torso_suit"));
+        Assert.True(inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2)));
+        Assert.Equal(0, inventory.Torso!.Contents.CountOf("battery"));
+    }
+
+    [Fact]
     public void EjectSpecializedSlot_PreservesItsRealChargeInTheResultingItem()
     {
         var inventory = new PlayerInventory();
