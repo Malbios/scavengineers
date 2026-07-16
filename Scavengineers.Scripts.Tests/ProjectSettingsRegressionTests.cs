@@ -1,12 +1,14 @@
 namespace Scavengineers.Scripts.Tests;
 
-/// <summary>Guards against a bug this project already hit once: editing project.godot's display
-/// settings through the Godot editor's Project Settings UI (bumping the window resolution) can
-/// silently drop an existing, unrelated setting in the same section — here,
-/// window/stretch/aspect="expand" vanished the moment window/stretch/scale_mode="integer" was
-/// added, desyncing the mouse-to-viewport coordinate transform used for all GUI hit-testing
-/// (drag-and-drop, right-click, window-title-bar dragging) while leaving keyboard input
-/// completely unaffected — and printing no error at all, making it look like a code regression.
+/// <summary>Guards against a bug this project already hit once: adding
+/// window/stretch/scale_mode="integer" via the Godot editor's Project Settings UI (while bumping
+/// the window resolution to 1920x1080) desynced the mouse-to-viewport coordinate transform used
+/// for all GUI hit-testing — every clickable rect rendered in the correct visual spot but its
+/// actual hit-test area was offset by roughly a third of the screen, so drag-and-drop/right-click/
+/// window-title-bar dragging all silently missed their targets. Keyboard input (Tab) was
+/// completely unaffected and nothing printed to the console, making it look exactly like a code
+/// regression in Player.cs/InventorySlotUI.cs — restoring the separately-dropped
+/// window/stretch/aspect="expand" did NOT fix it; only removing scale_mode="integer" entirely did.
 /// Reads the real project.godot file's text directly (no Godot runtime needed), same pattern as
 /// WorldSceneRegressionTests.</summary>
 public class ProjectSettingsRegressionTests
@@ -32,15 +34,11 @@ public class ProjectSettingsRegressionTests
     }
 
     [Fact]
-    public void Display_HasBothStretchAspectAndScaleMode_NeitherWasDroppedWhenTheOtherWasAdded()
+    public void Display_DoesNotSetStretchScaleMode_IntegerScaleModeCausedAGuiHitTestOffsetOnce()
     {
         var display = DisplaySectionLines();
 
-        // The exact regression: scale_mode was added via the editor's Project Settings UI and
-        // aspect silently disappeared from the same edit — assert both are present together
-        // (not their specific values) so this catches either one vanishing in the future too.
-        Assert.Contains(display, l => l.StartsWith("window/stretch/aspect="));
-        Assert.Contains(display, l => l.StartsWith("window/stretch/scale_mode="));
+        Assert.DoesNotContain(display, l => l.StartsWith("window/stretch/scale_mode="));
     }
 
     [Fact]
@@ -50,6 +48,5 @@ public class ProjectSettingsRegressionTests
 
         Assert.Contains("window/stretch/mode=\"canvas_items\"", display);
         Assert.Contains("window/stretch/aspect=\"expand\"", display);
-        Assert.Contains("window/stretch/scale_mode=\"integer\"", display);
     }
 }
