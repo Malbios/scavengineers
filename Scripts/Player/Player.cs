@@ -27,6 +27,21 @@ public partial class Player : CharacterBody3D
     // flashlight's old generic-Power drain used before Power was removed as a player stat.
     private const float FlashlightChargeDrainPerSecond = 1f / 900f;
 
+    // Placeholder/tunable — a full O2 tank lasts ~5 minutes sealed, matching SuitResources'
+    // own flat-counter pace (O2DrainPerSecond = 100/300) so donning the suit doesn't change the
+    // felt EVA budget, just makes it swappable.
+    private const float O2TankDrainPerSecond = 1f / 300f;
+
+    // Placeholder/tunable — a full filter lasts ~10 minutes, matching SuitResources' own
+    // Co2RiseWithFilterPerSecond pace (so the filter runs out right around when unfiltered CO2
+    // buildup would have anyway).
+    private const float SuitFilterDrainPerSecond = 1f / 600f;
+
+    // Placeholder/tunable — a full suit battery lasts ~20 minutes of "tiny bit of overall usage"
+    // (heating/cooling plus baseline life-support draw), much longer than the acute O2/filter
+    // budgets since it's a background drain, not the primary EVA-time limiter.
+    private const float SuitBatteryDrainPerSecond = 1f / 1200f;
+
     // Placeholder/tunable — the Hunger/Thirst/Energy-at-0% debuff (a slowdown, not a failure
     // state; that's O2/Health's job — see SuitResources).
     private const float NeedsDebuffMoveMultiplier = 0.5f;
@@ -122,6 +137,8 @@ public partial class Player : CharacterBody3D
     private Label? _verbLabel;
     private ProgressBar? _verbProgressBar;
     private ProgressBar? _o2Bar;
+    private Label? _co2Label;
+    private ProgressBar? _co2Bar;
     private ProgressBar? _healthBar;
     private Label? _roomO2Label;
     private Label? _leftHandLabel;
@@ -282,6 +299,8 @@ public partial class Player : CharacterBody3D
         _verbLabel = GetNode<Label>("HUD/VerbLabel");
         _verbProgressBar = GetNode<ProgressBar>("HUD/VerbProgressBar");
         _o2Bar = GetNode<ProgressBar>("HUD/ResourcesPanel/O2Bar");
+        _co2Label = GetNode<Label>("HUD/ResourcesPanel/CO2Label");
+        _co2Bar = GetNode<ProgressBar>("HUD/ResourcesPanel/CO2Bar");
         _healthBar = GetNode<ProgressBar>("HUD/ResourcesPanel/HealthBar");
         _hungerBar = GetNode<ProgressBar>("HUD/ResourcesPanel/HungerBar");
         _thirstBar = GetNode<ProgressBar>("HUD/ResourcesPanel/ThirstBar");
@@ -1163,8 +1182,45 @@ public partial class Player : CharacterBody3D
         // cold, or standing in an active fire's heat) drains Health too, compounding with O2
         // depletion instead of being a separate stat (see SuitResources.Tick).
         var ambientTemperature = roomVolume?.Temperature ?? AtmosphereVolume.Breathable.Temperature;
-        _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21, ambientTemperature, inSmoke);
+
+        // "Sealed" = the EVA suit's torso is worn; each tank/filter/battery reads as depleted
+        // when it's missing entirely (no torso worn at all) or genuinely out of charge — an
+        // installed-but-empty sub-slot is exactly as dangerous as no tank at all.
+        var suitSealed = _inventory.Torso is not null;
+        var o2TankDepleted = _inventory.SuitO2 is not { HasItem: true, Charge: > 0f };
+        var n2TankDepleted = _inventory.SuitN2 is not { HasItem: true, Charge: > 0f };
+        var filterDepleted = _inventory.SuitFilter is not { HasItem: true, Charge: > 0f };
+        var batteryDepleted = _inventory.SuitBattery is not { HasItem: true, Charge: > 0f };
+
+        _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21, ambientTemperature, inSmoke,
+            suitSealed, o2TankDepleted, n2TankDepleted, filterDepleted, batteryDepleted);
+
+        // Tank/filter/battery charge bookkeeping lives here, not in SuitResources itself (see its
+        // own Tick doc) — each only drains while actually doing its job (sealed and not already
+        // empty). N2 isn't drained here at all — it's input-driven by sustained-thrust movement.
+        if (suitSealed && !o2TankDepleted)
+        {
+            _inventory.DrainSpecializedSlot("suit_o2", O2TankDrainPerSecond * (float)delta);
+        }
+
+        if (suitSealed && !filterDepleted)
+        {
+            _inventory.DrainSpecializedSlot("suit_filter", SuitFilterDrainPerSecond * (float)delta);
+        }
+
+        if (suitSealed && !batteryDepleted)
+        {
+            _inventory.DrainSpecializedSlot("suit_battery", SuitBatteryDrainPerSecond * (float)delta);
+        }
+
         _o2Bar!.Value = _suitResources.O2Percent;
+
+        // Only meaningful while actually sealed — hidden the rest of the time rather than
+        // showing a permanently-0 bar that means nothing without a suit on.
+        _co2Label!.Visible = suitSealed;
+        _co2Bar!.Visible = suitSealed;
+        _co2Bar.Value = _suitResources.CO2Percent;
+
         _healthBar!.Value = _suitResources.HealthPercent;
         _coldOverlay!.Visible = _suitResources.IsFreezing;
         _burnOverlay!.Visible = _suitResources.IsBurning;

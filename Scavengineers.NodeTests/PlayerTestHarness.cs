@@ -44,6 +44,8 @@ public static class PlayerTestHarness
         var resourcesPanel = new Control { Name = "ResourcesPanel" };
         hud.AddChild(resourcesPanel);
         resourcesPanel.AddChild(new ProgressBar { Name = "O2Bar" });
+        resourcesPanel.AddChild(new Label { Name = "CO2Label" });
+        resourcesPanel.AddChild(new ProgressBar { Name = "CO2Bar" });
         resourcesPanel.AddChild(new ProgressBar { Name = "HealthBar" });
         resourcesPanel.AddChild(new ProgressBar { Name = "HungerBar" });
         resourcesPanel.AddChild(new ProgressBar { Name = "ThirstBar" });
@@ -88,6 +90,19 @@ public static class PlayerTestHarness
         var backpackGrid = new Control { Name = "BackpackGrid" };
         backpackLayout.AddChild(backpackGrid);
         backpackGrid.AddChild(MakeSlot("SlotTemplate"));
+
+        var suitWindow = new Control { Name = "SuitWindow" };
+        hud.AddChild(suitWindow);
+        var suitLayout = new Node { Name = "Layout" };
+        suitWindow.AddChild(suitLayout);
+        var suitGrid = new Node { Name = "SuitGrid" };
+        suitLayout.AddChild(suitGrid);
+        suitGrid.AddChild(MakeSlot("Pocket1"));
+        suitGrid.AddChild(MakeSlot("Pocket2"));
+        suitGrid.AddChild(MakeSlot("O2Tank"));
+        suitGrid.AddChild(MakeSlot("N2Tank"));
+        suitGrid.AddChild(MakeSlot("Filter"));
+        suitGrid.AddChild(MakeSlot("Battery"));
 
         var travelMapPanel = new TravelMapPanel { Name = "TravelMapPanel" };
         travelMapPanel.TravelButton = new Button();

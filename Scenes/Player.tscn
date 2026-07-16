@@ -1036,6 +1036,21 @@ theme_override_styles/background = SubResource("HudLabelBackground")
 value = 100.0
 show_percentage = false
 
+[node name="CO2Label" type="Label" parent="HUD/ResourcesPanel"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_styles/normal = SubResource("HudLabelBackground")
+text = "CO2"
+
+[node name="CO2Bar" type="ProgressBar" parent="HUD/ResourcesPanel"]
+visible = false
+custom_minimum_size = Vector2(0, 11)
+layout_mode = 2
+theme_override_styles/background = SubResource("HudLabelBackground")
+value = 0.0
+show_percentage = false
+
 [node name="HealthLabel" type="Label" parent="HUD/ResourcesPanel"]
 layout_mode = 2
 size_flags_horizontal = 0
