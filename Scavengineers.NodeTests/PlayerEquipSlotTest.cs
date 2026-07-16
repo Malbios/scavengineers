@@ -385,4 +385,60 @@ public class PlayerEquipSlotTest
 
         AutoFree(dropped);
     }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task ToggleItemWindow_OpensTheSuitWindowAndPointsItsPocketsAtTheRightContents_WhileTheSuitIsMerelyHeldNotWorn()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        ResetTorsoAndHeadFromStipend(player.Inventory);
+        player.Inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2));
+        player.Inventory.Torso!.Contents.Add("scrap_metal", 1);
+        // Take it off into a hand (bare token, contents persist — see PlayerInventory's
+        // persistent-contents model) rather than going through the full unequip flow, so this
+        // test only exercises the preview mechanic itself.
+        player.Inventory.ClearEquippedContainer("torso");
+        AssertBool(player.Inventory.Torso is null).IsTrue();
+
+        // Let the harness's normal per-frame update (UpdateInventoryHud) run at least once
+        // first, establishing the real "no window open" baseline exactly like real gameplay —
+        // a Control's raw Godot default is Visible, so checking before any frame has ticked
+        // would see that default instead of the game's own closed-by-default state.
+        var suitWindow = player.GetNode<Control>("HUD/SuitWindow");
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+        AssertBool(suitWindow.Visible).IsFalse();
+
+        player.ToggleItemWindow("eva_torso_suit");
+
+        AssertBool(suitWindow.Visible).IsTrue();
+
+        // Two-step await (matches this project's established convention) so UpdateInventoryHud's
+        // per-frame Container re-point has actually run by the time we check it.
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+
+        var pocket1 = player.GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/Pocket1");
+        AssertBool(ReferenceEquals(pocket1.Container, player.Inventory.GetPersistentContents("eva_torso_suit"))).IsTrue();
+        AssertBool(pocket1.Container!.CountOf("scrap_metal") == 1).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task ToggleItemWindow_DoesNothing_ForAnItemWithNoPersistentContentsAnywhere()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        ResetTorsoAndHeadFromStipend(player.Inventory);
+
+        var suitWindow = player.GetNode<Control>("HUD/SuitWindow");
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+        AssertBool(suitWindow.Visible).IsFalse();
+
+        player.ToggleItemWindow("eva_torso_suit");
+
+        AssertBool(suitWindow.Visible).IsFalse();
+    }
 }

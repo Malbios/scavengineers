@@ -165,6 +165,16 @@ public partial class Player : CharacterBody3D
     /// unequip/load), not every frame.</summary>
     private int _backpackSlotUICount = -1;
 
+    /// <summary>Which item's persistent contents (see PlayerInventory.GetPersistentContents) the
+    /// open backpack/suit window is currently showing — set by <see cref="ToggleItemWindow"/>,
+    /// read by <see cref="UpdateInventoryHud"/> to re-point the window's slots every frame. Not
+    /// the same thing as "currently worn": the window can stay open and keep showing an item's
+    /// contents while it's merely held in a hand, per the persistent-contents model — null
+    /// whenever that window is closed.</summary>
+    private string? _openBackpackItemId;
+
+    private string? _openSuitItemId;
+
     /// <summary>The EVA suit torso's own window — unlike the backpack's grid, its 2 pocket slots
     /// are static scene nodes (the torso's inner slot count never varies), so no
     /// rebuild-on-equip mechanism is needed, just a per-frame Container re-point.</summary>
@@ -952,7 +962,9 @@ public partial class Player : CharacterBody3D
         _drillWindow!.Visible = false;
         _flashlightWindow!.Visible = false;
         _backpackWindow!.Visible = false;
+        _openBackpackItemId = null;
         _suitWindow!.Visible = false;
+        _openSuitItemId = null;
         _worldDropZone!.Visible = false;
 
         CaptureMouse();
@@ -1031,7 +1043,14 @@ public partial class Player : CharacterBody3D
 
     /// <summary>Right-click-on-inventory-item entry point (see InventorySlotUI) — toggles open/
     /// closed whichever window (if any) represents that item's own inventory. A no-op for any
-    /// item that doesn't have one.</summary>
+    /// item that doesn't have one. Gated on <see cref="PlayerInventory.GetPersistentContents"/>
+    /// rather than "currently worn" (<c>_inventory.Backpack</c>/<c>Torso</c>), since a backpack/
+    /// suit's contents are reachable whether it's worn, merely held in a hand, or (for the
+    /// backpack) sitting in another backpack's slot — see PlayerInventory's persistent-contents
+    /// model. Tracks which item id is currently open (<see cref="_openBackpackItemId"/>/
+    /// <see cref="_openSuitItemId"/>) so UpdateInventoryHud re-points the window's slots at that
+    /// specific item's contents every frame, not just whichever one (if any) happens to be
+    /// worn.</summary>
     public void ToggleItemWindow(string itemId)
     {
         switch (itemId)
@@ -1042,11 +1061,13 @@ public partial class Player : CharacterBody3D
             case "flashlight":
                 _flashlightWindow!.Visible = !_flashlightWindow.Visible;
                 break;
-            case "backpack" or "debug_backpack" when _inventory.Backpack is not null:
+            case "backpack" or "debug_backpack" when _inventory.GetPersistentContents(itemId) is not null:
                 _backpackWindow!.Visible = !_backpackWindow.Visible;
+                _openBackpackItemId = _backpackWindow.Visible ? itemId : null;
                 break;
-            case "eva_torso_suit" when _inventory.Torso is not null:
+            case "eva_torso_suit" when _inventory.GetPersistentContents(itemId) is not null:
                 _suitWindow!.Visible = !_suitWindow.Visible;
+                _openSuitItemId = _suitWindow.Visible ? itemId : null;
                 break;
         }
     }
@@ -1773,17 +1794,21 @@ public partial class Player : CharacterBody3D
     private void UpdateInventoryHud()
     {
         // Re-pointed every frame rather than only on equip/unequip: equipping/unequipping
-        // creates a new SlotContainer instance, and this is the cheapest way to keep the panel's
-        // backpack section always addressing whichever one (if any) is currently worn.
-        _backpackGrid!.Visible = _inventory.Backpack is not null;
-        if (_inventory.Backpack is null)
+        // creates a new SlotContainer instance, and this is the cheapest way to keep the window
+        // always addressing whichever item's contents it's currently open for (see
+        // _openBackpackItemId) — worn, merely held, or (for the backpack) tucked into another
+        // backpack's slot, per PlayerInventory's persistent-contents model.
+        var backpackContents = _openBackpackItemId is { } backpackItemId ? _inventory.GetPersistentContents(backpackItemId) : null;
+        _backpackGrid!.Visible = backpackContents is not null;
+        if (backpackContents is null)
         {
-            // Unequipping while its contents window happens to be open closes it instead of
-            // leaving an empty window floating with nothing left to show.
+            // The open item was genuinely discarded (or the window was never opened) — nothing
+            // left to show, so close it instead of leaving an empty window floating.
             _backpackWindow!.Visible = false;
+            _openBackpackItemId = null;
         }
 
-        var backpackSlotCount = _inventory.Backpack?.Contents.Slots.Count ?? 0;
+        var backpackSlotCount = backpackContents?.Slots.Count ?? 0;
         if (backpackSlotCount != _backpackSlotUICount)
         {
             RebuildBackpackSlotUIs(backpackSlotCount);
@@ -1791,19 +1816,21 @@ public partial class Player : CharacterBody3D
 
         foreach (var slot in _backpackSlotUIs)
         {
-            slot.Container = _inventory.Backpack?.Contents;
+            slot.Container = backpackContents;
         }
 
-        // Same "re-point every frame, close on unequip" shape as the backpack above — the
-        // torso's own pocket slot *count* never varies (always 2), so no rebuild step is needed.
-        if (_inventory.Torso is null)
+        // Same "re-point every frame, close on discard" shape as the backpack above — the torso's
+        // own pocket slot *count* never varies (always 2), so no rebuild step is needed.
+        var suitContents = _openSuitItemId is { } suitItemId ? _inventory.GetPersistentContents(suitItemId) : null;
+        if (suitContents is null)
         {
             _suitWindow!.Visible = false;
+            _openSuitItemId = null;
         }
 
         foreach (var pocketSlot in _suitPocketSlots)
         {
-            pocketSlot!.Container = _inventory.Torso?.Contents;
+            pocketSlot!.Container = suitContents;
         }
 
         _creditsLabel!.Text = Tr("HUD_CREDITS") + $": {_credits}";
