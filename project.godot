@@ -13,13 +13,19 @@ config_version=5
 config/name="Scavengineers"
 run/main_scene="res://Scenes/World.tscn"
 config/features=PackedStringArray("4.7", "C#", "GL Compatibility")
+run/max_fps=60
 config/icon="res://icon.svg"
 
 [display]
 
+window/size/viewport_width=1920
+window/size/viewport_height=1080
 window/size/mode=2
+window/size/window_width_override=1920
+window/size/window_height_override=1080
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+window/stretch/scale_mode="integer"
 
 [dotnet]
 
