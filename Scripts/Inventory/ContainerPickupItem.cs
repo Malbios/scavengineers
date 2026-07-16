@@ -43,6 +43,22 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget, IPhysicsPre
 
     public SlotContainer? Contents { get; set; }
 
+    /// <summary>The EVA suit torso's tank/filter/battery sub-slot state at the moment it was
+    /// genuinely discarded (see Player's CaptureAndDetachSuitTanks) — null for anything that
+    /// isn't the suit (a plain backpack drop), non-null-but-HasItem-false for an attached-but-
+    /// empty sub-slot (still meaningful: this suit has that slot at all, just nothing loaded).
+    /// Restored via AttachSpecializedSlot on pickup (see ExecuteVerb) so a genuinely-discarded
+    /// suit's tanks travel with it into the world and back, instead of the "eject tanks back
+    /// into general inventory" behavior a mere unequip now uses (see PlayerInventory's
+    /// persistent-contents model).</summary>
+    public (bool HasItem, float Charge)? SuitO2 { get; set; }
+
+    public (bool HasItem, float Charge)? SuitN2 { get; set; }
+
+    public (bool HasItem, float Charge)? SuitFilter { get; set; }
+
+    public (bool HasItem, float Charge)? SuitBattery { get; set; }
+
     public override void _Ready()
     {
         AddToGroup("dropped_container");
@@ -173,6 +189,11 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget, IPhysicsPre
 
         if (inventory.EquipContainerDirectly(EquipSlotName, ItemId, Contents))
         {
+            if (SuitO2 is { } o2) inventory.AttachSpecializedSlot("suit_o2", o2.HasItem, o2.Charge);
+            if (SuitN2 is { } n2) inventory.AttachSpecializedSlot("suit_n2", n2.HasItem, n2.Charge);
+            if (SuitFilter is { } filter) inventory.AttachSpecializedSlot("suit_filter", filter.HasItem, filter.Charge);
+            if (SuitBattery is { } battery) inventory.AttachSpecializedSlot("suit_battery", battery.HasItem, battery.Charge);
+
             QueueFree();
         }
     }

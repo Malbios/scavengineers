@@ -711,14 +711,71 @@ public partial class Player : CharacterBody3D
         }
     }
 
+    /// <summary>Which equip slot a container-carrying item's own ContainerPickupItem should
+    /// re-equip into on pickup, for a caller (namely SaveManager, and the bare-token drop path
+    /// below) that only knows the item id, not the slot it actually came from — the backpack's is
+    /// hardcoded by item id (same "backpack"/"debug_backpack" special-casing ToggleItemWindow's
+    /// own switch already uses; its equip slot was never expressed as an items.json
+    /// <c>equipSlot</c> the way Torso/Head items are), everything else defers to
+    /// ItemCatalog.EquipSlot. Prefer passing the real slot name directly to SpawnDroppedContainer
+    /// wherever the caller already knows it (see DropEquippedItemInWorld) — this project's
+    /// isolated NodeTests catalog always returns null from ItemCatalog.EquipSlot regardless of
+    /// item id (see PlayerEquipSlotTest's own doc comment), so a path that could avoid depending
+    /// on it should.</summary>
+    private static string EquipSlotNameFor(string itemId) =>
+        itemId is "backpack" or "debug_backpack" ? "back" : ItemCatalog.EquipSlot(itemId) ?? "back";
+
+    /// <summary>Captures the EVA suit torso's tank/filter/battery sub-slot state and fully
+    /// detaches all four — the one place this state is actually removed from the player, used by
+    /// every genuine-discard path (a worn torso dropped, or a bare suit token dropped from a
+    /// hand/backpack slot) so it travels onto the dropped world item (see ContainerPickupItem)
+    /// instead of the "eject back into general inventory" behavior a mere unequip now uses (see
+    /// PlayerInventory's persistent-contents model). No-op (all null) unless `isSuit` is true —
+    /// left to the caller to determine (a reliable `slotName == "torso"` check where the item's
+    /// worn slot is already known, or an ItemCatalog.EquipSlot fallback where it isn't).</summary>
+    private ((bool, float)? O2, (bool, float)? N2, (bool, float)? Filter, (bool, float)? Battery) CaptureAndDetachSuitTanks(bool isSuit)
+    {
+        if (!isSuit)
+        {
+            return (null, null, null, null);
+        }
+
+        var o2 = _inventory.SuitO2 is { } s1 ? ((bool, float)?)(s1.HasItem, s1.Charge) : null;
+        var n2 = _inventory.SuitN2 is { } s2 ? ((bool, float)?)(s2.HasItem, s2.Charge) : null;
+        var filter = _inventory.SuitFilter is { } s3 ? ((bool, float)?)(s3.HasItem, s3.Charge) : null;
+        var battery = _inventory.SuitBattery is { } s4 ? ((bool, float)?)(s4.HasItem, s4.Charge) : null;
+
+        _inventory.DetachSpecializedSlot("suit_o2");
+        _inventory.DetachSpecializedSlot("suit_n2");
+        _inventory.DetachSpecializedSlot("suit_filter");
+        _inventory.DetachSpecializedSlot("suit_battery");
+
+        return (o2, n2, filter, battery);
+    }
+
     /// <summary>Spawns a full container's world representation at `position` — used both for an
     /// unequip-while-full drop (see TryUnequipBackpack) and by SaveManager to respawn dropped
     /// containers on load. Reuses the same generic dropped-item visual
     /// (Mesh/Shape/Material pattern InventoryOverflow.DropAt and ShipBuildTarget's own refunds
-    /// already use) via this Player's own wired exports.</summary>
-    public void SpawnDroppedContainer(string itemId, SlotContainer contents, Vector3 position)
+    /// already use) via this Player's own wired exports. `equipSlotName` defaults to a
+    /// catalog-derived guess (see EquipSlotNameFor) for a caller with no better information (e.g.
+    /// SaveManager) — pass it explicitly wherever it's already known. The 4 tank params are only
+    /// ever non-null for a genuinely-discarded EVA suit (see CaptureAndDetachSuitTanks) — null
+    /// for a plain backpack drop.</summary>
+    public void SpawnDroppedContainer(string itemId, SlotContainer contents, Vector3 position, string? equipSlotName = null,
+        (bool HasItem, float Charge)? suitO2 = null, (bool HasItem, float Charge)? suitN2 = null,
+        (bool HasItem, float Charge)? suitFilter = null, (bool HasItem, float Charge)? suitBattery = null)
     {
-        var pickup = new ContainerPickupItem { ItemId = itemId, Contents = contents };
+        var pickup = new ContainerPickupItem
+        {
+            ItemId = itemId,
+            Contents = contents,
+            EquipSlotName = equipSlotName ?? EquipSlotNameFor(itemId),
+            SuitO2 = suitO2,
+            SuitN2 = suitN2,
+            SuitFilter = suitFilter,
+            SuitBattery = suitBattery,
+        };
         GetParent()?.AddChild(pickup);
         pickup.GlobalPosition = position;
 
@@ -771,6 +828,20 @@ public partial class Player : CharacterBody3D
             return;
         }
 
+        // A bare, non-fungible container token (a backpack or suit that's merely being carried,
+        // not worn) has permanent contents of its own (see PlayerInventory's persistent-contents
+        // model) that must travel with it into the world, same "genuine discard" treatment a
+        // worn one gets below — otherwise they'd be silently orphaned in the player's own
+        // persistent-contents map, unreachable but never freed.
+        if (_inventory.GetPersistentContents(slot.ItemId) is { } persistentContents)
+        {
+            container.SetSlot(source.SlotIndex, null);
+            _inventory.DiscardPersistentContents(slot.ItemId);
+            var (o2, n2, filter, battery) = CaptureAndDetachSuitTanks(ItemCatalog.EquipSlot(slot.ItemId) == "torso");
+            SpawnDroppedContainer(slot.ItemId, persistentContents, position, null, o2, n2, filter, battery);
+            return;
+        }
+
         container.SetSlot(source.SlotIndex, null);
         InventoryOverflow.DropAt(this, slot.ItemId, slot.Count, DroppedItemMesh!, DroppedItemShape!, DroppedItemMaterial, position, slot.Charge);
     }
@@ -778,7 +849,8 @@ public partial class Player : CharacterBody3D
     /// <summary>Always drops the backpack (empty or not) at `position` — unlike
     /// TryUnequipBackpack's onto-a-hand-slot gesture, which prefers stashing an empty backpack
     /// back into a hand instead. Dragging it out into the world is a deliberate "put it down," so
-    /// it always ends up loose.</summary>
+    /// it always ends up loose. A genuine discard, so its persistent contents leave the player
+    /// entirely (see PlayerInventory.DiscardPersistentContents) rather than just being unworn.</summary>
     private void DropBackpackInWorld(Vector3 position)
     {
         if (_inventory.Backpack is not { } backpack)
@@ -787,12 +859,14 @@ public partial class Player : CharacterBody3D
         }
 
         _inventory.ClearBackpack();
-        SpawnDroppedContainer(backpack.ItemId, backpack.Contents, position);
+        _inventory.DiscardPersistentContents(backpack.ItemId);
+        SpawnDroppedContainer(backpack.ItemId, backpack.Contents, position, "back");
     }
 
-    /// <summary>Same "always drops it, deliberate put-down" shape as <see cref="DropBackpackInWorld"/>,
-    /// generalized to any Torso/Head equip slot — used when dragging a worn item straight into
-    /// open space (see WorldDropZone) rather than onto another slot.</summary>
+    /// <summary>Same "always drops it, deliberate put-down, genuine discard" shape as
+    /// <see cref="DropBackpackInWorld"/>, generalized to any Torso/Head equip slot — used when
+    /// dragging a worn item straight into open space (see WorldDropZone) rather than onto another
+    /// slot.</summary>
     private void DropEquippedItemInWorld(string slotName, Vector3 position)
     {
         if (_inventory.GetEquippedContainer(slotName) is not { } equipped)
@@ -801,22 +875,10 @@ public partial class Player : CharacterBody3D
         }
 
         _inventory.ClearEquippedContainer(slotName);
+        _inventory.DiscardPersistentContents(equipped.ItemId);
+        var (o2, n2, filter, battery) = CaptureAndDetachSuitTanks(slotName == "torso");
 
-        if (slotName == "torso")
-        {
-            // Same eject-then-detach shape as TryUnequipItem — the torso is genuinely gone here
-            // (dropping in the world is never refused for lack of room), so this always runs.
-            _inventory.EjectSpecializedSlot("suit_o2");
-            _inventory.EjectSpecializedSlot("suit_n2");
-            _inventory.EjectSpecializedSlot("suit_filter");
-            _inventory.EjectSpecializedSlot("suit_battery");
-            _inventory.DetachSpecializedSlot("suit_o2");
-            _inventory.DetachSpecializedSlot("suit_n2");
-            _inventory.DetachSpecializedSlot("suit_filter");
-            _inventory.DetachSpecializedSlot("suit_battery");
-        }
-
-        SpawnDroppedContainer(equipped.ItemId, equipped.Contents, position);
+        SpawnDroppedContainer(equipped.ItemId, equipped.Contents, position, slotName, o2, n2, filter, battery);
     }
 
     /// <summary>Projects a ray from the camera through the drop's screen position — the first

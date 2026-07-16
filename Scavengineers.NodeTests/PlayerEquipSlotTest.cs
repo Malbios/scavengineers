@@ -289,4 +289,100 @@ public class PlayerEquipSlotTest
 
         AutoFree(dropped);
     }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TryDropInWorld_EquippedTorsoSlot_CarriesTheSuitsTanks_RestoredExactlyOnPickup()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        ResetTorsoAndHeadFromStipend(player.Inventory);
+        player.Inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2));
+        player.Inventory.AttachSpecializedSlot("suit_o2", hasItem: true, charge: 0.6f);
+        player.Inventory.AttachSpecializedSlot("suit_n2", hasItem: false, charge: 0f);
+        player.Inventory.AttachSpecializedSlot("suit_filter", hasItem: true, charge: 0.9f);
+        player.Inventory.AttachSpecializedSlot("suit_battery", hasItem: true, charge: 0.4f);
+
+        var wall = AutoFree(new StaticBody3D { Position = new Vector3(0, 0, -1.5f) });
+        wall.AddChild(new CollisionShape3D { Shape = new BoxShape3D() });
+        sceneTree.Root.AddChild(wall);
+
+        var source = AutoFree(new InventorySlotUI { EquippedSlotName = "torso" });
+        var viewportCenter = player.GetViewport().GetVisibleRect().GetCenter();
+
+        player.TryDropInWorld(source, viewportCenter);
+
+        // Genuinely gone from the player — a mere unequip would leave these attached (see
+        // TryUnequipItem_LeavesInstalledSuitTanksAttachedAndLoaded_TanksStayWithTheSuit above);
+        // dropping in the world is the one path that actually removes them.
+        AssertBool(player.Inventory.SuitO2 is null).IsTrue();
+        AssertBool(player.Inventory.SuitN2 is null).IsTrue();
+        AssertBool(player.Inventory.SuitFilter is null).IsTrue();
+        AssertBool(player.Inventory.SuitBattery is null).IsTrue();
+
+        var dropped = sceneTree.Root.GetChildren().OfType<ContainerPickupItem>().FirstOrDefault(c => c.ItemId == "eva_torso_suit");
+        AssertBool(dropped is not null).IsTrue();
+        AssertBool(dropped!.EquipSlotName == "torso").IsTrue();
+        AssertBool(dropped.SuitO2 == (true, 0.6f)).IsTrue();
+        AssertBool(dropped.SuitN2 == (false, 0f)).IsTrue();
+        AssertBool(dropped.SuitFilter == (true, 0.9f)).IsTrue();
+        AssertBool(dropped.SuitBattery == (true, 0.4f)).IsTrue();
+
+        // Pick it back up — its own ExecuteVerb both re-equips the torso and restores the tanks.
+        dropped.ExecuteVerb(new Scavengineers.Scripts.Verbs.Verb("pick_up", "VERB_PICK_UP", DurationSeconds: 0f), player.Inventory);
+
+        AssertBool(player.Inventory.Torso is { ItemId: "eva_torso_suit" }).IsTrue();
+        AssertBool(player.Inventory.SuitO2 is { HasItem: true }).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(player.Inventory.SuitO2!.Charge, 0.6f)).IsTrue();
+        AssertBool(player.Inventory.SuitN2 is { HasItem: false }).IsTrue();
+        AssertBool(player.Inventory.SuitFilter is { HasItem: true }).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(player.Inventory.SuitFilter!.Charge, 0.9f)).IsTrue();
+        AssertBool(player.Inventory.SuitBattery is { HasItem: true }).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(player.Inventory.SuitBattery!.Charge, 0.4f)).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TryDropInWorld_BareBackpackTokenInAHand_CarriesItsPersistentContentsIntoTheWorld()
+    {
+        // A backpack that's merely being carried (not worn) still has permanent contents of its
+        // own (see PlayerInventory's persistent-contents model) — dropping the bare token from a
+        // hand must carry them along, not silently orphan them in the player's own
+        // persistent-contents map.
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        ResetTorsoAndHeadFromStipend(player.Inventory);
+        // The stipend's own debug_backpack already occupies "back" — clear it (and its
+        // persistent contents, same reasoning as ResetTorsoAndHeadFromStipend above) so this
+        // test's own fresh "backpack" equip has a free slot and a clean, empty container.
+        player.Inventory.ClearEquippedContainer("back");
+        player.Inventory.DiscardPersistentContents("debug_backpack");
+        AssertBool(player.Inventory.EquipContainerDirectly("back", "backpack", new SlotContainer(2))).IsTrue();
+        player.Inventory.Backpack!.Contents.Add("scrap_metal", 1);
+        // Take it off into a hand (bare token, contents stay behind in persistent-contents).
+        player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, null);
+        player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, null);
+        player.TryUnequipBackpack();
+        AssertBool(player.Inventory.Hands.Slots.Any(s => s?.ItemId == "backpack")).IsTrue();
+
+        var wall = AutoFree(new StaticBody3D { Position = new Vector3(0, 0, -1.5f) });
+        wall.AddChild(new CollisionShape3D { Shape = new BoxShape3D() });
+        sceneTree.Root.AddChild(wall);
+
+        var handSlotIndex = player.Inventory.Hands.Slots[PlayerInventory.LeftHandSlotIndex]?.ItemId == "backpack"
+            ? PlayerInventory.LeftHandSlotIndex
+            : PlayerInventory.RightHandSlotIndex;
+        var source = AutoFree(new InventorySlotUI { Container = player.Inventory.Hands, SlotIndex = handSlotIndex });
+        var viewportCenter = player.GetViewport().GetVisibleRect().GetCenter();
+
+        player.TryDropInWorld(source, viewportCenter);
+
+        AssertBool(player.Inventory.Hands.Slots[handSlotIndex] is null).IsTrue();
+        AssertBool(player.Inventory.GetPersistentContents("backpack") is null).IsTrue();
+        var dropped = sceneTree.Root.GetChildren().OfType<ContainerPickupItem>().FirstOrDefault(c => c.ItemId == "backpack");
+        AssertBool(dropped is not null).IsTrue();
+        AssertBool(dropped!.Contents!.CountOf("scrap_metal") == 1).IsTrue();
+
+        AutoFree(dropped);
+    }
 }
