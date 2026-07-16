@@ -59,7 +59,7 @@ public sealed class PlayerInventory
     public EquippedContainer? Head => _equippedContainers.GetValueOrDefault("head");
 
     /// <summary>Generic lookup by equip-slot name — used by Player.cs's generalized
-    /// TryEquipItemFromHand/TryUnequipItem so a new equip slot (beyond the named
+    /// TryEquipItemFrom/TryUnequipItem so a new equip slot (beyond the named
     /// Backpack/Torso/Head convenience properties above) needs no new code here.</summary>
     public EquippedContainer? GetEquippedContainer(string slotName) => _equippedContainers.GetValueOrDefault(slotName);
 

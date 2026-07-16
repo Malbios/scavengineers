@@ -67,7 +67,7 @@ public static class ItemCatalog
 
     /// <summary>Which equip slot this item drags onto (e.g. "torso", "head") — null (the
     /// default) for anything that isn't equippable that way, same safe-fallback spirit as
-    /// <see cref="MaxStackSize"/>. Used by Player.TryEquipItemFromHand instead of a hardcoded
+    /// <see cref="MaxStackSize"/>. Used by Player.TryEquipItemFrom instead of a hardcoded
     /// item-id check, so the equip flow generalizes to any future equippable item.</summary>
     public static string? EquipSlot(string itemId) =>
         Items.TryGetValue(itemId, out var item) ? item.EquipSlot : null;

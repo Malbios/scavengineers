@@ -10,9 +10,9 @@ using static GdUnit4.Assertions;
 namespace Scavengineers.NodeTests;
 
 /// <summary>Regression coverage for the new generalized Torso/Head equip-slot flow
-/// (Player.TryEquipItemFromHand/TryUnequipItem) and the Legs/LeftFoot/RightFoot "blocked while
+/// (Player.TryEquipItemFrom/TryUnequipItem) and the Legs/LeftFoot/RightFoot "blocked while
 /// the EVA suit's torso is worn" gate. Equips directly via PlayerInventory.EquipContainerDirectly
-/// rather than exercising TryEquipItemFromHand's own ItemCatalog.EquipSlot gate — this project's
+/// rather than exercising TryEquipItemFrom's own ItemCatalog.EquipSlot gate — this project's
 /// isolated NodeTests res:// has no Data/items.json (see PlayerTestHarness's own doc comment), so
 /// ItemCatalog.EquipSlot always returns null here regardless of item id; that specific gate is
 /// covered instead by ItemCatalogTests.EquipSlot_ReturnsTheDeclaredSlot (Scavengineers.Scripts.Tests,
@@ -97,7 +97,7 @@ public class PlayerEquipSlotTest
         player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, null);
         player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, null);
         player.Inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2));
-        // Simulates what TryEquipItemFromHand's own torso-specific glue does on a real equip —
+        // Simulates what TryEquipItemFrom's own torso-specific glue does on a real equip —
         // exercised directly here since that path needs a real ItemCatalog.EquipSlot match,
         // unreachable in this project's isolated NodeTests catalog (see class doc comment).
         player.Inventory.AttachSpecializedSlot("suit_o2", hasItem: true, charge: 0.6f);
@@ -114,6 +114,31 @@ public class PlayerEquipSlotTest
         var ejectedTank = player.Inventory.Hands.Slots.FirstOrDefault(s => s?.ItemId == "o2_tank");
         AssertBool(ejectedTank is not null).IsTrue();
         AssertBool(Mathf.IsEqualApprox(ejectedTank!.Value.Charge, 0.6f)).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TryUnequipItem_LeavesTheSuitsSubSlotsUntouched_WhenBothHandsAreFullAndTheTorsoStaysWorn()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        ResetTorsoAndHeadFromStipend(player.Inventory);
+        // Both hands genuinely full — the torso's own 2 pocket slots are empty, so the unequip
+        // attempt reaches the "isEmpty, but nowhere for it to go" branch and re-equips instead of
+        // actually coming off.
+        player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1, 1f));
+        player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, ("widget", 1, 1f));
+        player.Inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2));
+        player.Inventory.AttachSpecializedSlot("suit_o2", hasItem: true, charge: 0.6f);
+
+        player.TryUnequipItem("torso");
+
+        // The suit never actually left, so its sub-slots must be exactly as they were —
+        // regressing this would silently strip a worn suit's tanks any time both hands
+        // happen to be full at the moment you tried (and failed) to take it off.
+        AssertBool(player.Inventory.Torso is { ItemId: "eva_torso_suit" }).IsTrue();
+        AssertBool(player.Inventory.SuitO2 is { HasItem: true }).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(player.Inventory.SuitO2!.Charge, 0.6f)).IsTrue();
     }
 
     [TestCase]

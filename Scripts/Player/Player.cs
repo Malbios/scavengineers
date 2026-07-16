@@ -623,27 +623,30 @@ public partial class Player : CharacterBody3D
     }
 
     /// <summary>Called by a Torso/Head equip slot (see InventorySlotUI.EquippedSlotName) when
-    /// something is dragged onto it — equips it only if the dragged hand item's own
-    /// ItemCatalog.EquipSlot actually declares this slot name, generalizing
-    /// <see cref="TryEquipBackpackFromHand"/>'s hardcoded-"backpack" check into a tag-driven one
-    /// that works for any future equippable item. `containerSlotCount` is the inner inventory
-    /// size to give the freshly-equipped item (0 for a container-less item like the helmet).</summary>
-    public void TryEquipItemFromHand(int fromSlotIndex, string slotName, int containerSlotCount)
+    /// something is dragged onto it — equips it only if the dragged item's own ItemCatalog.EquipSlot
+    /// actually declares this slot name, generalizing <see cref="TryEquipBackpackFromHand"/>'s
+    /// hardcoded-"backpack" check into a tag-driven one that works for any future equippable
+    /// item. Reads/clears the dragged item from whatever real container it's currently sitting
+    /// in — a hand, a worn backpack's own contents, even the torso's own pocket slots — not just
+    /// a hand specifically (unlike TryEquipBackpackFromHand, which only special-cases the
+    /// backpack item id and is left as-is). `containerSlotCount` is the inner inventory size to
+    /// give the freshly-equipped item (0 for a container-less item like the helmet).</summary>
+    public void TryEquipItemFrom(SlotContainer sourceContainer, int fromSlotIndex, string slotName, int containerSlotCount)
     {
-        if (fromSlotIndex < 0 || fromSlotIndex >= _inventory.Hands.Slots.Count)
+        if (fromSlotIndex < 0 || fromSlotIndex >= sourceContainer.Slots.Count)
         {
             return;
         }
 
-        if (_inventory.Hands.Slots[fromSlotIndex] is not { } occupied || ItemCatalog.EquipSlot(occupied.ItemId) != slotName)
+        if (sourceContainer.Slots[fromSlotIndex] is not { } occupied || ItemCatalog.EquipSlot(occupied.ItemId) != slotName)
         {
             return;
         }
 
-        if (!_inventory.Hands.TryRemove(occupied.ItemId, 1))
-        {
-            return;
-        }
+        // Clears exactly this slot (not "the first slot anywhere holding this item id", the way
+        // an aggregate TryRemove would) — correct regardless of stacking, and matches dragging a
+        // specific slot's contents rather than a fungible count.
+        sourceContainer.SetSlot(fromSlotIndex, occupied.Count > 1 ? (occupied.ItemId, occupied.Count - 1, occupied.Charge) : null);
 
         _inventory.EquipContainerDirectly(slotName, occupied.ItemId, new SlotContainer(containerSlotCount));
 
@@ -671,19 +674,36 @@ public partial class Player : CharacterBody3D
             return;
         }
 
-        // Detached first, before any sub-slot ejection below — otherwise an ejected tank could
-        // spill right back into this same container (still first in ContainerPriority at that
-        // point), corrupting the isEmpty check just below and making an item-holding suit look
-        // "empty" that shouldn't. Re-attached further down if it turns out there's no room in a
-        // hand, so the net effect matches the original "stays equipped" behavior exactly.
+        // Detached first, before checking room — otherwise the Add attempt below could spill the
+        // item being unequipped right back into this same container (still first in
+        // ContainerPriority up to this point), corrupting the isEmpty check and making an
+        // item-holding suit look "empty" that shouldn't.
         _inventory.ClearEquippedContainer(slotName);
 
+        var isEmpty = equipped.Contents.Slots.All(s => s is null);
+        if (isEmpty)
+        {
+            if (_inventory.Hands.Add(equipped.ItemId, 1) != 1)
+            {
+                // No room in either hand — re-attach so nothing vanishes, same end state as the
+                // original "don't clear at all" version of this check. The suit never actually
+                // came off, so its own sub-slots below must NOT be touched.
+                _inventory.EquipContainerDirectly(slotName, equipped.ItemId, equipped.Contents);
+                return;
+            }
+        }
+        else
+        {
+            SpawnDroppedContainer(equipped.ItemId, equipped.Contents, GlobalPosition);
+        }
+
+        // Only reached once the item is genuinely gone (placed in a hand, or dropped in the
+        // world) — eject any installed tanks back into general inventory (best-effort, same
+        // "silently doesn't fit if nowhere has room" contract as every other Add-based eject in
+        // this codebase), then fully detach the sub-slots, since there's no longer a torso to
+        // carry them.
         if (slotName == "torso")
         {
-            // Eject any installed tanks back into general inventory (best-effort, same "silently
-            // doesn't fit if nowhere has room" contract as every other Add-based eject in this
-            // codebase) — they're tracked separately from the torso's own 2 pocket slots, so
-            // simply detaching them below would otherwise destroy whatever's currently loaded.
             _inventory.EjectSpecializedSlot("suit_o2");
             _inventory.EjectSpecializedSlot("suit_n2");
             _inventory.EjectSpecializedSlot("suit_filter");
@@ -693,21 +713,6 @@ public partial class Player : CharacterBody3D
             _inventory.DetachSpecializedSlot("suit_filter");
             _inventory.DetachSpecializedSlot("suit_battery");
         }
-
-        var isEmpty = equipped.Contents.Slots.All(s => s is null);
-        if (isEmpty)
-        {
-            if (_inventory.Hands.Add(equipped.ItemId, 1) != 1)
-            {
-                // No room in either hand — re-attach so nothing vanishes, same end state as the
-                // original "don't clear at all" version of this check.
-                _inventory.EquipContainerDirectly(slotName, equipped.ItemId, equipped.Contents);
-            }
-
-            return;
-        }
-
-        SpawnDroppedContainer(equipped.ItemId, equipped.Contents, GlobalPosition);
     }
 
     /// <summary>Spawns a full container's world representation at `position` — used both for an
@@ -1599,7 +1604,7 @@ public partial class Player : CharacterBody3D
 
         // Torso reconstructed the same two-phase way as the backpack above — fresh SlotContainer
         // first, then the 4 tank/filter/battery sub-slots attached afterward (mirroring the real
-        // equip flow in Player.TryEquipItemFromHand), so a torso-with-tanks round-trips exactly
+        // equip flow in Player.TryEquipItemFrom), so a torso-with-tanks round-trips exactly
         // as it was, not just its 2 pocket slots.
         if (data.TorsoItemId is { } torsoItemId)
         {

@@ -42,7 +42,7 @@ public partial class InventorySlotUI : Control
     /// (with its own <see cref="PlayerInventory.EquippedContainer"/>, possibly 0-slot for a
     /// container-less item like the helmet) via <see cref="PlayerRef"/>, the same
     /// non-fungible-item-via-PlayerRef shape <see cref="IsBackSlot"/> already established —
-    /// generalized (via <see cref="Player.TryEquipItemFromHand"/>'s tag-driven check) rather than
+    /// generalized (via <see cref="Player.TryEquipItemFrom"/>'s tag-driven check) rather than
     /// hardcoded per item the way the Back slot still is. Empty string = ordinary slot.</summary>
     [Export]
     public string EquippedSlotName { get; set; } = "";
@@ -231,9 +231,10 @@ public partial class InventorySlotUI : Control
 
         if (EquippedSlotName.Length > 0)
         {
-            if (!source.IsBackSlot && source.SpecializedSlotKey.Length == 0 && source.EquippedSlotName.Length == 0)
+            if (!source.IsBackSlot && source.SpecializedSlotKey.Length == 0 && source.EquippedSlotName.Length == 0
+                && source.Container is { } sourceContainer)
             {
-                PlayerRef.TryEquipItemFromHand(source.SlotIndex, EquippedSlotName, EquippedContainerSlotCount);
+                PlayerRef.TryEquipItemFrom(sourceContainer, source.SlotIndex, EquippedSlotName, EquippedContainerSlotCount);
             }
 
             return;
