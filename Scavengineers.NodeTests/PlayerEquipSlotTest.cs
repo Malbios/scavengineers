@@ -230,6 +230,48 @@ public class PlayerEquipSlotTest
 
     [TestCase]
     [RequireGodotRuntime]
+    public void CanDropData_StillAcceptsAnOrdinaryCompatibleItem_LikeTheHelmet_OntoABackpackSlot()
+    {
+        // The helmet has no storage restriction (unlike the suit's torso piece) — this should
+        // stay accepted regardless of ItemCatalog state, unlike the suit-specific rejection case
+        // below, which needs the real Data/items.json (see this class's own doc comment) and is
+        // covered instead by ItemCatalogTests.FitsInStorage plus manual playtest.
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        ResetTorsoAndHeadFromStipend(player.Inventory);
+        player.Inventory.EquipContainerDirectly("head", "eva_helmet", new SlotContainer(0));
+
+        var source = AutoFree(new InventorySlotUI { EquippedSlotName = "head", PlayerRef = player });
+        var destination = AutoFree(new InventorySlotUI { Container = new SlotContainer(2), PlayerRef = player });
+
+        AssertBool(destination!._CanDropData(Vector2.Zero, Variant.From(source))).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void CanDropData_ChecksTheSourcesCurrentItem_NotJustAnOrdinaryContainerSlot()
+    {
+        // Regression coverage for the mechanism itself (not the FitsInStorage gate's real
+        // value, which this project's isolated NodeTests catalog can't exercise) — dragging a
+        // *worn* item (EquippedSlotName-sourced, no ordinary Container/SlotIndex of its own)
+        // must resolve via source.CurrentSlot(), not silently skip the check because the source
+        // isn't an ordinary indexed slot.
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        ResetTorsoAndHeadFromStipend(player.Inventory);
+        player.Inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2));
+
+        var source = AutoFree(new InventorySlotUI { EquippedSlotName = "torso", PlayerRef = player });
+        var destination = AutoFree(new InventorySlotUI { Container = new SlotContainer(2), PlayerRef = player });
+
+        // Doesn't throw, and resolves a real verdict either way — the actual true/false value
+        // here just reflects this environment's catalog-less FitsInStorage default (true), not
+        // the real game's suit-specific restriction.
+        destination!._CanDropData(Vector2.Zero, Variant.From(source));
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
     public async Task UnusedBodySlot_NeverDisplaysAnItem_EvenWhenTheSharedHandsContainerHasSomethingAtIndexZero()
     {
         // Regression test: Player._Ready's blanket EquipSlots loop points every child's Container

@@ -135,6 +135,13 @@ public partial class InventorySlotUI : Control
         else if (CurrentSlot() is { } slot)
         {
             Tooltip.Text = $"{Tr("ITEM_" + slot.ItemId.ToUpperInvariant())}: {slot.Count}";
+            if (!ItemCatalog.FitsInStorage(slot.ItemId))
+            {
+                // Explains up front why dragging this toward a backpack/pocket slot gets
+                // refused (see _CanDropData's matching guard) — discoverable on hover, not just
+                // inferable from the rejected drag itself.
+                Tooltip.Text += $" ({Tr("HUD_TOO_BULKY_FOR_BACKPACK")})";
+            }
         }
         else if (EmptySlotNameKey.Length > 0)
         {
@@ -214,8 +221,30 @@ public partial class InventorySlotUI : Control
         return this;
     }
 
-    public override bool _CanDropData(Vector2 atPosition, Variant data) =>
-        !IsUnusedBodySlot && data.AsGodotObject() is InventorySlotUI;
+    public override bool _CanDropData(Vector2 atPosition, Variant data)
+    {
+        if (IsUnusedBodySlot || data.AsGodotObject() is not InventorySlotUI source || ReferenceEquals(source, this))
+        {
+            return false;
+        }
+
+        // An item that doesn't fit storage (see ItemCatalog.FitsInStorage — currently just the
+        // EVA suit's torso piece) can only ever land in a hand — reject the drag in real time
+        // (Godot shows its native "can't drop here" cursor while hovering) for any other ordinary
+        // destination, whether the dragged item is a bare token or the worn suit itself being
+        // dragged straight off its equip slot. Mirrors _DropData's own matching guard so the
+        // drag-time feedback and the actual drop outcome never disagree. Doesn't apply to
+        // Back/Torso/Head/specialized-slot destinations — those go through equip/unequip
+        // dispatch, not this generic storage-fit check.
+        if (!IsBackSlot && EquippedSlotName.Length == 0 && SpecializedSlotKey.Length == 0
+            && Container is { } container && PlayerRef is not null && !ReferenceEquals(container, PlayerRef.Inventory.Hands)
+            && source.CurrentSlot()?.ItemId is { } itemId && !ItemCatalog.FitsInStorage(itemId))
+        {
+            return false;
+        }
+
+        return true;
+    }
 
     public override void _DropData(Vector2 atPosition, Variant data)
     {
