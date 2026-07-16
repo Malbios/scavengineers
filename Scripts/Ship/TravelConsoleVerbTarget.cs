@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 using Godot;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Scripts.Travel;
 using Scavengineers.Scripts.Verbs;
+using Scavengineers.Sim.ShipModel;
 using PlayerScript = Scavengineers.Scripts.Player.Player;
 
 namespace Scavengineers.Scripts.Ship;
@@ -32,6 +34,22 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 
     // Placeholder/tunable, matching SuitResources's drain-constant convention.
     private const float BatteryDrainPerSecond = 0.05f;
+
+    // Same two-tier upkeep as everything else with a Deck-tracked Condition (see
+    // MaintenanceTier) — this console's own fixture (ShipSim.TravelConsoleFixtureId) has been
+    // passively decaying since Stage 1 with no way to repair it until now.
+    private static readonly ItemRequirement WrenchRequirement = new("wrench", 1) { Consumed = false };
+    private static readonly ItemRequirement SparePartsRequirement = new("spare_parts", 1);
+
+    private static readonly Verb MaintainTravelConsoleVerb = new("maintain_travel_console", "VERB_MAINTAIN_TRAVEL_CONSOLE", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement],
+    };
+
+    private static readonly Verb RepairTravelConsoleVerb = new("repair_travel_console", "VERB_REPAIR_TRAVEL_CONSOLE", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement, SparePartsRequirement],
+    };
 
     [Export]
     public ShipSim? ShipSimRef { get; set; }
@@ -89,17 +107,36 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     private readonly List<Node3D> _derelictGroups = new();
     private readonly List<ShipSim> _derelictShipSims = new();
 
+    // A second, independent timer/bool pair — travel and upkeep are two unrelated timed actions
+    // on the same object, not worth folding into one PendingAction-style dispatch at this scale.
+    private Timer? _maintenanceTimer;
+    private bool _maintaining;
+
     /// <summary>Bounds every loop/lookup below defensively against the three parallel arrays
     /// above being resized inconsistently by hand in the inspector.</summary>
     private int DerelictCount => Math.Min(_derelictGroups.Count, Math.Min(_derelictShipSims.Count, DerelictMapPositions.Count));
 
     public IReadOnlyList<Verb> AvailableVerbs =>
-        ShipSimRef is not null && ShipSimRef.IsPowered(ShipSim.TravelConsoleFixtureId) ? [TravelVerb] : [];
+        [
+            .. ShipSimRef is not null && ShipSimRef.IsPowered(ShipSim.TravelConsoleFixtureId) ? new[] { TravelVerb } : [],
+            // Offered regardless of current power state — a console you can't currently use to
+            // travel should still be repairable.
+            .. ConsoleFixture is { } fixture && MaintenanceTier.PickVerb(fixture.Condition, MaintainTravelConsoleVerb, RepairTravelConsoleVerb) is { } upkeepVerb ? new[] { upkeepVerb } : [],
+        ];
 
     public string? DisplayNameKey => "OBJECT_SHIP_CONSOLE";
 
+    /// <summary>The Deck fixture backing this console's own passive wear — reused from
+    /// ShipSim.TravelConsoleFixtureId (added at startup whenever HasPowerGrid is true) rather
+    /// than a new one, since it already exists purely for power routing.</summary>
+    private Fixture? ConsoleFixture => ShipSimRef?.Deck.Fixtures.FirstOrDefault(f => f.Id == ShipSim.TravelConsoleFixtureId);
+
+    public float? Condition => ConsoleFixture?.Condition;
+
     public float? CurrentVerbProgress =>
-        _traveling ? 1f - (float)(_travelTimer!.TimeLeft / _travelTimer.WaitTime) : null;
+        _traveling ? 1f - (float)(_travelTimer!.TimeLeft / _travelTimer.WaitTime)
+        : _maintaining ? 1f - (float)(_maintenanceTimer!.TimeLeft / _maintenanceTimer.WaitTime)
+        : null;
 
     public override void _Ready()
     {
@@ -122,6 +159,10 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         AddChild(_travelTimer);
         _travelTimer.Timeout += OnTravelComplete;
 
+        _maintenanceTimer = new Timer { OneShot = true, WaitTime = MaintainTravelConsoleVerb.DurationSeconds };
+        AddChild(_maintenanceTimer);
+        _maintenanceTimer.Timeout += OnMaintenanceComplete;
+
         // Deferred: both airlocks' ShipSim refs may belong to sibling branches of the scene
         // tree that haven't built their Deck yet at this exact point in _Ready() order (see
         // ShipSim's own deferred vacuum seeding for the same reason).
@@ -143,6 +184,17 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     /// business to decide the verb opens a UI panel it doesn't own a direct scene reference to.</summary>
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
+        if (verb.Id == MaintainTravelConsoleVerb.Id || verb.Id == RepairTravelConsoleVerb.Id)
+        {
+            if (!_maintaining)
+            {
+                _maintaining = true;
+                _maintenanceTimer!.Start();
+            }
+
+            return;
+        }
+
         if (verb.Id != TravelVerb.Id || _traveling)
         {
             return;
@@ -156,6 +208,12 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 
     public void CancelVerb()
     {
+        if (_maintaining)
+        {
+            _maintaining = false;
+            _maintenanceTimer!.Stop();
+        }
+
         if (!_traveling)
         {
             return;
@@ -163,6 +221,15 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 
         _traveling = false;
         _travelTimer!.Stop();
+    }
+
+    private void OnMaintenanceComplete()
+    {
+        _maintaining = false;
+        if (ConsoleFixture is { } fixture)
+        {
+            fixture.Condition = 1f;
+        }
     }
 
     /// <summary>Called back from the travel map (via Player.ConfirmTravel) once a destination is

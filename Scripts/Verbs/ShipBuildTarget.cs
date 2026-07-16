@@ -1064,19 +1064,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         ((a.X == ExcludedEdgeColumn - 1 && b.X == ExcludedEdgeColumn) ||
          (b.X == ExcludedEdgeColumn - 1 && a.X == ExcludedEdgeColumn));
 
-    /// <summary>Picks the upkeep verb matching Ostranauts-style two-tier maintenance: full health
-    /// offers nothing, >50% offers a free (tool-only) Maintain, and ≤50% offers a Repair that
-    /// also consumes spare_parts — null at exactly 0% since a breached surface's only remaining
-    /// option is the existing, more expensive Install verb (see the breached branches above/below,
-    /// which never call this).</summary>
-    private static Verb? MaintainOrRepairVerb(float health, Verb maintainVerb, Verb repairVerb) =>
-        health >= 1f ? null : health > 0.5f ? maintainVerb : repairVerb;
-
-    /// <summary>Same tiering as <see cref="MaintainOrRepairVerb"/>, applied to whichever conduit
-    /// fixture (if any) already occupies the given slot — null if nothing's placed there.</summary>
+    /// <summary>Same tiering as <see cref="MaintenanceTier.PickVerb"/>, applied to whichever
+    /// conduit fixture (if any) already occupies the given slot — null if nothing's placed
+    /// there.</summary>
     private Verb? ConduitUpkeepVerb(ConduitSlot slot) =>
         _placedConduits.ContainsKey(slot) && ShipSimRef!.Deck.Fixtures.FirstOrDefault(f => f.Id == ConduitFixtureId(slot)) is { } fixture
-            ? MaintainOrRepairVerb(fixture.Condition, MaintainConduitVerb, RepairConduitVerb)
+            ? MaintenanceTier.PickVerb(fixture.Condition, MaintainConduitVerb, RepairConduitVerb)
             : null;
 
     /// <summary>The conduit fixture (if any) at whatever this target is currently aimed at — Tile
@@ -1121,7 +1114,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                     var floorPresent = !ShipSimRef.Deck.IsHullBreached(cell, StructuralSurface.Floor);
                     verbs.Add(floorPresent ? RemoveFloorVerb : InstallFloorVerb);
 
-                    if (floorPresent && MaintainOrRepairVerb(ShipSimRef.Deck.FloorHealth(cell), MaintainFloorVerb, RepairFloorVerb) is { } floorUpkeepVerb)
+                    if (floorPresent && MaintenanceTier.PickVerb(ShipSimRef.Deck.FloorHealth(cell), MaintainFloorVerb, RepairFloorVerb) is { } floorUpkeepVerb)
                     {
                         verbs.Add(floorUpkeepVerb);
                     }
@@ -1136,7 +1129,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 var ceilingPresent = !ShipSimRef.Deck.IsHullBreached(cell, StructuralSurface.Ceiling);
                 var verbs = new List<Verb> { ceilingPresent ? RemoveCeilingVerb : InstallCeilingVerb };
 
-                if (ceilingPresent && MaintainOrRepairVerb(ShipSimRef.Deck.CeilingHealth(cell), MaintainCeilingVerb, RepairCeilingVerb) is { } ceilingUpkeepVerb)
+                if (ceilingPresent && MaintenanceTier.PickVerb(ShipSimRef.Deck.CeilingHealth(cell), MaintainCeilingVerb, RepairCeilingVerb) is { } ceilingUpkeepVerb)
                 {
                     verbs.Add(ceilingUpkeepVerb);
                 }
@@ -1158,7 +1151,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 {
                     verbs.Add(ExtendFloorVerb);
                 }
-                else if (MaintainOrRepairVerb(ShipSimRef.Deck.WallHealth(_edgeA, _edgeB), MaintainWallVerb, RepairWallVerb) is { } boundaryWallUpkeepVerb)
+                else if (MaintenanceTier.PickVerb(ShipSimRef.Deck.WallHealth(_edgeA, _edgeB), MaintainWallVerb, RepairWallVerb) is { } boundaryWallUpkeepVerb)
                 {
                     verbs.Add(boundaryWallUpkeepVerb);
                 }
@@ -1184,7 +1177,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 var sealed_ = ShipSimRef.Deck.IsEdgeSealed(_edgeA, _edgeB);
                 var verbs = new List<Verb> { sealed_ ? RemoveWallVerb : InstallWallVerb };
 
-                if (sealed_ && MaintainOrRepairVerb(ShipSimRef.Deck.WallHealth(_edgeA, _edgeB), MaintainWallVerb, RepairWallVerb) is { } interiorWallUpkeepVerb)
+                if (sealed_ && MaintenanceTier.PickVerb(ShipSimRef.Deck.WallHealth(_edgeA, _edgeB), MaintainWallVerb, RepairWallVerb) is { } interiorWallUpkeepVerb)
                 {
                     verbs.Add(interiorWallUpkeepVerb);
                 }
@@ -1368,7 +1361,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             return [];
         }
 
-        return MaintainOrRepairVerb(fixture.Condition, MaintainVerbFor(type), RepairVerbFor(type)) is { } verb ? [verb] : [];
+        return MaintenanceTier.PickVerb(fixture.Condition, MaintainVerbFor(type), RepairVerbFor(type)) is { } verb ? [verb] : [];
     }
 
     /// <summary>Counterpart to <see cref="MachineRemovalVerbs"/> — a machine's own ExecuteVerb

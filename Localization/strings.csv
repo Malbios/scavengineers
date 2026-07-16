@@ -104,3 +104,7 @@ VERB_MAINTAIN_SWITCH,Maintain Switch,Schalter warten
 VERB_REPAIR_SWITCH,Repair Switch,Schalter reparieren
 VERB_MAINTAIN_RECHARGE_STATION,Maintain Recharge Station,Ladestation warten
 VERB_REPAIR_RECHARGE_STATION,Repair Recharge Station,Ladestation reparieren
+VERB_MAINTAIN_BUNK,Maintain Bunk,Schlafkoje warten
+VERB_REPAIR_BUNK,Repair Bunk,Schlafkoje reparieren
+VERB_MAINTAIN_TRAVEL_CONSOLE,Maintain Travel Console,Schiffskonsole warten
+VERB_REPAIR_TRAVEL_CONSOLE,Repair Travel Console,Schiffskonsole reparieren

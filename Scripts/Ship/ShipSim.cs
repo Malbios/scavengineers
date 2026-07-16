@@ -60,6 +60,7 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     private static readonly CellCoord InteriorDoorCell = new(5, 2);
     private static readonly CellCoord StationAirlockCell = new(0, 2);
     private static readonly CellCoord DerelictAirlockCell = new(11, 2);
+    private static readonly CellCoord BunkCell = new(0, 1);
 
     /// <summary>The Derelict's starting hull breaches — a real gap cut into the wall mesh at
     /// these edges, repaired via ShipBuildTarget's generic wall-building (docs/project-plan.md
@@ -125,6 +126,7 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     public const string InteriorDoorFixtureId = "interior_door_power";
     public const string StationAirlockFixtureId = "station_airlock_power";
     public const string DerelictAirlockFixtureId = "derelict_airlock_power";
+    public const string BunkFixtureId = "bunk";
 
     // Placeholder/tunable — one power cell (see StationConsoleVerbTarget's economy) restores
     // this fraction of a full charge.
@@ -150,6 +152,12 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     /// should stay spent even after its hull is patched.</summary>
     [Export]
     public bool HasLifeSupport { get; set; }
+
+    /// <summary>Whether this ship has a Bunk (see BunkVerbTarget) with its own Deck-tracked wear —
+    /// true only for the Home Ship. Independent of <see cref="HasPowerGrid"/>: a bunk doesn't
+    /// need power, so this must not be nested inside that gate.</summary>
+    [Export]
+    public bool HasBunk { get; set; }
 
     public Deck Deck { get; private set; } = null!;
 
@@ -259,6 +267,11 @@ public partial class ShipSim : Node, IShipLayoutSaveable
             Deck.AddFixture(new MachineFixture(DerelictAirlockFixtureId, DerelictAirlockCell, FixtureSurface.FloorUnderside));
 
             _power = new PowerSystem(Deck);
+        }
+
+        if (HasBunk)
+        {
+            Deck.AddFixture(new MachineFixture(BunkFixtureId, BunkCell, FixtureSurface.FloorUnderside));
         }
 
         if (HasFireHazard)

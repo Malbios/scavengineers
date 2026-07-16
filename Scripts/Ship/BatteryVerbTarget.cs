@@ -38,6 +38,12 @@ public partial class BatteryVerbTarget : StaticBody3D, IVerbTarget, IStateSaveab
 
     public string? DisplayNameKey => "OBJECT_BATTERY";
 
+    /// <summary>The battery's own Condition already means charge, not wear (it's excluded from
+    /// WearSystem's passive decay) — this just surfaces that existing value for the PDA's scan
+    /// mode, same as everything else with a Condition. No Maintain/Repair verbs here: charge
+    /// already has its own Recharge verb + drain mechanic.</summary>
+    public float? Condition => ShipSimRef?.BatteryChargeFraction;
+
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 
     // Hidden once already full — mirrors SellVerbs only showing while there's something to
