@@ -272,6 +272,27 @@ public class DeckTests
     }
 
     [Fact]
+    public void SetFloorCeilingWallHealth_AssignsTheExactValue_WithNoClampingOrBreachSideEffect()
+    {
+        var deck = new Deck();
+        var cell = new CellCoord(0, 0);
+        var neighbor = new CellCoord(1, 0);
+
+        deck.SetFloorHealth(cell, 0.4f);
+        deck.SetCeilingHealth(cell, 0.6f);
+        deck.SetWallHealth(cell, neighbor, 0f);
+
+        Assert.Equal(0.4f, deck.FloorHealth(cell));
+        Assert.Equal(0.6f, deck.CeilingHealth(cell));
+        Assert.Equal(0f, deck.WallHealth(cell, neighbor));
+        // Unlike DamageFloor/DamageCeiling/DamageWall, reaching 0 here never breaches anything —
+        // save/load restore (the only caller) applies breach state separately and explicitly.
+        Assert.False(deck.IsHullBreached(cell, StructuralSurface.Floor));
+        Assert.False(deck.IsHullBreached(cell, StructuralSurface.Ceiling));
+        Assert.False(deck.IsWallEdgeBreached(cell, neighbor));
+    }
+
+    [Fact]
     public void AddFixture_IsRetrievableFromFixturesList()
     {
         var deck = new Deck();

@@ -161,6 +161,16 @@ public sealed class Deck
 
     public void RepairWall(CellCoord a, CellCoord b) => _wallHealth[Normalize(a, b)] = 1f;
 
+    /// <summary>Sets health to an absolute value with no clamping or breach side-effect — used
+    /// only by save/load restore (see ShipBuildTarget.ApplyBuildState), which reconstructs breach
+    /// state separately and explicitly; DamageFloor's own breach-on-zero side effect would be
+    /// redundant (and load-order-dependent) here.</summary>
+    public void SetFloorHealth(CellCoord cell, float health) => _floorHealth[cell] = health;
+
+    public void SetCeilingHealth(CellCoord cell, float health) => _ceilingHealth[cell] = health;
+
+    public void SetWallHealth(CellCoord a, CellCoord b, float health) => _wallHealth[Normalize(a, b)] = health;
+
     public void IgniteFire(CellCoord cell) => _fires.Add(cell);
 
     public void ExtinguishFire(CellCoord cell) => _fires.Remove(cell);

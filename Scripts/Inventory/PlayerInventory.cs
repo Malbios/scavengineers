@@ -29,6 +29,10 @@ public sealed class PlayerInventory
     // tank/filter/battery sub-slots are tracked separately, see SpecializedSlot).
     public const int TorsoSlotCount = 2;
 
+    // The PDA's one cartridge pocket — room to grow later (see the PDA equip slot's own doc
+    // comment) without a redesign.
+    public const int PdaSlotCount = 1;
+
     // The fixed slot-name priority Add/TryRemove/Unequip use when more than one container is
     // worn at once — matches this codebase's original "backpack before hand" behavior exactly
     // when only "back" is worn, and extends predictably as more simultaneously-wearable

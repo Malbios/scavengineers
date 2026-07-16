@@ -91,11 +91,33 @@ public sealed class BuildTargetSaveData
     /// CeilingBreaches entries may reference one of these cells. Purely additive: empty for any
     /// save predating dynamic ship expansion.</summary>
     public List<TileCoord> ExtendedCells { get; set; } = new();
+
+    /// <summary>Only entries below full health (1.0) are saved — missing means default full
+    /// health, same "absence is the default" convention Deck.FloorHealth/CeilingHealth/WallHealth
+    /// already use (see WearSystem/ShipBuildTarget's Maintain/Repair verbs). Purely additive:
+    /// empty for any save predating structural wear.</summary>
+    public List<TileHealthCoord> FloorHealthEntries { get; set; } = new();
+
+    public List<TileHealthCoord> CeilingHealthEntries { get; set; } = new();
+
+    public List<EdgeHealthCoord> WallHealthEntries { get; set; } = new();
+
+    /// <summary>A placed conduit fixture's own Condition (wear), keyed by its ConduitFixtureId —
+    /// a plain string key serializes natively (unlike Scavengineers.Sim.Grid.CellCoord, which
+    /// can't back a JSON dictionary key without a custom converter — the reason
+    /// FloorHealthEntries/CeilingHealthEntries/WallHealthEntries above are lists of coord+health
+    /// structs instead of dictionaries). Only entries below full health are saved, same
+    /// convention as those lists.</summary>
+    public Dictionary<string, float> ConduitConditions { get; set; } = new();
 }
 
 public readonly record struct TileCoord(int X, int Y);
 
 public readonly record struct EdgeCoord(int AX, int AY, int BX, int BY);
+
+public readonly record struct TileHealthCoord(int X, int Y, float Health);
+
+public readonly record struct EdgeHealthCoord(int AX, int AY, int BX, int BY, float Health);
 
 /// <summary>Slot defaults to 1 (today's top height, 2 slots per wall) so a save written before
 /// wall conduits had height slots keeps its wire at the same visual height it was saved at.</summary>
@@ -104,8 +126,12 @@ public readonly record struct WallConduitCoord(int TileX, int TileY, int Neighbo
 /// <summary>State is each machine's own extra save data, stringified (Battery's charge fraction,
 /// Switch's on/off bool) — null for a stateless machine (Recharge Station). Applied directly to
 /// the freshly spawned instance on load, not through the generic "saveable" group scan (a
-/// dynamically spawned machine is never in that group).</summary>
-public readonly record struct MachineCoord(string Type, int EdgeAX, int EdgeAY, int EdgeBX, int EdgeBY, string? State);
+/// dynamically spawned machine is never in that group). Condition is a separate field (not part
+/// of State) since it's the machine's own Deck fixture wear, not its ApplySaveState string —
+/// Battery is excluded from wear entirely (its own Condition already means charge, tracked via
+/// State), so Condition defaults to 1f (full health) and is only meaningful for Switch/
+/// RechargeStation.</summary>
+public readonly record struct MachineCoord(string Type, int EdgeAX, int EdgeAY, int EdgeBX, int EdgeBY, string? State, float Condition = 1f);
 
 /// <summary>A draggable HUD window's top-left position (see Scripts/Player/DraggableWindow.cs).
 /// Nullable on PlayerSaveData rather than defaulted to a sentinel — a dragged window can
@@ -295,4 +321,24 @@ public sealed class PlayerSaveData
     public float CO2Percent { get; set; }
 
     public WindowPosition? SuitWindow { get; set; }
+
+    /// <summary>Null when the PDA isn't currently worn — same nullable-item-id shape as
+    /// <see cref="TorsoItemId"/>.</summary>
+    public string? PdaItemId { get; set; }
+
+    /// <summary>Whether the player possesses a PDA at all — worn, merely held, or stored —
+    /// independent of <see cref="PdaItemId"/> (which only means "currently worn"). Same
+    /// owned-anywhere-vs-worn shape as <see cref="HasEvaSuit"/>/<see cref="TorsoItemId"/>. False
+    /// for an old save predating the PDA (falls back to PdaItemId at restore) or one with no PDA
+    /// owned anywhere.</summary>
+    public bool HasPda { get; set; }
+
+    /// <summary>The PDA's one cartridge pocket — same SlotSaveData shape as <see
+    /// cref="TorsoSlots"/>, no legacy-dict fallback needed (brand-new field). Captures contents
+    /// whenever the PDA is owned at all (see <see cref="HasPda"/>), not just worn.</summary>
+    public List<SlotSaveData?> PdaSlots { get; set; } = new();
+
+    public int PdaSlotCount { get; set; } = PlayerInventory.PdaSlotCount;
+
+    public WindowPosition? PdaWindow { get; set; }
 }

@@ -2399,11 +2399,23 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             {
                 data.Conduits.Add(new TileCoord(slot.Tile.X, slot.Tile.Y));
             }
+
+            var conduitHealth = ShipSimRef!.Deck.Fixtures.FirstOrDefault(f => f.Id == ConduitFixtureId(slot))?.Condition ?? 1f;
+            if (conduitHealth < 1f)
+            {
+                data.ConduitConditions[ConduitFixtureId(slot)] = conduitHealth;
+            }
         }
 
         foreach (var (a, b) in _placedWalls.Keys)
         {
             data.Walls.Add(new EdgeCoord(a.X, a.Y, b.X, b.Y));
+
+            var wallHealth = ShipSimRef!.Deck.WallHealth(a, b);
+            if (wallHealth < 1f)
+            {
+                data.WallHealthEntries.Add(new EdgeHealthCoord(a.X, a.Y, b.X, b.Y, wallHealth));
+            }
         }
 
         foreach (var cell in _floorPanels.Keys)
@@ -2411,6 +2423,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             if (ShipSimRef!.Deck.IsHullBreached(cell, StructuralSurface.Floor))
             {
                 data.FloorBreaches.Add(new TileCoord(cell.X, cell.Y));
+            }
+
+            var floorHealth = ShipSimRef.Deck.FloorHealth(cell);
+            if (floorHealth < 1f)
+            {
+                data.FloorHealthEntries.Add(new TileHealthCoord(cell.X, cell.Y, floorHealth));
             }
         }
 
@@ -2420,11 +2438,20 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             {
                 data.CeilingBreaches.Add(new TileCoord(cell.X, cell.Y));
             }
+
+            var ceilingHealth = ShipSimRef.Deck.CeilingHealth(cell);
+            if (ceilingHealth < 1f)
+            {
+                data.CeilingHealthEntries.Add(new TileHealthCoord(cell.X, cell.Y, ceilingHealth));
+            }
         }
 
         foreach (var (type, placed) in _placedMachines)
         {
-            data.Machines.Add(new MachineCoord(ItemIdFor(type), placed.EdgeA.X, placed.EdgeA.Y, placed.EdgeB.X, placed.EdgeB.Y, MachineStateOf(type, placed.Node)));
+            var machineHealth = MachineFixtureIdFor(type) is { } machineFixtureId
+                ? ShipSimRef!.Deck.Fixtures.FirstOrDefault(f => f.Id == machineFixtureId)?.Condition ?? 1f
+                : 1f;
+            data.Machines.Add(new MachineCoord(ItemIdFor(type), placed.EdgeA.X, placed.EdgeA.Y, placed.EdgeB.X, placed.EdgeB.Y, MachineStateOf(type, placed.Node), machineHealth));
         }
 
         foreach (var cell in _extendedCells)
@@ -2490,6 +2517,14 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             InstallConduit(new ConduitSlot(tile, neighbor, slot));
         }
 
+        foreach (var (fixtureId, health) in state.ConduitConditions)
+        {
+            if (ShipSimRef!.Deck.Fixtures.FirstOrDefault(f => f.Id == fixtureId) is { } conduitFixture)
+            {
+                conduitFixture.Condition = health;
+            }
+        }
+
         foreach (var edge in state.Walls)
         {
             var a = new CellCoord(edge.AX, edge.AY);
@@ -2505,6 +2540,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             }
 
             SpawnWallSegment(a, b);
+        }
+
+        foreach (var entry in state.WallHealthEntries)
+        {
+            ShipSimRef!.Deck.SetWallHealth(new CellCoord(entry.AX, entry.AY), new CellCoord(entry.BX, entry.BY), entry.Health);
         }
 
         // ClearAllBuildState just breached every floor/ceiling tile as its own "removed"
@@ -2538,6 +2578,16 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             RefreshCeilingPanelState(new Vector2I(tile.X, tile.Y));
         }
 
+        foreach (var entry in state.FloorHealthEntries)
+        {
+            ShipSimRef!.Deck.SetFloorHealth(new CellCoord(entry.X, entry.Y), entry.Health);
+        }
+
+        foreach (var entry in state.CeilingHealthEntries)
+        {
+            ShipSimRef!.Deck.SetCeilingHealth(new CellCoord(entry.X, entry.Y), entry.Health);
+        }
+
         foreach (var machine in state.Machines)
         {
             if (MachineTypeFromItemId(machine.Type) is not { } type)
@@ -2547,6 +2597,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             }
 
             InstallMachine(type, new CellCoord(machine.EdgeAX, machine.EdgeAY), new CellCoord(machine.EdgeBX, machine.EdgeBY), machine.State);
+
+            if (MachineFixtureIdFor(type) is { } machineFixtureId &&
+                ShipSimRef!.Deck.Fixtures.FirstOrDefault(f => f.Id == machineFixtureId) is { } machineFixture)
+            {
+                machineFixture.Condition = machine.Condition;
+            }
         }
     }
 

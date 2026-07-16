@@ -1685,6 +1685,7 @@ public partial class Player : CharacterBody3D
         var ownedBackpackItemId = OwnedBackpackItemId;
         var ownedBackpackContents = ownedBackpackItemId is not null ? _inventory.GetPersistentContents(ownedBackpackItemId) : null;
         var ownedTorsoContents = _inventory.GetPersistentContents("eva_torso_suit");
+        var ownedPdaContents = _inventory.GetPersistentContents("pda");
 
         return new PlayerSaveData
         {
@@ -1733,6 +1734,13 @@ public partial class Player : CharacterBody3D
             SuitBatteryCharge = _inventory.SuitBattery?.Charge ?? 0f,
             CO2Percent = _suitResources.CO2Percent,
             SuitWindow = new WindowPosition(_suitWindow!.Position.X, _suitWindow.Position.Y),
+            PdaItemId = _inventory.GetEquippedContainer("pda")?.ItemId,
+            HasPda = ownedPdaContents is not null,
+            PdaSlots = ownedPdaContents is not null
+                ? SlotSaveDataConverter.Capture(ownedPdaContents)
+                : new List<SlotSaveData?>(),
+            PdaSlotCount = ownedPdaContents?.Slots.Count ?? PlayerInventory.PdaSlotCount,
+            PdaWindow = new WindowPosition(_pdaWindow!.Position.X, _pdaWindow.Position.Y),
         };
     }
 
@@ -1834,6 +1842,21 @@ public partial class Player : CharacterBody3D
             _inventory.EquipContainerDirectly("head", headItemId, new SlotContainer(0));
         }
 
+        // Same owned-anywhere-first shape as the backpack/suit above — an old save predating
+        // HasPda falls back to the worn-only marker (PdaItemId), since that was the only signal
+        // available for "does this item exist" back then.
+        if (data.HasPda || data.PdaItemId is not null)
+        {
+            var pdaContents = new SlotContainer(data.PdaSlotCount);
+            SlotSaveDataConverter.Restore(pdaContents, data.PdaSlots);
+            _inventory.RestorePersistentContents("pda", pdaContents);
+        }
+
+        if (data.PdaItemId is { } pdaItemId)
+        {
+            _inventory.EquipContainerDirectly("pda", pdaItemId, new SlotContainer(data.PdaSlotCount));
+        }
+
         // Only applied when present — an old save predating this feature leaves every window at
         // its scene-authored default position.
         if (data.InventoryWindow is { } inventoryWindowPos)
@@ -1854,6 +1877,11 @@ public partial class Player : CharacterBody3D
         if (data.BackpackWindow is { } backpackWindowPos)
         {
             _backpackWindow!.Position = new Vector2(backpackWindowPos.X, backpackWindowPos.Y);
+        }
+
+        if (data.PdaWindow is { } pdaWindowPos)
+        {
+            _pdaWindow!.Position = new Vector2(pdaWindowPos.X, pdaWindowPos.Y);
         }
 
         if (data.SuitWindow is { } suitWindowPos)

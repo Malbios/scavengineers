@@ -247,4 +247,58 @@ public class PlayerSaveStateTest
         AssertBool(roundTripped.OwnedBackpackItemId == "backpack").IsTrue();
         AssertBool(roundTripped.BackpackSlots.Any(s => s?.ItemId == "scrap_metal")).IsTrue();
     }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void ApplyThenCapturePlayerState_RoundTripsAWornPdaAndItsCartridge()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+
+        var data = new PlayerSaveData
+        {
+            PdaItemId = "pda",
+            HasPda = true,
+            PdaSlots = new List<SlotSaveData?> { new() { ItemId = "health_scan_cartridge", Count = 1, Charge = 1f } },
+            PdaSlotCount = 1,
+        };
+
+        player.ApplyPlayerState(data);
+        var roundTripped = player.CapturePlayerState();
+
+        AssertBool(roundTripped.PdaItemId == "pda").IsTrue();
+        AssertBool(roundTripped.HasPda).IsTrue();
+        AssertBool(roundTripped.PdaSlots.Any(s => s?.ItemId == "health_scan_cartridge")).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void ApplyPlayerState_ARestoredPdaHeldNotWorn_RestoresItsCartridgeAnyway()
+    {
+        // Same gap as the EVA suit/backpack cases above — a PDA that's merely held (not equipped
+        // into "pda") must still restore its cartridge pocket, not silently lose it because
+        // PdaItemId is null.
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+
+        var data = new PlayerSaveData
+        {
+            PdaItemId = null, // not worn
+            HasPda = true, // but owned
+            PdaSlots = new List<SlotSaveData?> { new() { ItemId = "health_scan_cartridge", Count = 1, Charge = 1f } },
+            PdaSlotCount = 1,
+        };
+
+        player.ApplyPlayerState(data);
+
+        AssertBool(player.Inventory.GetEquippedContainer("pda") is null).IsTrue();
+        var pocketContents = player.Inventory.GetPersistentContents("pda");
+        AssertBool(pocketContents is not null).IsTrue();
+        AssertBool(pocketContents!.CountOf("health_scan_cartridge") == 1).IsTrue();
+
+        var roundTripped = player.CapturePlayerState();
+        AssertBool(roundTripped.PdaItemId is null).IsTrue();
+        AssertBool(roundTripped.HasPda).IsTrue();
+        AssertBool(roundTripped.PdaSlots.Any(s => s?.ItemId == "health_scan_cartridge")).IsTrue();
+    }
 }
