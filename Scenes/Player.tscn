@@ -372,7 +372,7 @@ custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 size_flags_horizontal = 4
 script = ExtResource("3")
-IsDrillBatterySlot = true
+SpecializedSlotKey = "drill_battery"
 EmptySlotNameKey = "HUD_DRILL_BATTERY_SLOT"
 Tooltip = NodePath("../../../InventoryTooltip")
 
@@ -440,7 +440,7 @@ custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 size_flags_horizontal = 4
 script = ExtResource("3")
-IsFlashlightBatterySlot = true
+SpecializedSlotKey = "flashlight_battery"
 EmptySlotNameKey = "HUD_FLASHLIGHT_BATTERY_SLOT"
 Tooltip = NodePath("../../../InventoryTooltip")
 

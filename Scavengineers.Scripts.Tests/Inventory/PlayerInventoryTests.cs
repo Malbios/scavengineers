@@ -192,126 +192,138 @@ public class PlayerInventoryTests : IDisposable
     }
 
     [Fact]
-    public void EjectDrillBattery_PreservesItsRealChargeInTheResultingItem()
+    public void EjectSpecializedSlot_PreservesItsRealChargeInTheResultingItem()
     {
         var inventory = new PlayerInventory();
-        inventory.AttachDrill(hasBattery: true, charge: 0.42f);
+        inventory.AttachSpecializedSlot("drill_battery", hasItem: true, charge: 0.42f);
 
-        Assert.True(inventory.EjectDrillBattery());
+        Assert.True(inventory.EjectSpecializedSlot("drill_battery"));
 
-        Assert.False(inventory.Drill!.HasBattery);
+        Assert.False(inventory.Drill!.HasItem);
         var ejected = inventory.Hands.Slots.First(s => s?.ItemId == "battery");
         Assert.Equal(0.42f, ejected!.Value.Charge);
     }
 
     [Fact]
-    public void InsertDrillBattery_HonorsTheSpareBatterysRealCharge_NotRefillingToFull()
+    public void InsertIntoSpecializedSlot_HonorsTheSpareItemsRealCharge_NotRefillingToFull()
     {
         var inventory = new PlayerInventory();
-        inventory.AttachDrill(hasBattery: true, charge: 0.42f);
-        inventory.EjectDrillBattery(); // drill now empty; a 42%-charged battery sits in a hand
+        inventory.AttachSpecializedSlot("drill_battery", hasItem: true, charge: 0.42f);
+        inventory.EjectSpecializedSlot("drill_battery"); // drill now empty; a 42%-charged battery sits in a hand
 
-        Assert.True(inventory.InsertDrillBattery());
+        Assert.True(inventory.InsertIntoSpecializedSlot("drill_battery"));
 
         Assert.Equal(0.42f, inventory.Drill!.Charge);
     }
 
     [Fact]
-    public void EjectDrillBatteryForWorld_ReturnsRealChargeAndClearsTheDrillsBattery_WithNoInventoryDestination()
+    public void EjectSpecializedSlotForWorld_ReturnsRealChargeAndClearsTheSlot_WithNoInventoryDestination()
     {
         var inventory = new PlayerInventory();
-        inventory.AttachDrill(hasBattery: true, charge: 0.42f);
+        inventory.AttachSpecializedSlot("drill_battery", hasItem: true, charge: 0.42f);
 
-        var charge = inventory.EjectDrillBatteryForWorld();
+        var charge = inventory.EjectSpecializedSlotForWorld("drill_battery");
 
         Assert.Equal(0.42f, charge);
-        Assert.False(inventory.Drill!.HasBattery);
+        Assert.False(inventory.Drill!.HasItem);
         Assert.Equal(0, inventory.CountOf("battery")); // nothing landed in a hand/backpack slot
     }
 
     [Fact]
-    public void EjectDrillBatteryForWorld_ReturnsNull_WhenNoBatteryIsInstalled()
+    public void EjectSpecializedSlotForWorld_ReturnsNull_WhenNoItemIsInstalled()
     {
         var inventory = new PlayerInventory();
-        inventory.AttachDrill(hasBattery: false, charge: 0f);
+        inventory.AttachSpecializedSlot("drill_battery", hasItem: false, charge: 0f);
 
-        Assert.Null(inventory.EjectDrillBatteryForWorld());
+        Assert.Null(inventory.EjectSpecializedSlotForWorld("drill_battery"));
     }
 
     [Fact]
-    public void EjectFlashlightBatteryForWorld_ReturnsRealChargeAndClearsTheFlashlightsBattery_WithNoInventoryDestination()
+    public void EjectSpecializedSlotForWorld_WorksIdenticallyForTheFlashlightSlot()
     {
         var inventory = new PlayerInventory();
-        inventory.AttachFlashlight(hasBattery: true, charge: 0.7f);
+        inventory.AttachSpecializedSlot("flashlight_battery", hasItem: true, charge: 0.7f);
 
-        var charge = inventory.EjectFlashlightBatteryForWorld();
+        var charge = inventory.EjectSpecializedSlotForWorld("flashlight_battery");
 
         Assert.Equal(0.7f, charge);
-        Assert.False(inventory.Flashlight!.HasBattery);
+        Assert.False(inventory.Flashlight!.HasItem);
         Assert.Equal(0, inventory.CountOf("battery"));
     }
 
     [Fact]
-    public void EjectFlashlightBattery_PreservesItsRealChargeInTheResultingItem()
+    public void EjectSpecializedSlot_PreservesItsRealCharge_ForTheFlashlightSlotToo()
     {
         var inventory = new PlayerInventory();
-        inventory.AttachFlashlight(hasBattery: true, charge: 0.7f);
+        inventory.AttachSpecializedSlot("flashlight_battery", hasItem: true, charge: 0.7f);
 
-        Assert.True(inventory.EjectFlashlightBattery());
+        Assert.True(inventory.EjectSpecializedSlot("flashlight_battery"));
 
-        Assert.False(inventory.Flashlight!.HasBattery);
+        Assert.False(inventory.Flashlight!.HasItem);
         var ejected = inventory.Hands.Slots.First(s => s?.ItemId == "battery");
         Assert.Equal(0.7f, ejected!.Value.Charge);
     }
 
     [Fact]
-    public void InsertFlashlightBattery_HonorsTheSpareBatterysRealCharge_NotRefillingToFull()
+    public void InsertIntoSpecializedSlot_HonorsTheSpareItemsRealCharge_ForTheFlashlightSlotToo()
     {
         var inventory = new PlayerInventory();
-        inventory.AttachFlashlight(hasBattery: true, charge: 0.7f);
-        inventory.EjectFlashlightBattery(); // flashlight now empty; a 70%-charged battery sits in a hand
+        inventory.AttachSpecializedSlot("flashlight_battery", hasItem: true, charge: 0.7f);
+        inventory.EjectSpecializedSlot("flashlight_battery"); // flashlight now empty; a 70%-charged battery sits in a hand
 
-        Assert.True(inventory.InsertFlashlightBattery());
+        Assert.True(inventory.InsertIntoSpecializedSlot("flashlight_battery"));
 
         Assert.Equal(0.7f, inventory.Flashlight!.Charge);
     }
 
     [Fact]
-    public void EjectDrillBatteryTo_MovesTheRealChargeIntoTheGivenSlot_AndClearsTheDrill()
+    public void EjectSpecializedSlotTo_MovesTheRealChargeIntoTheGivenSlot_AndClearsTheDrill()
     {
         var inventory = new PlayerInventory();
-        inventory.AttachDrill(hasBattery: true, charge: 0.42f);
+        inventory.AttachSpecializedSlot("drill_battery", hasItem: true, charge: 0.42f);
         var container = new SlotContainer(1);
 
-        Assert.True(inventory.EjectDrillBatteryTo(container, 0));
+        Assert.True(inventory.EjectSpecializedSlotTo("drill_battery", container, 0));
 
-        Assert.False(inventory.Drill!.HasBattery);
+        Assert.False(inventory.Drill!.HasItem);
         Assert.Equal(("battery", 1, 0.42f), container.Slots[0]);
     }
 
     [Fact]
-    public void EjectDrillBatteryTo_ReturnsFalse_WhenTheTargetSlotIsAlreadyOccupied()
+    public void EjectSpecializedSlotTo_ReturnsFalse_WhenTheTargetSlotIsAlreadyOccupied()
     {
         var inventory = new PlayerInventory();
-        inventory.AttachDrill(hasBattery: true, charge: 0.42f);
+        inventory.AttachSpecializedSlot("drill_battery", hasItem: true, charge: 0.42f);
         var container = new SlotContainer(1);
         container.SetSlot(0, ("widget", 1, 1f));
 
-        Assert.False(inventory.EjectDrillBatteryTo(container, 0));
+        Assert.False(inventory.EjectSpecializedSlotTo("drill_battery", container, 0));
 
-        Assert.True(inventory.Drill!.HasBattery); // untouched — the eject never happened
+        Assert.True(inventory.Drill!.HasItem); // untouched — the eject never happened
     }
 
     [Fact]
-    public void EjectFlashlightBatteryTo_MovesTheRealChargeIntoTheGivenSlot_AndClearsTheFlashlight()
+    public void EjectSpecializedSlotTo_MovesTheRealChargeIntoTheGivenSlot_ForTheFlashlightSlotToo()
     {
         var inventory = new PlayerInventory();
-        inventory.AttachFlashlight(hasBattery: true, charge: 0.7f);
+        inventory.AttachSpecializedSlot("flashlight_battery", hasItem: true, charge: 0.7f);
         var container = new SlotContainer(1);
 
-        Assert.True(inventory.EjectFlashlightBatteryTo(container, 0));
+        Assert.True(inventory.EjectSpecializedSlotTo("flashlight_battery", container, 0));
 
-        Assert.False(inventory.Flashlight!.HasBattery);
+        Assert.False(inventory.Flashlight!.HasItem);
         Assert.Equal(("battery", 1, 0.7f), container.Slots[0]);
+    }
+
+    [Fact]
+    public void DrainSpecializedSlot_ClampsAtZero_AndIsANoOp_WhenTheSlotDoesNotExist()
+    {
+        var inventory = new PlayerInventory();
+        inventory.AttachSpecializedSlot("drill_battery", hasItem: true, charge: 0.1f);
+
+        inventory.DrainSpecializedSlot("drill_battery", 0.5f);
+        Assert.Equal(0f, inventory.Drill!.Charge);
+
+        inventory.DrainSpecializedSlot("nonexistent_slot", 0.5f); // no-op, no exception
     }
 }

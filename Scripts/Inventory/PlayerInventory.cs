@@ -49,34 +49,63 @@ public sealed class PlayerInventory
 
     public EquippedContainer? Torso => _equippedContainers.GetValueOrDefault("torso");
 
-    /// <summary>A power drill's own battery — the first item with real per-instance state that
-    /// isn't a worn container (see <see cref="EquippedContainer"/>). Deliberately not a generic
+    /// <summary>A device's own swappable battery/tank — the shape a power drill's, flashlight's,
+    /// or (later) an EVA suit tank's per-instance state takes. Deliberately not a generic
     /// slot-level extension to <see cref="SlotContainer"/> (that would touch every inventory
-    /// consumer for one tool) — just enough state riding alongside the "power_drill" item,
-    /// wherever it currently sits (hand or backpack), independent of location the same way
-    /// <see cref="Backpack"/>'s existence doesn't care which hand it was equipped from.</summary>
-    public sealed class DrillState
+    /// consumer for one tool) — just enough state riding alongside the item that owns it,
+    /// wherever it currently sits (hand or worn container), independent of location the same way
+    /// a worn container's existence doesn't care which hand it was equipped from.</summary>
+    public sealed class SpecializedSlot
     {
-        public bool HasBattery { get; set; }
+        public bool HasItem { get; set; }
 
-        /// <summary>0-1; meaningless while <see cref="HasBattery"/> is false.</summary>
+        /// <summary>0-1; meaningless while <see cref="HasItem"/> is false.</summary>
         public float Charge { get; set; }
     }
 
-    public DrillState? Drill { get; private set; }
-
-    /// <summary>A flashlight's own battery — the same per-instance-state shape as
-    /// <see cref="DrillState"/>, since removing the player's generic Power stat left the
-    /// flashlight with nothing limiting continuous use.</summary>
-    public sealed class FlashlightState
+    /// <summary>Which real inventory item id each specialized sub-slot accepts — the one place
+    /// that grows when a new sub-slot is added (e.g. the EVA suit's O2/N2/filter/battery tanks),
+    /// instead of a new bespoke class + a new branch in every dispatch site.</summary>
+    private static readonly Dictionary<string, string> SpecializedSlotAcceptedItemIds = new()
     {
-        public bool HasBattery { get; set; }
+        ["drill_battery"] = "battery",
+        ["flashlight_battery"] = "battery",
+    };
 
-        /// <summary>0-1; meaningless while <see cref="HasBattery"/> is false.</summary>
-        public float Charge { get; set; }
+    public SpecializedSlot? Drill { get; private set; }
+
+    public SpecializedSlot? Flashlight { get; private set; }
+
+    /// <summary>Looks up a specialized sub-slot by key — used by <see cref="InventorySlotUI"/>
+    /// (via <see cref="InventorySlotUI.SpecializedSlotKey"/>) so a single generic code path can
+    /// drive the drill/flashlight battery slots (and later the EVA suit's tank slots) without a
+    /// bespoke branch per device.</summary>
+    public SpecializedSlot? GetSpecializedSlot(string key) => key switch
+    {
+        "drill_battery" => Drill,
+        "flashlight_battery" => Flashlight,
+        _ => null,
+    };
+
+    private void SetSpecializedSlot(string key, SpecializedSlot? value)
+    {
+        switch (key)
+        {
+            case "drill_battery":
+                Drill = value;
+                break;
+            case "flashlight_battery":
+                Flashlight = value;
+                break;
+        }
     }
 
-    public FlashlightState? Flashlight { get; private set; }
+    /// <summary>The accepted item id for a specialized sub-slot key — used by
+    /// <see cref="InventorySlotUI"/> to reject a drag before calling
+    /// <see cref="InsertIntoSpecializedSlot"/>, so dropping an unrelated item onto e.g. the
+    /// drill's battery slot can't spuriously consume an unrelated battery from elsewhere in
+    /// inventory.</summary>
+    public static string? SpecializedSlotAcceptedItemId(string key) => SpecializedSlotAcceptedItemIds.GetValueOrDefault(key);
 
     /// <summary>The raw per-slot view of the two hands (see InventorySlotUI) — a worn
     /// backpack's own contents are addressed separately via <see cref="Backpack"/>.Contents,
@@ -309,26 +338,33 @@ public sealed class PlayerInventory
     /// to gate its Pick Up verb the same way the backpack's own equip flow already does.</summary>
     public bool IsContainerSlotFree(string slotName) => !_equippedContainers.ContainsKey(slotName);
 
-    /// <summary>Attaches drill state directly — used by the fresh-game stipend (fully charged)
-    /// and by save/load restore, mirroring <see cref="EquipContainerDirectly"/>'s shape.</summary>
-    public void AttachDrill(bool hasBattery, float charge) => Drill = new DrillState { HasBattery = hasBattery, Charge = charge };
+    /// <summary>Attaches a specialized sub-slot's state directly — used by the fresh-game
+    /// stipend (fully charged) and by save/load restore, mirroring
+    /// <see cref="EquipContainerDirectly"/>'s shape.</summary>
+    public void AttachSpecializedSlot(string key, bool hasItem, float charge) =>
+        SetSpecializedSlot(key, new SpecializedSlot { HasItem = hasItem, Charge = charge });
 
-    /// <summary>Finds and removes one "battery" item — preferring the backpack over a held hand
-    /// (same order <see cref="TryRemove"/> already uses) — and reports its real <c>Charge</c>
-    /// instead of just discarding which specific instance it was, the way a plain
-    /// <see cref="TryRemove"/>+hardcoded-1f would. Scans, then removes from that exact same slot
-    /// (same read-then-remove-from-the-same-container shape as <see cref="Equip"/> above), so it
-    /// can't drift onto a different battery than the one it reported. Null if no battery exists
-    /// anywhere in the inventory.</summary>
-    private float? TryRemoveBattery()
+    /// <summary>Finds and removes one item matching `itemId` — preferring worn containers (in
+    /// <see cref="ContainerPriority"/> order) over a held hand (same order <see cref="TryRemove"/>
+    /// already uses) — and reports its real <c>Charge</c> instead of just discarding which
+    /// specific instance it was, the way a plain <see cref="TryRemove"/>+hardcoded-1f would.
+    /// Scans, then removes from that exact same slot (same read-then-remove-from-the-same-container
+    /// shape as <see cref="Equip"/> above), so it can't drift onto a different instance than the
+    /// one it reported. Null if no matching item exists anywhere in the inventory.</summary>
+    private float? TryRemoveItem(string itemId)
     {
-        if (Backpack is not null)
+        foreach (var key in ContainerPriority)
         {
-            foreach (var slot in Backpack.Contents.Slots)
+            if (!_equippedContainers.TryGetValue(key, out var container))
             {
-                if (slot is { ItemId: "battery" } found)
+                continue;
+            }
+
+            foreach (var slot in container.Contents.Slots)
+            {
+                if (slot is { } found && found.ItemId == itemId)
                 {
-                    Backpack.Contents.TryRemove("battery", 1);
+                    container.Contents.TryRemove(itemId, 1);
                     return found.Charge;
                 }
             }
@@ -336,9 +372,9 @@ public sealed class PlayerInventory
 
         foreach (var slot in _hands.Slots)
         {
-            if (slot is { ItemId: "battery" } found)
+            if (slot is { } found && found.ItemId == itemId)
             {
-                _hands.TryRemove("battery", 1);
+                _hands.TryRemove(itemId, 1);
                 return found.Charge;
             }
         }
@@ -346,141 +382,93 @@ public sealed class PlayerInventory
         return null;
     }
 
-    /// <summary>Loads a spare "battery" item (wherever it currently sits) into the drill, honoring
-    /// whichever specific battery instance came up first (see <see cref="TryRemoveBattery"/>) —
-    /// no forced-full-charge simplification anymore, a used battery installs used. No-op/false if
-    /// there's no drill, it's already loaded, or no spare battery is available.</summary>
-    public bool InsertDrillBattery()
+    /// <summary>Loads a spare item (whichever this sub-slot key accepts, wherever it currently
+    /// sits) into the specialized sub-slot, honoring whichever specific instance came up first
+    /// (see <see cref="TryRemoveItem"/>) — no forced-full-charge simplification, a used
+    /// battery/tank installs used. No-op/false if the slot doesn't exist, it's already loaded, or
+    /// no spare item is available.</summary>
+    public bool InsertIntoSpecializedSlot(string key)
     {
-        if (Drill is not { HasBattery: false } || TryRemoveBattery() is not { } charge)
+        if (GetSpecializedSlot(key) is not { HasItem: false } slot
+            || !SpecializedSlotAcceptedItemIds.TryGetValue(key, out var itemId)
+            || TryRemoveItem(itemId) is not { } charge)
         {
             return false;
         }
 
-        Drill.HasBattery = true;
-        Drill.Charge = charge;
+        slot.HasItem = true;
+        slot.Charge = charge;
         return true;
     }
 
-    /// <summary>Ejects the drill's battery back into inventory as a "battery" item carrying its
-    /// real remaining charge (see SlotContainer's Charge field) — no longer discarded on eject,
-    /// so a used battery genuinely stays used until replaced. No-op/false if there's no drill or
-    /// it's already empty.</summary>
-    public bool EjectDrillBattery()
+    /// <summary>Ejects a specialized sub-slot's item back into inventory carrying its real
+    /// remaining charge (see SlotContainer's Charge field) — no longer discarded on eject, so a
+    /// used battery/tank genuinely stays used until replaced. No-op/false if the slot doesn't
+    /// exist or it's already empty.</summary>
+    public bool EjectSpecializedSlot(string key)
     {
-        if (Drill is not { HasBattery: true })
+        if (GetSpecializedSlot(key) is not { HasItem: true } slot
+            || !SpecializedSlotAcceptedItemIds.TryGetValue(key, out var itemId))
         {
             return false;
         }
 
-        var charge = Drill.Charge;
-        Drill.HasBattery = false;
-        Drill.Charge = 0f;
-        Add("battery", 1, charge);
+        var charge = slot.Charge;
+        slot.HasItem = false;
+        slot.Charge = 0f;
+        Add(itemId, 1, charge);
         return true;
     }
 
-    /// <summary>Same battery-state mutation as <see cref="EjectDrillBattery"/>, but with no
-    /// inventory destination at all — used when the player drags the drill's battery slot straight
-    /// into the world (see Player.TryDropInWorld), which spawns a loose world pickup instead of
-    /// placing it in a slot. Returns the battery's real charge, or null if there's no installed
-    /// battery to eject.</summary>
-    public float? EjectDrillBatteryForWorld()
+    /// <summary>Same state mutation as <see cref="EjectSpecializedSlot"/>, but with no inventory
+    /// destination at all — used when the player drags a specialized slot straight into the world
+    /// (see Player.TryDropInWorld), which spawns a loose world pickup instead of placing it in a
+    /// slot. Returns the ejected item's real charge, or null if the slot was already empty.</summary>
+    public float? EjectSpecializedSlotForWorld(string key)
     {
-        if (Drill is not { HasBattery: true })
+        if (GetSpecializedSlot(key) is not { HasItem: true } slot)
         {
             return null;
         }
 
-        var charge = Drill.Charge;
-        Drill.HasBattery = false;
-        Drill.Charge = 0f;
+        var charge = slot.Charge;
+        slot.HasItem = false;
+        slot.Charge = 0f;
         return charge;
     }
 
-    /// <summary>Same battery-state mutation as <see cref="EjectDrillBattery"/>, but places the
-    /// ejected battery into a specific target slot instead of wherever <see cref="Add"/> finds
-    /// room — used when the player drags the drill's battery onto a particular hand/backpack slot
-    /// rather than dropping it in open space (see InventorySlotUI._DropData). No-op/false if
-    /// there's no installed battery to eject, or the target slot isn't actually empty.</summary>
-    public bool EjectDrillBatteryTo(SlotContainer container, int slotIndex)
+    /// <summary>Same state mutation as <see cref="EjectSpecializedSlot"/>, but places the ejected
+    /// item into a specific target slot instead of wherever <see cref="Add"/> finds room — used
+    /// when the player drags a specialized slot's item onto a particular hand/container slot
+    /// rather than dropping it in open space (see InventorySlotUI._DropData). No-op/false if the
+    /// slot was already empty, or the target slot isn't actually empty.</summary>
+    public bool EjectSpecializedSlotTo(string key, SlotContainer container, int slotIndex)
     {
-        if (Drill is not { HasBattery: true } || container.Slots[slotIndex] is not null)
+        if (GetSpecializedSlot(key) is not { HasItem: true } slot
+            || container.Slots[slotIndex] is not null
+            || !SpecializedSlotAcceptedItemIds.TryGetValue(key, out var itemId))
         {
             return false;
         }
 
-        var charge = Drill.Charge;
-        Drill.HasBattery = false;
-        Drill.Charge = 0f;
-        container.SetSlot(slotIndex, ("battery", 1, charge));
+        var charge = slot.Charge;
+        slot.HasItem = false;
+        slot.Charge = 0f;
+        container.SetSlot(slotIndex, (itemId, 1, charge));
         return true;
     }
 
-    /// <summary>Attaches flashlight battery state directly — mirrors <see cref="AttachDrill"/>'s
-    /// own fresh-game-stipend/save-load-restore usage.</summary>
-    public void AttachFlashlight(bool hasBattery, float charge) => Flashlight = new FlashlightState { HasBattery = hasBattery, Charge = charge };
-
-    /// <summary>Loads a spare "battery" item into the flashlight — mirrors
-    /// <see cref="InsertDrillBattery"/> exactly (honors the specific battery's real charge).</summary>
-    public bool InsertFlashlightBattery()
+    /// <summary>Drains a specialized sub-slot's charge by `amount` (clamped at 0) — used by the
+    /// EVA suit's sustained-thrust locomotion (burning N2) and its per-tick O2/filter/battery
+    /// draw while sealed. A no-op if the slot doesn't exist or isn't currently loaded.</summary>
+    public void DrainSpecializedSlot(string key, float amount)
     {
-        if (Flashlight is not { HasBattery: false } || TryRemoveBattery() is not { } charge)
+        if (GetSpecializedSlot(key) is not { } slot)
         {
-            return false;
+            return;
         }
 
-        Flashlight.HasBattery = true;
-        Flashlight.Charge = charge;
-        return true;
-    }
-
-    /// <summary>Ejects the flashlight's battery back into inventory — mirrors
-    /// <see cref="EjectDrillBattery"/> exactly (real remaining charge preserved).</summary>
-    public bool EjectFlashlightBattery()
-    {
-        if (Flashlight is not { HasBattery: true })
-        {
-            return false;
-        }
-
-        var charge = Flashlight.Charge;
-        Flashlight.HasBattery = false;
-        Flashlight.Charge = 0f;
-        Add("battery", 1, charge);
-        return true;
-    }
-
-    /// <summary>Same battery-state mutation as <see cref="EjectFlashlightBattery"/>, but with no
-    /// inventory destination — mirrors <see cref="EjectDrillBatteryForWorld"/> exactly.</summary>
-    public float? EjectFlashlightBatteryForWorld()
-    {
-        if (Flashlight is not { HasBattery: true })
-        {
-            return null;
-        }
-
-        var charge = Flashlight.Charge;
-        Flashlight.HasBattery = false;
-        Flashlight.Charge = 0f;
-        return charge;
-    }
-
-    /// <summary>Same battery-state mutation as <see cref="EjectFlashlightBattery"/>, but places
-    /// the ejected battery into a specific target slot — mirrors
-    /// <see cref="EjectDrillBatteryTo"/> exactly.</summary>
-    public bool EjectFlashlightBatteryTo(SlotContainer container, int slotIndex)
-    {
-        if (Flashlight is not { HasBattery: true } || container.Slots[slotIndex] is not null)
-        {
-            return false;
-        }
-
-        var charge = Flashlight.Charge;
-        Flashlight.HasBattery = false;
-        Flashlight.Charge = 0f;
-        container.SetSlot(slotIndex, ("battery", 1, charge));
-        return true;
+        slot.Charge = Math.Max(0f, slot.Charge - amount);
     }
 
     public void Clear()

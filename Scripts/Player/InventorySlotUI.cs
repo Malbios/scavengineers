@@ -28,19 +28,15 @@ public partial class InventorySlotUI : Control
     [Export]
     public bool IsBackSlot { get; set; }
 
-    /// <summary>True only for the one drill-battery slot — reads/writes the held power drill's
-    /// own battery via <see cref="PlayerRef"/>, the same non-fungible-item-via-PlayerRef shape
-    /// <see cref="IsBackSlot"/> already established. Shows a synthetic "battery" slot (count
-    /// always 1) when the drill has one installed — the drill's actual charge is shown
-    /// separately (HUD/ResourcesPanel's DrillBar), not on this slot.</summary>
+    /// <summary>Non-empty only for a specialized sub-slot (e.g. "drill_battery",
+    /// "flashlight_battery", or the EVA suit's tank slots) — reads/writes that device's own
+    /// battery/tank via <see cref="PlayerRef"/>'s generic <c>PlayerInventory.SpecializedSlot</c>
+    /// mechanism, the same non-fungible-item-via-PlayerRef shape <see cref="IsBackSlot"/> already
+    /// established. Shows a synthetic single-item slot (count always 1) when loaded — the
+    /// device's actual charge is shown separately (e.g. HUD/ResourcesPanel's DrillBar), not on
+    /// this slot. Empty string = ordinary slot.</summary>
     [Export]
-    public bool IsDrillBatterySlot { get; set; }
-
-    /// <summary>True only for the one flashlight-battery slot — same PlayerRef-addressed,
-    /// synthetic-single-slot shape as <see cref="IsDrillBatterySlot"/>, just for the flashlight's
-    /// own battery instead of the drill's.</summary>
-    [Export]
-    public bool IsFlashlightBatterySlot { get; set; }
+    public string SpecializedSlotKey { get; set; } = "";
 
     /// <summary>Localization key shown by <see cref="OnMouseEntered"/> when this slot has
     /// nothing in it — an empty slot otherwise gives no hover feedback about what it's for.</summary>
@@ -97,9 +93,12 @@ public partial class InventorySlotUI : Control
 
         if (BatteryCharge() is { } charge)
         {
-            // A battery slot's Count is always the synthetic "1" from CurrentSlot() — showing
-            // charge instead is the actually useful number here (how much is left), not how many.
-            Tooltip.Text = $"{Tr("ITEM_BATTERY")}: {Mathf.RoundToInt(charge * 100)}%";
+            // A specialized slot's Count is always the synthetic "1" from CurrentSlot() —
+            // showing charge instead is the actually useful number here (how much is left), not
+            // how many. Named generically off CurrentSlot()'s own item id rather than assuming
+            // "battery", since a future specialized slot (e.g. an EVA suit's O2 tank) won't be.
+            var itemId = CurrentSlot()?.ItemId ?? "battery";
+            Tooltip.Text = $"{Tr("ITEM_" + itemId.ToUpperInvariant())}: {Mathf.RoundToInt(charge * 100)}%";
         }
         else if (CurrentSlot() is { } slot)
         {
@@ -125,18 +124,13 @@ public partial class InventorySlotUI : Control
     /// null, i.e. "empty slot" tooltip handling).</summary>
     private float? BatteryCharge()
     {
-        if (IsDrillBatterySlot)
+        if (SpecializedSlotKey.Length > 0)
         {
-            return PlayerRef?.Inventory.Drill is { HasBattery: true } drill ? drill.Charge : null;
+            return PlayerRef?.Inventory.GetSpecializedSlot(SpecializedSlotKey) is { HasItem: true } slot ? slot.Charge : null;
         }
 
-        if (IsFlashlightBatterySlot)
-        {
-            return PlayerRef?.Inventory.Flashlight is { HasBattery: true } flashlight ? flashlight.Charge : null;
-        }
-
-        return Container is { } c && SlotIndex >= 0 && SlotIndex < c.Slots.Count && c.Slots[SlotIndex] is { ItemId: "battery" } slot
-            ? slot.Charge
+        return Container is { } c && SlotIndex >= 0 && SlotIndex < c.Slots.Count && c.Slots[SlotIndex] is { ItemId: "battery" } slot2
+            ? slot2.Charge
             : null;
     }
 
@@ -203,55 +197,31 @@ public partial class InventorySlotUI : Control
             return;
         }
 
-        if (IsDrillBatterySlot)
+        if (SpecializedSlotKey.Length > 0)
         {
-            if (!source.IsDrillBatterySlot && source.CurrentSlot()?.ItemId == "battery")
+            if (source.SpecializedSlotKey != SpecializedSlotKey
+                && source.CurrentSlot()?.ItemId == PlayerInventory.SpecializedSlotAcceptedItemId(SpecializedSlotKey))
             {
-                PlayerRef.Inventory.InsertDrillBattery();
+                PlayerRef.Inventory.InsertIntoSpecializedSlot(SpecializedSlotKey);
             }
 
             return;
         }
 
-        if (source.IsDrillBatterySlot)
+        if (source.SpecializedSlotKey.Length > 0)
         {
-            // A real indexed Container slot (e.g. a hand or backpack slot) lands the battery
+            // A real indexed Container slot (e.g. a hand or backpack slot) lands the item
             // exactly where it was dropped, failing outright if that exact slot is occupied
             // rather than silently placing it elsewhere. Only falls back to the generic
             // "wherever there's room" placement when the target isn't a real slot at all (e.g.
-            // dropped onto the flashlight's own battery slot).
+            // dropped onto another device's own specialized slot).
             if (Container is not null)
             {
-                PlayerRef.Inventory.EjectDrillBatteryTo(Container, SlotIndex);
+                PlayerRef.Inventory.EjectSpecializedSlotTo(source.SpecializedSlotKey, Container, SlotIndex);
             }
             else
             {
-                PlayerRef.Inventory.EjectDrillBattery();
-            }
-
-            return;
-        }
-
-        if (IsFlashlightBatterySlot)
-        {
-            if (!source.IsFlashlightBatterySlot && source.CurrentSlot()?.ItemId == "battery")
-            {
-                PlayerRef.Inventory.InsertFlashlightBattery();
-            }
-
-            return;
-        }
-
-        if (source.IsFlashlightBatterySlot)
-        {
-            // Same exact-slot-or-fail placement as the drill battery branch above.
-            if (Container is not null)
-            {
-                PlayerRef.Inventory.EjectFlashlightBatteryTo(Container, SlotIndex);
-            }
-            else
-            {
-                PlayerRef.Inventory.EjectFlashlightBattery();
+                PlayerRef.Inventory.EjectSpecializedSlot(source.SpecializedSlotKey);
             }
 
             return;
@@ -272,14 +242,12 @@ public partial class InventorySlotUI : Control
             return PlayerRef?.Inventory.Backpack is { } backpack ? (backpack.ItemId, 1) : null;
         }
 
-        if (IsDrillBatterySlot)
+        if (SpecializedSlotKey.Length > 0)
         {
-            return PlayerRef?.Inventory.Drill is { HasBattery: true } ? ("battery", 1) : null;
-        }
-
-        if (IsFlashlightBatterySlot)
-        {
-            return PlayerRef?.Inventory.Flashlight is { HasBattery: true } ? ("battery", 1) : null;
+            return PlayerRef?.Inventory.GetSpecializedSlot(SpecializedSlotKey) is { HasItem: true }
+                && PlayerInventory.SpecializedSlotAcceptedItemId(SpecializedSlotKey) is { } specializedItemId
+                ? (specializedItemId, 1)
+                : null;
         }
 
         return Container is { } c && SlotIndex >= 0 && SlotIndex < c.Slots.Count && c.Slots[SlotIndex] is { } slot

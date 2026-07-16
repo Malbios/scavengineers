@@ -73,7 +73,7 @@ public class PlayerSaveStateTest
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
-        player.Inventory.AttachDrill(hasBattery: true, charge: 0.37f);
+        player.Inventory.AttachSpecializedSlot("drill_battery", hasItem: true, charge: 0.37f);
 
         // A solid target within reach, straight ahead of the camera's default forward (-Z), so
         // Player.ResolveWorldDropPosition's raycast actually has something to hit.
@@ -81,15 +81,40 @@ public class PlayerSaveStateTest
         wall.AddChild(new CollisionShape3D { Shape = new BoxShape3D() });
         sceneTree.Root.AddChild(wall);
 
-        var source = AutoFree(new InventorySlotUI { IsDrillBatterySlot = true });
+        var source = AutoFree(new InventorySlotUI { SpecializedSlotKey = "drill_battery" });
         var viewportCenter = player.GetViewport().GetVisibleRect().GetCenter();
 
         player.TryDropInWorld(source, viewportCenter);
 
-        AssertBool(player.Inventory.Drill!.HasBattery).IsFalse();
+        AssertBool(player.Inventory.Drill!.HasItem).IsFalse();
         var dropped = sceneTree.Root.GetChildren().OfType<PickupItem>().FirstOrDefault(p => p.ItemId == "battery");
         AssertBool(dropped is not null).IsTrue();
         AssertBool(Mathf.IsEqualApprox(dropped!.Charge, 0.37f)).IsTrue();
+
+        AutoFree(dropped);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TryDropInWorld_FlashlightBatterySlot_SpawnsALooseBatteryWithRealChargeAndClearsTheFlashlight()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        player.Inventory.AttachSpecializedSlot("flashlight_battery", hasItem: true, charge: 0.63f);
+
+        var wall = AutoFree(new StaticBody3D { Position = new Vector3(0, 0, -1.5f) });
+        wall.AddChild(new CollisionShape3D { Shape = new BoxShape3D() });
+        sceneTree.Root.AddChild(wall);
+
+        var source = AutoFree(new InventorySlotUI { SpecializedSlotKey = "flashlight_battery" });
+        var viewportCenter = player.GetViewport().GetVisibleRect().GetCenter();
+
+        player.TryDropInWorld(source, viewportCenter);
+
+        AssertBool(player.Inventory.Flashlight!.HasItem).IsFalse();
+        var dropped = sceneTree.Root.GetChildren().OfType<PickupItem>().FirstOrDefault(p => p.ItemId == "battery");
+        AssertBool(dropped is not null).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(dropped!.Charge, 0.63f)).IsTrue();
 
         AutoFree(dropped);
     }

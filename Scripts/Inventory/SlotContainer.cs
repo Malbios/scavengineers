@@ -13,8 +13,8 @@ namespace Scavengineers.Scripts.Inventory;
 public sealed class SlotContainer
 {
     // Charge is 1f (full) and meaningless for every item except "battery" — the same "meaningless
-    // unless a condition holds" shape PlayerInventory.DrillState/FlashlightState.Charge already
-    // use, just carried on the slot itself so a loose/dropped battery has somewhere to keep its
+    // unless a condition holds" shape PlayerInventory.SpecializedSlot.Charge already uses, just
+    // carried on the slot itself so a loose/dropped battery has somewhere to keep its
     // real remaining charge instead of it being discarded the moment it leaves a device.
     private readonly (string ItemId, int Count, float Charge)?[] _slots;
 

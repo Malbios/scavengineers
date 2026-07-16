@@ -330,9 +330,9 @@ public partial class Player : CharacterBody3D
         _inventory.Add("water_bottle", 3);
         _inventory.Add("crowbar", 1);
         _inventory.Add("power_drill", 1);
-        _inventory.AttachDrill(hasBattery: true, charge: 1f);
+        _inventory.AttachSpecializedSlot("drill_battery", hasItem: true, charge: 1f);
         _inventory.Add("flashlight", 1);
-        _inventory.AttachFlashlight(hasBattery: true, charge: 1f);
+        _inventory.AttachSpecializedSlot("flashlight_battery", hasItem: true, charge: 1f);
         _inventory.Add("debug_flashlight", 1);
         _flashlightOn = true; // starts on, same as before this was toggleable, but F now turns it off too
 
@@ -602,21 +602,12 @@ public partial class Player : CharacterBody3D
             return;
         }
 
-        if (source.IsDrillBatterySlot)
+        if (source.SpecializedSlotKey.Length > 0)
         {
-            if (_inventory.EjectDrillBatteryForWorld() is { } drillCharge)
+            if (_inventory.EjectSpecializedSlotForWorld(source.SpecializedSlotKey) is { } charge
+                && PlayerInventory.SpecializedSlotAcceptedItemId(source.SpecializedSlotKey) is { } itemId)
             {
-                InventoryOverflow.DropAt(this, "battery", 1, DroppedItemMesh!, DroppedItemShape!, DroppedItemMaterial, position, drillCharge);
-            }
-
-            return;
-        }
-
-        if (source.IsFlashlightBatterySlot)
-        {
-            if (_inventory.EjectFlashlightBatteryForWorld() is { } flashlightCharge)
-            {
-                InventoryOverflow.DropAt(this, "battery", 1, DroppedItemMesh!, DroppedItemShape!, DroppedItemMaterial, position, flashlightCharge);
+                InventoryOverflow.DropAt(this, itemId, 1, DroppedItemMesh!, DroppedItemShape!, DroppedItemMaterial, position, charge);
             }
 
             return;
@@ -1025,7 +1016,7 @@ public partial class Player : CharacterBody3D
         // can be switched off too, but skips the held/battery gating — it's a testing convenience,
         // not something you hold, and it has no battery to drain.
         var holdingFlashlight = LeftHandItemId == "flashlight" || RightHandItemId == "flashlight";
-        var realFlashlightOn = _flashlightOn && holdingFlashlight && _inventory.Flashlight is { HasBattery: true, Charge: > 0f };
+        var realFlashlightOn = _flashlightOn && holdingFlashlight && _inventory.Flashlight is { HasItem: true, Charge: > 0f };
         // Deliberately still keyed to the literal debug item, not ItemCatalog.IsToggleableLight —
         // that flag only means "the F-key toggle applies to this item," not "bypasses hand/battery
         // gating entirely, on merely carrying it." Those are different properties that happen to
@@ -1095,7 +1086,7 @@ public partial class Player : CharacterBody3D
         _drillBar!.Visible = holdingDrill;
         if (holdingDrill)
         {
-            _drillBar.Value = _inventory.Drill is { HasBattery: true } drill ? drill.Charge * 100 : 0;
+            _drillBar.Value = _inventory.Drill is { HasItem: true } drill ? drill.Charge * 100 : 0;
         }
 
         // Same "only while holding it" feedback as the drill above.
@@ -1103,7 +1094,7 @@ public partial class Player : CharacterBody3D
         _flashlightBar!.Visible = holdingFlashlight;
         if (holdingFlashlight)
         {
-            _flashlightBar.Value = _inventory.Flashlight is { HasBattery: true } flashlight ? flashlight.Charge * 100 : 0;
+            _flashlightBar.Value = _inventory.Flashlight is { HasItem: true } flashlight ? flashlight.Charge * 100 : 0;
         }
 
         UpdateVerbHud();
@@ -1245,14 +1236,14 @@ public partial class Player : CharacterBody3D
     /// the inventory — this is the single place every item-gated verb (repair hull breach,
     /// repair damaged conduit, install conduit, ...) is gated, so a target never needs its own
     /// affordability logic. One extra clause is specific to the power drill (the only stateful
-    /// tool so far, see PlayerInventory.DrillState) — holding it isn't enough, it also needs an
+    /// tool so far, see PlayerInventory.SpecializedSlot) — holding it isn't enough, it also needs an
     /// installed battery with real charge left.</summary>
     private bool IsAffordable(Verb verb) =>
         verb.Requirements.Count == 0 ||
         verb.Requirements.All(r =>
             (r.ItemId == LeftHandItemId || r.ItemId == RightHandItemId) &&
             _inventory.Has(r.ItemId, r.Count) &&
-            (r.ItemId != "power_drill" || _inventory.Drill is { HasBattery: true, Charge: > 0f }));
+            (r.ItemId != "power_drill" || _inventory.Drill is { HasItem: true, Charge: > 0f }));
 
     /// <summary>The single place a target's verbs are filtered to affordable ones and ordered
     /// for cycling/selection — every caller (Interact, CycleSelectedVerb, UpdateVerbHud) must
@@ -1357,10 +1348,10 @@ public partial class Player : CharacterBody3D
                 : new List<SlotSaveData?>(),
             BackpackSlotCount = _inventory.Backpack?.Contents.Slots.Count ?? PlayerInventory.BackpackSlotCount,
             HasDrill = _inventory.Drill is not null,
-            DrillHasBattery = _inventory.Drill?.HasBattery ?? false,
+            DrillHasBattery = _inventory.Drill?.HasItem ?? false,
             DrillCharge = _inventory.Drill?.Charge ?? 0f,
             HasFlashlight = _inventory.Flashlight is not null,
-            FlashlightHasBattery = _inventory.Flashlight?.HasBattery ?? false,
+            FlashlightHasBattery = _inventory.Flashlight?.HasItem ?? false,
             FlashlightCharge = _inventory.Flashlight?.Charge ?? 0f,
             InventoryWindow = new WindowPosition(_inventoryPanel!.Position.X, _inventoryPanel.Position.Y),
             DrillWindow = new WindowPosition(_drillWindow!.Position.X, _drillWindow.Position.Y),
@@ -1422,12 +1413,12 @@ public partial class Player : CharacterBody3D
 
         if (data.HasDrill)
         {
-            _inventory.AttachDrill(data.DrillHasBattery, data.DrillCharge);
+            _inventory.AttachSpecializedSlot("drill_battery", data.DrillHasBattery, data.DrillCharge);
         }
 
         if (data.HasFlashlight)
         {
-            _inventory.AttachFlashlight(data.FlashlightHasBattery, data.FlashlightCharge);
+            _inventory.AttachSpecializedSlot("flashlight_battery", data.FlashlightHasBattery, data.FlashlightCharge);
         }
 
         // Only applied when present — an old save predating this feature leaves every window at

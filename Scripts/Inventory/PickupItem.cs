@@ -48,8 +48,8 @@ public partial class PickupItem : RigidBody3D, IVerbTarget, IPhysicsPresenceAwar
     public int Count { get; set; } = 1;
 
     /// <summary>0-1; meaningless except for ItemId == "battery" — same shape as
-    /// PlayerInventory.DrillState/FlashlightState.Charge and SlotContainer's own per-slot Charge,
-    /// just carried on the loose world item instead.</summary>
+    /// PlayerInventory.SpecializedSlot.Charge and SlotContainer's own per-slot Charge, just
+    /// carried on the loose world item instead.</summary>
     [Export]
     public float Charge { get; set; } = 1f;
 
