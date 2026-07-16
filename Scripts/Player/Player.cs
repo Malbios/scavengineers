@@ -56,9 +56,12 @@ public partial class Player : CharacterBody3D
     private const float ZeroGDrag = 2f; // passive deceleration per second, always applied
     private const float ZeroGMaxSpeed = 3.5f;
 
-    // How close a wall/floor/ceiling/device has to be for zero-g thrust to work at all — no
-    // jetpack yet, so control only comes from pushing off something within reach.
-    private const float ZeroGControlRadius = 1.2f;
+    // Placeholder/tunable — a full N2 tank gives ~2.5 minutes of continuous thrust. A flat
+    // per-second rate while any thrust input is held, not scaled by how many direction keys are
+    // pressed at once: the actual acceleration applied is always ZeroGThrustAcceleration
+    // (thrust.Normalized() makes it direction-only), so the fuel cost should match that constant
+    // effort, not reward holding fewer keys for the same resulting push.
+    private const float N2DrainPerSecondWhileThrusting = 1f / 150f;
 
     // Placeholder/tunable — CharacterBody3D doesn't push RigidBody3D obstacles on its own
     // (MoveAndSlide resolves the character's own motion but never applies a reciprocal impulse to
@@ -1015,12 +1018,15 @@ public partial class Player : CharacterBody3D
                     thrust += Vector3.Down;
                 }
 
-                // No jetpack yet — without one, real EVA control only comes from pushing off a
-                // nearby surface, not thrusting freely through open space. Once launched, you
-                // drift (drag still applies above) until you reach something else to push off.
-                if (thrust != Vector3.Zero && IsNearSurface())
+                // The EVA suit's N2 tank is the jetpack — sustained thrust works anywhere in
+                // zero-g (no more push-off-a-surface requirement), but only while the torso is
+                // worn with a charged N2 tank. No suit/no N2/empty N2 means thrust input is
+                // simply ignored (pure drift, ZeroGDrag above still applies) — you need the suit
+                // to move under thrust in zero-g at all, matching needing it to survive there.
+                if (thrust != Vector3.Zero && _inventory.SuitN2 is { HasItem: true, Charge: > 0f })
                 {
                     velocity += thrust.Normalized() * ZeroGThrustAcceleration * moveMultiplier * (float)delta;
+                    _inventory.DrainSpecializedSlot("suit_n2", N2DrainPerSecondWhileThrusting * (float)delta);
                 }
             }
             else
@@ -1266,29 +1272,6 @@ public partial class Player : CharacterBody3D
         UpdateVerbHud();
     }
 
-    /// <summary>Whether any solid geometry (wall, floor, ceiling, device — anything with a
-    /// collider) is within <see cref="ZeroGControlRadius"/> — the zero-g "is there something to
-    /// push off of" check. A single sphere overlap query, cheap enough to run only when the
-    /// player is actually trying to thrust (see the zero-g branch of _PhysicsProcess).</summary>
-    private bool IsNearSurface()
-    {
-        var spaceState = GetWorld3D().DirectSpaceState;
-        var query = new PhysicsShapeQueryParameters3D
-        {
-            Shape = new SphereShape3D { Radius = ZeroGControlRadius },
-            Transform = new Transform3D(Basis.Identity, GlobalPosition),
-            Exclude = new Godot.Collections.Array<Rid> { GetRid() },
-            CollideWithAreas = false,
-            CollideWithBodies = true,
-            // Layer 1 only — excludes the "build_aim_only" layer (project.godot) the Home
-            // Ship's floor/ceiling aim-helper bodies live on, which never blocks movement
-            // and would otherwise make a genuine hole look like a nearby surface to push off.
-            CollisionMask = 1,
-        };
-
-        return spaceState.IntersectShape(query, maxResults: 1).Count > 0;
-    }
-
     /// <summary>No ship structure at all within a generous distance straight down — you've
     /// walked/fallen off the edge of a ship (a removed wall or floor) into open space, not just
     /// lost your footing inside a room that still has a floor nearby. Independent of room O2:
@@ -1301,13 +1284,13 @@ public partial class Player : CharacterBody3D
         var query = PhysicsRayQueryParameters3D.Create(
             GlobalPosition, GlobalPosition + Vector3.Down * FreefallRaycastDistance);
         query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        // Layer 1 only, same reasoning as IsNearSurface — the Home Ship's floor aim-helper
-        // body (layer "build_aim_only") is deliberately non-blocking and must not register
-        // as real floor here, or a genuine hole through it would never trigger zero-g.
+        // Layer 1 only — the Home Ship's floor aim-helper body (layer "build_aim_only") is
+        // deliberately non-blocking and must not register as real floor here, or a genuine hole
+        // through it would never trigger zero-g.
         query.CollisionMask = 1;
 
-        // Matches IsNearSurface's own IntersectShape(...).Count > 0 idiom — IntersectRay
-        // returns an empty Dictionary on a miss, populated (position/normal/collider/...) on a hit.
+        // IntersectRay returns an empty Dictionary on a miss, populated
+        // (position/normal/collider/...) on a hit.
         return spaceState.IntersectRay(query).Count == 0;
     }
 
