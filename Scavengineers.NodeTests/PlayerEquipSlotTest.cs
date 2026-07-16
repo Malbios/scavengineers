@@ -483,4 +483,65 @@ public class PlayerEquipSlotTest
 
         AssertBool(suitWindow.Visible).IsFalse();
     }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TryUnequipItem_Pda_ReturnsItToAHand_WhenRoomExists()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, null);
+        player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, null);
+        player.Inventory.EquipContainerDirectly("pda", "pda", new SlotContainer(1));
+
+        player.TryUnequipItem("pda");
+
+        AssertBool(player.Inventory.GetEquippedContainer("pda") is null).IsTrue();
+        AssertBool(player.Inventory.Hands.Slots.Any(s => s?.ItemId == "pda")).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TryUnequipItem_Pda_LeavesItsCartridgePersistentContentsIntact_WhileMerelyHeld()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, null);
+        player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, null);
+        player.Inventory.EquipContainerDirectly("pda", "pda", new SlotContainer(1));
+        player.Inventory.GetEquippedContainer("pda")!.Contents.Add("health_scan_cartridge", 1);
+
+        player.TryUnequipItem("pda");
+
+        AssertBool(player.Inventory.GetEquippedContainer("pda") is null).IsTrue();
+        var contents = player.Inventory.GetPersistentContents("pda");
+        AssertBool(contents is not null).IsTrue();
+        AssertBool(contents!.CountOf("health_scan_cartridge") == 1).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task ToggleItemWindow_OpensThePdaWindowAndPointsItsCartridgeSlotAtTheRightContents()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        player.Inventory.EquipContainerDirectly("pda", "pda", new SlotContainer(1));
+        player.Inventory.GetEquippedContainer("pda")!.Contents.Add("health_scan_cartridge", 1);
+
+        var pdaWindow = player.GetNode<Control>("HUD/PdaWindow");
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+        AssertBool(pdaWindow.Visible).IsFalse();
+
+        player.ToggleItemWindow("pda");
+
+        AssertBool(pdaWindow.Visible).IsTrue();
+
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+
+        var cartridgeSlot = player.GetNode<InventorySlotUI>("HUD/PdaWindow/Layout/PdaGrid/Cartridge1");
+        AssertBool(ReferenceEquals(cartridgeSlot.Container, player.Inventory.GetPersistentContents("pda"))).IsTrue();
+        AssertBool(cartridgeSlot.Container!.CountOf("health_scan_cartridge") == 1).IsTrue();
+    }
 }

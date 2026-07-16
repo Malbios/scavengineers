@@ -175,11 +175,19 @@ public partial class Player : CharacterBody3D
 
     private string? _openSuitItemId;
 
+    private string? _openPdaItemId;
+
     /// <summary>The EVA suit torso's own window — unlike the backpack's grid, its 2 pocket slots
     /// are static scene nodes (the torso's inner slot count never varies), so no
     /// rebuild-on-equip mechanism is needed, just a per-frame Container re-point.</summary>
     private Control? _suitWindow;
     private readonly InventorySlotUI?[] _suitPocketSlots = new InventorySlotUI?[2];
+
+    /// <summary>The PDA's own window — its single cartridge pocket is a static scene node (like
+    /// the suit's pockets above), room to grow into more slots later without a rebuild
+    /// mechanism being needed yet.</summary>
+    private Control? _pdaWindow;
+    private InventorySlotUI? _pdaCartridgeSlot;
     private readonly SuitResources _suitResources = new();
     private readonly PlayerNeeds _needs = new();
     private readonly PlayerInventory _inventory = new();
@@ -367,6 +375,10 @@ public partial class Player : CharacterBody3D
         {
             pocketSlot!.PlayerRef = this;
         }
+
+        _pdaWindow = GetNode<Control>("HUD/PdaWindow");
+        _pdaCartridgeSlot = GetNode<InventorySlotUI>("HUD/PdaWindow/Layout/PdaGrid/Cartridge1");
+        _pdaCartridgeSlot.PlayerRef = this;
 
         // Placeholder/tunable starting stipend for testing the free-form conduit wiring
         // extensively — same "don't wait on it" spirit as the near-instant verb durations.
@@ -965,6 +977,8 @@ public partial class Player : CharacterBody3D
         _openBackpackItemId = null;
         _suitWindow!.Visible = false;
         _openSuitItemId = null;
+        _pdaWindow!.Visible = false;
+        _openPdaItemId = null;
         _worldDropZone!.Visible = false;
 
         CaptureMouse();
@@ -1068,6 +1082,10 @@ public partial class Player : CharacterBody3D
             case "eva_torso_suit" when _inventory.GetPersistentContents(itemId) is not null:
                 _suitWindow!.Visible = !_suitWindow.Visible;
                 _openSuitItemId = _suitWindow.Visible ? itemId : null;
+                break;
+            case "pda" when _inventory.GetPersistentContents(itemId) is not null:
+                _pdaWindow!.Visible = !_pdaWindow.Visible;
+                _openPdaItemId = _pdaWindow.Visible ? itemId : null;
                 break;
         }
     }
@@ -1864,6 +1882,17 @@ public partial class Player : CharacterBody3D
         {
             pocketSlot!.Container = suitContents;
         }
+
+        // Same shape again — the PDA's single cartridge pocket, like the suit's, is a static
+        // scene node.
+        var pdaContents = _openPdaItemId is { } pdaItemId ? _inventory.GetPersistentContents(pdaItemId) : null;
+        if (pdaContents is null)
+        {
+            _pdaWindow!.Visible = false;
+            _openPdaItemId = null;
+        }
+
+        _pdaCartridgeSlot!.Container = pdaContents;
 
         _creditsLabel!.Text = Tr("HUD_CREDITS") + $": {_credits}";
 

@@ -104,6 +104,14 @@ public static class PlayerTestHarness
         suitGrid.AddChild(MakeSlot("Filter"));
         suitGrid.AddChild(MakeSlot("Battery"));
 
+        var pdaWindow = new Control { Name = "PdaWindow" };
+        hud.AddChild(pdaWindow);
+        var pdaLayout = new Node { Name = "Layout" };
+        pdaWindow.AddChild(pdaLayout);
+        var pdaGrid = new Node { Name = "PdaGrid" };
+        pdaLayout.AddChild(pdaGrid);
+        pdaGrid.AddChild(MakeSlot("Cartridge1"));
+
         var travelMapPanel = new TravelMapPanel { Name = "TravelMapPanel" };
         travelMapPanel.TravelButton = new Button();
         travelMapPanel.CancelButton = new Button();
