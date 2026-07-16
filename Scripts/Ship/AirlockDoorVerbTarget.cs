@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using System.Linq;
 
 using Godot;
 using Scavengineers.Sim.Atmosphere;
 using Scavengineers.Sim.Grid;
+using Scavengineers.Sim.ShipModel;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Scripts.Verbs;
@@ -44,6 +46,22 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
 
     // Placeholder/tunable, matching SuitResources's drain-constant convention.
     private const float BatteryDrainPerSecond = 0.05f;
+
+    // Same two-tier upkeep as everything else with a Deck-tracked Condition (see
+    // MaintenanceTier) — this airlock's own fixture (PowerFixtureId) has been passively decaying
+    // since Stage 1 with no way to repair it until now.
+    private static readonly ItemRequirement WrenchRequirement = new("wrench", 1) { Consumed = false };
+    private static readonly ItemRequirement SparePartsRequirement = new("spare_parts", 1);
+
+    private static readonly Verb MaintainAirlockVerb = new("maintain_airlock", "VERB_MAINTAIN_AIRLOCK", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement],
+    };
+
+    private static readonly Verb RepairAirlockVerb = new("repair_airlock", "VERB_REPAIR_AIRLOCK", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement, SparePartsRequirement],
+    };
 
     [Export]
     public ShipSim? ShipARef { get; set; }
@@ -102,13 +120,21 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     private bool _isOpen;
     private Material? _doorMaterial;
 
+    // A second, independent timer/bool pair — upkeep is a third, unrelated timed action on top
+    // of the existing Open/Close/Pry cycle (already juggled via _cyclingIsPry), not worth folding
+    // into that one flag at this scale.
+    private Timer? _maintenanceTimer;
+    private bool _maintaining;
+
     public bool IsOpen => _isOpen;
 
     /// <summary>Powered: the normal instant Open/Close, same as ever. Unpowered: no motor to
     /// drive the mechanism either way, so <see cref="PryVerb"/> (a crowbar, by hand) is the only
     /// option regardless of current state — it prys the airlock open if closed, or forces it shut
     /// again if already open (see <see cref="ExecuteVerb"/>, which decides the direction from the
-    /// current <see cref="IsOpen"/> state rather than from which verb was picked).</summary>
+    /// current <see cref="IsOpen"/> state rather than from which verb was picked). Maintain/Repair
+    /// is offered regardless of powered state — a console you can't currently open should still
+    /// be repairable.</summary>
     public IReadOnlyList<Verb> AvailableVerbs
     {
         get
@@ -118,19 +144,27 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
                 return [];
             }
 
-            if (ShipARef.IsPowered(PowerFixtureId))
+            var verbs = new List<Verb> { ShipARef.IsPowered(PowerFixtureId) ? (IsOpen ? CloseVerb : OpenVerb) : PryVerb };
+
+            if (AirlockFixture is { } fixture && MaintenanceTier.PickVerb(fixture.Condition, MaintainAirlockVerb, RepairAirlockVerb) is { } upkeepVerb)
             {
-                return [IsOpen ? CloseVerb : OpenVerb];
+                verbs.Add(upkeepVerb);
             }
 
-            return [PryVerb];
+            return verbs;
         }
     }
 
     public string? DisplayNameKey => "OBJECT_AIRLOCK";
 
+    private Fixture? AirlockFixture => ShipARef?.Deck.Fixtures.FirstOrDefault(f => f.Id == PowerFixtureId);
+
+    public float? Condition => AirlockFixture?.Condition;
+
     public float? CurrentVerbProgress =>
-        _cycling ? 1f - (float)(_cycleTimer!.TimeLeft / _cycleTimer.WaitTime) : null;
+        _cycling ? 1f - (float)(_cycleTimer!.TimeLeft / _cycleTimer.WaitTime)
+        : _maintaining ? 1f - (float)(_maintenanceTimer!.TimeLeft / _maintenanceTimer.WaitTime)
+        : null;
 
     public override void _Ready()
     {
@@ -144,6 +178,10 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
         _cycleTimer = new Timer { OneShot = true, WaitTime = OpenVerb.DurationSeconds };
         AddChild(_cycleTimer);
         _cycleTimer.Timeout += OnCycleComplete;
+
+        _maintenanceTimer = new Timer { OneShot = true, WaitTime = MaintainAirlockVerb.DurationSeconds };
+        AddChild(_maintenanceTimer);
+        _maintenanceTimer.Timeout += OnMaintenanceComplete;
 
         _doorMaterial = SlabMesh?.GetSurfaceOverrideMaterial(0);
     }
@@ -161,6 +199,17 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
+        if (verb.Id == MaintainAirlockVerb.Id || verb.Id == RepairAirlockVerb.Id)
+        {
+            if (!_maintaining)
+            {
+                _maintaining = true;
+                _maintenanceTimer!.Start();
+            }
+
+            return;
+        }
+
         if (_bridge is null || _cycling || (verb.Id != OpenVerb.Id && verb.Id != CloseVerb.Id && verb.Id != PryVerb.Id))
         {
             return;
@@ -175,6 +224,12 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
 
     public void CancelVerb()
     {
+        if (_maintaining)
+        {
+            _maintaining = false;
+            _maintenanceTimer!.Stop();
+        }
+
         if (!_cycling)
         {
             return;
@@ -188,6 +243,15 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     {
         _cycling = false;
         SetOpen(_pendingOpenState);
+    }
+
+    private void OnMaintenanceComplete()
+    {
+        _maintaining = false;
+        if (AirlockFixture is { } fixture)
+        {
+            fixture.Condition = 1f;
+        }
     }
 
     public bool GetSaveState() => IsOpen;

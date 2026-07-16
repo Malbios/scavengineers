@@ -108,3 +108,5 @@ VERB_MAINTAIN_BUNK,Maintain Bunk,Schlafkoje warten
 VERB_REPAIR_BUNK,Repair Bunk,Schlafkoje reparieren
 VERB_MAINTAIN_TRAVEL_CONSOLE,Maintain Travel Console,Schiffskonsole warten
 VERB_REPAIR_TRAVEL_CONSOLE,Repair Travel Console,Schiffskonsole reparieren
+VERB_MAINTAIN_AIRLOCK,Maintain Airlock,Luftschleuse warten
+VERB_REPAIR_AIRLOCK,Repair Airlock,Luftschleuse reparieren
