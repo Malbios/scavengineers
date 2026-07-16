@@ -763,6 +763,12 @@ public partial class Player : CharacterBody3D
             return;
         }
 
+        if (source.EquippedSlotName.Length > 0)
+        {
+            DropEquippedItemInWorld(source.EquippedSlotName, position);
+            return;
+        }
+
         if (source.Container is not { } container || source.SlotIndex < 0 || source.SlotIndex >= container.Slots.Count
             || container.Slots[source.SlotIndex] is not { } slot)
         {
@@ -786,6 +792,35 @@ public partial class Player : CharacterBody3D
 
         _inventory.ClearBackpack();
         SpawnDroppedContainer(backpack.ItemId, backpack.Contents, position);
+    }
+
+    /// <summary>Same "always drops it, deliberate put-down" shape as <see cref="DropBackpackInWorld"/>,
+    /// generalized to any Torso/Head equip slot — used when dragging a worn item straight into
+    /// open space (see WorldDropZone) rather than onto another slot.</summary>
+    private void DropEquippedItemInWorld(string slotName, Vector3 position)
+    {
+        if (_inventory.GetEquippedContainer(slotName) is not { } equipped)
+        {
+            return;
+        }
+
+        _inventory.ClearEquippedContainer(slotName);
+
+        if (slotName == "torso")
+        {
+            // Same eject-then-detach shape as TryUnequipItem — the torso is genuinely gone here
+            // (dropping in the world is never refused for lack of room), so this always runs.
+            _inventory.EjectSpecializedSlot("suit_o2");
+            _inventory.EjectSpecializedSlot("suit_n2");
+            _inventory.EjectSpecializedSlot("suit_filter");
+            _inventory.EjectSpecializedSlot("suit_battery");
+            _inventory.DetachSpecializedSlot("suit_o2");
+            _inventory.DetachSpecializedSlot("suit_n2");
+            _inventory.DetachSpecializedSlot("suit_filter");
+            _inventory.DetachSpecializedSlot("suit_battery");
+        }
+
+        SpawnDroppedContainer(equipped.ItemId, equipped.Contents, position);
     }
 
     /// <summary>Projects a ray from the camera through the drop's screen position — the first

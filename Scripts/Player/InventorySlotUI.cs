@@ -161,6 +161,17 @@ public partial class InventorySlotUI : Control
             return PlayerRef?.Inventory.GetSpecializedSlot(SpecializedSlotKey) is { HasItem: true } slot ? slot.Charge : null;
         }
 
+        if (IsBackSlot || EquippedSlotName.Length > 0 || IsUnusedBodySlot)
+        {
+            // None of these represent a literal "battery" item slot — a worn backpack/torso/
+            // helmet, or an always-empty Legs/feet slot, never has its own Charge to show. Without
+            // this guard they'd fall through to the generic Container/SlotIndex check below, whose
+            // Container/SlotIndex (set to Hands/0 by Player._Ready's blanket EquipSlots loop) is
+            // otherwise meaningless here — coincidentally showing a battery charge from whatever's
+            // in the player's left hand.
+            return null;
+        }
+
         return Container is { } c && SlotIndex >= 0 && SlotIndex < c.Slots.Count && c.Slots[SlotIndex] is { ItemId: "battery" } slot2
             ? slot2.Charge
             : null;
@@ -289,6 +300,14 @@ public partial class InventorySlotUI : Control
         if (IsBackSlot)
         {
             return PlayerRef?.Inventory.Backpack is { } backpack ? (backpack.ItemId, 1) : null;
+        }
+
+        if (IsUnusedBodySlot)
+        {
+            // Nothing can ever occupy Legs/LeftFoot/RightFoot — always empty, never falls through
+            // to the generic Container-based lookup below, whose Container/SlotIndex (set to
+            // Hands/0 by Player._Ready's blanket EquipSlots loop) is otherwise meaningless here.
+            return null;
         }
 
         if (EquippedSlotName.Length > 0)

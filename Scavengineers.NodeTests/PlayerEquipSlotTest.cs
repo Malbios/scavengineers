@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Threading.Tasks;
 
 using GdUnit4;
 using Godot;
@@ -172,5 +173,67 @@ public class PlayerEquipSlotTest
         var source = AutoFree(new InventorySlotUI());
 
         AssertBool(ordinarySlot!._CanDropData(Vector2.Zero, Variant.From(source))).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task UnusedBodySlot_NeverDisplaysAnItem_EvenWhenTheSharedHandsContainerHasSomethingAtIndexZero()
+    {
+        // Regression test: Player._Ready's blanket EquipSlots loop points every child's Container
+        // at _inventory.Hands (harmless for Torso/Head/SpecializedSlot-driven slots, which check
+        // their own PlayerRef-based state first) — but Legs/LeftFoot/RightFoot never set their
+        // own SlotIndex, so it defaults to 0. Before the fix, CurrentSlot() had no IsUnusedBodySlot
+        // guard and fell through to reading Hands.Slots[0] directly, showing whatever's in the
+        // player's left hand on a slot that should always be empty.
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1, 1f));
+
+        var legSlot = AutoFree(new InventorySlotUI { IsUnusedBodySlot = true, PlayerRef = player, Container = player.Inventory.Hands });
+        legSlot!.AddChild(new ColorRect { Name = "Icon" });
+        legSlot.AddChild(new Label { Name = "Count" });
+        sceneTree.Root.AddChild(legSlot);
+
+        // Two-step await (matches InteriorDoorVerbTargetTest's established convention) — a single
+        // ProcessFrame isn't always enough for _Ready() to have wired _icon/_countLabel and for
+        // _Process's own Refresh() to have run by the time we check.
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+
+        var icon = legSlot.GetNode<ColorRect>("Icon");
+        AssertBool(icon.Visible).IsFalse();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TryDropInWorld_EquippedTorsoSlot_SpawnsTheSuitAsAWorldPickup_NotWhateverIsInTheLeftHand()
+    {
+        // Regression test: TryDropInWorld had no EquippedSlotName check, so dragging a worn
+        // Torso/Head item into open space fell through to the generic Container/SlotIndex path
+        // (Hands/0) and would silently drop/clear whatever was in the left hand instead.
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        ResetTorsoAndHeadFromStipend(player.Inventory);
+        player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1, 1f));
+        var contents = new SlotContainer(2);
+        contents.Add("scrap_metal", 1);
+        player.Inventory.EquipContainerDirectly("torso", "eva_torso_suit", contents);
+
+        var wall = AutoFree(new StaticBody3D { Position = new Vector3(0, 0, -1.5f) });
+        wall.AddChild(new CollisionShape3D { Shape = new BoxShape3D() });
+        sceneTree.Root.AddChild(wall);
+
+        var source = AutoFree(new InventorySlotUI { EquippedSlotName = "torso" });
+        var viewportCenter = player.GetViewport().GetVisibleRect().GetCenter();
+
+        player.TryDropInWorld(source, viewportCenter);
+
+        AssertBool(player.Inventory.Hands.Slots[PlayerInventory.LeftHandSlotIndex]?.ItemId == "widget").IsTrue();
+        AssertBool(player.Inventory.Torso is null).IsTrue();
+        var dropped = sceneTree.Root.GetChildren().OfType<ContainerPickupItem>().FirstOrDefault(c => c.ItemId == "eva_torso_suit");
+        AssertBool(dropped is not null).IsTrue();
+        AssertBool(dropped!.Contents!.CountOf("scrap_metal") == 1).IsTrue();
+
+        AutoFree(dropped);
     }
 }
