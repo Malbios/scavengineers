@@ -188,6 +188,27 @@ public partial class Player : CharacterBody3D
     /// mechanism being needed yet.</summary>
     private Control? _pdaWindow;
     private InventorySlotUI? _pdaCartridgeSlot;
+
+    /// <summary>Toggled by the scan-mode key (see _Input) — only ever true while
+    /// <see cref="CanScan"/> also holds; forced back off the moment it stops holding (checked
+    /// once a frame alongside every other HUD-state refresh), so taking off the PDA/cartridge/
+    /// helmet mid-scan turns it off automatically rather than leaving a stale "on" state that
+    /// silently does nothing.</summary>
+    private bool _scanModeOn;
+
+    /// <summary>Test-only observability for scan mode's toggle state — matches this codebase's
+    /// existing narrow test-accessor pattern (see <see cref="SuppressMouseCaptureForTests"/>).</summary>
+    public bool ScanModeOn => _scanModeOn;
+
+    /// <summary>Gates scan mode: the PDA worn, its one cartridge pocket holding the health-scan
+    /// cartridge, and *any* helmet worn (checked via ItemCatalog.EquipSlot rather than hardcoding
+    /// "eva_helmet" — a future helmet type qualifies automatically).</summary>
+    private bool CanScan =>
+        _inventory.GetEquippedContainer("pda") is { } pda
+        && pda.Contents.CountOf("health_scan_cartridge") > 0
+        && _inventory.Head is { ItemId: { } headItemId }
+        && ItemCatalog.EquipSlot(headItemId) == "head";
+
     private readonly SuitResources _suitResources = new();
     private readonly PlayerNeeds _needs = new();
     private readonly PlayerInventory _inventory = new();
@@ -491,6 +512,12 @@ public partial class Player : CharacterBody3D
         else if (@event is InputEventKey { Keycode: Key.F, Pressed: true } && !IsBusy && !AnyPanelOpen)
         {
             UseHeldItem();
+        }
+        else if (@event is InputEventKey { Keycode: Key.V, Pressed: true } && !IsBusy && !AnyPanelOpen)
+        {
+            // Always allowed to turn off; only turns on if the gate (PDA worn + cartridge loaded
+            // + any helmet worn) actually passes — see CanScan.
+            _scanModeOn = !_scanModeOn && CanScan;
         }
         else if (@event is InputEventKey { Pressed: true } hotbarKey && !IsBusy)
         {
@@ -1591,9 +1618,17 @@ public partial class Player : CharacterBody3D
         {
             // A loose battery's real charge is worth surfacing here too, same "label (suffix)"
             // shape the verb label below already uses for Verb.DisplaySuffix.
-            _targetNameLabel!.Text = target is PickupItem { ItemId: "battery" } batteryPickup
+            var nameText = target is PickupItem { ItemId: "battery" } batteryPickup
                 ? $"{Tr(displayNameKey)} ({Mathf.RoundToInt(batteryPickup.Charge * 100)}%)"
                 : Tr(displayNameKey);
+
+            // Only while scan mode is active (see _scanModeOn/CanScan) — the PDA's health-scan
+            // cartridge is what makes the exact number visible; an ambient "this looks damaged"
+            // material cue (see ShipBuildTarget's own Maintain/Repair wiring) stays visible to
+            // everyone regardless.
+            _targetNameLabel!.Text = _scanModeOn && target.Condition is { } condition
+                ? $"{nameText} ({Mathf.RoundToInt(condition * 100)}%)"
+                : nameText;
             _targetNameLabel.Visible = true;
         }
         else
@@ -1893,6 +1928,13 @@ public partial class Player : CharacterBody3D
         }
 
         _pdaCartridgeSlot!.Container = pdaContents;
+
+        // Force scan mode off the moment its gate stops holding (PDA/cartridge/helmet removed
+        // mid-scan) — see _scanModeOn's own doc comment.
+        if (_scanModeOn && !CanScan)
+        {
+            _scanModeOn = false;
+        }
 
         _creditsLabel!.Text = Tr("HUD_CREDITS") + $": {_credits}";
 

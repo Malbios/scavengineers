@@ -81,6 +81,8 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, IStat
 
     public string? DisplayNameKey => "OBJECT_DAMAGED_CONDUIT";
 
+    public float? Condition => FindConduitFixture()?.Condition;
+
     public float? CurrentVerbProgress =>
         _actionInProgress ? 1f - (float)(_actionTimer!.TimeLeft / _actionTimer.WaitTime) : null;
 

@@ -23,4 +23,10 @@ public interface IVerbTarget
     /// player can tell what they're about to repair/pick up/toggle — null if this target
     /// doesn't have (or need) one.</summary>
     string? DisplayNameKey => null;
+
+    /// <summary>0-1 health/wear, shown as a percentage on the crosshair label while the PDA's
+    /// health-scan cartridge is active (see Player's scan mode) — null if this target has no
+    /// health concept at all (most targets; a Fixture-backed or structural-surface-backed one
+    /// overrides this with its real Deck-tracked value, see WearSystem).</summary>
+    float? Condition => null;
 }
