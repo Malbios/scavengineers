@@ -13,5 +13,7 @@
   { "id": "power_drill", "maxStackSize": 1, "color": "#4D4D4D" },
   { "id": "debug_backpack", "maxStackSize": 1, "color": "#CC00CC" },
   { "id": "flashlight", "maxStackSize": 1, "color": "#E6D659", "isToggleableLight": true },
-  { "id": "debug_flashlight", "maxStackSize": 1, "color": "#CC00CC", "isToggleableLight": true }
+  { "id": "debug_flashlight", "maxStackSize": 1, "color": "#CC00CC", "isToggleableLight": true },
+  { "id": "eva_torso_suit", "maxStackSize": 1, "color": "#4D6B57", "equipSlot": "torso" },
+  { "id": "eva_helmet", "maxStackSize": 1, "color": "#3A5A6B", "equipSlot": "head" }
 ]

@@ -65,6 +65,13 @@ public static class ItemCatalog
     public static bool IsToggleableLight(string itemId) =>
         Items.TryGetValue(itemId, out var item) && item.IsToggleableLight;
 
+    /// <summary>Which equip slot this item drags onto (e.g. "torso", "head") — null (the
+    /// default) for anything that isn't equippable that way, same safe-fallback spirit as
+    /// <see cref="MaxStackSize"/>. Used by Player.TryEquipItemFromHand instead of a hardcoded
+    /// item-id check, so the equip flow generalizes to any future equippable item.</summary>
+    public static string? EquipSlot(string itemId) =>
+        Items.TryGetValue(itemId, out var item) ? item.EquipSlot : null;
+
     private static Dictionary<string, ItemDefinition> Items => _items ??= Load();
 
     /// <summary>Test-only seam: lets Scavengineers.Scripts.Tests seed the catalog directly,
@@ -107,5 +114,8 @@ public static class ItemCatalog
 
         [JsonPropertyName("isToggleableLight")]
         public bool IsToggleableLight { get; set; }
+
+        [JsonPropertyName("equipSlot")]
+        public string? EquipSlot { get; set; }
     }
 }

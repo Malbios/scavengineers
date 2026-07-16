@@ -571,6 +571,59 @@ public partial class Player : CharacterBody3D
         SpawnDroppedContainer(backpack.ItemId, backpack.Contents, GlobalPosition);
     }
 
+    /// <summary>Called by a Torso/Head equip slot (see InventorySlotUI.EquippedSlotName) when
+    /// something is dragged onto it — equips it only if the dragged hand item's own
+    /// ItemCatalog.EquipSlot actually declares this slot name, generalizing
+    /// <see cref="TryEquipBackpackFromHand"/>'s hardcoded-"backpack" check into a tag-driven one
+    /// that works for any future equippable item. `containerSlotCount` is the inner inventory
+    /// size to give the freshly-equipped item (0 for a container-less item like the helmet).</summary>
+    public void TryEquipItemFromHand(int fromSlotIndex, string slotName, int containerSlotCount)
+    {
+        if (fromSlotIndex < 0 || fromSlotIndex >= _inventory.Hands.Slots.Count)
+        {
+            return;
+        }
+
+        if (_inventory.Hands.Slots[fromSlotIndex] is not { } occupied || ItemCatalog.EquipSlot(occupied.ItemId) != slotName)
+        {
+            return;
+        }
+
+        if (!_inventory.Hands.TryRemove(occupied.ItemId, 1))
+        {
+            return;
+        }
+
+        _inventory.EquipContainerDirectly(slotName, occupied.ItemId, new SlotContainer(containerSlotCount));
+    }
+
+    /// <summary>Called by an ordinary hand slot's InventorySlotUI when a worn Torso/Head item
+    /// (dragged from its own equip slot) is dropped onto it — generalizes
+    /// <see cref="TryUnequipBackpack"/>'s exact shape (empty falls back into a hand if it fits,
+    /// staying equipped otherwise; non-empty always drops in the world, contents intact) to any
+    /// equip-slot name.</summary>
+    public void TryUnequipItem(string slotName)
+    {
+        if (_inventory.GetEquippedContainer(slotName) is not { } equipped)
+        {
+            return;
+        }
+
+        var isEmpty = equipped.Contents.Slots.All(s => s is null);
+        if (isEmpty)
+        {
+            if (_inventory.Hands.Add(equipped.ItemId, 1) == 1)
+            {
+                _inventory.ClearEquippedContainer(slotName);
+            }
+
+            return;
+        }
+
+        _inventory.ClearEquippedContainer(slotName);
+        SpawnDroppedContainer(equipped.ItemId, equipped.Contents, GlobalPosition);
+    }
+
     /// <summary>Spawns a full container's world representation at `position` — used both for an
     /// unequip-while-full drop (see TryUnequipBackpack) and by SaveManager to respawn dropped
     /// containers on load. Reuses the same generic dropped-item visual

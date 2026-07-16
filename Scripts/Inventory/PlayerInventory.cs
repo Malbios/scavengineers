@@ -25,10 +25,16 @@ public sealed class PlayerInventory
     // Placeholder/tunable — how many slots a worn backpack's own contents have.
     public const int BackpackSlotCount = 8;
 
+    // Placeholder/tunable — the EVA suit torso's own 2 unlabeled pocket slots (its 4 specialized
+    // tank/filter/battery sub-slots are tracked separately, see SpecializedSlot).
+    public const int TorsoSlotCount = 2;
+
     // The fixed slot-name priority Add/TryRemove/Unequip use when more than one container is
     // worn at once — matches this codebase's original "backpack before hand" behavior exactly
     // when only "back" is worn, and extends predictably as more simultaneously-wearable
-    // containers (e.g. the EVA suit's torso piece) are added.
+    // containers (e.g. the EVA suit's torso piece) are added. "head" is deliberately excluded —
+    // a worn helmet carries a 0-slot container (see EquipItemDirectly), so it has nothing to
+    // aggregate into anyway.
     private static readonly string[] ContainerPriority = ["back", "torso"];
 
     private readonly SlotContainer _hands = new(HandCount);
@@ -38,7 +44,8 @@ public sealed class PlayerInventory
     public SlotContainer Hands => _hands;
 
     /// <summary>An item id plus its own separate <see cref="SlotContainer"/> — the shape a
-    /// worn container takes while equipped (a backpack, or the EVA suit's torso piece). Which
+    /// worn container takes while equipped (a backpack, the EVA suit's torso piece, or a
+    /// container-less item like the helmet, which simply carries a 0-slot container). Which
     /// items are containers is hardcoded per equip slot (see EquipBackpackFromHand) rather than
     /// a speculative "which items are containers" lookup.</summary>
     public sealed record EquippedContainer(string ItemId, SlotContainer Contents);
@@ -48,6 +55,17 @@ public sealed class PlayerInventory
     public EquippedContainer? Backpack => _equippedContainers.GetValueOrDefault("back");
 
     public EquippedContainer? Torso => _equippedContainers.GetValueOrDefault("torso");
+
+    public EquippedContainer? Head => _equippedContainers.GetValueOrDefault("head");
+
+    /// <summary>Generic lookup by equip-slot name — used by Player.cs's generalized
+    /// TryEquipItemFromHand/TryUnequipItem so a new equip slot (beyond the named
+    /// Backpack/Torso/Head convenience properties above) needs no new code here.</summary>
+    public EquippedContainer? GetEquippedContainer(string slotName) => _equippedContainers.GetValueOrDefault(slotName);
+
+    /// <summary>Detaches whatever's worn in `slotName` with no fungible fallback — the caller
+    /// decides what happens to what was equipped (see Player.TryUnequipItem).</summary>
+    public void ClearEquippedContainer(string slotName) => _equippedContainers.Remove(slotName);
 
     /// <summary>A device's own swappable battery/tank — the shape a power drill's, flashlight's,
     /// or (later) an EVA suit tank's per-instance state takes. Deliberately not a generic

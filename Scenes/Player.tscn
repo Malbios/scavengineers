@@ -339,6 +339,202 @@ offset_top = -15.0
 mouse_filter = 2
 horizontal_alignment = 2
 
+[node name="Torso" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots" node_paths=PackedStringArray("Tooltip")]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+script = ExtResource("3")
+EquippedSlotName = "torso"
+EquippedContainerSlotCount = 2
+EmptySlotNameKey = "HUD_TORSO_SLOT"
+Tooltip = NodePath("../../../../InventoryTooltip")
+
+[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/EquipSlots/Torso"]
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("HudLabelBackground")
+
+[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/Torso"]
+visible = false
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
+mouse_filter = 2
+color = Color(0.6, 0.6, 0.6, 1)
+
+[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/Torso"]
+visible = false
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -19.0
+offset_top = -15.0
+mouse_filter = 2
+horizontal_alignment = 2
+
+[node name="Head" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots" node_paths=PackedStringArray("Tooltip")]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+script = ExtResource("3")
+EquippedSlotName = "head"
+EmptySlotNameKey = "HUD_HEAD_SLOT"
+Tooltip = NodePath("../../../../InventoryTooltip")
+
+[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/EquipSlots/Head"]
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("HudLabelBackground")
+
+[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/Head"]
+visible = false
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
+mouse_filter = 2
+color = Color(0.6, 0.6, 0.6, 1)
+
+[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/Head"]
+visible = false
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -19.0
+offset_top = -15.0
+mouse_filter = 2
+horizontal_alignment = 2
+
+[node name="Legs" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots" node_paths=PackedStringArray("Tooltip")]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+script = ExtResource("3")
+IsUnusedBodySlot = true
+EmptySlotNameKey = "HUD_LEGS_SLOT"
+Tooltip = NodePath("../../../../InventoryTooltip")
+
+[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/EquipSlots/Legs"]
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("HudLabelBackground")
+
+[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/Legs"]
+visible = false
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
+mouse_filter = 2
+color = Color(0.6, 0.6, 0.6, 1)
+
+[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/Legs"]
+visible = false
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -19.0
+offset_top = -15.0
+mouse_filter = 2
+horizontal_alignment = 2
+
+[node name="LeftFoot" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots" node_paths=PackedStringArray("Tooltip")]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+script = ExtResource("3")
+IsUnusedBodySlot = true
+EmptySlotNameKey = "HUD_LEFT_FOOT_SLOT"
+Tooltip = NodePath("../../../../InventoryTooltip")
+
+[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/EquipSlots/LeftFoot"]
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("HudLabelBackground")
+
+[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/LeftFoot"]
+visible = false
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
+mouse_filter = 2
+color = Color(0.6, 0.6, 0.6, 1)
+
+[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/LeftFoot"]
+visible = false
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -19.0
+offset_top = -15.0
+mouse_filter = 2
+horizontal_alignment = 2
+
+[node name="RightFoot" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots" node_paths=PackedStringArray("Tooltip")]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+script = ExtResource("3")
+IsUnusedBodySlot = true
+EmptySlotNameKey = "HUD_RIGHT_FOOT_SLOT"
+Tooltip = NodePath("../../../../InventoryTooltip")
+
+[node name="Background" type="Panel" parent="HUD/InventoryPanel/Layout/EquipSlots/RightFoot"]
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("HudLabelBackground")
+
+[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/RightFoot"]
+visible = false
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
+mouse_filter = 2
+color = Color(0.6, 0.6, 0.6, 1)
+
+[node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/RightFoot"]
+visible = false
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -19.0
+offset_top = -15.0
+mouse_filter = 2
+horizontal_alignment = 2
+
 [node name="DrillWindow" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar")]
 visible = false
 anchors_preset = 8

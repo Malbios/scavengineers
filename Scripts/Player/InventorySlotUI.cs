@@ -38,6 +38,26 @@ public partial class InventorySlotUI : Control
     [Export]
     public string SpecializedSlotKey { get; set; } = "";
 
+    /// <summary>Non-empty only for the Torso/Head equip slots — reads/writes a whole worn item
+    /// (with its own <see cref="PlayerInventory.EquippedContainer"/>, possibly 0-slot for a
+    /// container-less item like the helmet) via <see cref="PlayerRef"/>, the same
+    /// non-fungible-item-via-PlayerRef shape <see cref="IsBackSlot"/> already established —
+    /// generalized (via <see cref="Player.TryEquipItemFromHand"/>'s tag-driven check) rather than
+    /// hardcoded per item the way the Back slot still is. Empty string = ordinary slot.</summary>
+    [Export]
+    public string EquippedSlotName { get; set; } = "";
+
+    /// <summary>How many inner slots a freshly-equipped item on <see cref="EquippedSlotName"/>
+    /// gets (e.g. 2 for the EVA suit's torso pockets, 0 for the container-less helmet).</summary>
+    [Export]
+    public int EquippedContainerSlotCount { get; set; }
+
+    /// <summary>True only for the Legs/LeftFoot/RightFoot slots — nothing targets them yet (see
+    /// docs), so they never accept a drop at all, and show a "blocked" visual/tooltip whenever
+    /// the EVA suit's torso piece is worn (it physically covers legs and feet).</summary>
+    [Export]
+    public bool IsUnusedBodySlot { get; set; }
+
     /// <summary>Localization key shown by <see cref="OnMouseEntered"/> when this slot has
     /// nothing in it — an empty slot otherwise gives no hover feedback about what it's for.</summary>
     [Export]
@@ -61,10 +81,18 @@ public partial class InventorySlotUI : Control
         MouseExited += OnMouseExited;
     }
 
+    // Placeholder/tunable — how much an unused body slot dims while blocked by the worn torso.
+    private static readonly Color BlockedModulate = new(1f, 1f, 1f, 0.35f);
+
     public override void _Process(double delta) => Refresh();
 
     private void Refresh()
     {
+        if (IsUnusedBodySlot)
+        {
+            Modulate = PlayerRef?.Inventory.Torso is not null ? BlockedModulate : Colors.White;
+        }
+
         if (_icon is null || _countLabel is null)
         {
             return;
@@ -91,7 +119,11 @@ public partial class InventorySlotUI : Control
             return;
         }
 
-        if (BatteryCharge() is { } charge)
+        if (IsUnusedBodySlot && PlayerRef?.Inventory.Torso is not null)
+        {
+            Tooltip.Text = Tr("HUD_SLOT_BLOCKED_BY_SUIT");
+        }
+        else if (BatteryCharge() is { } charge)
         {
             // A specialized slot's Count is always the synthetic "1" from CurrentSlot() —
             // showing charge instead is the actually useful number here (how much is left), not
@@ -172,7 +204,7 @@ public partial class InventorySlotUI : Control
     }
 
     public override bool _CanDropData(Vector2 atPosition, Variant data) =>
-        data.AsGodotObject() is InventorySlotUI;
+        !IsUnusedBodySlot && data.AsGodotObject() is InventorySlotUI;
 
     public override void _DropData(Vector2 atPosition, Variant data)
     {
@@ -194,6 +226,22 @@ public partial class InventorySlotUI : Control
         if (source.IsBackSlot)
         {
             PlayerRef.TryUnequipBackpack();
+            return;
+        }
+
+        if (EquippedSlotName.Length > 0)
+        {
+            if (!source.IsBackSlot && source.SpecializedSlotKey.Length == 0 && source.EquippedSlotName.Length == 0)
+            {
+                PlayerRef.TryEquipItemFromHand(source.SlotIndex, EquippedSlotName, EquippedContainerSlotCount);
+            }
+
+            return;
+        }
+
+        if (source.EquippedSlotName.Length > 0)
+        {
+            PlayerRef.TryUnequipItem(source.EquippedSlotName);
             return;
         }
 
@@ -240,6 +288,11 @@ public partial class InventorySlotUI : Control
         if (IsBackSlot)
         {
             return PlayerRef?.Inventory.Backpack is { } backpack ? (backpack.ItemId, 1) : null;
+        }
+
+        if (EquippedSlotName.Length > 0)
+        {
+            return PlayerRef?.Inventory.GetEquippedContainer(EquippedSlotName) is { } equipped ? (equipped.ItemId, 1) : null;
         }
 
         if (SpecializedSlotKey.Length > 0)

@@ -12,6 +12,8 @@ public class ItemCatalogTests : IDisposable
             ["flashlight"] = new() { Id = "flashlight", MaxStackSize = 1, IsToggleableLight = true },
             ["debug_flashlight"] = new() { Id = "debug_flashlight", MaxStackSize = 1, IsToggleableLight = true },
             ["widget"] = new() { Id = "widget", MaxStackSize = 1 },
+            ["eva_torso_suit"] = new() { Id = "eva_torso_suit", MaxStackSize = 1, EquipSlot = "torso" },
+            ["eva_helmet"] = new() { Id = "eva_helmet", MaxStackSize = 1, EquipSlot = "head" },
         });
     }
 
@@ -25,5 +27,15 @@ public class ItemCatalogTests : IDisposable
     public void IsToggleableLight_ReturnsTrueOnlyForFlashlightAndDebugFlashlight_FalseForEverythingElse(string itemId, bool expected)
     {
         Assert.Equal(expected, ItemCatalog.IsToggleableLight(itemId));
+    }
+
+    [Theory]
+    [InlineData("eva_torso_suit", "torso")]
+    [InlineData("eva_helmet", "head")]
+    [InlineData("widget", null)]
+    [InlineData("unknown_item", null)]
+    public void EquipSlot_ReturnsTheDeclaredSlot_NullForAnythingNotEquippableThatWay(string itemId, string? expected)
+    {
+        Assert.Equal(expected, ItemCatalog.EquipSlot(itemId));
     }
 }

@@ -73,3 +73,11 @@ ITEM_RATION_BAR,Ration Bar,Nahrungsriegel
 ITEM_WATER_BOTTLE,Water Bottle,Wasserflasche
 VERB_SLEEP,Sleep,Schlafen
 OBJECT_BUNK,Bunk,Schlafkoje
+ITEM_EVA_TORSO_SUIT,EVA Suit,Raumanzug
+ITEM_EVA_HELMET,EVA Helmet,Raumhelm
+HUD_HEAD_SLOT,Head,Kopf
+HUD_TORSO_SLOT,Torso,Rumpf
+HUD_LEGS_SLOT,Legs,Beine
+HUD_LEFT_FOOT_SLOT,Left Foot,Linker Fuß
+HUD_RIGHT_FOOT_SLOT,Right Foot,Rechter Fuß
+HUD_SLOT_BLOCKED_BY_SUIT,Blocked by EVA Suit,Durch Raumanzug blockiert
