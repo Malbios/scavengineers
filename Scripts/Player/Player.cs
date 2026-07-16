@@ -274,7 +274,7 @@ public partial class Player : CharacterBody3D
     /// TryEquipBackpackFromHand) — no dedicated verb needed to buy or hold one. "ration_bar"/
     /// "water_bottle" are likewise ordinary holdable items until F consumes whichever's held
     /// (see UseHeldItem) — no dedicated equip path either.</summary>
-    public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell", "battery", "switch", "recharge_station", "backpack", "ration_bar", "water_bottle"];
+    public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell", "battery", "switch", "recharge_station", "backpack", "ration_bar", "water_bottle", "wrench", "pda", "health_scan_cartridge"];
 
     private enum Hand { Left, Right }
 
@@ -427,6 +427,13 @@ public partial class Player : CharacterBody3D
         _inventory.AttachSpecializedSlot("suit_filter", hasItem: true, charge: 1f);
         _inventory.AttachSpecializedSlot("suit_battery", hasItem: true, charge: 1f);
         _inventory.EquipContainerDirectly("head", "eva_helmet", new SlotContainer(0));
+
+        // Wrench (Maintain/Repair tool) plus a fully-loaded PDA — dev convenience so scan mode is
+        // testable immediately (helmet's already on above) rather than needing a shopping trip
+        // first. Same "bypasses hand-then-equip" spirit as the suit/backpack above.
+        _inventory.Add("wrench", 1);
+        _inventory.EquipContainerDirectly("pda", "pda", new SlotContainer(PlayerInventory.PdaSlotCount));
+        _inventory.GetPersistentContents("pda")?.Add("health_scan_cartridge", 1);
 
         _flashlightOn = true; // starts on, same as before this was toggleable, but F now turns it off too
 

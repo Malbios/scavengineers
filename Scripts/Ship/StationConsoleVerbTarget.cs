@@ -31,6 +31,9 @@ public partial class StationConsoleVerbTarget : StaticBody3D, IVerbTarget
         ["backpack"] = (25, 10),
         ["ration_bar"] = (8, 3),
         ["water_bottle"] = (6, 2),
+        ["wrench"] = (15, 6),
+        ["pda"] = (20, 8),
+        ["health_scan_cartridge"] = (10, 4),
     };
 
     private static readonly Verb ShopVerb = new("open_shop", "VERB_TRADE", DurationSeconds: 0f);
