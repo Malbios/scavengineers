@@ -135,13 +135,6 @@ public partial class InventorySlotUI : Control
         else if (CurrentSlot() is { } slot)
         {
             Tooltip.Text = $"{Tr("ITEM_" + slot.ItemId.ToUpperInvariant())}: {slot.Count}";
-            if (!ItemCatalog.FitsInStorage(slot.ItemId))
-            {
-                // Explains up front why dragging this toward a backpack/pocket slot gets
-                // refused (see _CanDropData's matching guard) — discoverable on hover, not just
-                // inferable from the rejected drag itself.
-                Tooltip.Text += $" ({Tr("HUD_TOO_BULKY_FOR_BACKPACK")})";
-            }
         }
         else if (EmptySlotNameKey.Length > 0)
         {

@@ -81,7 +81,6 @@ HUD_LEGS_SLOT,Legs,Beine
 HUD_LEFT_FOOT_SLOT,Left Foot,Linker Fuß
 HUD_RIGHT_FOOT_SLOT,Right Foot,Rechter Fuß
 HUD_SLOT_BLOCKED_BY_SUIT,Blocked by EVA Suit,Durch Raumanzug blockiert
-HUD_TOO_BULKY_FOR_BACKPACK,too bulky for a backpack,zu sperrig für einen Rucksack
 ITEM_O2_TANK,O2 Tank,O2-Tank
 ITEM_N2_TANK,N2 Tank,N2-Tank
 ITEM_CO2_FILTER,CO2 Filter,CO2-Filter
