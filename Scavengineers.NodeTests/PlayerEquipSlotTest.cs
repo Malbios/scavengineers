@@ -67,37 +67,31 @@ public class PlayerEquipSlotTest
 
     [TestCase]
     [RequireGodotRuntime]
-    public void TryUnequipItem_DropsANonEmptyItemInTheWorld_WhenBothHandsAreFull()
+    public void TryUnequipItem_StaysEquipped_WhenBothHandsAreFullAndNoDestinationGiven_EvenWithNonEmptyPocketContents()
     {
+        // Under the persistent-contents model, a worn item's contents never travel with the
+        // unequip decision (see PlayerInventory.GetPersistentContents) — so unlike the old
+        // "non-empty container forces a world drop" behavior, both hands being full with no
+        // drop destination now just means the suit can't come off right now and stays worn,
+        // same "nothing vanishes" contract as an empty one.
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
         ResetTorsoAndHeadFromStipend(player.Inventory);
         player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1, 1f));
         player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, ("widget", 1, 1f));
-
-        // This project's isolated NodeTests catalog can't load real Data/items.json, so every
-        // item's MaxStackSize falls back to 1 (see PlayerTestHarness's own doc comment) — a
-        // single slot holding "3 scrap_metal" isn't reachable here; one real item in one slot is
-        // enough to prove "non-empty container survives the drop intact."
         var contents = new SlotContainer(2);
         contents.Add("scrap_metal", 1);
         player.Inventory.EquipContainerDirectly("torso", "eva_torso_suit", contents);
 
         player.TryUnequipItem("torso");
 
-        // Both hands stay full (item couldn't fall back into either) — dropped in the world
-        // instead, exactly like TryUnequipBackpack's own full-container behavior.
-        AssertBool(player.Inventory.Torso is null).IsTrue();
-        var dropped = sceneTree.Root.GetChildren().OfType<ContainerPickupItem>().FirstOrDefault(c => c.ItemId == "eva_torso_suit");
-        AssertBool(dropped is not null).IsTrue();
-        AssertBool(dropped!.Contents!.CountOf("scrap_metal") == 1).IsTrue();
-
-        AutoFree(dropped);
+        AssertBool(player.Inventory.Torso is { ItemId: "eva_torso_suit" }).IsTrue();
+        AssertBool(player.Inventory.Torso!.Contents.CountOf("scrap_metal") == 1).IsTrue();
     }
 
     [TestCase]
     [RequireGodotRuntime]
-    public void TryUnequipItem_EjectsInstalledSuitTanksBackIntoInventory_ThenDetachesAllFourSubSlots()
+    public void TryUnequipItem_LeavesInstalledSuitTanksAttachedAndLoaded_TanksStayWithTheSuit()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
@@ -115,13 +109,65 @@ public class PlayerEquipSlotTest
 
         player.TryUnequipItem("torso");
 
-        AssertBool(player.Inventory.SuitO2 is null).IsTrue();
-        AssertBool(player.Inventory.SuitN2 is null).IsTrue();
-        AssertBool(player.Inventory.SuitFilter is null).IsTrue();
-        AssertBool(player.Inventory.SuitBattery is null).IsTrue();
-        var ejectedTank = player.Inventory.Hands.Slots.FirstOrDefault(s => s?.ItemId == "o2_tank");
-        AssertBool(ejectedTank is not null).IsTrue();
-        AssertBool(Mathf.IsEqualApprox(ejectedTank!.Value.Charge, 0.6f)).IsTrue();
+        // The suit came off into a hand, but its tank state is per-suit persistent state (like
+        // its pocket contents) — decoupled from worn state, so it stays attached and loaded
+        // instead of being ejected loose into general inventory.
+        AssertBool(player.Inventory.Torso is null).IsTrue();
+        AssertBool(player.Inventory.Hands.Slots.Any(s => s?.ItemId == "eva_torso_suit")).IsTrue();
+        AssertBool(player.Inventory.SuitO2 is { HasItem: true }).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(player.Inventory.SuitO2!.Charge, 0.6f)).IsTrue();
+        AssertBool(player.Inventory.SuitN2 is { HasItem: false }).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TryUnequipItem_PlacesTheBareTokenAtTheActualDropDestination_NotJustAHand()
+    {
+        // The FitsInStorage-based "suit can't go in a backpack" restriction itself is covered by
+        // ItemCatalogTests (Scavengineers.Scripts.Tests, where SeedForTests actually configures
+        // it) plus manual playtest — this project's isolated NodeTests catalog has no real
+        // Data/items.json, so FitsInStorage always returns its "unknown item" default (true)
+        // here regardless of item id (see this class's own doc comment). The helmet fits
+        // everywhere either way, so it's a valid destination-respecting case regardless of that
+        // limitation.
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        ResetTorsoAndHeadFromStipend(player.Inventory);
+        player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1, 1f));
+        player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, ("widget", 1, 1f));
+        player.Inventory.EquipContainerDirectly("head", "eva_helmet", new SlotContainer(0));
+
+        // A standalone container, not the (stipend-filled) real backpack — keeps this test's
+        // "is this exact slot empty" precondition isolated from stipend noise.
+        var destinationContainer = new SlotContainer(2);
+        var destination = AutoFree(new InventorySlotUI { Container = destinationContainer, SlotIndex = 0 });
+
+        player.TryUnequipItem("head", destination);
+
+        AssertBool(player.Inventory.Head is null).IsTrue();
+        AssertBool(destinationContainer.Slots[0]?.ItemId == "eva_helmet").IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TryUnequipItem_FallsBackToAHand_WhenTheDropDestinationIsAlreadyOccupied()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        ResetTorsoAndHeadFromStipend(player.Inventory);
+        player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, null);
+        player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, null);
+        player.Inventory.EquipContainerDirectly("head", "eva_helmet", new SlotContainer(0));
+
+        var destinationContainer = new SlotContainer(2);
+        destinationContainer.SetSlot(0, ("widget", 1, 1f));
+        var destination = AutoFree(new InventorySlotUI { Container = destinationContainer, SlotIndex = 0 });
+
+        player.TryUnequipItem("head", destination);
+
+        AssertBool(player.Inventory.Head is null).IsTrue();
+        AssertBool(destinationContainer.Slots[0]?.ItemId == "widget").IsTrue();
+        AssertBool(player.Inventory.Hands.Slots.Any(s => s?.ItemId == "eva_helmet")).IsTrue();
     }
 
     [TestCase]

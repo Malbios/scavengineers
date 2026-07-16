@@ -236,7 +236,7 @@ public partial class InventorySlotUI : Control
 
         if (source.IsBackSlot)
         {
-            PlayerRef.TryUnequipBackpack();
+            PlayerRef.TryUnequipBackpack(this);
             return;
         }
 
@@ -253,7 +253,7 @@ public partial class InventorySlotUI : Control
 
         if (source.EquippedSlotName.Length > 0)
         {
-            PlayerRef.TryUnequipItem(source.EquippedSlotName);
+            PlayerRef.TryUnequipItem(source.EquippedSlotName, this);
             return;
         }
 

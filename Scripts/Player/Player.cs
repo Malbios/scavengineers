@@ -595,31 +595,56 @@ public partial class Player : CharacterBody3D
         _inventory.EquipBackpackFromHand();
     }
 
+    /// <summary>Places a bare, non-fungible item token (a worn container just taken off) directly
+    /// into `destination` if it's a valid, ordinary, currently-empty slot compatible with the
+    /// item (see ItemCatalog.FitsInStorage) — used by TryUnequipItem/TryUnequipBackpack so an
+    /// unequip drop respects wherever the player actually dropped it, instead of always aiming
+    /// for a hand. False (no placement made, caller falls back to trying any hand) for a
+    /// non-ordinary destination (IsBackSlot/EquippedSlotName/SpecializedSlotKey/IsUnusedBodySlot —
+    /// the same "ordinary slot" completeness check _DropData's generic MoveBetween fallback
+    /// relies on), an already-occupied slot, or an incompatible destination for an item that
+    /// doesn't fit storage.</summary>
+    private bool TryPlaceAt(InventorySlotUI? destination, string itemId)
+    {
+        if (destination is null
+            || destination.IsBackSlot
+            || destination.EquippedSlotName.Length > 0
+            || destination.SpecializedSlotKey.Length > 0
+            || destination.IsUnusedBodySlot
+            || destination.Container is not { } container
+            || container.Slots[destination.SlotIndex] is not null)
+        {
+            return false;
+        }
+
+        if (!ReferenceEquals(container, _inventory.Hands) && !ItemCatalog.FitsInStorage(itemId))
+        {
+            return false;
+        }
+
+        container.SetSlot(destination.SlotIndex, (itemId, 1, 1f));
+        return true;
+    }
+
     /// <summary>Called by an ordinary hand slot's InventorySlotUI when the equipped backpack
-    /// itself (dragged from the Back slot) is dropped onto it. An empty backpack becomes a
-    /// fungible item again if a hand fits it (staying equipped if both hands are full —
-    /// "nothing vanishes"); a non-empty one can't fall back into a hand at all, so it's dropped
-    /// in the world instead, contents intact.</summary>
-    public void TryUnequipBackpack()
+    /// itself (dragged from the Back slot) is dropped onto it — or, when `destination` is null,
+    /// by a path with no specific drop target (see the equivalent generalized
+    /// <see cref="TryUnequipItem"/>). Its contents are permanent (see PlayerInventory's
+    /// persistent-contents model) and never travel with this decision, so unequipping is just
+    /// placing the bare backpack token: at the actual drop destination if it's a valid, empty,
+    /// compatible ordinary slot; else in any hand with room; else it stays equipped ("nothing
+    /// vanishes").</summary>
+    public void TryUnequipBackpack(InventorySlotUI? destination = null)
     {
         if (_inventory.Backpack is not { } backpack)
         {
             return;
         }
 
-        var isEmpty = backpack.Contents.Slots.All(s => s is null);
-        if (isEmpty)
+        if (TryPlaceAt(destination, backpack.ItemId) || _inventory.Hands.Add(backpack.ItemId, 1) == 1)
         {
-            if (_inventory.Hands.Add(backpack.ItemId, 1) == 1)
-            {
-                _inventory.ClearBackpack();
-            }
-
-            return;
+            _inventory.ClearBackpack();
         }
-
-        _inventory.ClearBackpack();
-        SpawnDroppedContainer(backpack.ItemId, backpack.Contents, GlobalPosition);
     }
 
     /// <summary>Called by a Torso/Head equip slot (see InventorySlotUI.EquippedSlotName) when
@@ -652,66 +677,37 @@ public partial class Player : CharacterBody3D
 
         if (slotName == "torso")
         {
-            // The suit's 4 tank/filter/battery sub-slots exist only while the torso is actually
-            // worn — attached empty (not left null) so InsertIntoSpecializedSlot has something to
-            // load a tank into right away, without a separate "is the suit worn" check of its own.
-            _inventory.AttachSpecializedSlot("suit_o2", hasItem: false, charge: 0f);
-            _inventory.AttachSpecializedSlot("suit_n2", hasItem: false, charge: 0f);
-            _inventory.AttachSpecializedSlot("suit_filter", hasItem: false, charge: 0f);
-            _inventory.AttachSpecializedSlot("suit_battery", hasItem: false, charge: 0f);
+            // The suit's 4 tank/filter/battery sub-slots are per-suit persistent state, same as
+            // its pocket contents (see PlayerInventory's persistent-contents model) — they no
+            // longer come and go with worn state, so re-equipping a suit that was merely taken
+            // off (not genuinely discarded) must NOT wipe whatever's already loaded. Only attach
+            // fresh-empty ones the first time the suit is ever acquired (each is null only before
+            // that, or after a genuine world-discard — see DropEquippedItemInWorld).
+            if (_inventory.SuitO2 is null) _inventory.AttachSpecializedSlot("suit_o2", hasItem: false, charge: 0f);
+            if (_inventory.SuitN2 is null) _inventory.AttachSpecializedSlot("suit_n2", hasItem: false, charge: 0f);
+            if (_inventory.SuitFilter is null) _inventory.AttachSpecializedSlot("suit_filter", hasItem: false, charge: 0f);
+            if (_inventory.SuitBattery is null) _inventory.AttachSpecializedSlot("suit_battery", hasItem: false, charge: 0f);
         }
     }
 
     /// <summary>Called by an ordinary hand slot's InventorySlotUI when a worn Torso/Head item
-    /// (dragged from its own equip slot) is dropped onto it — generalizes
-    /// <see cref="TryUnequipBackpack"/>'s exact shape (empty falls back into a hand if it fits,
-    /// staying equipped otherwise; non-empty always drops in the world, contents intact) to any
-    /// equip-slot name.</summary>
-    public void TryUnequipItem(string slotName)
+    /// (dragged from its own equip slot) is dropped onto it — or, when `destination` is null, by
+    /// a path with no specific drop target. Generalizes <see cref="TryUnequipBackpack"/>'s shape
+    /// to any equip-slot name: its contents (and, for the suit, its tank/filter/battery sub-slots)
+    /// are permanent and never travel with this decision (see PlayerInventory's
+    /// persistent-contents model), so unequipping is just placing the bare item token: at the
+    /// actual drop destination if it's a valid, empty, compatible ordinary slot; else in any hand
+    /// with room; else it stays equipped ("nothing vanishes").</summary>
+    public void TryUnequipItem(string slotName, InventorySlotUI? destination = null)
     {
         if (_inventory.GetEquippedContainer(slotName) is not { } equipped)
         {
             return;
         }
 
-        // Detached first, before checking room — otherwise the Add attempt below could spill the
-        // item being unequipped right back into this same container (still first in
-        // ContainerPriority up to this point), corrupting the isEmpty check and making an
-        // item-holding suit look "empty" that shouldn't.
-        _inventory.ClearEquippedContainer(slotName);
-
-        var isEmpty = equipped.Contents.Slots.All(s => s is null);
-        if (isEmpty)
+        if (TryPlaceAt(destination, equipped.ItemId) || _inventory.Hands.Add(equipped.ItemId, 1) == 1)
         {
-            if (_inventory.Hands.Add(equipped.ItemId, 1) != 1)
-            {
-                // No room in either hand — re-attach so nothing vanishes, same end state as the
-                // original "don't clear at all" version of this check. The suit never actually
-                // came off, so its own sub-slots below must NOT be touched.
-                _inventory.EquipContainerDirectly(slotName, equipped.ItemId, equipped.Contents);
-                return;
-            }
-        }
-        else
-        {
-            SpawnDroppedContainer(equipped.ItemId, equipped.Contents, GlobalPosition);
-        }
-
-        // Only reached once the item is genuinely gone (placed in a hand, or dropped in the
-        // world) — eject any installed tanks back into general inventory (best-effort, same
-        // "silently doesn't fit if nowhere has room" contract as every other Add-based eject in
-        // this codebase), then fully detach the sub-slots, since there's no longer a torso to
-        // carry them.
-        if (slotName == "torso")
-        {
-            _inventory.EjectSpecializedSlot("suit_o2");
-            _inventory.EjectSpecializedSlot("suit_n2");
-            _inventory.EjectSpecializedSlot("suit_filter");
-            _inventory.EjectSpecializedSlot("suit_battery");
-            _inventory.DetachSpecializedSlot("suit_o2");
-            _inventory.DetachSpecializedSlot("suit_n2");
-            _inventory.DetachSpecializedSlot("suit_filter");
-            _inventory.DetachSpecializedSlot("suit_battery");
+            _inventory.ClearEquippedContainer(slotName);
         }
     }
 
@@ -1074,7 +1070,11 @@ public partial class Player : CharacterBody3D
                 // worn with a charged N2 tank. No suit/no N2/empty N2 means thrust input is
                 // simply ignored (pure drift, ZeroGDrag above still applies) — you need the suit
                 // to move under thrust in zero-g at all, matching needing it to survive there.
-                if (thrust != Vector3.Zero && _inventory.SuitN2 is { HasItem: true, Charge: > 0f })
+                // Torso worn is checked explicitly (not just SuitN2 non-null) because the suit's
+                // tank state is now persistent/decoupled from worn state (see PlayerInventory's
+                // persistent-contents model) — a loaded N2 tank can still exist while the suit
+                // merely sits in a hand.
+                if (thrust != Vector3.Zero && _inventory.Torso is not null && _inventory.SuitN2 is { HasItem: true, Charge: > 0f })
                 {
                     velocity += thrust.Normalized() * ZeroGThrustAcceleration * moveMultiplier * (float)delta;
                     _inventory.DrainSpecializedSlot("suit_n2", N2DrainPerSecondWhileThrusting * (float)delta);
