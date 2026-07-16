@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 using Godot;
 using Scavengineers.Scripts.Inventory;
@@ -40,11 +41,17 @@ public partial class ToggleLightVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     private bool _switchOn = true;
 
     public IReadOnlyList<Verb> AvailableVerbs =>
-        [ToggleVerb, .. BuildTarget?.MachineRemovalVerbs(ShipBuildTarget.MachineType.Switch) ?? []];
+        [
+            ToggleVerb,
+            .. BuildTarget?.MachineMaintainRepairVerbs(ShipBuildTarget.MachineType.Switch) ?? [],
+            .. BuildTarget?.MachineRemovalVerbs(ShipBuildTarget.MachineType.Switch) ?? [],
+        ];
 
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 
     public string? DisplayNameKey => "OBJECT_LIGHT_SWITCH";
+
+    public float? Condition => ShipSimRef?.Deck.Fixtures.FirstOrDefault(f => f.Id == ShipSim.SwitchFixtureId)?.Condition;
 
     public override void _PhysicsProcess(double delta) => UpdateLightVisibility();
 
@@ -58,6 +65,7 @@ public partial class ToggleLightVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
             return;
         }
 
+        BuildTarget?.ExecuteMachineMaintainRepair(ShipBuildTarget.MachineType.Switch, verb, inventory);
         BuildTarget?.ExecuteMachineRemoval(ShipBuildTarget.MachineType.Switch, verb, inventory);
     }
 

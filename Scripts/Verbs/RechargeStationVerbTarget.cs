@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 using Godot;
 using Scavengineers.Scripts.Inventory;
@@ -29,12 +30,15 @@ public partial class RechargeStationVerbTarget : StaticBody3D, IVerbTarget
     public IReadOnlyList<Verb> AvailableVerbs =>
         [
             .. ShipSimRef is not null && ShipSimRef.IsPowered(ShipSim.RechargeFixtureId) ? new[] { RechargeVerb } : [],
+            .. BuildTarget?.MachineMaintainRepairVerbs(ShipBuildTarget.MachineType.RechargeStation) ?? [],
             .. BuildTarget?.MachineRemovalVerbs(ShipBuildTarget.MachineType.RechargeStation) ?? [],
         ];
 
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 
     public string? DisplayNameKey => "OBJECT_RECHARGE_STATION";
+
+    public float? Condition => ShipSimRef?.Deck.Fixtures.FirstOrDefault(f => f.Id == ShipSim.RechargeFixtureId)?.Condition;
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
@@ -48,6 +52,7 @@ public partial class RechargeStationVerbTarget : StaticBody3D, IVerbTarget
             return;
         }
 
+        BuildTarget?.ExecuteMachineMaintainRepair(ShipBuildTarget.MachineType.RechargeStation, verb, inventory);
         BuildTarget?.ExecuteMachineRemoval(ShipBuildTarget.MachineType.RechargeStation, verb, inventory);
     }
 

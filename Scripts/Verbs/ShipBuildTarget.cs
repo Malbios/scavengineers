@@ -120,6 +120,41 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         Requirements = [WrenchRequirement, SparePartsRequirement],
     };
 
+    // Same two-tier upkeep for a placed conduit fixture (ConduitFixture.Condition) — offered
+    // alongside its Remove verb, never instead of it.
+    private static readonly Verb MaintainConduitVerb = new("maintain_conduit", "VERB_MAINTAIN_CONDUIT", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement],
+    };
+
+    private static readonly Verb RepairConduitVerb = new("repair_conduit", "VERB_REPAIR_CONDUIT", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement, SparePartsRequirement],
+    };
+
+    // Same two-tier upkeep for Switch/RechargeStation machine fixtures — Battery deliberately
+    // has no Maintain/Repair pair, since its own Condition already means charge, not wear (see
+    // WearSystem and BatteryFixture's own doc comment).
+    private static readonly Verb MaintainSwitchVerb = new("maintain_switch", "VERB_MAINTAIN_SWITCH", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement],
+    };
+
+    private static readonly Verb RepairSwitchVerb = new("repair_switch", "VERB_REPAIR_SWITCH", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement, SparePartsRequirement],
+    };
+
+    private static readonly Verb MaintainRechargeStationVerb = new("maintain_recharge_station", "VERB_MAINTAIN_RECHARGE_STATION", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement],
+    };
+
+    private static readonly Verb RepairRechargeStationVerb = new("repair_recharge_station", "VERB_REPAIR_RECHARGE_STATION", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement, SparePartsRequirement],
+    };
+
     // Battery/Switch/RechargeStation verbs — Install requires holding the machine's own item
     // (bought from a trade console, or refunded by a prior Uninstall); Uninstall gives that same
     // item back, Scrap gives partial scrap_metal instead (a real tradeoff, same shape as
@@ -292,6 +327,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         RepairCeiling,
         MaintainWall,
         RepairWall,
+        MaintainConduit,
+        RepairConduit,
+        MaintainMachine,
+        RepairMachine,
     }
 
     /// <summary>One tile can carry several conduits at once — one floor-mounted (WallNeighbor
@@ -529,7 +568,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     /// <summary>The currently-aimed surface's health, for the PDA scan-mode crosshair readout —
     /// null while breached (nothing left to measure until it's rebuilt) or while aiming at
-    /// something with no structural-surface concept at all (e.g. a bare conduit slot).</summary>
+    /// something with no structural-surface concept at all. A conduit fixture at the aimed slot
+    /// wins over the underlying floor/wall (scanning the wire is more specific than scanning what
+    /// it's mounted on) — never checked for AimKind.Ceiling, since a conduit slot is always
+    /// floor/wall-mounted and AimedConduitFixture's own Tile-vs-Edge resolution has no ceiling
+    /// case to fall into.</summary>
     public float? Condition
     {
         get
@@ -537,6 +580,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             if (ShipSimRef is null)
             {
                 return null;
+            }
+
+            if (_aimKind != AimKind.Ceiling && AimedConduitFixture() is { } conduitFixture)
+            {
+                return conduitFixture.Condition;
             }
 
             switch (_aimKind)
@@ -1024,6 +1072,28 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private static Verb? MaintainOrRepairVerb(float health, Verb maintainVerb, Verb repairVerb) =>
         health >= 1f ? null : health > 0.5f ? maintainVerb : repairVerb;
 
+    /// <summary>Same tiering as <see cref="MaintainOrRepairVerb"/>, applied to whichever conduit
+    /// fixture (if any) already occupies the given slot — null if nothing's placed there.</summary>
+    private Verb? ConduitUpkeepVerb(ConduitSlot slot) =>
+        _placedConduits.ContainsKey(slot) && ShipSimRef!.Deck.Fixtures.FirstOrDefault(f => f.Id == ConduitFixtureId(slot)) is { } fixture
+            ? MaintainOrRepairVerb(fixture.Condition, MaintainConduitVerb, RepairConduitVerb)
+            : null;
+
+    /// <summary>The conduit fixture (if any) at whatever this target is currently aimed at — Tile
+    /// aim means the floor-mounted slot, Edge aim means the wall-mounted one on the near side,
+    /// same slot resolution <see cref="ExecuteConduitVerb"/> already uses. Used by <see
+    /// cref="Condition"/> to prefer a conduit's own health over the underlying structural
+    /// surface's, since scanning a conduit is more specific than scanning the floor/wall it's
+    /// mounted on.</summary>
+    private Fixture? AimedConduitFixture()
+    {
+        var slot = _aimKind == AimKind.Edge
+            ? new ConduitSlot(new Vector2I(_edgeA.X, _edgeA.Y), _edgeB, _aimedWallSlot)
+            : new ConduitSlot(_aimedTile, null);
+
+        return ShipSimRef?.Deck.Fixtures.FirstOrDefault(f => f.Id == ConduitFixtureId(slot));
+    }
+
     private IReadOnlyList<Verb> ResolveAvailableVerbs()
     {
         if (ShipSimRef is null || !AllowStructuralModification)
@@ -1035,7 +1105,13 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         {
             case AimKind.Tile:
             {
-                var verbs = new List<Verb> { _placedConduits.ContainsKey(new ConduitSlot(_aimedTile, null)) ? RemoveConduitVerb : InstallConduitVerb };
+                var floorConduitSlot = new ConduitSlot(_aimedTile, null);
+                var verbs = new List<Verb> { _placedConduits.ContainsKey(floorConduitSlot) ? RemoveConduitVerb : InstallConduitVerb };
+
+                if (ConduitUpkeepVerb(floorConduitSlot) is { } floorConduitUpkeepVerb)
+                {
+                    verbs.Add(floorConduitUpkeepVerb);
+                }
 
                 // Floor panels are only a real, visualized thing on ships that opted into the
                 // system (PanelMesh configured) — everything else keeps its fixed floor.
@@ -1092,6 +1168,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                     verbs.Add(boundaryConduitVerb);
                 }
 
+                if (ConduitUpkeepVerb(new ConduitSlot(new Vector2I(_edgeA.X, _edgeA.Y), _edgeB, _aimedWallSlot)) is { } boundaryConduitUpkeepVerb)
+                {
+                    verbs.Add(boundaryConduitUpkeepVerb);
+                }
+
                 verbs.AddRange(MachineVerbsFor(wallPresent: !breached));
                 return verbs;
             }
@@ -1111,6 +1192,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 if (EdgeConduitVerb(wallPresent: sealed_) is { } interiorConduitVerb)
                 {
                     verbs.Add(interiorConduitVerb);
+                }
+
+                if (ConduitUpkeepVerb(new ConduitSlot(new Vector2I(_edgeA.X, _edgeA.Y), _edgeB, _aimedWallSlot)) is { } interiorConduitUpkeepVerb)
+                {
+                    verbs.Add(interiorConduitUpkeepVerb);
                 }
 
                 verbs.AddRange(MachineVerbsFor(wallPresent: sealed_));
@@ -1159,6 +1245,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         var here = _placedMachines.FirstOrDefault(kv => kv.Value.EdgeA == _edgeA && kv.Value.EdgeB == _edgeB);
         if (here.Value.Node is not null)
         {
+            foreach (var upkeepVerb in MachineMaintainRepairVerbs(here.Key))
+            {
+                yield return upkeepVerb;
+            }
+
             yield return UninstallVerbFor(here.Key);
             yield return ScrapVerbFor(here.Key);
             yield break;
@@ -1191,6 +1282,29 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         MachineType.Battery => ScrapBatteryVerb,
         MachineType.Switch => ScrapSwitchVerb,
         MachineType.RechargeStation => ScrapRechargeStationVerb,
+        _ => throw new System.ArgumentOutOfRangeException(nameof(type)),
+    };
+
+    /// <summary>The Deck fixture id backing a machine type's wear/Condition — null for Battery,
+    /// which deliberately has no upkeep verbs (see WearSystem/BatteryFixture).</summary>
+    private static string? MachineFixtureIdFor(MachineType type) => type switch
+    {
+        MachineType.Switch => ShipSim.SwitchFixtureId,
+        MachineType.RechargeStation => ShipSim.RechargeFixtureId,
+        _ => null,
+    };
+
+    private static Verb MaintainVerbFor(MachineType type) => type switch
+    {
+        MachineType.Switch => MaintainSwitchVerb,
+        MachineType.RechargeStation => MaintainRechargeStationVerb,
+        _ => throw new System.ArgumentOutOfRangeException(nameof(type)),
+    };
+
+    private static Verb RepairVerbFor(MachineType type) => type switch
+    {
+        MachineType.Switch => RepairSwitchVerb,
+        MachineType.RechargeStation => RepairRechargeStationVerb,
         _ => throw new System.ArgumentOutOfRangeException(nameof(type)),
     };
 
@@ -1238,6 +1352,25 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     internal IReadOnlyList<Verb> MachineRemovalVerbs(MachineType type) =>
         _placedMachines.ContainsKey(type) ? [UninstallVerbFor(type), ScrapVerbFor(type)] : [];
 
+    /// <summary>Same idea as <see cref="MachineRemovalVerbs"/>, for the Maintain/Repair pair — a
+    /// machine's own VerbTarget script (ToggleLightVerbTarget, RechargeStationVerbTarget) merges
+    /// this into its own AvailableVerbs too. Empty for Battery (see <see
+    /// cref="MachineFixtureIdFor"/>) or a machine not currently installed.</summary>
+    internal IReadOnlyList<Verb> MachineMaintainRepairVerbs(MachineType type)
+    {
+        if (MachineFixtureIdFor(type) is not { } fixtureId)
+        {
+            return [];
+        }
+
+        if (ShipSimRef?.Deck.Fixtures.FirstOrDefault(f => f.Id == fixtureId) is not { } fixture)
+        {
+            return [];
+        }
+
+        return MaintainOrRepairVerb(fixture.Condition, MaintainVerbFor(type), RepairVerbFor(type)) is { } verb ? [verb] : [];
+    }
+
     /// <summary>Counterpart to <see cref="MachineRemovalVerbs"/> — a machine's own ExecuteVerb
     /// delegates here for any verb id it doesn't recognize as its own. Looks the edge up from
     /// _placedMachines directly rather than this body's own _edgeA/_edgeB (which reflect whatever
@@ -1268,6 +1401,36 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         _pendingMachineType = type;
         _pendingEdgeA = placed.EdgeA;
         _pendingEdgeB = placed.EdgeB;
+        _pendingInventory = inventory;
+        _cycling = true;
+        _cycleTimer!.Start();
+    }
+
+    /// <summary>Counterpart to <see cref="MachineMaintainRepairVerbs"/> — same delegation shape as
+    /// <see cref="ExecuteMachineRemoval"/>.</summary>
+    internal void ExecuteMachineMaintainRepair(MachineType type, Verb verb, PlayerInventory inventory)
+    {
+        if (_cycling || !_placedMachines.ContainsKey(type) || MachineFixtureIdFor(type) is null)
+        {
+            return;
+        }
+
+        PendingAction action;
+        if (verb.Id == MaintainVerbFor(type).Id)
+        {
+            action = PendingAction.MaintainMachine;
+        }
+        else if (verb.Id == RepairVerbFor(type).Id)
+        {
+            action = PendingAction.RepairMachine;
+        }
+        else
+        {
+            return;
+        }
+
+        _pendingAction = action;
+        _pendingMachineType = type;
         _pendingInventory = inventory;
         _cycling = true;
         _cycleTimer!.Start();
@@ -1339,6 +1502,20 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             _pendingAction = verb.Id == MaintainWallVerb.Id ? PendingAction.MaintainWall : PendingAction.RepairWall;
             _pendingEdgeA = _edgeA;
             _pendingEdgeB = _edgeB;
+            _pendingInventory = inventory;
+            _cycling = true;
+            _cycleTimer!.Start();
+            return;
+        }
+
+        if (verb.Id == MaintainConduitVerb.Id || verb.Id == RepairConduitVerb.Id)
+        {
+            var slot = _aimKind == AimKind.Edge
+                ? new ConduitSlot(new Vector2I(_edgeA.X, _edgeA.Y), _edgeB, _aimedWallSlot)
+                : new ConduitSlot(_aimedTile, null);
+
+            _pendingAction = verb.Id == MaintainConduitVerb.Id ? PendingAction.MaintainConduit : PendingAction.RepairConduit;
+            _pendingSlot = slot;
             _pendingInventory = inventory;
             _cycling = true;
             _cycleTimer!.Start();
@@ -1534,6 +1711,23 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             case PendingAction.MaintainWall:
             case PendingAction.RepairWall:
                 ShipSimRef!.Deck.RepairWall(_pendingEdgeA, _pendingEdgeB);
+                break;
+            case PendingAction.MaintainConduit:
+            case PendingAction.RepairConduit:
+                if (ShipSimRef!.Deck.Fixtures.FirstOrDefault(f => f.Id == ConduitFixtureId(_pendingSlot)) is { } conduitFixture)
+                {
+                    conduitFixture.Condition = 1f;
+                }
+
+                break;
+            case PendingAction.MaintainMachine:
+            case PendingAction.RepairMachine:
+                if (MachineFixtureIdFor(_pendingMachineType) is { } machineFixtureId &&
+                    ShipSimRef!.Deck.Fixtures.FirstOrDefault(f => f.Id == machineFixtureId) is { } machineFixture)
+                {
+                    machineFixture.Condition = 1f;
+                }
+
                 break;
         }
     }
