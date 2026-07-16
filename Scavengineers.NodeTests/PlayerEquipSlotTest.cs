@@ -20,17 +20,33 @@ namespace Scavengineers.NodeTests;
 [TestSuite]
 public class PlayerEquipSlotTest
 {
+    /// <summary>The harness's fresh-game stipend really runs in _Ready() and now includes a
+    /// starter EVA suit (torso+helmet, fully suited) — undo that first so a test that wants to
+    /// exercise its own from-scratch equip/unequip scenario isn't fighting the stipend's own
+    /// already-worn suit.</summary>
+    private static void ResetTorsoAndHeadFromStipend(PlayerInventory inventory)
+    {
+        inventory.ClearEquippedContainer("torso");
+        inventory.ClearEquippedContainer("head");
+        inventory.DetachSpecializedSlot("suit_o2");
+        inventory.DetachSpecializedSlot("suit_n2");
+        inventory.DetachSpecializedSlot("suit_filter");
+        inventory.DetachSpecializedSlot("suit_battery");
+    }
+
     [TestCase]
     [RequireGodotRuntime]
     public void TryUnequipItem_ReturnsAnEmptyItemToAHand_WhenRoomExists()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
-        // The harness's fresh-game stipend really runs in _Ready() — in this project's isolated,
-        // catalog-less NodeTests environment (see PlayerTestHarness's own doc comment), every
-        // item's MaxStackSize falls back to 1, so the 50-count scrap_metal stipend overflows past
-        // the 24-slot debug backpack into both bare hands. Clear them explicitly so this test's
-        // own "room exists" precondition is real, not accidentally already-full from that.
+        ResetTorsoAndHeadFromStipend(player.Inventory);
+        // The harness's fresh-game stipend also loads up the debug backpack/hands — in this
+        // project's isolated, catalog-less NodeTests environment (see PlayerTestHarness's own
+        // doc comment), every item's MaxStackSize falls back to 1, so the 50-count scrap_metal
+        // stipend overflows past the 24-slot debug backpack into both bare hands. Clear them
+        // explicitly so this test's own "room exists" precondition is real, not accidentally
+        // already-full from that.
         player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, null);
         player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, null);
         player.Inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2));
@@ -47,6 +63,7 @@ public class PlayerEquipSlotTest
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
+        ResetTorsoAndHeadFromStipend(player.Inventory);
         player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1, 1f));
         player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, ("widget", 1, 1f));
 
@@ -76,6 +93,7 @@ public class PlayerEquipSlotTest
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
+        ResetTorsoAndHeadFromStipend(player.Inventory);
         player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, null);
         player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, null);
         player.Inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2));
@@ -104,6 +122,7 @@ public class PlayerEquipSlotTest
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
+        ResetTorsoAndHeadFromStipend(player.Inventory);
 
         player.TryUnequipItem("torso"); // no exception, nothing to do
 

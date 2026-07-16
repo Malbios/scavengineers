@@ -530,5 +530,9 @@ public sealed class PlayerInventory
         _equippedContainers.Clear();
         Drill = null;
         Flashlight = null;
+        SuitO2 = null;
+        SuitN2 = null;
+        SuitFilter = null;
+        SuitBattery = null;
     }
 }

@@ -365,4 +365,21 @@ public class PlayerInventoryTests : IDisposable
 
         Assert.Null(inventory.SuitN2);
     }
+
+    [Fact]
+    public void Clear_AlsoResetsAllFourSuitSubSlots_NotJustDrillAndFlashlight()
+    {
+        var inventory = new PlayerInventory();
+        inventory.AttachSpecializedSlot("suit_o2", hasItem: true, charge: 0.5f);
+        inventory.AttachSpecializedSlot("suit_n2", hasItem: true, charge: 0.5f);
+        inventory.AttachSpecializedSlot("suit_filter", hasItem: true, charge: 0.5f);
+        inventory.AttachSpecializedSlot("suit_battery", hasItem: true, charge: 0.5f);
+
+        inventory.Clear();
+
+        Assert.Null(inventory.SuitO2);
+        Assert.Null(inventory.SuitN2);
+        Assert.Null(inventory.SuitFilter);
+        Assert.Null(inventory.SuitBattery);
+    }
 }

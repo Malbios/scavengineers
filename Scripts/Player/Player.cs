@@ -374,6 +374,17 @@ public partial class Player : CharacterBody3D
         _inventory.Add("flashlight", 1);
         _inventory.AttachSpecializedSlot("flashlight_battery", hasItem: true, charge: 1f);
         _inventory.Add("debug_flashlight", 1);
+
+        // Starter EVA suit, fully suited and fully charged — dev convenience for testing the
+        // suit itself immediately, same "bypasses the normal hand-then-equip flow" spirit as the
+        // debug backpack above. Overwritten by ApplyPlayerState on load like everything else here.
+        _inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(PlayerInventory.TorsoSlotCount));
+        _inventory.AttachSpecializedSlot("suit_o2", hasItem: true, charge: 1f);
+        _inventory.AttachSpecializedSlot("suit_n2", hasItem: true, charge: 1f);
+        _inventory.AttachSpecializedSlot("suit_filter", hasItem: true, charge: 1f);
+        _inventory.AttachSpecializedSlot("suit_battery", hasItem: true, charge: 1f);
+        _inventory.EquipContainerDirectly("head", "eva_helmet", new SlotContainer(0));
+
         _flashlightOn = true; // starts on, same as before this was toggleable, but F now turns it off too
 
         CaptureMouse();
