@@ -111,6 +111,20 @@ public sealed class PlayerInventory
     /// "isn't currently worn."</summary>
     public void DiscardPersistentContents(string itemId) => _persistentContents.Remove(itemId);
 
+    /// <summary>Directly seeds an item's persistent contents at load time — used by save/load
+    /// restoration for an item that's merely held (not equipped into any slot) at save time, so
+    /// its contents survive even without an equip-slot mapping to attach to (see
+    /// <see cref="EquipContainerDirectly"/>, which handles the equipped case and reuses whatever
+    /// entry is already here rather than double-restoring). A no-op if an entry already exists —
+    /// same "first acquisition wins" contract as EquipContainerDirectly.</summary>
+    public void RestorePersistentContents(string itemId, SlotContainer contents)
+    {
+        if (!_persistentContents.ContainsKey(itemId))
+        {
+            _persistentContents[itemId] = contents;
+        }
+    }
+
     /// <summary>A device's own swappable battery/tank — the shape a power drill's, flashlight's,
     /// or (later) an EVA suit tank's per-instance state takes. Deliberately not a generic
     /// slot-level extension to <see cref="SlotContainer"/> (that would touch every inventory

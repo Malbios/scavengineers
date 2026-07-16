@@ -1609,8 +1609,22 @@ public partial class Player : CharacterBody3D
         UpdateInventoryHud();
     }
 
+    /// <summary>Which backpack-type item (if any) the player owns anywhere — worn, merely held,
+    /// or stored inside another backpack — used by CapturePlayerState to know which item's
+    /// persistent contents belong in the save's BackpackSlots (see PlayerSaveData.
+    /// OwnedBackpackItemId). Only one of "backpack"/"debug_backpack" is ever realistically owned
+    /// at once in practice, so this doesn't attempt to handle both existing simultaneously.</summary>
+    private string? OwnedBackpackItemId =>
+        _inventory.GetPersistentContents("backpack") is not null ? "backpack"
+        : _inventory.GetPersistentContents("debug_backpack") is not null ? "debug_backpack"
+        : null;
+
     public PlayerSaveData CapturePlayerState()
     {
+        var ownedBackpackItemId = OwnedBackpackItemId;
+        var ownedBackpackContents = ownedBackpackItemId is not null ? _inventory.GetPersistentContents(ownedBackpackItemId) : null;
+        var ownedTorsoContents = _inventory.GetPersistentContents("eva_torso_suit");
+
         return new PlayerSaveData
         {
             PosX = Position.X,
@@ -1626,10 +1640,11 @@ public partial class Player : CharacterBody3D
             HandSlots = SlotSaveDataConverter.Capture(_inventory.Hands),
             Credits = _credits,
             BackpackItemId = _inventory.Backpack?.ItemId,
-            BackpackSlots = _inventory.Backpack is { } backpack
-                ? SlotSaveDataConverter.Capture(backpack.Contents)
+            OwnedBackpackItemId = ownedBackpackItemId,
+            BackpackSlots = ownedBackpackContents is not null
+                ? SlotSaveDataConverter.Capture(ownedBackpackContents)
                 : new List<SlotSaveData?>(),
-            BackpackSlotCount = _inventory.Backpack?.Contents.Slots.Count ?? PlayerInventory.BackpackSlotCount,
+            BackpackSlotCount = ownedBackpackContents?.Slots.Count ?? PlayerInventory.BackpackSlotCount,
             HasDrill = _inventory.Drill is not null,
             DrillHasBattery = _inventory.Drill?.HasItem ?? false,
             DrillCharge = _inventory.Drill?.Charge ?? 0f,
@@ -1642,10 +1657,11 @@ public partial class Player : CharacterBody3D
             BackpackWindow = new WindowPosition(_backpackWindow!.Position.X, _backpackWindow.Position.Y),
             HeadItemId = _inventory.Head?.ItemId,
             TorsoItemId = _inventory.Torso?.ItemId,
-            TorsoSlots = _inventory.Torso is { } torso
-                ? SlotSaveDataConverter.Capture(torso.Contents)
+            HasEvaSuit = ownedTorsoContents is not null,
+            TorsoSlots = ownedTorsoContents is not null
+                ? SlotSaveDataConverter.Capture(ownedTorsoContents)
                 : new List<SlotSaveData?>(),
-            TorsoSlotCount = _inventory.Torso?.Contents.Slots.Count ?? PlayerInventory.TorsoSlotCount,
+            TorsoSlotCount = ownedTorsoContents?.Slots.Count ?? PlayerInventory.TorsoSlotCount,
             HasSuitO2Tank = _inventory.SuitO2?.HasItem ?? false,
             SuitO2Charge = _inventory.SuitO2?.Charge ?? 0f,
             HasSuitN2Tank = _inventory.SuitN2?.HasItem ?? false,
@@ -1688,26 +1704,37 @@ public partial class Player : CharacterBody3D
             }
         }
 
-        // Backpack is reconstructed after the body replay above (still null at that point, so
-        // those Add calls only ever fill body slots) and filled directly into its own fresh
-        // SlotContainer, keeping body-refill and backpack-refill from cross-contaminating.
-        if (data.BackpackItemId is { } backpackItemId)
+        // Owned-anywhere persistent contents are restored first (independent of worn state) —
+        // an old save predating OwnedBackpackItemId/HasEvaSuit falls back to the worn-only
+        // markers (BackpackItemId/TorsoItemId), since those were the only signal available for
+        // "does this item exist" back then. EquipContainerDirectly below reuses whichever entry
+        // was seeded here (see its own "first acquisition wins" contract) rather than
+        // double-restoring, so a worn item's contents aren't captured/restored twice.
+        var ownedBackpackItemId = data.OwnedBackpackItemId ?? data.BackpackItemId;
+        if (ownedBackpackItemId is not null)
         {
-            var contents = new SlotContainer(data.BackpackSlotCount);
+            var backpackContents = new SlotContainer(data.BackpackSlotCount);
             if (data.BackpackSlots.Count > 0)
             {
-                SlotSaveDataConverter.Restore(contents, data.BackpackSlots);
+                SlotSaveDataConverter.Restore(backpackContents, data.BackpackSlots);
             }
             else
             {
                 // Legacy save predating per-slot state (see PlayerSaveData.BackpackSlots).
                 foreach (var (itemId, count) in data.BackpackContents)
                 {
-                    contents.Add(itemId, count);
+                    backpackContents.Add(itemId, count);
                 }
             }
 
-            _inventory.EquipContainerDirectly("back", backpackItemId, contents);
+            _inventory.RestorePersistentContents(ownedBackpackItemId, backpackContents);
+        }
+
+        // Backpack is reconstructed after the body replay above (still null at that point, so
+        // those Add calls only ever fill body slots).
+        if (data.BackpackItemId is { } backpackItemId)
+        {
+            _inventory.EquipContainerDirectly("back", backpackItemId, new SlotContainer(data.BackpackSlotCount));
         }
 
         if (data.HasDrill)
@@ -1720,20 +1747,25 @@ public partial class Player : CharacterBody3D
             _inventory.AttachSpecializedSlot("flashlight_battery", data.FlashlightHasBattery, data.FlashlightCharge);
         }
 
-        // Torso reconstructed the same two-phase way as the backpack above — fresh SlotContainer
-        // first, then the 4 tank/filter/battery sub-slots attached afterward (mirroring the real
-        // equip flow in Player.TryEquipItemFrom), so a torso-with-tanks round-trips exactly
-        // as it was, not just its 2 pocket slots.
-        if (data.TorsoItemId is { } torsoItemId)
+        // Same owned-anywhere-first shape as the backpack above — the suit's tank/filter/battery
+        // sub-slots are restored unconditionally alongside its pocket contents (mirroring the
+        // real equip flow in Player.TryEquipItemFrom), since Stage 3 made them per-suit
+        // persistent state decoupled from worn state too, not just its 2 pocket slots.
+        if (data.HasEvaSuit || data.TorsoItemId is not null)
         {
-            var torsoContents = new SlotContainer(data.TorsoSlotCount);
+            var torsoContents = new SlotContainer(PlayerInventory.TorsoSlotCount);
             SlotSaveDataConverter.Restore(torsoContents, data.TorsoSlots);
-            _inventory.EquipContainerDirectly("torso", torsoItemId, torsoContents);
+            _inventory.RestorePersistentContents("eva_torso_suit", torsoContents);
 
             _inventory.AttachSpecializedSlot("suit_o2", data.HasSuitO2Tank, data.SuitO2Charge);
             _inventory.AttachSpecializedSlot("suit_n2", data.HasSuitN2Tank, data.SuitN2Charge);
             _inventory.AttachSpecializedSlot("suit_filter", data.HasSuitFilter, data.SuitFilterCharge);
             _inventory.AttachSpecializedSlot("suit_battery", data.HasSuitBattery, data.SuitBatteryCharge);
+        }
+
+        if (data.TorsoItemId is { } torsoItemId)
+        {
+            _inventory.EquipContainerDirectly("torso", torsoItemId, new SlotContainer(PlayerInventory.TorsoSlotCount));
         }
 
         if (data.HeadItemId is { } headItemId)

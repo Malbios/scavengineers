@@ -179,4 +179,72 @@ public class PlayerSaveStateTest
         var captured = player.CapturePlayerState();
         AssertBool(captured.CO2Percent == 0f).IsTrue();
     }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void ApplyPlayerState_ARestoredEvaSuitHeldNotWorn_RestoresItsPocketsAndTanksAnyway()
+    {
+        // The exact gap Stage 6 (persistent-contents save schema) closes: a save capturing a suit
+        // that's merely held (not equipped into "torso") must still restore its pocket contents
+        // and tank state, not just silently lose them because TorsoItemId is null.
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+
+        var data = new PlayerSaveData
+        {
+            TorsoItemId = null, // not worn
+            HasEvaSuit = true, // but owned
+            TorsoSlots = new List<SlotSaveData?> { new() { ItemId = "scrap_metal", Count = 1, Charge = 1f }, null },
+            HasSuitO2Tank = true,
+            SuitO2Charge = 0.75f,
+            HasSuitN2Tank = true,
+            SuitN2Charge = 0.5f,
+        };
+
+        player.ApplyPlayerState(data);
+
+        AssertBool(player.Inventory.Torso is null).IsTrue();
+        var pocketContents = player.Inventory.GetPersistentContents("eva_torso_suit");
+        AssertBool(pocketContents is not null).IsTrue();
+        AssertBool(pocketContents!.CountOf("scrap_metal") == 1).IsTrue();
+        AssertBool(player.Inventory.SuitO2 is { HasItem: true }).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(player.Inventory.SuitO2!.Charge, 0.75f)).IsTrue();
+        AssertBool(player.Inventory.SuitN2 is { HasItem: true }).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(player.Inventory.SuitN2!.Charge, 0.5f)).IsTrue();
+
+        var roundTripped = player.CapturePlayerState();
+        AssertBool(roundTripped.TorsoItemId is null).IsTrue();
+        AssertBool(roundTripped.HasEvaSuit).IsTrue();
+        AssertBool(roundTripped.TorsoSlots.Any(s => s?.ItemId == "scrap_metal")).IsTrue();
+        AssertBool(roundTripped.HasSuitO2Tank).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(roundTripped.SuitO2Charge, 0.75f)).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void ApplyPlayerState_ARestoredBackpackHeldNotWorn_RestoresItsContentsAnyway()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+
+        var data = new PlayerSaveData
+        {
+            BackpackItemId = null, // not worn
+            OwnedBackpackItemId = "backpack", // but owned
+            BackpackSlots = new List<SlotSaveData?> { new() { ItemId = "scrap_metal", Count = 1, Charge = 1f }, null },
+            BackpackSlotCount = 2,
+        };
+
+        player.ApplyPlayerState(data);
+
+        AssertBool(player.Inventory.Backpack is null).IsTrue();
+        var contents = player.Inventory.GetPersistentContents("backpack");
+        AssertBool(contents is not null).IsTrue();
+        AssertBool(contents!.CountOf("scrap_metal") == 1).IsTrue();
+
+        var roundTripped = player.CapturePlayerState();
+        AssertBool(roundTripped.BackpackItemId is null).IsTrue();
+        AssertBool(roundTripped.OwnedBackpackItemId == "backpack").IsTrue();
+        AssertBool(roundTripped.BackpackSlots.Any(s => s?.ItemId == "scrap_metal")).IsTrue();
+    }
 }

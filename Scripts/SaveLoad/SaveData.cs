@@ -197,12 +197,21 @@ public sealed class PlayerSaveData
     /// backpack-contents-free either way (see Player.CapturePlayerState/ApplyPlayerState).</summary>
     public string? BackpackItemId { get; set; }
 
+    /// <summary>Which backpack-type item ("backpack" or "debug_backpack") the player possesses
+    /// at all — worn, merely held, or stored inside another backpack — independent of
+    /// <see cref="BackpackItemId"/> (which only means "currently worn"). Null for an old save
+    /// predating the persistent-contents model (falls back to BackpackItemId at restore, so a
+    /// pre-existing worn backpack still round-trips) or one with no backpack owned anywhere.
+    /// Identifies which item <see cref="BackpackSlots"/> below actually belongs to.</summary>
+    public string? OwnedBackpackItemId { get; set; }
+
     /// <summary>Legacy pre-per-item-state format — same story as <see cref="Inventory"/>, just
     /// for the worn backpack's own contents.</summary>
     public Dictionary<string, int> BackpackContents { get; set; } = new();
 
     /// <summary>Replaces <see cref="BackpackContents"/> — same shape/fallback story as
-    /// <see cref="HandSlots"/>.</summary>
+    /// <see cref="HandSlots"/>. Captures whichever backpack-type item is owned at all (see
+    /// <see cref="OwnedBackpackItemId"/>), not just a currently-worn one.</summary>
     public List<SlotSaveData?> BackpackSlots { get; set; } = new();
 
     /// <summary>Defaulted to the normal backpack's own size — an old save missing this field
@@ -245,16 +254,26 @@ public sealed class PlayerSaveData
     /// <see cref="BackpackItemId"/>.</summary>
     public string? TorsoItemId { get; set; }
 
+    /// <summary>Whether the player possesses an EVA suit at all — worn, merely held, or stored —
+    /// independent of <see cref="TorsoItemId"/> (which only means "currently worn"). False for an
+    /// old save predating the persistent-contents model (falls back to TorsoItemId at restore,
+    /// so a pre-existing worn suit still round-trips) or one with no suit owned anywhere. Gates
+    /// whether <see cref="TorsoSlots"/>/HasSuitO2Tank/etc. below should be restored even when the
+    /// suit isn't currently equipped.</summary>
+    public bool HasEvaSuit { get; set; }
+
     /// <summary>The torso's own 2 pocket slots — same SlotSaveData shape as
     /// <see cref="HandSlots"/>/<see cref="BackpackSlots"/>, no legacy-dict fallback needed since
-    /// this is a brand-new field (nothing predates it to fall back from).</summary>
+    /// this is a brand-new field (nothing predates it to fall back from). Captures the suit's
+    /// contents whenever it's owned at all (see <see cref="HasEvaSuit"/>), not just worn.</summary>
     public List<SlotSaveData?> TorsoSlots { get; set; } = new();
 
     public int TorsoSlotCount { get; set; } = PlayerInventory.TorsoSlotCount;
 
     /// <summary>Whether a tank/filter/battery is actually loaded in the corresponding suit
     /// sub-slot — same DrillHasBattery/DrillCharge shape and reasoning, once per sub-slot.
-    /// Meaningless (both default false/0) unless <see cref="TorsoItemId"/> is also non-null.</summary>
+    /// Meaningless (both default false/0) unless <see cref="HasEvaSuit"/> (or, for an old save,
+    /// <see cref="TorsoItemId"/>) is also set.</summary>
     public bool HasSuitO2Tank { get; set; }
 
     public float SuitO2Charge { get; set; }
