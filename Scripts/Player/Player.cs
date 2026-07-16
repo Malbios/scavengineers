@@ -1631,6 +1631,14 @@ public partial class Player : CharacterBody3D
                 : nameText;
             _targetNameLabel.Visible = true;
         }
+        else if (_scanModeOn && target?.Condition is { } bareCondition)
+        {
+            // ShipBuildTarget (floor/ceiling/wall) deliberately has no DisplayNameKey — it's
+            // terrain, not a discrete object — so there's no name to prefix here, just the
+            // scanned percentage on its own.
+            _targetNameLabel!.Text = $"{Mathf.RoundToInt(bareCondition * 100)}%";
+            _targetNameLabel.Visible = true;
+        }
         else
         {
             _targetNameLabel!.Visible = false;

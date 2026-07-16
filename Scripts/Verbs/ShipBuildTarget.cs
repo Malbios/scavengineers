@@ -81,6 +81,45 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         Requirements = [new ItemRequirement("wall_panel", 1), PowerDrillRequirement],
     };
 
+    // The two-tier upkeep model (see WearSystem's passive decay): above 50% health, a wrench
+    // alone tops a surface back to full — no resource cost, matching "the right tool, no
+    // materials." At or below 50% it's Damaged and needs the wrench *and* spare_parts instead.
+    // Offered instead of each other (see ResolveAvailableVerbs), alongside — not instead of —
+    // the existing Install/Remove verb above; reaching exactly 0% health is a full breach, which
+    // stays on that existing, more expensive verb since there's no panel left to merely top up.
+    private static readonly ItemRequirement WrenchRequirement = new("wrench", 1) { Consumed = false };
+    private static readonly ItemRequirement SparePartsRequirement = new("spare_parts", 1);
+
+    private static readonly Verb MaintainFloorVerb = new("maintain_floor", "VERB_MAINTAIN_FLOOR", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement],
+    };
+
+    private static readonly Verb RepairFloorVerb = new("repair_floor", "VERB_REPAIR_FLOOR", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement, SparePartsRequirement],
+    };
+
+    private static readonly Verb MaintainCeilingVerb = new("maintain_ceiling", "VERB_MAINTAIN_CEILING", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement],
+    };
+
+    private static readonly Verb RepairCeilingVerb = new("repair_ceiling", "VERB_REPAIR_CEILING", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement, SparePartsRequirement],
+    };
+
+    private static readonly Verb MaintainWallVerb = new("maintain_wall", "VERB_MAINTAIN_WALL", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement],
+    };
+
+    private static readonly Verb RepairWallVerb = new("repair_wall", "VERB_REPAIR_WALL", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement, SparePartsRequirement],
+    };
+
     // Battery/Switch/RechargeStation verbs — Install requires holding the machine's own item
     // (bought from a trade console, or refunded by a prior Uninstall); Uninstall gives that same
     // item back, Scrap gives partial scrap_metal instead (a real tradeoff, same shape as
@@ -247,6 +286,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         InstallMachine,
         UninstallMachine,
         ScrapMachine,
+        MaintainFloor,
+        RepairFloor,
+        MaintainCeiling,
+        RepairCeiling,
+        MaintainWall,
+        RepairWall,
     }
 
     /// <summary>One tile can carry several conduits at once — one floor-mounted (WallNeighbor
@@ -481,6 +526,44 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     public float? CurrentVerbProgress =>
         _cycling ? 1f - (float)(_cycleTimer!.TimeLeft / _cycleTimer.WaitTime) : null;
+
+    /// <summary>The currently-aimed surface's health, for the PDA scan-mode crosshair readout —
+    /// null while breached (nothing left to measure until it's rebuilt) or while aiming at
+    /// something with no structural-surface concept at all (e.g. a bare conduit slot).</summary>
+    public float? Condition
+    {
+        get
+        {
+            if (ShipSimRef is null)
+            {
+                return null;
+            }
+
+            switch (_aimKind)
+            {
+                case AimKind.Tile when PanelMesh is not null:
+                {
+                    var cell = new CellCoord(_aimedTile.X, _aimedTile.Y);
+                    return ShipSimRef.Deck.IsHullBreached(cell, StructuralSurface.Floor) ? null : ShipSimRef.Deck.FloorHealth(cell);
+                }
+
+                case AimKind.Ceiling when PanelMesh is not null:
+                {
+                    var cell = new CellCoord(_aimedTile.X, _aimedTile.Y);
+                    return ShipSimRef.Deck.IsHullBreached(cell, StructuralSurface.Ceiling) ? null : ShipSimRef.Deck.CeilingHealth(cell);
+                }
+
+                case AimKind.Edge when !ShipSimRef.Deck.Cells.Contains(_edgeB):
+                    return ShipSimRef.Deck.IsWallEdgeBreached(_edgeA, _edgeB) ? null : ShipSimRef.Deck.WallHealth(_edgeA, _edgeB);
+
+                case AimKind.Edge:
+                    return ShipSimRef.Deck.IsEdgeSealed(_edgeA, _edgeB) ? ShipSimRef.Deck.WallHealth(_edgeA, _edgeB) : null;
+
+                default:
+                    return null;
+            }
+        }
+    }
 
     public override void _Ready()
     {
@@ -933,6 +1016,14 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         ((a.X == ExcludedEdgeColumn - 1 && b.X == ExcludedEdgeColumn) ||
          (b.X == ExcludedEdgeColumn - 1 && a.X == ExcludedEdgeColumn));
 
+    /// <summary>Picks the upkeep verb matching Ostranauts-style two-tier maintenance: full health
+    /// offers nothing, >50% offers a free (tool-only) Maintain, and ≤50% offers a Repair that
+    /// also consumes spare_parts — null at exactly 0% since a breached surface's only remaining
+    /// option is the existing, more expensive Install verb (see the breached branches above/below,
+    /// which never call this).</summary>
+    private static Verb? MaintainOrRepairVerb(float health, Verb maintainVerb, Verb repairVerb) =>
+        health >= 1f ? null : health > 0.5f ? maintainVerb : repairVerb;
+
     private IReadOnlyList<Verb> ResolveAvailableVerbs()
     {
         if (ShipSimRef is null || !AllowStructuralModification)
@@ -950,8 +1041,14 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 // system (PanelMesh configured) — everything else keeps its fixed floor.
                 if (PanelMesh is not null)
                 {
-                    var floorPresent = !ShipSimRef.Deck.IsHullBreached(new CellCoord(_aimedTile.X, _aimedTile.Y), StructuralSurface.Floor);
+                    var cell = new CellCoord(_aimedTile.X, _aimedTile.Y);
+                    var floorPresent = !ShipSimRef.Deck.IsHullBreached(cell, StructuralSurface.Floor);
                     verbs.Add(floorPresent ? RemoveFloorVerb : InstallFloorVerb);
+
+                    if (floorPresent && MaintainOrRepairVerb(ShipSimRef.Deck.FloorHealth(cell), MaintainFloorVerb, RepairFloorVerb) is { } floorUpkeepVerb)
+                    {
+                        verbs.Add(floorUpkeepVerb);
+                    }
                 }
 
                 return verbs;
@@ -959,8 +1056,16 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
             case AimKind.Ceiling when PanelMesh is not null:
             {
-                var ceilingPresent = !ShipSimRef.Deck.IsHullBreached(new CellCoord(_aimedTile.X, _aimedTile.Y), StructuralSurface.Ceiling);
-                return [ceilingPresent ? RemoveCeilingVerb : InstallCeilingVerb];
+                var cell = new CellCoord(_aimedTile.X, _aimedTile.Y);
+                var ceilingPresent = !ShipSimRef.Deck.IsHullBreached(cell, StructuralSurface.Ceiling);
+                var verbs = new List<Verb> { ceilingPresent ? RemoveCeilingVerb : InstallCeilingVerb };
+
+                if (ceilingPresent && MaintainOrRepairVerb(ShipSimRef.Deck.CeilingHealth(cell), MaintainCeilingVerb, RepairCeilingVerb) is { } ceilingUpkeepVerb)
+                {
+                    verbs.Add(ceilingUpkeepVerb);
+                }
+
+                return verbs;
             }
 
             case AimKind.Edge when !ShipSimRef.Deck.Cells.Contains(_edgeB):
@@ -976,6 +1081,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 if (breached)
                 {
                     verbs.Add(ExtendFloorVerb);
+                }
+                else if (MaintainOrRepairVerb(ShipSimRef.Deck.WallHealth(_edgeA, _edgeB), MaintainWallVerb, RepairWallVerb) is { } boundaryWallUpkeepVerb)
+                {
+                    verbs.Add(boundaryWallUpkeepVerb);
                 }
 
                 if (EdgeConduitVerb(wallPresent: !breached) is { } boundaryConduitVerb)
@@ -993,6 +1102,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 // gap between rooms has nothing to mount a conduit on until a wall goes up.
                 var sealed_ = ShipSimRef.Deck.IsEdgeSealed(_edgeA, _edgeB);
                 var verbs = new List<Verb> { sealed_ ? RemoveWallVerb : InstallWallVerb };
+
+                if (sealed_ && MaintainOrRepairVerb(ShipSimRef.Deck.WallHealth(_edgeA, _edgeB), MaintainWallVerb, RepairWallVerb) is { } interiorWallUpkeepVerb)
+                {
+                    verbs.Add(interiorWallUpkeepVerb);
+                }
+
                 if (EdgeConduitVerb(wallPresent: sealed_) is { } interiorConduitVerb)
                 {
                     verbs.Add(interiorConduitVerb);
@@ -1207,10 +1322,45 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             return;
         }
 
+        if (verb.Id == MaintainFloorVerb.Id || verb.Id == RepairFloorVerb.Id)
+        {
+            ExecuteStructuralUpkeepTileVerb(verb.Id == MaintainFloorVerb.Id ? PendingAction.MaintainFloor : PendingAction.RepairFloor, inventory);
+            return;
+        }
+
+        if (verb.Id == MaintainCeilingVerb.Id || verb.Id == RepairCeilingVerb.Id)
+        {
+            ExecuteStructuralUpkeepTileVerb(verb.Id == MaintainCeilingVerb.Id ? PendingAction.MaintainCeiling : PendingAction.RepairCeiling, inventory);
+            return;
+        }
+
+        if (verb.Id == MaintainWallVerb.Id || verb.Id == RepairWallVerb.Id)
+        {
+            _pendingAction = verb.Id == MaintainWallVerb.Id ? PendingAction.MaintainWall : PendingAction.RepairWall;
+            _pendingEdgeA = _edgeA;
+            _pendingEdgeB = _edgeB;
+            _pendingInventory = inventory;
+            _cycling = true;
+            _cycleTimer!.Start();
+            return;
+        }
+
         if (_aimKind == AimKind.Edge)
         {
             ExecuteWallVerb(verb, inventory);
         }
+    }
+
+    /// <summary>Shared by the floor/ceiling Maintain and Repair verbs — both just record the
+    /// aimed tile and the chosen action, differing only in PendingAction (which drives the
+    /// requirements check upstream in Player and the repair call in OnCycleComplete).</summary>
+    private void ExecuteStructuralUpkeepTileVerb(PendingAction action, PlayerInventory inventory)
+    {
+        _pendingAction = action;
+        _pendingTile = _aimedTile;
+        _pendingInventory = inventory;
+        _cycling = true;
+        _cycleTimer!.Start();
     }
 
     private void ExecuteConduitVerb(Verb verb, PlayerInventory inventory)
@@ -1372,6 +1522,18 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             case PendingAction.ScrapMachine:
                 RemoveMachine(_pendingMachineType);
                 AddOrDrop(inventory, "scrap_metal", ScrapYieldFor(_pendingMachineType));
+                break;
+            case PendingAction.MaintainFloor:
+            case PendingAction.RepairFloor:
+                ShipSimRef!.Deck.RepairFloor(new CellCoord(_pendingTile.X, _pendingTile.Y));
+                break;
+            case PendingAction.MaintainCeiling:
+            case PendingAction.RepairCeiling:
+                ShipSimRef!.Deck.RepairCeiling(new CellCoord(_pendingTile.X, _pendingTile.Y));
+                break;
+            case PendingAction.MaintainWall:
+            case PendingAction.RepairWall:
+                ShipSimRef!.Deck.RepairWall(_pendingEdgeA, _pendingEdgeB);
                 break;
         }
     }

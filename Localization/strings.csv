@@ -92,3 +92,9 @@ HUD_SUIT_O2_SLOT,O2 Tank,O2-Tank
 HUD_SUIT_N2_SLOT,N2 Tank,N2-Tank
 HUD_SUIT_FILTER_SLOT,CO2 Filter,CO2-Filter
 HUD_SUIT_BATTERY_SLOT,Suit Battery,Anzug-Akku
+VERB_MAINTAIN_FLOOR,Maintain Floor,Boden warten
+VERB_REPAIR_FLOOR,Repair Floor,Boden reparieren
+VERB_MAINTAIN_CEILING,Maintain Ceiling,Decke warten
+VERB_REPAIR_CEILING,Repair Ceiling,Decke reparieren
+VERB_MAINTAIN_WALL,Maintain Wall,Wand warten
+VERB_REPAIR_WALL,Repair Wall,Wand reparieren
