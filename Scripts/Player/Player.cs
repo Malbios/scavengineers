@@ -23,6 +23,18 @@ public partial class Player : CharacterBody3D
     // Placeholder/tunable — 25 wall/floor/ceiling actions per full battery.
     private const float DrillChargeDrainPerUse = 0.04f;
 
+    /// <summary>Tools with real durability — worn down by actual use (see Interact), not by
+    /// WearSystem's passive tick (that's ship fixtures only). Reuses the held item's own
+    /// SlotContainer/PickupItem Charge field to mean "durability" here, the same "same field,
+    /// different meaning per item" pattern Fixture.Condition already uses for BatteryFixture
+    /// (charge) vs ConduitFixture (wear) — a fresh tool already defaults to Charge 1f, so nothing
+    /// changes for an old save.</summary>
+    private static readonly string[] DurableToolIds = ["crowbar", "power_drill", "wrench"];
+
+    // Placeholder/tunable — roughly 50 uses to fully wear down, same order of magnitude as
+    // DrillChargeDrainPerUse's own battery-drain rate.
+    private const float ToolWearPerUse = 0.02f;
+
     // Placeholder/tunable — ~15 min of continuous use per full battery, same pacing the
     // flashlight's old generic-Power drain used before Power was removed as a player stat.
     private const float FlashlightChargeDrainPerSecond = 1f / 900f;
@@ -1542,6 +1554,14 @@ public partial class Player : CharacterBody3D
             _inventory.Drill!.Charge = Mathf.Max(0f, _inventory.Drill.Charge - DrillChargeDrainPerUse);
         }
 
+        foreach (var toolId in DurableToolIds)
+        {
+            if (verb.Requirements.Any(r => r.ItemId == toolId))
+            {
+                _inventory.DamageToolInHand(toolId, ToolWearPerUse);
+            }
+        }
+
         target.ExecuteVerb(verb, _inventory);
 
         if (verb.DurationSeconds > 0)
@@ -1572,13 +1592,25 @@ public partial class Player : CharacterBody3D
     /// repair damaged conduit, install conduit, ...) is gated, so a target never needs its own
     /// affordability logic. One extra clause is specific to the power drill (the only stateful
     /// tool so far, see PlayerInventory.SpecializedSlot) — holding it isn't enough, it also needs an
-    /// installed battery with real charge left.</summary>
+    /// installed battery with real charge left. Another gates every DurableToolIds entry
+    /// (including power_drill itself) on its own held-slot durability — a worn-out crowbar/
+    /// wrench/drill simply stops working until replaced (see DamageToolInHand's own doc comment;
+    /// no in-place repair for held tools in this pass).</summary>
     private bool IsAffordable(Verb verb) =>
         verb.Requirements.Count == 0 ||
         verb.Requirements.All(r =>
             (r.ItemId == LeftHandItemId || r.ItemId == RightHandItemId) &&
             _inventory.Has(r.ItemId, r.Count) &&
-            (r.ItemId != "power_drill" || _inventory.Drill is { HasItem: true, Charge: > 0f }));
+            (r.ItemId != "power_drill" || _inventory.Drill is { HasItem: true, Charge: > 0f }) &&
+            (!DurableToolIds.Contains(r.ItemId) || ToolCharge(r.ItemId) > 0f));
+
+    /// <summary>The Charge (durability) of whichever hand currently holds `itemId` — 0 if it
+    /// isn't actually held right now, matching IsAffordable's own "not held at all" failure
+    /// mode.</summary>
+    private float ToolCharge(string itemId) =>
+        (LeftHandItemId == itemId ? _inventory.Slots[PlayerInventory.LeftHandSlotIndex]
+            : RightHandItemId == itemId ? _inventory.Slots[PlayerInventory.RightHandSlotIndex]
+            : null)?.Charge ?? 0f;
 
     /// <summary>The single place a target's verbs are filtered to affordable ones and ordered
     /// for cycling/selection — every caller (Interact, CycleSelectedVerb, UpdateVerbHud) must

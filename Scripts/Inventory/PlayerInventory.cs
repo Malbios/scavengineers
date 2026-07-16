@@ -47,6 +47,23 @@ public sealed class PlayerInventory
     /// hand slots.</summary>
     public SlotContainer Hands => _hands;
 
+    /// <summary>Wears down whichever hand currently holds `itemId` by `amount` (its own held-slot
+    /// Charge, clamped at 0) — used for tool durability (crowbar/power_drill/wrench, see
+    /// Player.DurableToolIds), a different meaning than Charge's usual "battery level" (the same
+    /// per-item-type overload Fixture.Condition already uses for BatteryFixture vs
+    /// ConduitFixture). No-op if the item isn't actually in a hand right now.</summary>
+    public void DamageToolInHand(string itemId, float amount)
+    {
+        for (var i = 0; i < HandCount; i++)
+        {
+            if (_hands.Slots[i] is { } slot && slot.ItemId == itemId)
+            {
+                _hands.SetSlot(i, (slot.ItemId, slot.Count, Math.Max(0f, slot.Charge - amount)));
+                return;
+            }
+        }
+    }
+
     /// <summary>An item id plus its own separate <see cref="SlotContainer"/> — the shape a
     /// worn container takes while equipped (a backpack, the EVA suit's torso piece, or a
     /// container-less item like the helmet, which simply carries a 0-slot container). Which

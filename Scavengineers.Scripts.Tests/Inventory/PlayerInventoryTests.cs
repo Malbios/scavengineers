@@ -439,4 +439,45 @@ public class PlayerInventoryTests : IDisposable
         Assert.Null(inventory.SuitFilter);
         Assert.Null(inventory.SuitBattery);
     }
+
+    [Fact]
+    public void DamageToolInHand_ReducesTheHeldItemsOwnChargeByAmount_ClampedAtZero()
+    {
+        var inventory = new PlayerInventory();
+        inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("crowbar", 1, 1f));
+
+        inventory.DamageToolInHand("crowbar", 0.3f);
+
+        var slot = inventory.Hands.Slots[PlayerInventory.LeftHandSlotIndex];
+        Assert.NotNull(slot);
+        Assert.Equal("crowbar", slot!.Value.ItemId);
+        Assert.Equal(0.7f, slot.Value.Charge, precision: 5);
+
+        inventory.DamageToolInHand("crowbar", 5f); // overshoot
+
+        Assert.Equal(0f, inventory.Hands.Slots[PlayerInventory.LeftHandSlotIndex]!.Value.Charge);
+    }
+
+    [Fact]
+    public void DamageToolInHand_FindsItInEitherHand_NotJustTheLeftOne()
+    {
+        var inventory = new PlayerInventory();
+        inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, ("wrench", 1, 1f));
+
+        inventory.DamageToolInHand("wrench", 0.4f);
+
+        Assert.Equal(0.6f, inventory.Hands.Slots[PlayerInventory.RightHandSlotIndex]!.Value.Charge, precision: 5);
+    }
+
+    [Fact]
+    public void DamageToolInHand_IsANoOp_WhenTheItemIsNotActuallyHeld()
+    {
+        var inventory = new PlayerInventory();
+        inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("scrap_metal", 1, 1f));
+
+        inventory.DamageToolInHand("wrench", 0.5f); // not held at all
+
+        Assert.Equal("scrap_metal", inventory.Hands.Slots[PlayerInventory.LeftHandSlotIndex]!.Value.ItemId);
+        Assert.Equal(1f, inventory.Hands.Slots[PlayerInventory.LeftHandSlotIndex]!.Value.Charge);
+    }
 }
