@@ -12,6 +12,7 @@ public class PlayerInventoryTests : IDisposable
             ["widget"] = new() { Id = "widget", MaxStackSize = 1 },
             ["backpack"] = new() { Id = "backpack", MaxStackSize = 1 },
             ["battery"] = new() { Id = "battery", MaxStackSize = 1 },
+            ["o2_tank"] = new() { Id = "o2_tank", MaxStackSize = 1 },
         });
     }
 
@@ -325,5 +326,43 @@ public class PlayerInventoryTests : IDisposable
         Assert.Equal(0f, inventory.Drill!.Charge);
 
         inventory.DrainSpecializedSlot("nonexistent_slot", 0.5f); // no-op, no exception
+    }
+
+    [Fact]
+    public void SuitO2Slot_InsertAndEject_RoundTripsThroughTheSameGenericMechanismAsDrill()
+    {
+        var inventory = new PlayerInventory();
+        inventory.AttachSpecializedSlot("suit_o2", hasItem: false, charge: 0f); // "torso is worn, tank slot empty"
+        inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("o2_tank", 1, 0.88f));
+
+        Assert.True(inventory.InsertIntoSpecializedSlot("suit_o2"));
+        Assert.True(inventory.SuitO2!.HasItem);
+        Assert.Equal(0.88f, inventory.SuitO2.Charge);
+
+        Assert.True(inventory.EjectSpecializedSlot("suit_o2"));
+        Assert.False(inventory.SuitO2!.HasItem);
+        var ejected = inventory.Hands.Slots.First(s => s?.ItemId == "o2_tank");
+        Assert.Equal(0.88f, ejected!.Value.Charge);
+    }
+
+    [Fact]
+    public void InsertIntoSpecializedSlot_FailsForSuitSlots_WhenTheSuitIsntWorn()
+    {
+        var inventory = new PlayerInventory(); // no AttachSpecializedSlot("suit_o2", ...) — torso never equipped
+        inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("o2_tank", 1, 1f));
+
+        Assert.False(inventory.InsertIntoSpecializedSlot("suit_o2"));
+        Assert.Null(inventory.SuitO2);
+    }
+
+    [Fact]
+    public void DetachSpecializedSlot_SetsItFullyBackToNull_NotJustEmpty()
+    {
+        var inventory = new PlayerInventory();
+        inventory.AttachSpecializedSlot("suit_n2", hasItem: true, charge: 0.5f);
+
+        inventory.DetachSpecializedSlot("suit_n2");
+
+        Assert.Null(inventory.SuitN2);
     }
 }

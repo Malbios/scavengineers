@@ -144,6 +144,12 @@ public partial class Player : CharacterBody3D
     /// only rebuilds the grid's <see cref="InventorySlotUI"/> children when this changes (equip/
     /// unequip/load), not every frame.</summary>
     private int _backpackSlotUICount = -1;
+
+    /// <summary>The EVA suit torso's own window — unlike the backpack's grid, its 2 pocket slots
+    /// are static scene nodes (the torso's inner slot count never varies), so no
+    /// rebuild-on-equip mechanism is needed, just a per-frame Container re-point.</summary>
+    private Control? _suitWindow;
+    private readonly InventorySlotUI?[] _suitPocketSlots = new InventorySlotUI?[2];
     private readonly SuitResources _suitResources = new();
     private readonly PlayerNeeds _needs = new();
     private readonly PlayerInventory _inventory = new();
@@ -317,6 +323,18 @@ public partial class Player : CharacterBody3D
         GetNode<InventorySlotUI>("HUD/FlashlightWindow/Layout/FlashlightBatterySlot").PlayerRef = this;
 
         _backpackSlotTemplate = GetNode<InventorySlotUI>("HUD/BackpackWindow/Layout/BackpackGrid/SlotTemplate");
+
+        _suitWindow = GetNode<Control>("HUD/SuitWindow");
+        GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/O2Tank").PlayerRef = this;
+        GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/N2Tank").PlayerRef = this;
+        GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/Filter").PlayerRef = this;
+        GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/Battery").PlayerRef = this;
+        _suitPocketSlots[0] = GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/Pocket1");
+        _suitPocketSlots[1] = GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/Pocket2");
+        foreach (var pocketSlot in _suitPocketSlots)
+        {
+            pocketSlot!.PlayerRef = this;
+        }
 
         // Placeholder/tunable starting stipend for testing the free-form conduit wiring
         // extensively — same "don't wait on it" spirit as the near-instant verb durations.
@@ -595,6 +613,17 @@ public partial class Player : CharacterBody3D
         }
 
         _inventory.EquipContainerDirectly(slotName, occupied.ItemId, new SlotContainer(containerSlotCount));
+
+        if (slotName == "torso")
+        {
+            // The suit's 4 tank/filter/battery sub-slots exist only while the torso is actually
+            // worn — attached empty (not left null) so InsertIntoSpecializedSlot has something to
+            // load a tank into right away, without a separate "is the suit worn" check of its own.
+            _inventory.AttachSpecializedSlot("suit_o2", hasItem: false, charge: 0f);
+            _inventory.AttachSpecializedSlot("suit_n2", hasItem: false, charge: 0f);
+            _inventory.AttachSpecializedSlot("suit_filter", hasItem: false, charge: 0f);
+            _inventory.AttachSpecializedSlot("suit_battery", hasItem: false, charge: 0f);
+        }
     }
 
     /// <summary>Called by an ordinary hand slot's InventorySlotUI when a worn Torso/Head item
@@ -609,18 +638,42 @@ public partial class Player : CharacterBody3D
             return;
         }
 
+        // Detached first, before any sub-slot ejection below — otherwise an ejected tank could
+        // spill right back into this same container (still first in ContainerPriority at that
+        // point), corrupting the isEmpty check just below and making an item-holding suit look
+        // "empty" that shouldn't. Re-attached further down if it turns out there's no room in a
+        // hand, so the net effect matches the original "stays equipped" behavior exactly.
+        _inventory.ClearEquippedContainer(slotName);
+
+        if (slotName == "torso")
+        {
+            // Eject any installed tanks back into general inventory (best-effort, same "silently
+            // doesn't fit if nowhere has room" contract as every other Add-based eject in this
+            // codebase) — they're tracked separately from the torso's own 2 pocket slots, so
+            // simply detaching them below would otherwise destroy whatever's currently loaded.
+            _inventory.EjectSpecializedSlot("suit_o2");
+            _inventory.EjectSpecializedSlot("suit_n2");
+            _inventory.EjectSpecializedSlot("suit_filter");
+            _inventory.EjectSpecializedSlot("suit_battery");
+            _inventory.DetachSpecializedSlot("suit_o2");
+            _inventory.DetachSpecializedSlot("suit_n2");
+            _inventory.DetachSpecializedSlot("suit_filter");
+            _inventory.DetachSpecializedSlot("suit_battery");
+        }
+
         var isEmpty = equipped.Contents.Slots.All(s => s is null);
         if (isEmpty)
         {
-            if (_inventory.Hands.Add(equipped.ItemId, 1) == 1)
+            if (_inventory.Hands.Add(equipped.ItemId, 1) != 1)
             {
-                _inventory.ClearEquippedContainer(slotName);
+                // No room in either hand — re-attach so nothing vanishes, same end state as the
+                // original "don't clear at all" version of this check.
+                _inventory.EquipContainerDirectly(slotName, equipped.ItemId, equipped.Contents);
             }
 
             return;
         }
 
-        _inventory.ClearEquippedContainer(slotName);
         SpawnDroppedContainer(equipped.ItemId, equipped.Contents, GlobalPosition);
     }
 
@@ -768,6 +821,7 @@ public partial class Player : CharacterBody3D
         _drillWindow!.Visible = false;
         _flashlightWindow!.Visible = false;
         _backpackWindow!.Visible = false;
+        _suitWindow!.Visible = false;
         _worldDropZone!.Visible = false;
 
         CaptureMouse();
@@ -859,6 +913,9 @@ public partial class Player : CharacterBody3D
                 break;
             case "backpack" or "debug_backpack" when _inventory.Backpack is not null:
                 _backpackWindow!.Visible = !_backpackWindow.Visible;
+                break;
+            case "eva_torso_suit" when _inventory.Torso is not null:
+                _suitWindow!.Visible = !_suitWindow.Visible;
                 break;
         }
     }
@@ -1541,6 +1598,18 @@ public partial class Player : CharacterBody3D
         foreach (var slot in _backpackSlotUIs)
         {
             slot.Container = _inventory.Backpack?.Contents;
+        }
+
+        // Same "re-point every frame, close on unequip" shape as the backpack above — the
+        // torso's own pocket slot *count* never varies (always 2), so no rebuild step is needed.
+        if (_inventory.Torso is null)
+        {
+            _suitWindow!.Visible = false;
+        }
+
+        foreach (var pocketSlot in _suitPocketSlots)
+        {
+            pocketSlot!.Container = _inventory.Torso?.Contents;
         }
 
         _creditsLabel!.Text = Tr("HUD_CREDITS") + $": {_credits}";

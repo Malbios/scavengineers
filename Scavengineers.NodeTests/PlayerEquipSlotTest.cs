@@ -72,6 +72,34 @@ public class PlayerEquipSlotTest
 
     [TestCase]
     [RequireGodotRuntime]
+    public void TryUnequipItem_EjectsInstalledSuitTanksBackIntoInventory_ThenDetachesAllFourSubSlots()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, null);
+        player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, null);
+        player.Inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2));
+        // Simulates what TryEquipItemFromHand's own torso-specific glue does on a real equip —
+        // exercised directly here since that path needs a real ItemCatalog.EquipSlot match,
+        // unreachable in this project's isolated NodeTests catalog (see class doc comment).
+        player.Inventory.AttachSpecializedSlot("suit_o2", hasItem: true, charge: 0.6f);
+        player.Inventory.AttachSpecializedSlot("suit_n2", hasItem: false, charge: 0f);
+        player.Inventory.AttachSpecializedSlot("suit_filter", hasItem: false, charge: 0f);
+        player.Inventory.AttachSpecializedSlot("suit_battery", hasItem: false, charge: 0f);
+
+        player.TryUnequipItem("torso");
+
+        AssertBool(player.Inventory.SuitO2 is null).IsTrue();
+        AssertBool(player.Inventory.SuitN2 is null).IsTrue();
+        AssertBool(player.Inventory.SuitFilter is null).IsTrue();
+        AssertBool(player.Inventory.SuitBattery is null).IsTrue();
+        var ejectedTank = player.Inventory.Hands.Slots.FirstOrDefault(s => s?.ItemId == "o2_tank");
+        AssertBool(ejectedTank is not null).IsTrue();
+        AssertBool(Mathf.IsEqualApprox(ejectedTank!.Value.Charge, 0.6f)).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
     public void TryUnequipItem_IsANoOp_WhenNothingIsEquippedInThatSlot()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();

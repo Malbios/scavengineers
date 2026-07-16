@@ -88,20 +88,38 @@ public sealed class PlayerInventory
     {
         ["drill_battery"] = "battery",
         ["flashlight_battery"] = "battery",
+        ["suit_o2"] = "o2_tank",
+        ["suit_n2"] = "n2_tank",
+        ["suit_filter"] = "co2_filter",
+        ["suit_battery"] = "battery",
     };
 
     public SpecializedSlot? Drill { get; private set; }
 
     public SpecializedSlot? Flashlight { get; private set; }
 
+    /// <summary>The EVA suit torso's own tank/filter/battery sub-slots — non-null only while the
+    /// torso is worn (attached/detached alongside it, see Player's equip/unequip flow).</summary>
+    public SpecializedSlot? SuitO2 { get; private set; }
+
+    public SpecializedSlot? SuitN2 { get; private set; }
+
+    public SpecializedSlot? SuitFilter { get; private set; }
+
+    public SpecializedSlot? SuitBattery { get; private set; }
+
     /// <summary>Looks up a specialized sub-slot by key — used by <see cref="InventorySlotUI"/>
     /// (via <see cref="InventorySlotUI.SpecializedSlotKey"/>) so a single generic code path can
-    /// drive the drill/flashlight battery slots (and later the EVA suit's tank slots) without a
-    /// bespoke branch per device.</summary>
+    /// drive the drill/flashlight battery slots and the EVA suit's tank slots without a bespoke
+    /// branch per device.</summary>
     public SpecializedSlot? GetSpecializedSlot(string key) => key switch
     {
         "drill_battery" => Drill,
         "flashlight_battery" => Flashlight,
+        "suit_o2" => SuitO2,
+        "suit_n2" => SuitN2,
+        "suit_filter" => SuitFilter,
+        "suit_battery" => SuitBattery,
         _ => null,
     };
 
@@ -114,6 +132,18 @@ public sealed class PlayerInventory
                 break;
             case "flashlight_battery":
                 Flashlight = value;
+                break;
+            case "suit_o2":
+                SuitO2 = value;
+                break;
+            case "suit_n2":
+                SuitN2 = value;
+                break;
+            case "suit_filter":
+                SuitFilter = value;
+                break;
+            case "suit_battery":
+                SuitBattery = value;
                 break;
         }
     }
@@ -361,6 +391,11 @@ public sealed class PlayerInventory
     /// <see cref="EquipContainerDirectly"/>'s shape.</summary>
     public void AttachSpecializedSlot(string key, bool hasItem, float charge) =>
         SetSpecializedSlot(key, new SpecializedSlot { HasItem = hasItem, Charge = charge });
+
+    /// <summary>Fully detaches a specialized sub-slot (back to null, not just emptied) — used
+    /// when the device that owns it (e.g. the EVA suit's torso piece) is itself unequipped, since
+    /// the sub-slot shouldn't exist at all while there's no suit to carry it.</summary>
+    public void DetachSpecializedSlot(string key) => SetSpecializedSlot(key, null);
 
     /// <summary>Finds and removes one item matching `itemId` — preferring worn containers (in
     /// <see cref="ContainerPriority"/> order) over a held hand (same order <see cref="TryRemove"/>
