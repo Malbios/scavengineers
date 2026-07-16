@@ -35,6 +35,12 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget, IPhysicsPre
     [Export]
     public string ItemId { get; set; } = "";
 
+    /// <summary>Which equip slot this container re-equips into on pickup — "back" for a dropped
+    /// backpack, "torso" for a dropped EVA suit torso piece, etc. Defaults to "back" since the
+    /// backpack was this class's only use case until other worn containers existed.</summary>
+    [Export]
+    public string EquipSlotName { get; set; } = "back";
+
     public SlotContainer? Contents { get; set; }
 
     public override void _Ready()
@@ -153,10 +159,10 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget, IPhysicsPre
 
     public string? DisplayNameKey => "ITEM_" + ItemId.ToUpperInvariant();
 
-    /// <summary>Pick Up only offered while the player's Back slot is free — a full backpack has
+    /// <summary>Pick Up only offered while the target equip slot is free — a full container has
     /// no fungible slot to fall back into, so there's nowhere else for it to go.</summary>
     public IReadOnlyList<Verb> AvailableVerbs =>
-        GetPlayer() is { } player && player.Inventory.Backpack is null ? [PickUpVerb] : [];
+        GetPlayer() is { } player && player.Inventory.IsContainerSlotFree(EquipSlotName) ? [PickUpVerb] : [];
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
@@ -165,7 +171,7 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget, IPhysicsPre
             return;
         }
 
-        if (inventory.EquipContainerDirectly(ItemId, Contents))
+        if (inventory.EquipContainerDirectly(EquipSlotName, ItemId, Contents))
         {
             QueueFree();
         }

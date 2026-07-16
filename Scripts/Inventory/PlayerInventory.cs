@@ -5,12 +5,12 @@ using System.Linq;
 namespace Scavengineers.Scripts.Inventory;
 
 /// <summary>
-/// Composes the player's two hands with, optionally, an equipped backpack's own separate
-/// <see cref="SlotContainer"/> (inventory arc Stage 3) — a backpack is the first non-fungible
-/// item (it carries real per-instance state, its own contents), so it's tracked as a distinct
-/// <see cref="EquippedContainer"/> rather than merged into the hand slots. There is no
-/// unrealistic "pockets" storage beyond that: what you're not holding or carrying in a bag
-/// simply isn't on you.
+/// Composes the player's two hands with zero or more simultaneously-worn containers (each its
+/// own separate <see cref="SlotContainer"/>), keyed by equip-slot name — a worn container is the
+/// first non-fungible item type (it carries real per-instance state, its own contents), so each
+/// is tracked as a distinct <see cref="EquippedContainer"/> rather than merged into the hand
+/// slots. There is no unrealistic "pockets" storage beyond that: what you're not holding or
+/// carrying in a worn container simply isn't on you.
 /// </summary>
 public sealed class PlayerInventory
 {
@@ -25,6 +25,12 @@ public sealed class PlayerInventory
     // Placeholder/tunable — how many slots a worn backpack's own contents have.
     public const int BackpackSlotCount = 8;
 
+    // The fixed slot-name priority Add/TryRemove/Unequip use when more than one container is
+    // worn at once — matches this codebase's original "backpack before hand" behavior exactly
+    // when only "back" is worn, and extends predictably as more simultaneously-wearable
+    // containers (e.g. the EVA suit's torso piece) are added.
+    private static readonly string[] ContainerPriority = ["back", "torso"];
+
     private readonly SlotContainer _hands = new(HandCount);
 
     /// <summary>The two hand slots — read by InventorySlotUI/Player.cs to wire up the panel's
@@ -32,12 +38,16 @@ public sealed class PlayerInventory
     public SlotContainer Hands => _hands;
 
     /// <summary>An item id plus its own separate <see cref="SlotContainer"/> — the shape a
-    /// worn backpack takes while equipped. The one container item type this stage supports is
-    /// hardcoded as "backpack" (see EquipBackpackFromBody), matching Stage 1's "one flat
-    /// catalog" precedent rather than a speculative "which items are containers" lookup.</summary>
+    /// worn container takes while equipped (a backpack, or the EVA suit's torso piece). Which
+    /// items are containers is hardcoded per equip slot (see EquipBackpackFromHand) rather than
+    /// a speculative "which items are containers" lookup.</summary>
     public sealed record EquippedContainer(string ItemId, SlotContainer Contents);
 
-    public EquippedContainer? Backpack { get; private set; }
+    private readonly Dictionary<string, EquippedContainer> _equippedContainers = new();
+
+    public EquippedContainer? Backpack => _equippedContainers.GetValueOrDefault("back");
+
+    public EquippedContainer? Torso => _equippedContainers.GetValueOrDefault("torso");
 
     /// <summary>A power drill's own battery — the first item with real per-instance state that
     /// isn't a worn container (see <see cref="EquippedContainer"/>). Deliberately not a generic
@@ -78,9 +88,9 @@ public sealed class PlayerInventory
         get
         {
             var counts = new Dictionary<string, int>(_hands.Counts);
-            if (Backpack is not null)
+            foreach (var container in _equippedContainers.Values)
             {
-                foreach (var (itemId, count) in Backpack.Contents.Counts)
+                foreach (var (itemId, count) in container.Contents.Counts)
                 {
                     counts[itemId] = counts.GetValueOrDefault(itemId) + count;
                 }
@@ -90,43 +100,58 @@ public sealed class PlayerInventory
         }
     }
 
-    public int CountOf(string itemId) => _hands.CountOf(itemId) + (Backpack?.Contents.CountOf(itemId) ?? 0);
+    public int CountOf(string itemId) =>
+        _hands.CountOf(itemId) + _equippedContainers.Values.Sum(c => c.Contents.CountOf(itemId));
 
     public bool Has(string itemId, int count) => CountOf(itemId) >= count;
 
-    /// <summary>Whether any item anywhere in inventory (hands or worn backpack) matches
+    /// <summary>Whether any item anywhere in inventory (hands or any worn container) matches
     /// `predicate` — e.g. Player's flashlight toggle uses this against
     /// ItemCatalog.IsToggleableLight to find a never-held toggleable light (like the debug
     /// flashlight) without hardcoding its item id.</summary>
     public bool HasAny(Func<string, bool> predicate) =>
         _hands.Slots.Any(slot => slot is { } s && predicate(s.ItemId))
-        || (Backpack?.Contents.Slots.Any(slot => slot is { } s && predicate(s.ItemId)) ?? false);
+        || _equippedContainers.Values.Any(c => c.Contents.Slots.Any(slot => slot is { } s && predicate(s.ItemId)));
 
-    /// <summary>Whether `count` more of this item would fit right now, across the worn
-    /// backpack's contents (if any) and empty/matching hands, without actually adding
-    /// anything.</summary>
+    /// <summary>Whether `count` more of this item would fit right now, across every worn
+    /// container's contents and empty/matching hands, without actually adding anything.</summary>
     public bool HasRoomFor(string itemId, int count) =>
-        (Backpack?.Contents.RoomFor(itemId) ?? 0) + _hands.RoomFor(itemId) >= count;
+        _equippedContainers.Values.Sum(c => c.Contents.RoomFor(itemId)) + _hands.RoomFor(itemId) >= count;
 
-    /// <summary>Adds up to `count`: tops up/fills the worn backpack's own contents first, then
-    /// falls back to a hand only if the backpack doesn't exist or doesn't have room — a passive
-    /// pickup never bumps something you're deliberately holding, and never fills an empty hand
-    /// as long as the bag can take it. Returns how much actually fit (0..count). `charge` only
-    /// matters for a freshly-created "battery" slot — every other item ignores it.</summary>
+    /// <summary>Adds up to `count`: tops up/fills worn containers first (in <see cref="ContainerPriority"/>
+    /// order — back before torso, matching this codebase's original "backpack before hand"
+    /// behavior when only a backpack is worn), then falls back to a hand only if no worn
+    /// container exists or has room — a passive pickup never bumps something you're deliberately
+    /// holding, and never fills an empty hand as long as a worn container can take it. Returns
+    /// how much actually fit (0..count). `charge` only matters for a freshly-created "battery"
+    /// slot — every other item ignores it.</summary>
     public int Add(string itemId, int count = 1, float charge = 1f)
     {
-        var addedToBackpack = Backpack?.Contents.Add(itemId, count, charge) ?? 0;
-        var remaining = count - addedToBackpack;
-        if (remaining <= 0)
+        var added = 0;
+        foreach (var key in ContainerPriority)
         {
-            return addedToBackpack;
+            if (added >= count)
+            {
+                break;
+            }
+
+            if (_equippedContainers.TryGetValue(key, out var container))
+            {
+                added += container.Contents.Add(itemId, count - added, charge);
+            }
         }
 
-        return addedToBackpack + _hands.Add(itemId, remaining, charge);
+        if (added >= count)
+        {
+            return added;
+        }
+
+        return added + _hands.Add(itemId, count - added, charge);
     }
 
-    /// <summary>Removes up to `count`, preferring the backpack's bulk stock over what's actively
-    /// held in a hand — draining a hand last keeps a held item in hand as long as possible.</summary>
+    /// <summary>Removes up to `count`, preferring worn containers' bulk stock (in
+    /// <see cref="ContainerPriority"/> order) over what's actively held in a hand — draining a
+    /// hand last keeps a held item in hand as long as possible.</summary>
     public bool TryRemove(string itemId, int count = 1)
     {
         if (!Has(itemId, count))
@@ -134,13 +159,27 @@ public sealed class PlayerInventory
             return false;
         }
 
-        var fromBackpack = Backpack is null ? 0 : Math.Min(Backpack.Contents.CountOf(itemId), count);
-        if (fromBackpack > 0)
+        var remaining = count;
+        foreach (var key in ContainerPriority)
         {
-            Backpack!.Contents.TryRemove(itemId, fromBackpack);
+            if (remaining <= 0)
+            {
+                break;
+            }
+
+            if (!_equippedContainers.TryGetValue(key, out var container))
+            {
+                continue;
+            }
+
+            var fromContainer = Math.Min(container.Contents.CountOf(itemId), remaining);
+            if (fromContainer > 0)
+            {
+                container.Contents.TryRemove(itemId, fromContainer);
+                remaining -= fromContainer;
+            }
         }
 
-        var remaining = count - fromBackpack;
         if (remaining > 0)
         {
             _hands.TryRemove(itemId, remaining);
@@ -149,26 +188,30 @@ public sealed class PlayerInventory
         return true;
     }
 
-    /// <summary>Moves item `itemId` into `handIndex` from the worn backpack's contents —
-    /// equipping it (there's nowhere else it could be, since neither hand already holds it by
-    /// the time this is called — see Player.ToggleHeldItem). <see cref="SlotContainer.MoveBetween"/>
-    /// already swaps if `handIndex` is occupied by something else, which is what makes "replace
-    /// whichever hand was filled most recently" trivial: call this again on that same hand, and
-    /// its old contents land back in the backpack. Returns false (no-op) if the backpack doesn't
-    /// currently hold this item.</summary>
+    /// <summary>Moves item `itemId` into `handIndex` from whichever worn container currently
+    /// holds it (checked in <see cref="ContainerPriority"/> order) — equipping it (there's
+    /// nowhere else it could be, since neither hand already holds it by the time this is called
+    /// — see Player.ToggleHeldItem). <see cref="SlotContainer.MoveBetween"/> already swaps if
+    /// `handIndex` is occupied by something else, which is what makes "replace whichever hand
+    /// was filled most recently" trivial: call this again on that same hand, and its old
+    /// contents land back in the container they came from. Returns false (no-op) if no worn
+    /// container currently holds this item.</summary>
     public bool Equip(string itemId, int handIndex)
     {
-        if (Backpack is null)
+        foreach (var key in ContainerPriority)
         {
-            return false;
-        }
-
-        for (var i = 0; i < Backpack.Contents.Slots.Count; i++)
-        {
-            if (Backpack.Contents.Slots[i]?.ItemId == itemId)
+            if (!_equippedContainers.TryGetValue(key, out var container))
             {
-                SlotContainer.MoveBetween(Backpack.Contents, i, _hands, handIndex);
-                return true;
+                continue;
+            }
+
+            for (var i = 0; i < container.Contents.Slots.Count; i++)
+            {
+                if (container.Contents.Slots[i]?.ItemId == itemId)
+                {
+                    SlotContainer.MoveBetween(container.Contents, i, _hands, handIndex);
+                    return true;
+                }
             }
         }
 
@@ -176,10 +219,10 @@ public sealed class PlayerInventory
     }
 
     /// <summary>The explicit toggle-off case — pressing the hotbar key for whatever's already in
-    /// a hand, with no swap target involved. Moves the hand's contents into the worn backpack
-    /// (if any), leaving any leftover that didn't fit right back in the hand (same "nothing
-    /// vanishes" partial-fit spirit as <see cref="Add"/>) — no backpack, or a full one, means the
-    /// hand keeps everything and this returns false.</summary>
+    /// a hand, with no swap target involved. Moves the hand's contents into worn containers (in
+    /// <see cref="ContainerPriority"/> order), leaving any leftover that didn't fit right back in
+    /// the hand (same "nothing vanishes" partial-fit spirit as <see cref="Add"/>) — no worn
+    /// container with room means the hand keeps everything and this returns false.</summary>
     public bool Unequip(int handIndex)
     {
         if (_hands.Slots[handIndex] is not { } occupied)
@@ -188,10 +231,23 @@ public sealed class PlayerInventory
         }
 
         _hands.SetSlot(handIndex, null);
-        var added = Backpack?.Contents.Add(occupied.ItemId, occupied.Count, occupied.Charge) ?? 0;
-        var leftover = occupied.Count - added;
-        _hands.SetSlot(handIndex, leftover > 0 ? (occupied.ItemId, leftover, occupied.Charge) : null);
-        return leftover == 0;
+
+        var remaining = occupied.Count;
+        foreach (var key in ContainerPriority)
+        {
+            if (remaining <= 0)
+            {
+                break;
+            }
+
+            if (_equippedContainers.TryGetValue(key, out var container))
+            {
+                remaining -= container.Contents.Add(occupied.ItemId, remaining, occupied.Charge);
+            }
+        }
+
+        _hands.SetSlot(handIndex, remaining > 0 ? (occupied.ItemId, remaining, occupied.Charge) : null);
+        return remaining == 0;
     }
 
     /// <summary>Removes up to `count` from that *specific* hand slot only — unlike the aggregate
@@ -212,9 +268,8 @@ public sealed class PlayerInventory
     }
 
     /// <summary>Equips a worn backpack by consuming one "backpack" item from a hand (wherever it
-    /// currently sits) and attaching a freshly-emptied <see cref="SlotContainer"/> as
-    /// <see cref="Backpack"/>. Fails (no-op) if a backpack is already worn, or no hand currently
-    /// holds one.</summary>
+    /// currently sits) and attaching a freshly-emptied <see cref="SlotContainer"/> to the "back"
+    /// slot. Fails (no-op) if a backpack is already worn, or no hand currently holds one.</summary>
     public bool EquipBackpackFromHand(int slotCount = BackpackSlotCount)
     {
         if (Backpack is not null)
@@ -227,28 +282,32 @@ public sealed class PlayerInventory
             return false;
         }
 
-        Backpack = new EquippedContainer("backpack", new SlotContainer(slotCount));
+        _equippedContainers["back"] = new EquippedContainer("backpack", new SlotContainer(slotCount));
         return true;
     }
 
     /// <summary>Detaches the worn backpack with no fungible fallback — the caller decides what
     /// happens to what was equipped (see Player.TryUnequipBackpack).</summary>
-    public void ClearBackpack() => Backpack = null;
+    public void ClearBackpack() => _equippedContainers.Remove("back");
 
-    /// <summary>Attaches an already-built container as the worn backpack directly, bypassing the
-    /// hand-consume step in <see cref="EquipBackpackFromBody"/> — used by save/load restoration
-    /// and by picking a full backpack back up off the ground (see ContainerPickupItem). Fails
-    /// (no-op, returns false) if a backpack is already worn.</summary>
-    public bool EquipContainerDirectly(string itemId, SlotContainer contents)
+    /// <summary>Attaches an already-built container directly to `slotName`, bypassing the
+    /// hand-consume step in <see cref="EquipBackpackFromHand"/> — used by save/load restoration
+    /// and by picking a full worn container back up off the ground (see ContainerPickupItem).
+    /// Fails (no-op, returns false) if that slot is already occupied.</summary>
+    public bool EquipContainerDirectly(string slotName, string itemId, SlotContainer contents)
     {
-        if (Backpack is not null)
+        if (_equippedContainers.ContainsKey(slotName))
         {
             return false;
         }
 
-        Backpack = new EquippedContainer(itemId, contents);
+        _equippedContainers[slotName] = new EquippedContainer(itemId, contents);
         return true;
     }
+
+    /// <summary>Whether `slotName` currently has nothing worn in it — used by ContainerPickupItem
+    /// to gate its Pick Up verb the same way the backpack's own equip flow already does.</summary>
+    public bool IsContainerSlotFree(string slotName) => !_equippedContainers.ContainsKey(slotName);
 
     /// <summary>Attaches drill state directly — used by the fresh-game stipend (fully charged)
     /// and by save/load restore, mirroring <see cref="EquipContainerDirectly"/>'s shape.</summary>
@@ -427,7 +486,7 @@ public sealed class PlayerInventory
     public void Clear()
     {
         _hands.Clear();
-        Backpack = null;
+        _equippedContainers.Clear();
         Drill = null;
         Flashlight = null;
     }

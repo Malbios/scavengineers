@@ -21,7 +21,7 @@ public class PlayerInventoryTests : IDisposable
     public void HasAny_FindsAMatchInAHandSlotOrTheBackpack_AndFalseWhenNoSlotMatches()
     {
         var inventory = new PlayerInventory();
-        Assert.True(inventory.EquipContainerDirectly("backpack", new SlotContainer(2)));
+        Assert.True(inventory.EquipContainerDirectly("back", "backpack", new SlotContainer(2)));
         inventory.Backpack!.Contents.Add("battery", 1);
 
         Assert.True(inventory.HasAny(itemId => itemId == "battery"));
@@ -47,7 +47,7 @@ public class PlayerInventoryTests : IDisposable
     public void Add_FillsTheWornBackpackFirst_ThenSpillsIntoHands()
     {
         var inventory = new PlayerInventory();
-        Assert.True(inventory.EquipContainerDirectly("backpack", new SlotContainer(2)));
+        Assert.True(inventory.EquipContainerDirectly("back", "backpack", new SlotContainer(2)));
 
         var added = inventory.Add("widget", 3);
 
@@ -60,7 +60,7 @@ public class PlayerInventoryTests : IDisposable
     public void HasRoomFor_CombinesWornBackpackAndHandCapacity()
     {
         var inventory = new PlayerInventory();
-        Assert.True(inventory.EquipContainerDirectly("backpack", new SlotContainer(2)));
+        Assert.True(inventory.EquipContainerDirectly("back", "backpack", new SlotContainer(2)));
 
         Assert.True(inventory.HasRoomFor("widget", 4)); // 2 backpack + 2 hands
         Assert.False(inventory.HasRoomFor("widget", 5));
@@ -70,7 +70,7 @@ public class PlayerInventoryTests : IDisposable
     public void TryRemove_PrefersTheWornBackpackOverAHeldItem()
     {
         var inventory = new PlayerInventory();
-        Assert.True(inventory.EquipContainerDirectly("backpack", new SlotContainer(2)));
+        Assert.True(inventory.EquipContainerDirectly("back", "backpack", new SlotContainer(2)));
         inventory.Backpack!.Contents.Add("widget", 2);
         inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1, 1f));
 
@@ -85,7 +85,7 @@ public class PlayerInventoryTests : IDisposable
     public void Equip_MovesAnItemFromTheBackpackIntoAHand()
     {
         var inventory = new PlayerInventory();
-        Assert.True(inventory.EquipContainerDirectly("backpack", new SlotContainer(2)));
+        Assert.True(inventory.EquipContainerDirectly("back", "backpack", new SlotContainer(2)));
         inventory.Backpack!.Contents.Add("widget", 1);
 
         var equipped = inventory.Equip("widget", PlayerInventory.LeftHandSlotIndex);
@@ -107,7 +107,7 @@ public class PlayerInventoryTests : IDisposable
     public void Unequip_ReturnsFalseAndKeepsHandContents_WhenBackpackHasNoRoom()
     {
         var inventory = new PlayerInventory();
-        Assert.True(inventory.EquipContainerDirectly("backpack", new SlotContainer(1)));
+        Assert.True(inventory.EquipContainerDirectly("back", "backpack", new SlotContainer(1)));
         inventory.Backpack!.Contents.SetSlot(0, ("widget", 1, 1f)); // fill the only backpack slot
         inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1, 1f));
 
@@ -121,7 +121,7 @@ public class PlayerInventoryTests : IDisposable
     public void Unequip_MovesHandContentsIntoTheBackpack_WhenRoomExists()
     {
         var inventory = new PlayerInventory();
-        Assert.True(inventory.EquipContainerDirectly("backpack", new SlotContainer(2)));
+        Assert.True(inventory.EquipContainerDirectly("back", "backpack", new SlotContainer(2)));
         inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1, 1f));
 
         var result = inventory.Unequip(PlayerInventory.LeftHandSlotIndex);
@@ -160,15 +160,35 @@ public class PlayerInventoryTests : IDisposable
     }
 
     [Fact]
-    public void EquipContainerDirectly_FailsWhenABackpackIsAlreadyWorn()
+    public void EquipContainerDirectly_FailsWhenThatSlotIsAlreadyOccupied()
     {
         var inventory = new PlayerInventory();
-        Assert.True(inventory.EquipContainerDirectly("backpack-a", new SlotContainer(1)));
+        Assert.True(inventory.EquipContainerDirectly("back", "backpack-a", new SlotContainer(1)));
 
-        var second = inventory.EquipContainerDirectly("backpack-b", new SlotContainer(1));
+        var second = inventory.EquipContainerDirectly("back", "backpack-b", new SlotContainer(1));
 
         Assert.False(second);
         Assert.Equal("backpack-a", inventory.Backpack!.ItemId);
+    }
+
+    [Fact]
+    public void TwoSimultaneouslyEquippedContainers_BothAggregateInto_AddCountOfAndCounts()
+    {
+        var inventory = new PlayerInventory();
+        Assert.True(inventory.EquipContainerDirectly("back", "backpack", new SlotContainer(1)));
+        Assert.True(inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(1)));
+
+        // Back is filled first per ContainerPriority; the second widget must spill into torso,
+        // not hands, since torso still has room — this is the actual behavior under test, not
+        // just "both exist."
+        var added = inventory.Add("widget", 2);
+
+        Assert.Equal(2, added);
+        Assert.Equal(1, inventory.Backpack!.Contents.CountOf("widget"));
+        Assert.Equal(1, inventory.Torso!.Contents.CountOf("widget"));
+        Assert.Equal(2, inventory.CountOf("widget"));
+        Assert.Equal(2, inventory.Counts["widget"]);
+        Assert.Equal(0, inventory.Hands.CountOf("widget"));
     }
 
     [Fact]

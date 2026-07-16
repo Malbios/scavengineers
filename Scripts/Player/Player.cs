@@ -324,7 +324,7 @@ public partial class Player : CharacterBody3D
         // The debug backpack is attached first (dev convenience, not something you "found" —
         // bypasses the normal hand-then-equip flow entirely) so the stipend below spills into
         // its 24 slots instead of overflowing two bare hands.
-        _inventory.EquipContainerDirectly("debug_backpack", new SlotContainer(24));
+        _inventory.EquipContainerDirectly("back", "debug_backpack", new SlotContainer(24));
         _inventory.Add("scrap_metal", 50);
         _inventory.Add("ration_bar", 3);
         _inventory.Add("water_bottle", 3);
@@ -1417,7 +1417,7 @@ public partial class Player : CharacterBody3D
                 }
             }
 
-            _inventory.EquipContainerDirectly(backpackItemId, contents);
+            _inventory.EquipContainerDirectly("back", backpackItemId, contents);
         }
 
         if (data.HasDrill)
