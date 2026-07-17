@@ -179,7 +179,7 @@ public partial class Player : CharacterBody3D
     private TravelMapPanel? _travelMapPanel;
     private TravelConsoleVerbTarget? _openTravelConsole;
     private ShopPanel? _shopPanel;
-    private StationConsoleVerbTarget? _openShopConsole;
+    private VendorVerbTarget? _openShopVendor;
     private WorldDropZone? _worldDropZone;
     private Control? _backpackGrid;
     private InventorySlotUI? _backpackSlotTemplate;
@@ -293,7 +293,7 @@ public partial class Player : CharacterBody3D
     private bool AnyPanelOpen => _inventoryOpen || _travelMapOpen || _shopOpen;
 
     /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-9, 0) —
-    /// also reused by StationConsoleVerbTarget as the set of things Buy can offer, since there's
+    /// also reused by VendorVerbTarget as the set of things Buy can offer, since there's
     /// no separate item-definition data yet. "backpack" is an ordinary holdable/purchasable item
     /// right up until it's actually equipped via drag-and-drop onto the Back slot (see
     /// TryEquipBackpackFromHand) — no dedicated verb needed to buy or hold one. "ration_bar"/
@@ -315,7 +315,7 @@ public partial class Player : CharacterBody3D
     public PlayerInventory Inventory => _inventory;
 
     // Placeholder starting stipend — tunable. Not modeled as an ItemRequirement (those pull
-    // from PlayerInventory, a different resource) — StationConsoleVerbTarget checks/spends
+    // from PlayerInventory, a different resource) — VendorVerbTarget checks/spends
     // this directly via the Player reference it already resolves.
     private int _credits = 20;
 
@@ -1080,12 +1080,12 @@ public partial class Player : CharacterBody3D
         CaptureMouse();
     }
 
-    /// <summary>Called by StationConsoleVerbTarget.ExecuteVerb — opens the shop panel instead of
+    /// <summary>Called by VendorVerbTarget.ExecuteVerb — opens the shop panel instead of
     /// the old per-item Buy/Sell verb-cycling, same shape as OpenTravelMap.</summary>
-    public void OpenShop(StationConsoleVerbTarget console)
+    public void OpenShop(VendorVerbTarget vendor)
     {
         _shopOpen = true;
-        _openShopConsole = console;
+        _openShopVendor = vendor;
         RefreshShop();
         _shopPanel!.Visible = true;
         Input.MouseMode = Input.MouseModeEnum.Visible;
@@ -1096,28 +1096,28 @@ public partial class Player : CharacterBody3D
     /// than closing the panel like a one-shot travel confirmation would.</summary>
     public void BuyItem(string itemId)
     {
-        _openShopConsole?.TryBuy(itemId);
+        _openShopVendor?.TryBuy(itemId);
         RefreshShop();
     }
 
     public void SellItem(string itemId)
     {
-        _openShopConsole?.TrySell(itemId);
+        _openShopVendor?.TrySell(itemId);
         RefreshShop();
     }
 
     private void RefreshShop()
     {
-        if (_openShopConsole is not null)
+        if (_openShopVendor is not null)
         {
-            _shopPanel!.Populate(_openShopConsole.BuildBuyEntries(), _openShopConsole.BuildSellEntries());
+            _shopPanel!.Populate(_openShopVendor.BuildBuyEntries(), _openShopVendor.BuildSellEntries());
         }
     }
 
     public void CloseShop()
     {
         _shopOpen = false;
-        _openShopConsole = null;
+        _openShopVendor = null;
         _shopPanel!.Visible = false;
         CaptureMouse();
     }

@@ -1248,7 +1248,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// each — see <see cref="_placedMachines"/>). Every Install verb is returned regardless of
     /// what's currently held; IsAffordable (Player.cs) is what actually narrows the visible cycle
     /// down to whichever one item the player has in hand, same reliance
-    /// StationConsoleVerbTarget's always-present Buy verbs already use. Gated behind BatteryMesh
+    /// VendorVerbTarget's always-present Buy verbs already use. Gated behind BatteryMesh
     /// so ships that never opted into this system (Derelict/Station) never offer it at all.</summary>
     private IEnumerable<Verb> MachineVerbsFor(bool wallPresent)
     {
@@ -2231,7 +2231,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     };
 
     // Placeholder/tunable — roughly matches each machine's relative buy price (see
-    // StationConsoleVerbTarget.Prices).
+    // VendorVerbTarget.Prices).
     private static int ScrapYieldFor(MachineType type) => type switch
     {
         MachineType.Battery => 4,

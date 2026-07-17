@@ -203,7 +203,7 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget, IPhysicsPre
         // Instant, already complete by the time anyone could cancel it — nothing to do.
     }
 
-    // Resolved fresh on every access rather than cached in _Ready — see StationConsoleVerbTarget's
+    // Resolved fresh on every access rather than cached in _Ready — see VendorVerbTarget's
     // own GetPlayer for why (scene-tree "player" group membership order isn't guaranteed yet).
     private PlayerScript? GetPlayer() => GetTree().GetFirstNodeInGroup("player") as PlayerScript;
 }

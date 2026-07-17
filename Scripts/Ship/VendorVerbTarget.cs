@@ -10,14 +10,15 @@ using PlayerScript = Scavengineers.Scripts.Player.Player;
 namespace Scavengineers.Scripts.Ship;
 
 /// <summary>
-/// The Station's trade console. A single always-available verb opens the shop panel (see
-/// Player.OpenShop) instead of cycling one Buy/Sell verb per item at a time — the panel's Buy tab
-/// lists every item in <see cref="PlayerScript.HotbarItems"/>, greyed out while unaffordable or
-/// with no room to carry it; the Sell tab lists the same catalog, greyed out for anything you
-/// don't currently hold. Buy is always pricier than Sell so there's no trivial buy-then-sell
-/// arbitrage loop.
+/// The Station's vendor — a person, not a machine (see World.tscn's ShopFigure, previously just
+/// idle-animated set dressing with no interaction of its own). A single always-available verb
+/// opens the shop panel (see Player.OpenShop) instead of cycling one Buy/Sell verb per item at a
+/// time — the panel's Buy tab lists every item in <see cref="PlayerScript.HotbarItems"/>, greyed
+/// out while unaffordable or with no room to carry it; the Sell tab lists the same catalog, greyed
+/// out for anything you don't currently hold. Buy is always pricier than Sell so there's no
+/// trivial buy-then-sell arbitrage loop.
 /// </summary>
-public partial class StationConsoleVerbTarget : StaticBody3D, IVerbTarget
+public partial class VendorVerbTarget : StaticBody3D, IVerbTarget
 {
     private static readonly Dictionary<string, (int Buy, int Sell)> Prices = new()
     {
@@ -38,7 +39,7 @@ public partial class StationConsoleVerbTarget : StaticBody3D, IVerbTarget
 
     private static readonly Verb ShopVerb = new("open_shop", "VERB_TRADE", DurationSeconds: 0f);
 
-    public string? DisplayNameKey => "OBJECT_TRADE_CONSOLE";
+    public string? DisplayNameKey => "OBJECT_VENDOR";
 
     public float? CurrentVerbProgress => null;
 

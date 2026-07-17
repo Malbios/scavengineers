@@ -128,7 +128,7 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     public const string DerelictAirlockFixtureId = "derelict_airlock_power";
     public const string BunkFixtureId = "bunk";
 
-    // Placeholder/tunable — one power cell (see StationConsoleVerbTarget's economy) restores
+    // Placeholder/tunable — one power cell (see VendorVerbTarget's economy) restores
     // this fraction of a full charge.
     public const float PowerCellRechargeAmount = 0.5f;
 

@@ -17,7 +17,7 @@
 [ext_resource type="Script" path="res://Scripts/Verbs/ShipBuildTarget.cs" id="18"]
 [ext_resource type="Script" path="res://Scripts/Verbs/ShipBuildAimForwarder.cs" id="20"]
 [ext_resource type="Script" path="res://Scripts/Ship/TravelConsoleVerbTarget.cs" id="21"]
-[ext_resource type="Script" path="res://Scripts/Ship/StationConsoleVerbTarget.cs" id="22"]
+[ext_resource type="Script" path="res://Scripts/Ship/VendorVerbTarget.cs" id="22"]
 [ext_resource type="Script" path="res://Scripts/Ship/BunkVerbTarget.cs" id="23"]
 [ext_resource type="Shader" path="res://Shaders/starfield_sky.gdshader" id="24"]
 [ext_resource type="Material" path="res://Assets/Materials/station_floor_material.tres" id="25"]
@@ -238,9 +238,6 @@ size = Vector3(6, 4, 0.2)
 
 [sub_resource type="StandardMaterial3D" id="ShipConsoleMaterial"]
 albedo_color = Color(0.2, 0.4, 0.6, 1)
-
-[sub_resource type="StandardMaterial3D" id="TradeConsoleMaterial"]
-albedo_color = Color(0.6, 0.45, 0.15, 1)
 
 [sub_resource type="BoxShape3D" id="BunkShape"]
 size = Vector3(1.8, 0.5, 0.6)
@@ -687,19 +684,9 @@ shape = SubResource("CorridorZoneShape")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 0)
 omni_range = 8.0
 
-[node name="StationConsole" type="StaticBody3D" parent="Station"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -2.7)
-script = ExtResource("22")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Station/StationConsole"]
-shape = SubResource("ComputerShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Station/StationConsole"]
-mesh = SubResource("ComputerMesh")
-surface_material_override/0 = SubResource("TradeConsoleMaterial")
-
 [node name="ShopFigure" type="StaticBody3D" parent="Station"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.0, 0, -2.4)
+script = ExtResource("22")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Station/ShopFigure"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)

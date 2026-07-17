@@ -37,7 +37,7 @@ VERB_BUILD_WALL,Build Wall,Wand bauen
 VERB_REMOVE_WALL,Remove Wall,Wand entfernen
 VERB_SCRAP,Scrap,Verschrotten
 OBJECT_SHIP_CONSOLE,Ship Console,Schiffskonsole
-OBJECT_TRADE_CONSOLE,Trade Console,Handelskonsole
+OBJECT_VENDOR,Vendor,Händler
 OBJECT_STATION,Station,Station
 OBJECT_DERELICT_1,Derelict 1,Wrack 1
 OBJECT_DERELICT_2,Derelict 2,Wrack 2

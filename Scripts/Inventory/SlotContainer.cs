@@ -44,7 +44,7 @@ public sealed class SlotContainer
 
     /// <summary>How much of `itemId` would still fit right now, without actually adding
     /// anything — for a caller that needs to know before committing to a cost (see
-    /// StationConsoleVerbTarget's Buy verb), or that needs to combine room across more than one
+    /// VendorVerbTarget's Buy verb), or that needs to combine room across more than one
     /// container (see PlayerInventory.HasRoomFor).</summary>
     public int RoomFor(string itemId)
     {
