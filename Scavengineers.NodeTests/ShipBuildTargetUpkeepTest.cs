@@ -162,11 +162,11 @@ public class ShipBuildTargetUpkeepTest
 
     [TestCase]
     [RequireGodotRuntime]
-    public void HighlightVisual_IsNull_BeforeAnyAimPointIsEverSet()
+    public void HighlightVisual_IsEmpty_BeforeAnyAimPointIsEverSet()
     {
         var (buildTarget, _) = MakeHarness((SceneTree)Engine.GetMainLoop());
 
-        AssertObject(buildTarget.HighlightVisual).IsNull();
+        AssertInt(buildTarget.HighlightVisual.Count).IsEqual(0);
     }
 
     [TestCase]
@@ -177,20 +177,21 @@ public class ShipBuildTargetUpkeepTest
 
         buildTarget.SetAimPoint(CellZeroZeroCenter);
 
-        AssertBool(buildTarget.HighlightVisual is MeshInstance3D { Mesh: not null }).IsTrue();
+        AssertInt(buildTarget.HighlightVisual.Count).IsEqual(1);
+        AssertBool(buildTarget.HighlightVisual[0] is MeshInstance3D { Mesh: not null }).IsTrue();
     }
 
     [TestCase]
     [RequireGodotRuntime]
-    public void HighlightVisual_GoesBackToNull_WhenAimingSomewhereInvalidAfterwards()
+    public void HighlightVisual_GoesBackToEmpty_WhenAimingSomewhereInvalidAfterwards()
     {
         var (buildTarget, _) = MakeHarness((SceneTree)Engine.GetMainLoop());
         buildTarget.SetAimPoint(CellZeroZeroCenter);
-        AssertObject(buildTarget.HighlightVisual).IsNotNull();
+        AssertInt(buildTarget.HighlightVisual.Count).IsEqual(1);
 
         // Far outside the default 12x6 grid — no cell there at all.
         buildTarget.SetAimPoint(new Vector3(500f, 0f, 500f));
 
-        AssertObject(buildTarget.HighlightVisual).IsNull();
+        AssertInt(buildTarget.HighlightVisual.Count).IsEqual(0);
     }
 }

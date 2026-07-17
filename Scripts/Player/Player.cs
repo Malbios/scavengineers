@@ -159,7 +159,7 @@ public partial class Player : CharacterBody3D
     private SubViewport? _scanHighlightViewport;
     private Camera3D? _scanHighlightCamera;
     private ColorRect? _scanHighlightOverlay;
-    private VisualInstance3D? _highlightedVisual;
+    private IReadOnlyList<VisualInstance3D> _highlightedVisuals = [];
 
     private Label? _targetNameLabel;
     private Label? _verbLabel;
@@ -1736,21 +1736,31 @@ public partial class Player : CharacterBody3D
     /// frame (so its silhouette mask lines up pixel-for-pixel with the live scene), and moves the
     /// highlight render layer bit onto whichever target's HighlightVisual is current — cleared
     /// entirely the moment scan mode is off or nothing valid is aimed at, so the shader's mask
-    /// (and therefore its outline) goes empty rather than lingering on a stale target.</summary>
+    /// (and therefore its outline) goes empty rather than lingering on a stale target. A target
+    /// can offer more than one mesh (e.g. an airlock's separate frame + slab) — every one of them
+    /// gets the layer bit together.</summary>
     private void UpdateScanHighlight(IVerbTarget? target)
     {
         _scanHighlightCamera!.GlobalTransform = _camera!.GlobalTransform;
         _scanHighlightCamera.Fov = _camera.Fov;
 
-        var desired = _scanModeOn ? target?.HighlightVisual : null;
-        if (desired == _highlightedVisual)
+        var desired = _scanModeOn ? target?.HighlightVisual ?? [] : [];
+        if (desired.SequenceEqual(_highlightedVisuals))
         {
             return;
         }
 
-        _highlightedVisual?.SetLayerMaskValue(ScanHighlightLayer, false);
-        desired?.SetLayerMaskValue(ScanHighlightLayer, true);
-        _highlightedVisual = desired;
+        foreach (var visual in _highlightedVisuals)
+        {
+            visual.SetLayerMaskValue(ScanHighlightLayer, false);
+        }
+
+        foreach (var visual in desired)
+        {
+            visual.SetLayerMaskValue(ScanHighlightLayer, true);
+        }
+
+        _highlightedVisuals = desired;
     }
 
     /// <summary>Which backpack-type item (if any) the player owns anywhere — worn, merely held,

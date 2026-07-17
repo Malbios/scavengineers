@@ -627,7 +627,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// wall/ceiling has no single mesh to point at, so this dynamically-repositioned dedicated
     /// mesh (see UpdateHighlightGhostTransform, kept in sync with the aim point) stands in for
     /// whichever surface is currently aimed at.</summary>
-    public VisualInstance3D? HighlightVisual => _aimKind == AimKind.None ? null : _highlightGhost;
+    public IReadOnlyList<VisualInstance3D> HighlightVisual => _aimKind == AimKind.None ? [] : [_highlightGhost!];
 
     public override void _Ready()
     {

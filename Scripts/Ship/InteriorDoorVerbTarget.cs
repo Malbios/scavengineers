@@ -85,11 +85,10 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
 
     public string? DisplayNameKey => "OBJECT_DOOR";
 
-    /// <summary>Overrides IVerbTarget's default (which would just grab this node's first
-    /// VisualInstance3D child) — that's FrameMesh, the static frame that stays put regardless of
-    /// open/closed state (see World.tscn, added before SlabMesh). SlabMesh is the part that
-    /// actually reflects this door, so it's the one the scan-mode outline should track.</summary>
-    public VisualInstance3D? HighlightVisual => SlabMesh as VisualInstance3D;
+    // No HighlightVisual override needed: IVerbTarget's default (all direct VisualInstance3D
+    // children) already covers both FrameMesh (the static frame, present open or closed) and
+    // SlabMesh (the part that actually toggles) — FrameCollision/SlabCollision aren't
+    // VisualInstance3D, so they're excluded automatically.
 
     public float? CurrentVerbProgress =>
         _cycling ? 1f - (float)(_cycleTimer!.TimeLeft / _cycleTimer.WaitTime) : null;
