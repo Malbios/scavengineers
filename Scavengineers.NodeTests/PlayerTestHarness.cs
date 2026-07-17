@@ -68,7 +68,7 @@ public static class PlayerTestHarness
         hud.AddChild(new Label { Name = "RightHandLabel" });
         hud.AddChild(new Label { Name = "CreditsLabel" });
 
-        var inventoryPanel = new Control { Name = "InventoryPanel" };
+        var inventoryPanel = MakeWindow("InventoryPanel");
         hud.AddChild(inventoryPanel);
         var inventoryLayout = new Node { Name = "Layout" };
         inventoryPanel.AddChild(inventoryLayout);
@@ -76,19 +76,19 @@ public static class PlayerTestHarness
         // requires any to exist. Slot-UI-specific behavior isn't in scope for this harness.
         inventoryLayout.AddChild(new Node { Name = "EquipSlots" });
 
-        var drillWindow = new Control { Name = "DrillWindow" };
+        var drillWindow = MakeWindow("DrillWindow");
         hud.AddChild(drillWindow);
         var drillLayout = new Node { Name = "Layout" };
         drillWindow.AddChild(drillLayout);
         drillLayout.AddChild(MakeSlot("DrillBatterySlot"));
 
-        var flashlightWindow = new Control { Name = "FlashlightWindow" };
+        var flashlightWindow = MakeWindow("FlashlightWindow");
         hud.AddChild(flashlightWindow);
         var flashlightLayout = new Node { Name = "Layout" };
         flashlightWindow.AddChild(flashlightLayout);
         flashlightLayout.AddChild(MakeSlot("FlashlightBatterySlot"));
 
-        var backpackWindow = new Control { Name = "BackpackWindow" };
+        var backpackWindow = MakeWindow("BackpackWindow");
         hud.AddChild(backpackWindow);
         var backpackLayout = new Node { Name = "Layout" };
         backpackWindow.AddChild(backpackLayout);
@@ -96,7 +96,7 @@ public static class PlayerTestHarness
         backpackLayout.AddChild(backpackGrid);
         backpackGrid.AddChild(MakeSlot("SlotTemplate"));
 
-        var suitWindow = new Control { Name = "SuitWindow" };
+        var suitWindow = MakeWindow("SuitWindow");
         hud.AddChild(suitWindow);
         var suitLayout = new Node { Name = "Layout" };
         suitWindow.AddChild(suitLayout);
@@ -109,7 +109,7 @@ public static class PlayerTestHarness
         suitGrid.AddChild(MakeSlot("Filter"));
         suitGrid.AddChild(MakeSlot("Battery"));
 
-        var pdaWindow = new Control { Name = "PdaWindow" };
+        var pdaWindow = MakeWindow("PdaWindow");
         hud.AddChild(pdaWindow);
         var pdaLayout = new Node { Name = "Layout" };
         pdaWindow.AddChild(pdaLayout);
@@ -141,5 +141,18 @@ public static class PlayerTestHarness
         slot.AddChild(new ColorRect { Name = "Icon" });
         slot.AddChild(new Label { Name = "Count" });
         return slot;
+    }
+
+    /// <summary>DraggableWindow._Ready() dereferences TitleBar unconditionally (GuiInput +=) —
+    /// unlike the real scene, where Godot's own node_paths export resolution wires it before
+    /// _Ready() runs, a bare C# node here needs it assigned explicitly before this window ever
+    /// enters the tree. CloseButton is deliberately left null (DraggableWindow already tolerates
+    /// that) — no test built on this harness needs to press it.</summary>
+    private static Scavengineers.Scripts.Player.DraggableWindow MakeWindow(string name)
+    {
+        var titleBar = new Control { Name = "TitleBar" };
+        var window = new Scavengineers.Scripts.Player.DraggableWindow { Name = name, TitleBar = titleBar };
+        window.AddChild(titleBar);
+        return window;
     }
 }

@@ -172,10 +172,10 @@ public partial class Player : CharacterBody3D
     private Label? _leftHandLabel;
     private Label? _rightHandLabel;
     private Label? _creditsLabel;
-    private Control? _inventoryPanel;
-    private Control? _drillWindow;
-    private Control? _flashlightWindow;
-    private Control? _backpackWindow;
+    private DraggableWindow? _inventoryPanel;
+    private DraggableWindow? _drillWindow;
+    private DraggableWindow? _flashlightWindow;
+    private DraggableWindow? _backpackWindow;
     private TravelMapPanel? _travelMapPanel;
     private TravelConsoleVerbTarget? _openTravelConsole;
     private ShopPanel? _shopPanel;
@@ -205,13 +205,13 @@ public partial class Player : CharacterBody3D
     /// <summary>The EVA suit torso's own window — unlike the backpack's grid, its 2 pocket slots
     /// are static scene nodes (the torso's inner slot count never varies), so no
     /// rebuild-on-equip mechanism is needed, just a per-frame Container re-point.</summary>
-    private Control? _suitWindow;
+    private DraggableWindow? _suitWindow;
     private readonly InventorySlotUI?[] _suitPocketSlots = new InventorySlotUI?[2];
 
     /// <summary>The PDA's own window — its single cartridge pocket is a static scene node (like
     /// the suit's pockets above), room to grow into more slots later without a rebuild
     /// mechanism being needed yet.</summary>
-    private Control? _pdaWindow;
+    private DraggableWindow? _pdaWindow;
     private InventorySlotUI? _pdaCartridgeSlot;
 
     /// <summary>Toggled by the scan-mode key (see _Input) — only ever true while
@@ -379,10 +379,10 @@ public partial class Player : CharacterBody3D
         _leftHandLabel = GetNode<Label>("HUD/LeftHandLabel");
         _rightHandLabel = GetNode<Label>("HUD/RightHandLabel");
         _creditsLabel = GetNode<Label>("HUD/CreditsLabel");
-        _inventoryPanel = GetNode<Control>("HUD/InventoryPanel");
-        _drillWindow = GetNode<Control>("HUD/DrillWindow");
-        _flashlightWindow = GetNode<Control>("HUD/FlashlightWindow");
-        _backpackWindow = GetNode<Control>("HUD/BackpackWindow");
+        _inventoryPanel = GetNode<DraggableWindow>("HUD/InventoryPanel");
+        _drillWindow = GetNode<DraggableWindow>("HUD/DrillWindow");
+        _flashlightWindow = GetNode<DraggableWindow>("HUD/FlashlightWindow");
+        _backpackWindow = GetNode<DraggableWindow>("HUD/BackpackWindow");
         _backpackGrid = GetNode<Control>("HUD/BackpackWindow/Layout/BackpackGrid");
         _travelMapPanel = GetNode<TravelMapPanel>("HUD/TravelMapPanel");
         _travelMapPanel.PlayerRef = this;
@@ -405,7 +405,7 @@ public partial class Player : CharacterBody3D
 
         _backpackSlotTemplate = GetNode<InventorySlotUI>("HUD/BackpackWindow/Layout/BackpackGrid/SlotTemplate");
 
-        _suitWindow = GetNode<Control>("HUD/SuitWindow");
+        _suitWindow = GetNode<DraggableWindow>("HUD/SuitWindow");
         GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/O2Tank").PlayerRef = this;
         GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/N2Tank").PlayerRef = this;
         GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/Filter").PlayerRef = this;
@@ -417,9 +417,32 @@ public partial class Player : CharacterBody3D
             pocketSlot!.PlayerRef = this;
         }
 
-        _pdaWindow = GetNode<Control>("HUD/PdaWindow");
+        _pdaWindow = GetNode<DraggableWindow>("HUD/PdaWindow");
         _pdaCartridgeSlot = GetNode<InventorySlotUI>("HUD/PdaWindow/Layout/PdaGrid/Cartridge1");
         _pdaCartridgeSlot.PlayerRef = this;
+
+        // X button / right-click-on-background — each window closes exactly the way its own
+        // existing toggle-off path already does (see ToggleItemWindow's closing branches/
+        // CloseInventory), just reachable without needing to re-press the same hotkey/re-click
+        // the same slot.
+        _inventoryPanel.CloseRequested += CloseInventory;
+        _drillWindow.CloseRequested += () => _drillWindow!.Visible = false;
+        _flashlightWindow.CloseRequested += () => _flashlightWindow!.Visible = false;
+        _backpackWindow.CloseRequested += () =>
+        {
+            _backpackWindow!.Visible = false;
+            _openBackpackItemId = null;
+        };
+        _suitWindow.CloseRequested += () =>
+        {
+            _suitWindow!.Visible = false;
+            _openSuitItemId = null;
+        };
+        _pdaWindow.CloseRequested += () =>
+        {
+            _pdaWindow!.Visible = false;
+            _openPdaItemId = null;
+        };
 
         // Placeholder/tunable starting stipend for testing the free-form conduit wiring
         // extensively — same "don't wait on it" spirit as the near-instant verb durations.

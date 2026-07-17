@@ -199,7 +199,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("8")
 
-[node name="InventoryPanel" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar")]
+[node name="InventoryPanel" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar", "CloseButton")]
 visible = false
 anchors_preset = 8
 anchor_left = 0.5
@@ -215,6 +215,17 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 script = ExtResource("4")
 TitleBar = NodePath("Layout/TitleBar")
+CloseButton = NodePath("CloseButton")
+
+[node name="CloseButton" type="Button" parent="HUD/InventoryPanel"]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -22.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = 22.0
+text = "X"
 
 [node name="Layout" type="VBoxContainer" parent="HUD/InventoryPanel"]
 layout_mode = 2
@@ -576,7 +587,7 @@ offset_top = -15.0
 mouse_filter = 2
 horizontal_alignment = 2
 
-[node name="DrillWindow" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar")]
+[node name="DrillWindow" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar", "CloseButton")]
 visible = false
 anchors_preset = 8
 anchor_left = 0.5
@@ -592,6 +603,17 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 script = ExtResource("4")
 TitleBar = NodePath("Layout/TitleBar")
+CloseButton = NodePath("CloseButton")
+
+[node name="CloseButton" type="Button" parent="HUD/DrillWindow"]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -22.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = 22.0
+text = "X"
 
 [node name="Layout" type="VBoxContainer" parent="HUD/DrillWindow"]
 layout_mode = 2
@@ -643,7 +665,7 @@ offset_top = -15.0
 mouse_filter = 2
 horizontal_alignment = 2
 
-[node name="FlashlightWindow" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar")]
+[node name="FlashlightWindow" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar", "CloseButton")]
 visible = false
 anchors_preset = 8
 anchor_left = 0.5
@@ -659,6 +681,17 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 script = ExtResource("4")
 TitleBar = NodePath("Layout/TitleBar")
+CloseButton = NodePath("CloseButton")
+
+[node name="CloseButton" type="Button" parent="HUD/FlashlightWindow"]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -22.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = 22.0
+text = "X"
 
 [node name="Layout" type="VBoxContainer" parent="HUD/FlashlightWindow"]
 layout_mode = 2
@@ -710,7 +743,7 @@ offset_top = -15.0
 mouse_filter = 2
 horizontal_alignment = 2
 
-[node name="BackpackWindow" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar")]
+[node name="BackpackWindow" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar", "CloseButton")]
 visible = false
 anchors_preset = 8
 anchor_left = 0.5
@@ -726,6 +759,17 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 script = ExtResource("4")
 TitleBar = NodePath("Layout/TitleBar")
+CloseButton = NodePath("CloseButton")
+
+[node name="CloseButton" type="Button" parent="HUD/BackpackWindow"]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -22.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = 22.0
+text = "X"
 
 [node name="Layout" type="VBoxContainer" parent="HUD/BackpackWindow"]
 layout_mode = 2
@@ -782,7 +826,7 @@ offset_top = -15.0
 mouse_filter = 2
 horizontal_alignment = 2
 
-[node name="SuitWindow" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar")]
+[node name="SuitWindow" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar", "CloseButton")]
 visible = false
 anchors_preset = 8
 anchor_left = 0.5
@@ -798,6 +842,17 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 script = ExtResource("4")
 TitleBar = NodePath("Layout/TitleBar")
+CloseButton = NodePath("CloseButton")
+
+[node name="CloseButton" type="Button" parent="HUD/SuitWindow"]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -22.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = 22.0
+text = "X"
 
 [node name="Layout" type="VBoxContainer" parent="HUD/SuitWindow"]
 layout_mode = 2
@@ -1042,7 +1097,7 @@ offset_top = -15.0
 mouse_filter = 2
 horizontal_alignment = 2
 
-[node name="PdaWindow" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar")]
+[node name="PdaWindow" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("TitleBar", "CloseButton")]
 visible = false
 anchors_preset = 8
 anchor_left = 0.5
@@ -1058,6 +1113,17 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 script = ExtResource("4")
 TitleBar = NodePath("Layout/TitleBar")
+CloseButton = NodePath("CloseButton")
+
+[node name="CloseButton" type="Button" parent="HUD/PdaWindow"]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -22.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = 22.0
+text = "X"
 
 [node name="Layout" type="VBoxContainer" parent="HUD/PdaWindow"]
 layout_mode = 2
