@@ -163,11 +163,19 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         AddChild(_maintenanceTimer);
         _maintenanceTimer.Timeout += OnMaintenanceComplete;
 
-        // Deferred: both airlocks' ShipSim refs may belong to sibling branches of the scene
-        // tree that haven't built their Deck yet at this exact point in _Ready() order (see
-        // ShipSim's own deferred vacuum seeding for the same reason).
-        CallDeferred(nameof(ApplyCurrentLocation));
+        // Deferred TWICE, not once: every Derelict's own Floor.SeedDefaultShipLayout (which
+        // spawns the actual wall/conduit/machine CollisionShape3D children) is ALSO deferred,
+        // from that Floor's own _Ready() — and since HomeShip (this node's ancestor) readies
+        // before Derelict1..5 as an earlier scene-tree sibling (see World.tscn), a single
+        // CallDeferred here would run BEFORE those walls exist, leaving them permanently
+        // un-decollided for whichever derelict isn't the starting location (SetShipPresence can
+        // only disable colliders that already exist at the moment it runs). Deferring a second
+        // time lands this call at the back of the same deferred-call flush, after every already-
+        // queued SeedDefaultShipLayout call, guaranteeing the walls exist first.
+        CallDeferred(nameof(DeferApplyCurrentLocationOnceMore));
     }
+
+    private void DeferApplyCurrentLocationOnceMore() => CallDeferred(nameof(ApplyCurrentLocation));
 
     public override void _PhysicsProcess(double delta)
     {
