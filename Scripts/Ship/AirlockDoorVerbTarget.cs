@@ -161,6 +161,12 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
 
     public float? Condition => AirlockFixture?.Condition;
 
+    /// <summary>Overrides IVerbTarget's default (which would just grab this node's first
+    /// VisualInstance3D child) — that's FrameMesh, the static frame that stays put regardless of
+    /// open/closed state (see World.tscn, added before SlabMesh). SlabMesh is the part that
+    /// actually reflects this airlock, so it's the one the scan-mode outline should track.</summary>
+    public VisualInstance3D? HighlightVisual => SlabMesh;
+
     public float? CurrentVerbProgress =>
         _cycling ? 1f - (float)(_cycleTimer!.TimeLeft / _cycleTimer.WaitTime)
         : _maintaining ? 1f - (float)(_maintenanceTimer!.TimeLeft / _maintenanceTimer.WaitTime)

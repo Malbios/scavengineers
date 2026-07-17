@@ -2340,10 +2340,30 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
             case AimKind.Edge:
             {
-                _highlightGhost!.Mesh = WallSegmentMesh;
-                var (position, rotationDegrees) = EdgeTransform(_edgeA, _edgeB);
-                _highlightGhost.Position = position;
-                _highlightGhost.RotationDegrees = rotationDegrees;
+                // EdgeMargin's own band is deliberately wide (lets you target a wall from well
+                // inside the neighboring tile) but that means "aim resolved to Edge" does NOT
+                // imply a wall actually exists there yet — outlining a phantom wall where there's
+                // only open floor reads as wrong. Same wallPresent test Condition's own Edge
+                // branches use: falls back to highlighting the floor tile itself when there's
+                // nothing built on this edge to outline instead.
+                var wallPresent = ShipSimRef!.Deck.Cells.Contains(_edgeB)
+                    ? ShipSimRef.Deck.IsEdgeSealed(_edgeA, _edgeB)
+                    : !ShipSimRef.Deck.IsWallEdgeBreached(_edgeA, _edgeB);
+
+                if (wallPresent)
+                {
+                    _highlightGhost!.Mesh = WallSegmentMesh;
+                    var (position, rotationDegrees) = EdgeTransform(_edgeA, _edgeB);
+                    _highlightGhost.Position = position;
+                    _highlightGhost.RotationDegrees = rotationDegrees;
+                }
+                else
+                {
+                    _highlightGhost!.Mesh = PanelMesh ?? ConduitMesh;
+                    _highlightGhost.RotationDegrees = Vector3.Zero;
+                    _highlightGhost.Position = ToLocal(TileWorldPosition(_aimedTile, FloorPanelHeight));
+                }
+
                 break;
             }
         }
