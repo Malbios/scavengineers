@@ -98,15 +98,6 @@ size = Vector3(0.6, 0.9, 0.4)
 [sub_resource type="StandardMaterial3D" id="BatteryMaterial"]
 albedo_color = Color(0.9, 0.6, 0.05, 1)
 
-[sub_resource type="BoxShape3D" id="PickupItemShape"]
-size = Vector3(0.3, 0.3, 0.3)
-
-[sub_resource type="BoxMesh" id="PickupItemMesh"]
-size = Vector3(0.3, 0.3, 0.3)
-
-[sub_resource type="StandardMaterial3D" id="PickupItemMaterial"]
-albedo_color = Color(0.15, 0.8, 0.2, 1)
-
 [sub_resource type="StandardMaterial3D" id="ScrapMetalMaterial"]
 albedo_color = Color(0.55, 0.55, 0.6, 1)
 
@@ -190,9 +181,6 @@ albedo_color = Color(0.35, 0.55, 0.75, 1)
 
 [sub_resource type="StandardMaterial3D" id="PowerCellMaterial"]
 albedo_color = Color(0.2, 0.702, 0.902, 1)
-
-[sub_resource type="StandardMaterial3D" id="CrowbarMaterial"]
-albedo_color = Color(0.702, 0.302, 0.15, 1)
 
 [sub_resource type="BoxShape3D" id="ComputerShape"]
 size = Vector3(0.5, 0.8, 0.4)
@@ -361,9 +349,6 @@ RechargeStationMesh = SubResource("RechargeStationMesh")
 RechargeStationShape = SubResource("RechargeStationShape")
 RechargeStationMaterial = SubResource("RechargeStationMaterial")
 RoomLight = NodePath("../RoomLight")
-DroppedItemMesh = SubResource("PickupItemMesh")
-DroppedItemShape = SubResource("PickupItemShape")
-DroppedItemMaterial = SubResource("PickupItemMaterial")
 SaveId = "home_ship_build_target"
 GhostMaterial = SubResource("ConduitGhostMaterial")
 ExcludedEdgeColumn = 6
@@ -429,13 +414,6 @@ surface_material_override/0 = SubResource("BunkMaterial")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.15, 0.5)
 script = ExtResource("12")
 ItemId = "crowbar"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/Crowbar"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="HomeShip/Crowbar"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("CrowbarMaterial")
 
 [node name="InteriorDoor" type="StaticBody3D" parent="HomeShip" node_paths=PackedStringArray("ShipSimRef", "SlabMesh", "SlabCollision") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.0, -0.8)
@@ -750,7 +728,4 @@ surface_material_override/0 = SubResource("AirlockDoorMaterial")
 
 [node name="Player" parent="." unique_id=191954104 instance=ExtResource("2") node_paths=PackedStringArray("SaveManagerRef")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
-DroppedItemMesh = SubResource("PickupItemMesh")
-DroppedItemShape = SubResource("PickupItemShape")
-DroppedItemMaterial = SubResource("PickupItemMaterial")
 SaveManagerRef = NodePath("../SaveManager")

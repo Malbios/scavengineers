@@ -44,27 +44,6 @@ size = Vector3(1, 0.05, 1)
 transparency = 1
 albedo_color = Color(0.15, 0.75, 0.85, 0.35)
 
-[sub_resource type="BoxMesh" id="PickupItemMesh"]
-size = Vector3(0.3, 0.3, 0.3)
-
-[sub_resource type="BoxShape3D" id="PickupItemShape"]
-size = Vector3(0.3, 0.3, 0.3)
-
-[sub_resource type="StandardMaterial3D" id="PickupItemMaterial"]
-albedo_color = Color(0.15, 0.8, 0.2, 1)
-
-[sub_resource type="StandardMaterial3D" id="WallPanelPickupMaterial"]
-albedo_color = Color(0.35, 0.55, 0.75, 1)
-
-[sub_resource type="StandardMaterial3D" id="ScrapMetalMaterial"]
-albedo_color = Color(0.55, 0.55, 0.6, 1)
-
-[sub_resource type="StandardMaterial3D" id="SparePartsMaterial"]
-albedo_color = Color(0.85, 0.7, 0.15, 1)
-
-[sub_resource type="StandardMaterial3D" id="PowerCellMaterial"]
-albedo_color = Color(0.2, 0.702, 0.902, 1)
-
 [sub_resource type="StandardMaterial3D" id="RepairingMaterial"]
 albedo_color = Color(0.9, 0.85, 0.1, 1)
 
@@ -155,9 +134,6 @@ GhostMaterial = SubResource("ConduitGhostMaterial")
 ExcludedEdgeColumn = 6
 SeedDefaultLayout = true
 GenerateAtmosphereZones = true
-DroppedItemMesh = SubResource("PickupItemMesh")
-DroppedItemShape = SubResource("PickupItemShape")
-DroppedItemMaterial = SubResource("PickupItemMaterial")
 SaveId = "derelict_build_target"
 
 [node name="FloorAimHelper" type="StaticBody3D" parent="." node_paths=PackedStringArray("BuildTarget")]
@@ -186,132 +162,55 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.15, -2)
 script = ExtResource("12")
 ItemId = "wall_panel"
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="WallPanel1"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="WallPanel1"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("WallPanelPickupMaterial")
-
 [node name="WallPanel2" type="RigidBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.5, 0.15, -1)
 script = ExtResource("12")
 ItemId = "wall_panel"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="WallPanel2"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="WallPanel2"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("WallPanelPickupMaterial")
 
 [node name="ScrapMetal" type="RigidBody3D" parent="." unique_id=225809168]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0.15, -2)
 script = ExtResource("12")
 ItemId = "scrap_metal"
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="ScrapMetal" unique_id=1503916654]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="ScrapMetal" unique_id=1778977634]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("ScrapMetalMaterial")
-
 [node name="ScrapMetal2" type="RigidBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.15, -0.5)
 script = ExtResource("12")
 ItemId = "scrap_metal"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="ScrapMetal2"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="ScrapMetal2"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("ScrapMetalMaterial")
 
 [node name="ScrapMetal3" type="RigidBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 0.15, 0.5)
 script = ExtResource("12")
 ItemId = "scrap_metal"
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="ScrapMetal3"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="ScrapMetal3"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("ScrapMetalMaterial")
-
 [node name="SpareParts" type="RigidBody3D" parent="." unique_id=498314835]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.606081, 0.15, 2)
 script = ExtResource("12")
 ItemId = "spare_parts"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="SpareParts" unique_id=802464128]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="SpareParts" unique_id=1966985226]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("SparePartsMaterial")
 
 [node name="ScrapMetal4" type="RigidBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.15, -1.5)
 script = ExtResource("12")
 ItemId = "scrap_metal"
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="ScrapMetal4"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="ScrapMetal4"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("ScrapMetalMaterial")
-
 [node name="ScrapMetal5" type="RigidBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0.15, 1.5)
 script = ExtResource("12")
 ItemId = "scrap_metal"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="ScrapMetal5"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="ScrapMetal5"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("ScrapMetalMaterial")
 
 [node name="SpareParts2" type="RigidBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.5, 0.15, 1)
 script = ExtResource("12")
 ItemId = "spare_parts"
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="SpareParts2"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="SpareParts2"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("SparePartsMaterial")
-
 [node name="WallPanel3" type="RigidBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0.15, -1)
 script = ExtResource("12")
 ItemId = "wall_panel"
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="WallPanel3"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="WallPanel3"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("WallPanelPickupMaterial")
-
 [node name="PowerCell1" type="RigidBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.5, 0.15, -2)
 script = ExtResource("12")
 ItemId = "power_cell"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="PowerCell1"]
-shape = SubResource("PickupItemShape")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="PowerCell1"]
-mesh = SubResource("PickupItemMesh")
-surface_material_override/0 = SubResource("PowerCellMaterial")
 
 [node name="DamagedConduit" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipSimRef", "Mesh", "Collider", "SmokeParticles") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0.3, 0.5)
@@ -323,9 +222,6 @@ RepairingMaterial = SubResource("RepairingMaterial")
 RepairedMaterial = SubResource("RepairedConduitMaterial")
 BurningMaterial = SubResource("BurningConduitMaterial")
 SmokeParticles = NodePath("SmokeParticles")
-DroppedItemMesh = SubResource("PickupItemMesh")
-DroppedItemShape = SubResource("PickupItemShape")
-DroppedItemMaterial = SubResource("PickupItemMaterial")
 SaveId = "damaged_conduit_1"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="DamagedConduit"]
