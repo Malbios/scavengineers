@@ -1,7 +1,9 @@
 using System.Collections.Generic;
+using System.Linq;
 
 using Godot;
 using Scavengineers.Sim.Grid;
+using Scavengineers.Sim.ShipModel;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Scripts.Verbs;
@@ -38,6 +40,23 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
     private static readonly (CellCoord A, CellCoord B) Edge1 = (new CellCoord(5, 2), new CellCoord(6, 2));
     private static readonly (CellCoord A, CellCoord B) Edge2 = (new CellCoord(5, 3), new CellCoord(6, 3));
 
+    // Same two-tier upkeep as everything else with a Deck-tracked Condition (see
+    // MaintenanceTier) — this door's own fixture (ShipSim.InteriorDoorFixtureId) has been
+    // passively decaying since it started existing unconditionally, with no way to repair it
+    // until now.
+    private static readonly ItemRequirement WrenchRequirement = new("wrench", 1) { Consumed = false };
+    private static readonly ItemRequirement SparePartsRequirement = new("spare_parts", 1);
+
+    private static readonly Verb MaintainInteriorDoorVerb = new("maintain_interior_door", "VERB_MAINTAIN_INTERIOR_DOOR", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement],
+    };
+
+    private static readonly Verb RepairInteriorDoorVerb = new("repair_interior_door", "VERB_REPAIR_INTERIOR_DOOR", DurationSeconds: 0.2f)
+    {
+        Requirements = [WrenchRequirement, SparePartsRequirement],
+    };
+
     [Export]
     public ShipSim? ShipSimRef { get; set; }
 
@@ -58,13 +77,21 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
     private bool _pendingOpenState;
     private bool _isOpen;
 
+    // A second, independent timer/bool pair — upkeep is a third, unrelated timed action on top
+    // of the existing Open/Close/Pry cycle (already juggled via _cyclingIsPry), not worth folding
+    // into that one flag at this scale.
+    private Timer? _maintenanceTimer;
+    private bool _maintaining;
+
     public bool IsOpen => _isOpen;
 
     /// <summary>Powered: the normal instant Open/Close, same as ever. Unpowered: no ship motor to
     /// drive the mechanism either way, so <see cref="PryVerb"/> (a crowbar, by hand) is the only
     /// option regardless of current state — it prys the door open if closed, or forces it shut
     /// again if already open (see <see cref="ExecuteVerb"/>, which decides the direction from the
-    /// current <see cref="IsOpen"/> state rather than from which verb was picked).</summary>
+    /// current <see cref="IsOpen"/> state rather than from which verb was picked). Maintain/Repair
+    /// is offered regardless of powered state — a door you can't currently open should still be
+    /// repairable.</summary>
     public IReadOnlyList<Verb> AvailableVerbs
     {
         get
@@ -74,16 +101,22 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
                 return [];
             }
 
-            if (ShipSimRef.IsPowered(ShipSim.InteriorDoorFixtureId))
+            var verbs = new List<Verb> { ShipSimRef.IsPowered(ShipSim.InteriorDoorFixtureId) ? (IsOpen ? CloseVerb : OpenVerb) : PryVerb };
+
+            if (DoorFixture is { } fixture && MaintenanceTier.PickVerb(fixture.Condition, MaintainInteriorDoorVerb, RepairInteriorDoorVerb) is { } upkeepVerb)
             {
-                return [IsOpen ? CloseVerb : OpenVerb];
+                verbs.Add(upkeepVerb);
             }
 
-            return [PryVerb];
+            return verbs;
         }
     }
 
     public string? DisplayNameKey => "OBJECT_DOOR";
+
+    private Fixture? DoorFixture => ShipSimRef?.Deck.Fixtures.FirstOrDefault(f => f.Id == ShipSim.InteriorDoorFixtureId);
+
+    public float? Condition => DoorFixture?.Condition;
 
     // No HighlightVisual override needed: IVerbTarget's default (all direct VisualInstance3D
     // children) already covers both FrameMesh (the static frame, present open or closed) and
@@ -91,13 +124,19 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
     // VisualInstance3D, so they're excluded automatically.
 
     public float? CurrentVerbProgress =>
-        _cycling ? 1f - (float)(_cycleTimer!.TimeLeft / _cycleTimer.WaitTime) : null;
+        _cycling ? 1f - (float)(_cycleTimer!.TimeLeft / _cycleTimer.WaitTime)
+        : _maintaining ? 1f - (float)(_maintenanceTimer!.TimeLeft / _maintenanceTimer.WaitTime)
+        : null;
 
     public override void _Ready()
     {
         _cycleTimer = new Timer { OneShot = true };
         AddChild(_cycleTimer);
         _cycleTimer.Timeout += OnCycleComplete;
+
+        _maintenanceTimer = new Timer { OneShot = true, WaitTime = MaintainInteriorDoorVerb.DurationSeconds };
+        AddChild(_maintenanceTimer);
+        _maintenanceTimer.Timeout += OnMaintenanceComplete;
 
         // Deferred for two reasons: ShipSimRef's own Deck/power may not be built yet at this
         // exact point in _Ready() order (needed to decide the starting _isOpen below), and a
@@ -130,6 +169,17 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
+        if (verb.Id == MaintainInteriorDoorVerb.Id || verb.Id == RepairInteriorDoorVerb.Id)
+        {
+            if (!_maintaining)
+            {
+                _maintaining = true;
+                _maintenanceTimer!.Start();
+            }
+
+            return;
+        }
+
         if (ShipSimRef is null || _cycling || (verb.Id != OpenVerb.Id && verb.Id != CloseVerb.Id && verb.Id != PryVerb.Id))
         {
             return;
@@ -144,6 +194,12 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
 
     public void CancelVerb()
     {
+        if (_maintaining)
+        {
+            _maintaining = false;
+            _maintenanceTimer!.Stop();
+        }
+
         if (!_cycling)
         {
             return;
@@ -159,6 +215,15 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
         _isOpen = _pendingOpenState;
         ApplyEdgeSeal();
         ApplySlabVisual();
+    }
+
+    private void OnMaintenanceComplete()
+    {
+        _maintaining = false;
+        if (DoorFixture is { } fixture)
+        {
+            fixture.Condition = 1f;
+        }
     }
 
     public bool GetSaveState() => _isOpen;

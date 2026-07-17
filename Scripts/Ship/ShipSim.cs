@@ -253,6 +253,15 @@ public partial class ShipSim : Node, IShipLayoutSaveable
         // is holed) rather than a blanket assumption.
         CallDeferred(nameof(SeedVacuumFromInitialBreaches));
 
+        // Unconditional (unlike the power-grid fixtures below): a physical door wears down
+        // whether or not the ship it's on has any electricity at all, so its own wear-tracked
+        // fixture exists on every ship — a Derelict never has HasPowerGrid, so without this its
+        // own interior door would have no Condition/upkeep concept whatsoever. InteriorDoorCell's
+        // fixed (5,2) is a nominal placeholder shared across every ship type (the Derelict's own
+        // door actually sits at a different column) — harmless today since nothing reads this
+        // fixture's cell for position, only WearSystem's blanket per-tick decay and lookup-by-Id.
+        Deck.AddFixture(new MachineFixture(InteriorDoorFixtureId, InteriorDoorCell, FixtureSurface.FloorUnderside));
+
         if (HasPowerGrid)
         {
             // None of the below are pre-connected — the player must run their own conduits
@@ -262,7 +271,6 @@ public partial class ShipSim : Node, IShipLayoutSaveable
             // MachineType), seeded (for the Home Ship) through the exact same
             // Install*/Remove* calls below that a player action or a save replay uses.
             Deck.AddFixture(new MachineFixture(TravelConsoleFixtureId, TravelConsoleCell, FixtureSurface.WallInner));
-            Deck.AddFixture(new MachineFixture(InteriorDoorFixtureId, InteriorDoorCell, FixtureSurface.FloorUnderside));
             Deck.AddFixture(new MachineFixture(StationAirlockFixtureId, StationAirlockCell, FixtureSurface.FloorUnderside));
             Deck.AddFixture(new MachineFixture(DerelictAirlockFixtureId, DerelictAirlockCell, FixtureSurface.FloorUnderside));
 

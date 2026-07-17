@@ -110,3 +110,5 @@ VERB_MAINTAIN_TRAVEL_CONSOLE,Maintain Travel Console,Schiffskonsole warten
 VERB_REPAIR_TRAVEL_CONSOLE,Repair Travel Console,Schiffskonsole reparieren
 VERB_MAINTAIN_AIRLOCK,Maintain Airlock,Luftschleuse warten
 VERB_REPAIR_AIRLOCK,Repair Airlock,Luftschleuse reparieren
+VERB_MAINTAIN_INTERIOR_DOOR,Maintain Door,Tür warten
+VERB_REPAIR_INTERIOR_DOOR,Repair Door,Tür reparieren
