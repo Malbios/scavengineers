@@ -85,6 +85,103 @@ public static class ItemVisualBuilder
         _ => new BoxShape3D { Size = FallbackBoxSize },
     };
 
+    // Every item without a recognized shapeKind (unknown id, or a catalog entry that hasn't been
+    // given one yet) gets this — the exact same "one flat square" look every icon already has
+    // today, so nothing regresses for an item this table hasn't caught up with.
+    private static readonly Rect2 FallbackIconRect = new(0f, 0f, 1f, 1f);
+
+    /// <summary>Normalized (0-1) rects for this item's own flat 2D inventory icon — a simplified,
+    /// flattened echo of the same per-shapeKind composition PartsFor uses for the real 3D visual
+    /// (same proportions/groupings, just 2D rects instead of 3D primitives), so an icon reads as
+    /// "the same item, flattened" rather than a second, independently-designed representation.
+    /// Normalized so the caller (InventorySlotUI) can anchor each rect directly regardless of the
+    /// icon Control's actual pixel size. Y grows downward in UI space (unlike the 3D parts' own Y-
+    /// up convention) — anything positioned "on top of" another part here uses a SMALLER y than
+    /// the part it sits above.</summary>
+    public static IReadOnlyList<Rect2> IconPartsFor(string? shapeKind) => shapeKind switch
+    {
+        "tank" =>
+        [
+            new Rect2(0.3f, 0.3f, 0.4f, 0.65f),
+            new Rect2(0.4f, 0.1f, 0.2f, 0.2f),
+        ],
+        "cell" => [new Rect2(0.15f, 0.35f, 0.7f, 0.3f)],
+        "canister" => [new Rect2(0.1f, 0.4f, 0.8f, 0.25f)],
+        "bottle" =>
+        [
+            new Rect2(0.35f, 0.3f, 0.3f, 0.6f),
+            new Rect2(0.42f, 0.1f, 0.16f, 0.2f),
+        ],
+        "bar" => [new Rect2(0.1f, 0.42f, 0.8f, 0.16f)],
+        "panel" => [new Rect2(0.05f, 0.35f, 0.9f, 0.3f)],
+        "debris" =>
+        [
+            new Rect2(0.15f, 0.45f, 0.35f, 0.3f),
+            new Rect2(0.5f, 0.3f, 0.3f, 0.25f),
+            new Rect2(0.35f, 0.55f, 0.28f, 0.25f),
+        ],
+        "fastener" =>
+        [
+            new Rect2(0.25f, 0.35f, 0.35f, 0.3f),
+            new Rect2(0.6f, 0.42f, 0.18f, 0.16f),
+        ],
+        "bag" =>
+        [
+            new Rect2(0.2f, 0.35f, 0.6f, 0.55f),
+            new Rect2(0.32f, 0.15f, 0.36f, 0.2f),
+        ],
+        "tool_crowbar" =>
+        [
+            new Rect2(0.42f, 0.1f, 0.16f, 0.7f),
+            new Rect2(0.3f, 0.75f, 0.4f, 0.15f),
+        ],
+        "tool_drill" =>
+        [
+            new Rect2(0.25f, 0.35f, 0.35f, 0.4f),
+            new Rect2(0.6f, 0.45f, 0.3f, 0.18f),
+        ],
+        "tool_wrench" =>
+        [
+            new Rect2(0.42f, 0.1f, 0.16f, 0.65f),
+            new Rect2(0.28f, 0.68f, 0.44f, 0.2f),
+        ],
+        "flashlight" =>
+        [
+            new Rect2(0.4f, 0.35f, 0.2f, 0.55f),
+            new Rect2(0.3f, 0.1f, 0.4f, 0.25f),
+        ],
+        "switch" =>
+        [
+            new Rect2(0.25f, 0.45f, 0.5f, 0.35f),
+            new Rect2(0.42f, 0.25f, 0.16f, 0.2f),
+        ],
+        "battery_unit" =>
+        [
+            new Rect2(0.2f, 0.35f, 0.6f, 0.45f),
+            new Rect2(0.28f, 0.2f, 0.14f, 0.15f),
+            new Rect2(0.58f, 0.2f, 0.14f, 0.15f),
+        ],
+        "recharge_station" =>
+        [
+            new Rect2(0.3f, 0.35f, 0.4f, 0.55f),
+            new Rect2(0.46f, 0.08f, 0.08f, 0.27f),
+        ],
+        "tablet" => [new Rect2(0.15f, 0.38f, 0.7f, 0.22f)],
+        "cartridge" => [new Rect2(0.3f, 0.42f, 0.4f, 0.16f)],
+        "suit_torso" =>
+        [
+            new Rect2(0.32f, 0.3f, 0.36f, 0.55f),
+            new Rect2(0.14f, 0.32f, 0.18f, 0.2f),
+            new Rect2(0.68f, 0.32f, 0.18f, 0.2f),
+        ],
+        "helmet" =>
+        [
+            new Rect2(0.25f, 0.15f, 0.5f, 0.5f),
+            new Rect2(0.32f, 0.55f, 0.36f, 0.18f),
+        ],
+        _ => [FallbackIconRect],
+    };
+
     private static List<MeshInstance3D> PartsFor(string? shapeKind) => shapeKind switch
     {
         "tank" =>

@@ -69,12 +69,13 @@ public partial class InventorySlotUI : Control
     /// the equipped backpack itself is dragged from the Back slot onto them (see _DropData).</summary>
     public Player? PlayerRef { get; set; }
 
-    private ColorRect? _icon;
+    private Control? _icon;
+    private string? _iconItemId;
     private Label? _countLabel;
 
     public override void _Ready()
     {
-        _icon = GetNode<ColorRect>("Icon");
+        _icon = GetNode<Control>("Icon");
         _countLabel = GetNode<Label>("Count");
 
         MouseEntered += OnMouseEntered;
@@ -101,15 +102,56 @@ public partial class InventorySlotUI : Control
         if (CurrentSlot() is not { } occupied)
         {
             _icon.Visible = false;
+            if (_iconItemId is not null)
+            {
+                ClearIconParts();
+                _iconItemId = null;
+            }
+
             _countLabel.Visible = false;
             return;
         }
 
         _icon.Visible = true;
-        _icon.Color = ItemCatalog.Color(occupied.ItemId);
+        if (_iconItemId != occupied.ItemId)
+        {
+            RebuildIconParts(occupied.ItemId);
+            _iconItemId = occupied.ItemId;
+        }
+
         // Skip the redundant "1" on a lone item — only worth showing once there's a real stack.
         _countLabel.Visible = occupied.Count > 1;
         _countLabel.Text = occupied.Count.ToString();
+    }
+
+    /// <summary>Rebuilds the icon's own child rects from this item's shapeKind (see
+    /// ItemVisualBuilder.IconPartsFor) — only called when the occupying item actually changes
+    /// (see Refresh's own _iconItemId tracking), not every _Process tick.</summary>
+    private void RebuildIconParts(string itemId)
+    {
+        ClearIconParts();
+
+        var color = ItemCatalog.Color(itemId);
+        foreach (var rect in ItemVisualBuilder.IconPartsFor(ItemCatalog.ShapeKind(itemId)))
+        {
+            _icon!.AddChild(new ColorRect
+            {
+                Color = color,
+                AnchorLeft = rect.Position.X,
+                AnchorTop = rect.Position.Y,
+                AnchorRight = rect.Position.X + rect.Size.X,
+                AnchorBottom = rect.Position.Y + rect.Size.Y,
+                MouseFilter = MouseFilterEnum.Ignore,
+            });
+        }
+    }
+
+    private void ClearIconParts()
+    {
+        foreach (var child in _icon!.GetChildren())
+        {
+            child.QueueFree();
+        }
     }
 
     private void OnMouseEntered()
@@ -204,8 +246,13 @@ public partial class InventorySlotUI : Control
             return default;
         }
 
-        var preview = new Control();
-        preview.AddChild(new ColorRect { Color = ItemCatalog.Color(slot.ItemId), Size = Size });
+        var preview = new Control { Size = Size };
+        var color = ItemCatalog.Color(slot.ItemId);
+        foreach (var rect in ItemVisualBuilder.IconPartsFor(ItemCatalog.ShapeKind(slot.ItemId)))
+        {
+            preview.AddChild(new ColorRect { Color = color, Position = rect.Position * Size, Size = rect.Size * Size });
+        }
+
         SetDragPreview(preview);
 
         // The source slot itself, not just an index — hand and backpack-contents slots address

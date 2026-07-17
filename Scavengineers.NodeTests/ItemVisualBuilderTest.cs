@@ -149,4 +149,44 @@ public class ItemVisualBuilderTest
 
         AssertFloat(halfHeight).IsEqual(0.15f);
     }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void IconPartsFor_SameShapeKind_ProducesIdenticalRects()
+    {
+        var tankParts = ItemVisualBuilder.IconPartsFor("tank");
+        var sameKindAgain = ItemVisualBuilder.IconPartsFor("tank");
+
+        AssertBool(tankParts.SequenceEqual(sameKindAgain)).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void IconPartsFor_DistinctToolShapeKinds_ProduceDifferentRects()
+    {
+        var crowbarParts = ItemVisualBuilder.IconPartsFor("tool_crowbar");
+        var wrenchParts = ItemVisualBuilder.IconPartsFor("tool_wrench");
+
+        AssertBool(crowbarParts.SequenceEqual(wrenchParts)).IsFalse();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void IconPartsFor_UnknownShapeKind_FallsBackToOneFullCoveringRect()
+    {
+        var parts = ItemVisualBuilder.IconPartsFor("not_a_real_shape_kind");
+
+        AssertInt(parts.Count).IsEqual(1);
+        AssertBool(parts[0] == new Rect2(0f, 0f, 1f, 1f)).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void IconPartsFor_NullShapeKind_FallsBackToOneFullCoveringRect()
+    {
+        var parts = ItemVisualBuilder.IconPartsFor(null);
+
+        AssertInt(parts.Count).IsEqual(1);
+        AssertBool(parts[0] == new Rect2(0f, 0f, 1f, 1f)).IsTrue();
+    }
 }

@@ -247,7 +247,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/LeftHand"]
+[node name="Icon" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots/LeftHand"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -257,7 +257,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/LeftHand"]
 visible = false
@@ -286,7 +285,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/RightHand"]
+[node name="Icon" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots/RightHand"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -296,7 +295,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/RightHand"]
 visible = false
@@ -325,7 +323,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/Back"]
+[node name="Icon" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots/Back"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -335,7 +333,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/Back"]
 visible = false
@@ -365,7 +362,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/Torso"]
+[node name="Icon" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots/Torso"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -375,7 +372,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/Torso"]
 visible = false
@@ -404,7 +400,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/Head"]
+[node name="Icon" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots/Head"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -414,7 +410,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/Head"]
 visible = false
@@ -444,7 +439,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/Pda"]
+[node name="Icon" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots/Pda"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -454,7 +449,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/Pda"]
 visible = false
@@ -483,7 +477,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/Legs"]
+[node name="Icon" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots/Legs"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -493,7 +487,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/Legs"]
 visible = false
@@ -522,7 +515,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/LeftFoot"]
+[node name="Icon" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots/LeftFoot"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -532,7 +525,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/LeftFoot"]
 visible = false
@@ -561,7 +553,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/InventoryPanel/Layout/EquipSlots/RightFoot"]
+[node name="Icon" type="Control" parent="HUD/InventoryPanel/Layout/EquipSlots/RightFoot"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -571,7 +563,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/InventoryPanel/Layout/EquipSlots/RightFoot"]
 visible = false
@@ -629,7 +620,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/DrillWindow/Layout/DrillBatterySlot"]
+[node name="Icon" type="Control" parent="HUD/DrillWindow/Layout/DrillBatterySlot"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -639,7 +630,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/DrillWindow/Layout/DrillBatterySlot"]
 visible = false
@@ -697,7 +687,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/FlashlightWindow/Layout/FlashlightBatterySlot"]
+[node name="Icon" type="Control" parent="HUD/FlashlightWindow/Layout/FlashlightBatterySlot"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -707,7 +697,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/FlashlightWindow/Layout/FlashlightBatterySlot"]
 visible = false
@@ -770,7 +759,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/BackpackWindow/Layout/BackpackGrid/SlotTemplate"]
+[node name="Icon" type="Control" parent="HUD/BackpackWindow/Layout/BackpackGrid/SlotTemplate"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -780,7 +769,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/BackpackWindow/Layout/BackpackGrid/SlotTemplate"]
 visible = false
@@ -842,7 +830,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/SuitWindow/Layout/SuitGrid/Pocket1"]
+[node name="Icon" type="Control" parent="HUD/SuitWindow/Layout/SuitGrid/Pocket1"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -852,7 +840,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/SuitWindow/Layout/SuitGrid/Pocket1"]
 visible = false
@@ -880,7 +867,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/SuitWindow/Layout/SuitGrid/Pocket2"]
+[node name="Icon" type="Control" parent="HUD/SuitWindow/Layout/SuitGrid/Pocket2"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -890,7 +877,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/SuitWindow/Layout/SuitGrid/Pocket2"]
 visible = false
@@ -919,7 +905,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/SuitWindow/Layout/SuitGrid/O2Tank"]
+[node name="Icon" type="Control" parent="HUD/SuitWindow/Layout/SuitGrid/O2Tank"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -929,7 +915,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/SuitWindow/Layout/SuitGrid/O2Tank"]
 visible = false
@@ -958,7 +943,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/SuitWindow/Layout/SuitGrid/N2Tank"]
+[node name="Icon" type="Control" parent="HUD/SuitWindow/Layout/SuitGrid/N2Tank"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -968,7 +953,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/SuitWindow/Layout/SuitGrid/N2Tank"]
 visible = false
@@ -997,7 +981,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/SuitWindow/Layout/SuitGrid/Filter"]
+[node name="Icon" type="Control" parent="HUD/SuitWindow/Layout/SuitGrid/Filter"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -1007,7 +991,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/SuitWindow/Layout/SuitGrid/Filter"]
 visible = false
@@ -1036,7 +1019,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/SuitWindow/Layout/SuitGrid/Battery"]
+[node name="Icon" type="Control" parent="HUD/SuitWindow/Layout/SuitGrid/Battery"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -1046,7 +1029,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/SuitWindow/Layout/SuitGrid/Battery"]
 visible = false
@@ -1108,7 +1090,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 
-[node name="Icon" type="ColorRect" parent="HUD/PdaWindow/Layout/PdaGrid/Cartridge1"]
+[node name="Icon" type="Control" parent="HUD/PdaWindow/Layout/PdaGrid/Cartridge1"]
 visible = false
 layout_mode = 1
 anchor_right = 1.0
@@ -1118,7 +1100,6 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-color = Color(0.6, 0.6, 0.6, 1)
 
 [node name="Count" type="Label" parent="HUD/PdaWindow/Layout/PdaGrid/Cartridge1"]
 visible = false
