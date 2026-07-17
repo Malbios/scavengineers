@@ -1200,6 +1200,13 @@ public partial class Player : CharacterBody3D
             // docs/architecture/locomotion.md describes for the complete game's free-float mode.
             velocity = velocity.MoveToward(Vector3.Zero, ZeroGDrag * (float)delta);
 
+            // Computed once, reused by both the thrust block below and the decompression-pull
+            // block further down — same condition either way: a real jetpack (torso worn, N2
+            // tank charged) means you can actively counter being sucked toward a breach, not just
+            // move under your own power. See the thrust block's own doc comment for why Torso is
+            // checked explicitly rather than just SuitN2 non-null.
+            var hasWorkingThrusters = _inventory.Torso is not null && _inventory.SuitN2 is { HasItem: true, Charge: > 0f };
+
             if (!IsBusy)
             {
                 var thrust = Vector3.Zero;
@@ -1242,7 +1249,7 @@ public partial class Player : CharacterBody3D
                 // tank state is now persistent/decoupled from worn state (see PlayerInventory's
                 // persistent-contents model) — a loaded N2 tank can still exist while the suit
                 // merely sits in a hand.
-                if (thrust != Vector3.Zero && _inventory.Torso is not null && _inventory.SuitN2 is { HasItem: true, Charge: > 0f })
+                if (thrust != Vector3.Zero && hasWorkingThrusters)
                 {
                     velocity += thrust.Normalized() * ZeroGThrustAcceleration * moveMultiplier * (float)delta;
                     _inventory.DrainSpecializedSlot("suit_n2", N2DrainPerSecondWhileThrusting * (float)delta);
@@ -1254,9 +1261,14 @@ public partial class Player : CharacterBody3D
             }
 
             // Not gated on IsNearSurface/IsBusy like thrust above — decompression isn't
-            // something you opt into, it applies to anyone unsecured near an open breach. Full
-            // DecompressionPullAcceleration applies at a constant rate any time inZeroG is true
-            // (i.e. the room is actively vented) — NOT scaled by the room's current Pressure:
+            // something you opt into by pressing a key, it applies to anyone unsecured near an
+            // open breach. It IS gated on hasWorkingThrusters, though: a real jetpack is precisely
+            // the tool that counters rushing air, so a fully-suited player with a charged N2 tank
+            // can hold position/fly against the pull instead of being dragged out regardless of
+            // input — someone without a working suit (no torso, no/empty N2) has no way to resist
+            // it at all, which is what makes an unsecured breach dangerous in the first place.
+            // Full DecompressionPullAcceleration applies at a constant rate any time inZeroG is
+            // true (i.e. the room is actively vented) — NOT scaled by the room's current Pressure:
             // whole-component venting (AtmosphereSystem.Vent) now drives Pressure to near-zero
             // within about a second and it never recovers, so a Pressure-scaled pull would decay
             // to an imperceptible force almost immediately rather than a sustained rushing-air
@@ -1274,7 +1286,7 @@ public partial class Player : CharacterBody3D
             // just because ActiveBreachPositions() lists every breach on the whole ship and the
             // range check alone can't tell "actually reachable by air from here" apart from
             // "happens to be within 5m in a straight line through solid walls."
-            if (_ambientBuildTarget is not null && ambientZone is not null && isConnectedToOutside)
+            if (!hasWorkingThrusters && _ambientBuildTarget is not null && ambientZone is not null && isConnectedToOutside)
             {
                 foreach (var breachPosition in _ambientBuildTarget.ActiveBreachPositions())
                 {
