@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 using Godot;
 using Scavengineers.Scripts.Ship;
@@ -37,6 +38,11 @@ public partial class PickupItem : RigidBody3D, IVerbTarget, IPhysicsPresenceAwar
     // free-float movement is deferred — see docs/project-plan.md) — forward-compatible
     // groundwork only: a frozen, physically-present marker for whenever EVA recovery ships later.
     private const float BreachEjectOffset = 1f;
+
+    // Mirrors Player.cs's own DurableToolIds exactly — duplicated rather than shared, matching
+    // this codebase's existing duplication convention between PickupItem and Player (see
+    // ZeroGSettleDamp/DecompressionPullRange above).
+    private static readonly string[] DurableToolIds = ["crowbar", "power_drill", "wrench"];
 
     private bool _hasSettled;
     private bool _ejected;
@@ -209,6 +215,12 @@ public partial class PickupItem : RigidBody3D, IVerbTarget, IPhysicsPresenceAwar
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 
     public string? DisplayNameKey => "ITEM_" + ItemId.ToUpperInvariant();
+
+    /// <summary>Charge means durability for a durable tool sitting loose on the ground — same
+    /// "same field, different meaning per item" pattern Charge already carries for a battery's
+    /// charge fraction (see PlayerInventory.DamageToolInHand's own doc comment for the held-tool
+    /// side of this). Null for anything else, matching IVerbTarget's default.</summary>
+    public float? Condition => DurableToolIds.Contains(ItemId) ? Charge : null;
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {

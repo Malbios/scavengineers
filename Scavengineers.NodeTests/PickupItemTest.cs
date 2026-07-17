@@ -39,6 +39,24 @@ public class PickupItemTest
 
     [TestCase]
     [RequireGodotRuntime]
+    public void Condition_ReflectsChargeAsDurability_ForADurableToolSittingLoose()
+    {
+        var item = AutoFree(new PickupItem { ItemId = "crowbar", Charge = 0.6f });
+
+        AssertFloat(item.Condition!.Value).IsEqual(0.6f);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void Condition_IsNull_ForAnItemThatIsNotADurableTool()
+    {
+        var item = AutoFree(new PickupItem { ItemId = "scrap_metal", Charge = 0.6f });
+
+        AssertObject(item.Condition).IsNull();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
     public void ContainerPickupItem_UnfreezesAfterFirstPhysicsTick_RegardlessOfRoomVacuumState()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
