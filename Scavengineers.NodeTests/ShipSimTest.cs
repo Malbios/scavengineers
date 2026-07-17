@@ -32,6 +32,38 @@ public class ShipSimTest
 
     [TestCase]
     [RequireGodotRuntime]
+    public void HasHullBreaches_GivesEveryFloorAndCeiling_ARoughStartingHealthBelowFull()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var shipSim = AutoFree(new ShipSim { HasHullBreaches = true });
+        sceneTree.Root.AddChild(shipSim);
+
+        foreach (var cell in shipSim.Deck.Cells)
+        {
+            AssertFloat(shipSim.Deck.FloorHealth(cell)).IsLess(1f);
+            AssertFloat(shipSim.Deck.FloorHealth(cell)).IsGreaterEqual(0.3f);
+            AssertFloat(shipSim.Deck.CeilingHealth(cell)).IsLess(1f);
+            AssertFloat(shipSim.Deck.CeilingHealth(cell)).IsGreaterEqual(0.3f);
+        }
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void NoHullBreaches_LeavesEveryFloorAndCeiling_AtPristineFullHealth()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var shipSim = AutoFree(new ShipSim()); // HasHullBreaches defaults false (e.g. the Home Ship)
+        sceneTree.Root.AddChild(shipSim);
+
+        foreach (var cell in shipSim.Deck.Cells)
+        {
+            AssertFloat(shipSim.Deck.FloorHealth(cell)).IsEqual(1f);
+            AssertFloat(shipSim.Deck.CeilingHealth(cell)).IsEqual(1f);
+        }
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
     public void VolumeAt_ForACellPastThisShipsOwnModeledCorridorLength_ReadsTheNearestModeledNeighbor()
     {
         // Reproduces the crash hit crossing a live airlock: ShipAtmosphereZone.TileAt derives a

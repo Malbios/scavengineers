@@ -243,6 +243,8 @@ public partial class ShipSim : Node, IShipLayoutSaveable
             {
                 Deck.BreachWallEdge(cell, outside);
             }
+
+            SeedStructuralWear();
         }
 
         // Deferring to the next frame guarantees every breach for this ship is already
@@ -352,6 +354,46 @@ public partial class ShipSim : Node, IShipLayoutSaveable
         foreach (var cell in _atmosphere.CellsConnectedToOutside())
         {
             _atmosphere.ApplyExternalVolume(cell, AtmosphereVolume.Vacuum);
+        }
+    }
+
+    // Placeholder/tunable — a found derelict should read as genuinely rough, not pristine: this
+    // spans both the Maintain (>50%) and Repair (<=50%) upkeep tiers (see MaintenanceTier)
+    // rather than sitting comfortably in one, so different tiles on the same wreck can need
+    // different levels of work.
+    private const float MinStartingStructuralHealth = 0.3f;
+    private const float MaxStartingStructuralHealth = 0.9f;
+
+    /// <summary>Gives every floor/ceiling/wall a random starting health in
+    /// [MinStartingStructuralHealth, MaxStartingStructuralHealth] instead of the default pristine
+    /// 1.0 — only called for a ship worth marking HasHullBreaches (currently only the Derelict
+    /// template), which should read as genuinely found-this-way rather than freshly built. Uses
+    /// SetFloorHealth/SetCeilingHealth/SetWallHealth (the no-clamp, no-breach-side-effect
+    /// absolute setters Deck already reserves for exactly this "establish a starting value"
+    /// purpose — see their own doc comments) rather than DamageFloor/etc., which would risk an
+    /// unwanted breach if a low roll landed near 0. Seeding every cell's own edges from all 4
+    /// directions is simpler than tracking which edges will actually get a real wall spawned
+    /// later (a Scripts-layer concern this Sim-layer setup doesn't need to know about) — an edge
+    /// that ends up unsealed/breached just never has its seeded value read at all (see
+    /// ShipBuildTarget's own Condition getter).</summary>
+    private void SeedStructuralWear()
+    {
+        var rng = new RandomNumberGenerator();
+        foreach (var cell in Deck.Cells)
+        {
+            Deck.SetFloorHealth(cell, rng.RandfRange(MinStartingStructuralHealth, MaxStartingStructuralHealth));
+            Deck.SetCeilingHealth(cell, rng.RandfRange(MinStartingStructuralHealth, MaxStartingStructuralHealth));
+
+            foreach (var neighbor in new[]
+            {
+                new CellCoord(cell.X + 1, cell.Y),
+                new CellCoord(cell.X - 1, cell.Y),
+                new CellCoord(cell.X, cell.Y + 1),
+                new CellCoord(cell.X, cell.Y - 1),
+            })
+            {
+                Deck.SetWallHealth(cell, neighbor, rng.RandfRange(MinStartingStructuralHealth, MaxStartingStructuralHealth));
+            }
         }
     }
 
