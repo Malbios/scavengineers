@@ -657,6 +657,20 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
     }
 
+    /// <summary>ToggleLightVerbTarget's own _PhysicsProcess is what keeps RoomLight in sync with
+    /// power while a switch is installed — with no switch node to do that, RoomLight would
+    /// otherwise just freeze at whatever it last showed. Uninstalling the switch isn't cutting the
+    /// wire, just removing the toggle: the light should keep following raw ship power, not go dark
+    /// for no electrical reason. Only takes over while no switch is placed at all — deliberately
+    /// hands off entirely to the switch's own tick (including its manual on/off toggle) otherwise.</summary>
+    public override void _PhysicsProcess(double delta)
+    {
+        if (RoomLight is not null && !_placedMachines.ContainsKey(MachineType.Switch))
+        {
+            RoomLight.Visible = ShipSimRef?.IsPowered(ShipSim.BatteryFixtureId) ?? false;
+        }
+    }
+
     /// <summary>Turns ShipSimRef's own procedurally-generated LootSpawns into real world
     /// PickupItems — reuses InventoryOverflow.DropAt (already used for refund/scrap-yield
     /// overflow), which builds each pickup's own visual from its ItemId (see
@@ -2193,14 +2207,6 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 break;
             case MachineType.Switch:
                 ShipSimRef?.RemoveSwitch();
-                // ToggleLightVerbTarget's own _PhysicsProcess is what keeps RoomLight's
-                // visibility in sync with power state — with its node gone, nothing would ever
-                // update RoomLight again, leaving it frozen in whatever state it was last in
-                // (e.g. still lit after a later battery removal).
-                if (RoomLight is not null)
-                {
-                    RoomLight.Visible = false;
-                }
                 break;
             case MachineType.RechargeStation:
                 ShipSimRef?.RemoveRechargeStation();
