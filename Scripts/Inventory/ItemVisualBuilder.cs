@@ -44,6 +44,19 @@ public static class ItemVisualBuilder
         return root;
     }
 
+    /// <summary>Half this item's own vertical collision extent — used to nudge a raycast-resolved
+    /// world-drop position far enough above a resting surface that the item doesn't spawn already
+    /// embedded (and, for a shape tall enough, past a thin floor panel's own collision entirely —
+    /// see Player.RestingDropPosition). Reuses BuildCollisionShape's own dimensions rather than a
+    /// second hand-maintained table, so the two can never drift apart.</summary>
+    public static float RestingHalfHeight(string? shapeKind) => BuildCollisionShape(shapeKind) switch
+    {
+        BoxShape3D box => box.Size.Y / 2f,
+        CylinderShape3D cylinder => cylinder.Height / 2f,
+        SphereShape3D sphere => sphere.Radius,
+        _ => FallbackBoxSize.Y / 2f,
+    };
+
     /// <summary>A single Shape3D roughly matching this item's own visual silhouette — an
     /// approximation (one shape, not a compound matching every primitive), not a physically exact
     /// collider.</summary>

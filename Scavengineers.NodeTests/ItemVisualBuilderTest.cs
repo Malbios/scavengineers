@@ -110,4 +110,43 @@ public class ItemVisualBuilderTest
 
         AssertBool(shape is CylinderShape3D).IsTrue();
     }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void RestingHalfHeight_MatchesHalfOfTheBoxShapeSActualHeight()
+    {
+        // suit_torso's own BoxShape3D is Size.Y = 0.3 — this is the exact regression case (a
+        // dropped EVA suit torso spawning embedded past the floor's own thin collision and
+        // falling straight through) this helper exists to prevent.
+        var halfHeight = ItemVisualBuilder.RestingHalfHeight("suit_torso");
+
+        AssertFloat(halfHeight).IsEqual(0.15f);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void RestingHalfHeight_ForACylinderShape_IsHalfItsOwnHeight()
+    {
+        var halfHeight = ItemVisualBuilder.RestingHalfHeight("tank");
+
+        AssertFloat(halfHeight).IsEqual(0.215f);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void RestingHalfHeight_ForASphereShape_IsItsOwnRadius()
+    {
+        var halfHeight = ItemVisualBuilder.RestingHalfHeight("helmet");
+
+        AssertFloat(halfHeight).IsEqual(0.15f);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void RestingHalfHeight_UnknownShapeKind_FallsBackToHalfTheFallbackBoxHeight()
+    {
+        var halfHeight = ItemVisualBuilder.RestingHalfHeight("not_a_real_shape_kind");
+
+        AssertFloat(halfHeight).IsEqual(0.15f);
+    }
 }

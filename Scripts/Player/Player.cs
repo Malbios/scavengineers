@@ -874,7 +874,7 @@ public partial class Player : CharacterBody3D
             if (_inventory.EjectSpecializedSlotForWorld(source.SpecializedSlotKey) is { } charge
                 && PlayerInventory.SpecializedSlotAcceptedItemId(source.SpecializedSlotKey) is { } itemId)
             {
-                InventoryOverflow.DropAt(this, itemId, 1, position, charge);
+                InventoryOverflow.DropAt(this, itemId, 1, RestingDropPosition(position, itemId), charge);
             }
 
             return;
@@ -908,12 +908,12 @@ public partial class Player : CharacterBody3D
             container.SetSlot(source.SlotIndex, null);
             _inventory.DiscardPersistentContents(slot.ItemId);
             var (o2, n2, filter, battery) = CaptureAndDetachSuitTanks(ItemCatalog.EquipSlot(slot.ItemId) == "torso");
-            SpawnDroppedContainer(slot.ItemId, persistentContents, position, null, o2, n2, filter, battery);
+            SpawnDroppedContainer(slot.ItemId, persistentContents, RestingDropPosition(position, slot.ItemId), null, o2, n2, filter, battery);
             return;
         }
 
         container.SetSlot(source.SlotIndex, null);
-        InventoryOverflow.DropAt(this, slot.ItemId, slot.Count, position, slot.Charge);
+        InventoryOverflow.DropAt(this, slot.ItemId, slot.Count, RestingDropPosition(position, slot.ItemId), slot.Charge);
     }
 
     /// <summary>Always drops the backpack (empty or not) at `position` — unlike
@@ -930,7 +930,7 @@ public partial class Player : CharacterBody3D
 
         _inventory.ClearBackpack();
         _inventory.DiscardPersistentContents(backpack.ItemId);
-        SpawnDroppedContainer(backpack.ItemId, backpack.Contents, position, "back");
+        SpawnDroppedContainer(backpack.ItemId, backpack.Contents, RestingDropPosition(position, backpack.ItemId), "back");
     }
 
     /// <summary>Same "always drops it, deliberate put-down, genuine discard" shape as
@@ -948,7 +948,7 @@ public partial class Player : CharacterBody3D
         _inventory.DiscardPersistentContents(equipped.ItemId);
         var (o2, n2, filter, battery) = CaptureAndDetachSuitTanks(slotName == "torso");
 
-        SpawnDroppedContainer(equipped.ItemId, equipped.Contents, position, slotName, o2, n2, filter, battery);
+        SpawnDroppedContainer(equipped.ItemId, equipped.Contents, RestingDropPosition(position, equipped.ItemId), slotName, o2, n2, filter, battery);
     }
 
     /// <summary>Projects a ray from the camera through the drop's screen position — the first
@@ -973,9 +973,25 @@ public partial class Player : CharacterBody3D
             return null;
         }
 
-        // Nudge off the surface along its normal so the item doesn't spawn half-embedded.
+        // Nudge off the surface along its normal so the item doesn't spawn half-embedded — a
+        // small fixed amount, enough to dodge z-fighting on any surface. NOT enough clearance on
+        // its own for a tall item to avoid spawning past a thin floor panel's own collision shape
+        // entirely (see RestingDropPosition, which every actual spawn call site adds on top of
+        // this for the specific item being dropped).
         return (Vector3)result["position"] + (Vector3)result["normal"] * 0.05f;
     }
+
+    /// <summary>Adds this item's own collision half-height (see ItemVisualBuilder.RestingHalfHeight)
+    /// on top of ResolveWorldDropPosition's own small fixed surface nudge — without this, a tall
+    /// item (e.g. the EVA suit torso, ContainerPickupItem's "suit_torso" shapeKind) can spawn
+    /// already embedded past a thin floor panel's own collision shape entirely, so instead of
+    /// being pushed back out it just falls straight through the moment its one-tick startup
+    /// freeze lifts. Assumes "up" for this extra nudge (every drop in this ship-grid game is
+    /// effectively onto a floor) rather than the raycast's own surface normal — gravity settles
+    /// the item onto whatever it's actually resting near regardless; this only prevents spawning
+    /// catastrophically embedded.</summary>
+    private static Vector3 RestingDropPosition(Vector3 surfacePosition, string itemId) =>
+        surfacePosition + Vector3.Up * ItemVisualBuilder.RestingHalfHeight(ItemCatalog.ShapeKind(itemId));
 
     /// <summary>Test harnesses that instantiate a real Player (see
     /// Scavengineers.NodeTests/PlayerTestHarness.cs) run inside a real, non-headless Godot
