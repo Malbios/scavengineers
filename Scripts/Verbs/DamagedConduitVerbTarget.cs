@@ -55,17 +55,6 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, IStat
     [Export]
     public GpuParticles3D? SmokeParticles { get; set; }
 
-    /// <summary>Generic dropped-item visual for the Scrap yield, if it doesn't fully fit in the
-    /// player's inventory — see InventoryOverflow.</summary>
-    [Export]
-    public Mesh? DroppedItemMesh { get; set; }
-
-    [Export]
-    public Shape3D? DroppedItemShape { get; set; }
-
-    [Export]
-    public Material? DroppedItemMaterial { get; set; }
-
     [Export]
     public string SaveId { get; set; } = "";
 
@@ -182,9 +171,9 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, IStat
         if (_pendingState == ConduitState.Scrapped)
         {
             var added = inventory?.Add("scrap_metal", 1) ?? 0;
-            if (added < 1 && DroppedItemMesh is not null && DroppedItemShape is not null)
+            if (added < 1)
             {
-                InventoryOverflow.DropAt(this, "scrap_metal", 1 - added, DroppedItemMesh, DroppedItemShape, DroppedItemMaterial);
+                InventoryOverflow.DropAt(this, "scrap_metal", 1 - added);
             }
         }
     }

@@ -252,19 +252,6 @@ public partial class Player : CharacterBody3D
     private ColorRect? _coldOverlay;
     private ColorRect? _burnOverlay;
 
-    /// <summary>The generic dropped-item visual (same box mesh + per-item material-override
-    /// pattern InventoryOverflow.DropAt and ShipBuildTarget's own refunds already use) — reused
-    /// here for a dropped, contents-full backpack (see SpawnDroppedBackpack). Wired in World.tscn
-    /// to the same shared sub-resources.</summary>
-    [Export]
-    public Mesh? DroppedItemMesh { get; set; }
-
-    [Export]
-    public Shape3D? DroppedItemShape { get; set; }
-
-    [Export]
-    public Material? DroppedItemMaterial { get; set; }
-
     /// <summary>The death fallback's reload target — SaveManager already holds the reverse
     /// PlayerRef (World.tscn), this is the same reference the other way round.</summary>
     [Export]
@@ -844,13 +831,13 @@ public partial class Player : CharacterBody3D
 
     /// <summary>Spawns a full container's world representation at `position` — used both for an
     /// unequip-while-full drop (see TryUnequipBackpack) and by SaveManager to respawn dropped
-    /// containers on load. Reuses the same generic dropped-item visual
-    /// (Mesh/Shape/Material pattern InventoryOverflow.DropAt and ShipBuildTarget's own refunds
-    /// already use) via this Player's own wired exports. `equipSlotName` defaults to a
-    /// catalog-derived guess (see EquipSlotNameFor) for a caller with no better information (e.g.
-    /// SaveManager) — pass it explicitly wherever it's already known. The 4 tank params are only
-    /// ever non-null for a genuinely-discarded EVA suit (see CaptureAndDetachSuitTanks) — null
-    /// for a plain backpack drop.</summary>
+    /// containers on load. The container's own _Ready() (fired synchronously by AddChild, since
+    /// the tree is already running) builds its own visual/collision from ItemId via
+    /// ItemVisualBuilder — nothing else needed here. `equipSlotName` defaults to a catalog-derived
+    /// guess (see EquipSlotNameFor) for a caller with no better information (e.g. SaveManager) —
+    /// pass it explicitly wherever it's already known. The 4 tank params are only ever non-null
+    /// for a genuinely-discarded EVA suit (see CaptureAndDetachSuitTanks) — null for a plain
+    /// backpack drop.</summary>
     public void SpawnDroppedContainer(string itemId, SlotContainer contents, Vector3 position, string? equipSlotName = null,
         (bool HasItem, float Charge)? suitO2 = null, (bool HasItem, float Charge)? suitN2 = null,
         (bool HasItem, float Charge)? suitFilter = null, (bool HasItem, float Charge)? suitBattery = null)
@@ -867,12 +854,6 @@ public partial class Player : CharacterBody3D
         };
         GetParent()?.AddChild(pickup);
         pickup.GlobalPosition = position;
-
-        var meshInstance = new MeshInstance3D { Mesh = DroppedItemMesh };
-        meshInstance.SetSurfaceOverrideMaterial(0, ItemCatalog.TintedMaterial(itemId, DroppedItemMaterial));
-        pickup.AddChild(meshInstance);
-
-        pickup.AddChild(new CollisionShape3D { Shape = DroppedItemShape });
     }
 
     // Placeholder/tunable — how far you can reach to place a dropped item.
@@ -893,7 +874,7 @@ public partial class Player : CharacterBody3D
             if (_inventory.EjectSpecializedSlotForWorld(source.SpecializedSlotKey) is { } charge
                 && PlayerInventory.SpecializedSlotAcceptedItemId(source.SpecializedSlotKey) is { } itemId)
             {
-                InventoryOverflow.DropAt(this, itemId, 1, DroppedItemMesh!, DroppedItemShape!, DroppedItemMaterial, position, charge);
+                InventoryOverflow.DropAt(this, itemId, 1, position, charge);
             }
 
             return;
@@ -932,7 +913,7 @@ public partial class Player : CharacterBody3D
         }
 
         container.SetSlot(source.SlotIndex, null);
-        InventoryOverflow.DropAt(this, slot.ItemId, slot.Count, DroppedItemMesh!, DroppedItemShape!, DroppedItemMaterial, position, slot.Charge);
+        InventoryOverflow.DropAt(this, slot.ItemId, slot.Count, position, slot.Charge);
     }
 
     /// <summary>Always drops the backpack (empty or not) at `position` — unlike

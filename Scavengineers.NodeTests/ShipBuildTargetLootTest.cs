@@ -44,8 +44,6 @@ public class ShipBuildTargetLootTest
             ShipSimRef = shipSim,
             ShipRoot = shipRoot,
             GenerateLoot = true,
-            DroppedItemMesh = new BoxMesh(),
-            DroppedItemShape = new BoxShape3D(),
         };
         shipRoot.AddChild(buildTarget);
 
@@ -87,8 +85,6 @@ public class ShipBuildTargetLootTest
             ShipSimRef = shipSim,
             ShipRoot = shipRoot,
             GenerateLoot = false,
-            DroppedItemMesh = new BoxMesh(),
-            DroppedItemShape = new BoxShape3D(),
         };
         shipRoot.AddChild(buildTarget);
 

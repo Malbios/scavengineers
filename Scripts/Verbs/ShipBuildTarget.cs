@@ -507,19 +507,6 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public Light3D? RoomLight { get; set; }
 
-    /// <summary>Generic dropped-item visual (reused for every item id) — used by AddOrDrop when a
-    /// refund/scrap yield doesn't fully fit in the player's inventory, see InventoryOverflow.
-    /// Same shared box PickupItem's own pre-placed world instances already use, just wired here
-    /// too since a runtime-spawned pickup has no scene-authored mesh child of its own.</summary>
-    [Export]
-    public Mesh? DroppedItemMesh { get; set; }
-
-    [Export]
-    public Shape3D? DroppedItemShape { get; set; }
-
-    [Export]
-    public Material? DroppedItemMaterial { get; set; }
-
     [Export]
     public string SaveId { get; set; } = "";
 
@@ -672,11 +659,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     /// <summary>Turns ShipSimRef's own procedurally-generated LootSpawns into real world
     /// PickupItems — reuses InventoryOverflow.DropAt (already used for refund/scrap-yield
-    /// overflow) with the same DroppedItemMesh/Shape/Material every ship scene already wires, so
-    /// this needs no new visual/spawn code of its own.</summary>
+    /// overflow), which builds each pickup's own visual from its ItemId (see
+    /// ItemVisualBuilder/PickupItem), so this needs no visual/spawn code of its own.</summary>
     private void SpawnGeneratedLoot()
     {
-        if (ShipSimRef is null || DroppedItemMesh is null || DroppedItemShape is null)
+        if (ShipSimRef is null)
         {
             return;
         }
@@ -684,7 +671,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         foreach (var loot in ShipSimRef.LootSpawns)
         {
             var worldPosition = TileWorldPosition(new Vector2I(loot.TileX, loot.TileY), LootRestHeight);
-            InventoryOverflow.DropAt(this, loot.ItemId, loot.Count, DroppedItemMesh, DroppedItemShape, DroppedItemMaterial, worldPosition);
+            InventoryOverflow.DropAt(this, loot.ItemId, loot.Count, worldPosition);
         }
     }
 
@@ -1759,9 +1746,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
 
         var added = inventory.Add(itemId, count);
-        if (added < count && DroppedItemMesh is not null && DroppedItemShape is not null)
+        if (added < count)
         {
-            InventoryOverflow.DropAt(this, itemId, count - added, DroppedItemMesh, DroppedItemShape, DroppedItemMaterial);
+            InventoryOverflow.DropAt(this, itemId, count - added);
         }
     }
 
