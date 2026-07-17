@@ -215,17 +215,7 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 script = ExtResource("4")
 TitleBar = NodePath("Layout/TitleBar")
-CloseButton = NodePath("CloseButton")
-
-[node name="CloseButton" type="Button" parent="HUD/InventoryPanel"]
-layout_mode = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -22.0
-offset_top = 2.0
-offset_right = -2.0
-offset_bottom = 22.0
-text = "X"
+CloseButton = NodePath("Layout/TitleBar/CloseButton")
 
 [node name="Layout" type="VBoxContainer" parent="HUD/InventoryPanel"]
 layout_mode = 2
@@ -237,6 +227,18 @@ mouse_filter = 0
 theme_override_styles/normal = SubResource("HudLabelBackground")
 text = "INVENTORY"
 horizontal_alignment = 1
+
+[node name="CloseButton" type="Button" parent="HUD/InventoryPanel/Layout/TitleBar"]
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -18.0
+offset_top = 1.0
+offset_right = -2.0
+offset_bottom = -1.0
+text = "X"
 
 [node name="EquipSlots" type="HBoxContainer" parent="HUD/InventoryPanel/Layout"]
 layout_mode = 2
@@ -603,17 +605,7 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 script = ExtResource("4")
 TitleBar = NodePath("Layout/TitleBar")
-CloseButton = NodePath("CloseButton")
-
-[node name="CloseButton" type="Button" parent="HUD/DrillWindow"]
-layout_mode = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -22.0
-offset_top = 2.0
-offset_right = -2.0
-offset_bottom = 22.0
-text = "X"
+CloseButton = NodePath("Layout/TitleBar/CloseButton")
 
 [node name="Layout" type="VBoxContainer" parent="HUD/DrillWindow"]
 layout_mode = 2
@@ -625,6 +617,18 @@ mouse_filter = 0
 theme_override_styles/normal = SubResource("HudLabelBackground")
 text = "DRILL BATTERY"
 horizontal_alignment = 1
+
+[node name="CloseButton" type="Button" parent="HUD/DrillWindow/Layout/TitleBar"]
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -18.0
+offset_top = 1.0
+offset_right = -2.0
+offset_bottom = -1.0
+text = "X"
 
 [node name="DrillBatterySlot" type="Control" parent="HUD/DrillWindow/Layout" node_paths=PackedStringArray("Tooltip")]
 custom_minimum_size = Vector2(40, 40)
@@ -681,17 +685,7 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 script = ExtResource("4")
 TitleBar = NodePath("Layout/TitleBar")
-CloseButton = NodePath("CloseButton")
-
-[node name="CloseButton" type="Button" parent="HUD/FlashlightWindow"]
-layout_mode = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -22.0
-offset_top = 2.0
-offset_right = -2.0
-offset_bottom = 22.0
-text = "X"
+CloseButton = NodePath("Layout/TitleBar/CloseButton")
 
 [node name="Layout" type="VBoxContainer" parent="HUD/FlashlightWindow"]
 layout_mode = 2
@@ -703,6 +697,18 @@ mouse_filter = 0
 theme_override_styles/normal = SubResource("HudLabelBackground")
 text = "FLASHLIGHT BATTERY"
 horizontal_alignment = 1
+
+[node name="CloseButton" type="Button" parent="HUD/FlashlightWindow/Layout/TitleBar"]
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -18.0
+offset_top = 1.0
+offset_right = -2.0
+offset_bottom = -1.0
+text = "X"
 
 [node name="FlashlightBatterySlot" type="Control" parent="HUD/FlashlightWindow/Layout" node_paths=PackedStringArray("Tooltip")]
 custom_minimum_size = Vector2(40, 40)
@@ -759,17 +765,7 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 script = ExtResource("4")
 TitleBar = NodePath("Layout/TitleBar")
-CloseButton = NodePath("CloseButton")
-
-[node name="CloseButton" type="Button" parent="HUD/BackpackWindow"]
-layout_mode = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -22.0
-offset_top = 2.0
-offset_right = -2.0
-offset_bottom = 22.0
-text = "X"
+CloseButton = NodePath("Layout/TitleBar/CloseButton")
 
 [node name="Layout" type="VBoxContainer" parent="HUD/BackpackWindow"]
 layout_mode = 2
@@ -781,6 +777,18 @@ mouse_filter = 0
 theme_override_styles/normal = SubResource("HudLabelBackground")
 text = "BACKPACK"
 horizontal_alignment = 1
+
+[node name="CloseButton" type="Button" parent="HUD/BackpackWindow/Layout/TitleBar"]
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -18.0
+offset_top = 1.0
+offset_right = -2.0
+offset_bottom = -1.0
+text = "X"
 
 [node name="BackpackGrid" type="GridContainer" parent="HUD/BackpackWindow/Layout"]
 visible = false
@@ -842,17 +850,7 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 script = ExtResource("4")
 TitleBar = NodePath("Layout/TitleBar")
-CloseButton = NodePath("CloseButton")
-
-[node name="CloseButton" type="Button" parent="HUD/SuitWindow"]
-layout_mode = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -22.0
-offset_top = 2.0
-offset_right = -2.0
-offset_bottom = 22.0
-text = "X"
+CloseButton = NodePath("Layout/TitleBar/CloseButton")
 
 [node name="Layout" type="VBoxContainer" parent="HUD/SuitWindow"]
 layout_mode = 2
@@ -864,6 +862,18 @@ mouse_filter = 0
 theme_override_styles/normal = SubResource("HudLabelBackground")
 text = "EVA SUIT"
 horizontal_alignment = 1
+
+[node name="CloseButton" type="Button" parent="HUD/SuitWindow/Layout/TitleBar"]
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -18.0
+offset_top = 1.0
+offset_right = -2.0
+offset_bottom = -1.0
+text = "X"
 
 [node name="SuitGrid" type="GridContainer" parent="HUD/SuitWindow/Layout"]
 layout_mode = 2
@@ -1113,17 +1123,7 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("HudLabelBackground")
 script = ExtResource("4")
 TitleBar = NodePath("Layout/TitleBar")
-CloseButton = NodePath("CloseButton")
-
-[node name="CloseButton" type="Button" parent="HUD/PdaWindow"]
-layout_mode = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -22.0
-offset_top = 2.0
-offset_right = -2.0
-offset_bottom = 22.0
-text = "X"
+CloseButton = NodePath("Layout/TitleBar/CloseButton")
 
 [node name="Layout" type="VBoxContainer" parent="HUD/PdaWindow"]
 layout_mode = 2
@@ -1135,6 +1135,18 @@ mouse_filter = 0
 theme_override_styles/normal = SubResource("HudLabelBackground")
 text = "PDA"
 horizontal_alignment = 1
+
+[node name="CloseButton" type="Button" parent="HUD/PdaWindow/Layout/TitleBar"]
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -18.0
+offset_top = 1.0
+offset_right = -2.0
+offset_bottom = -1.0
+text = "X"
 
 [node name="PdaGrid" type="GridContainer" parent="HUD/PdaWindow/Layout"]
 layout_mode = 2
