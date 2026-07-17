@@ -2193,6 +2193,14 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 break;
             case MachineType.Switch:
                 ShipSimRef?.RemoveSwitch();
+                // ToggleLightVerbTarget's own _PhysicsProcess is what keeps RoomLight's
+                // visibility in sync with power state — with its node gone, nothing would ever
+                // update RoomLight again, leaving it frozen in whatever state it was last in
+                // (e.g. still lit after a later battery removal).
+                if (RoomLight is not null)
+                {
+                    RoomLight.Visible = false;
+                }
                 break;
             case MachineType.RechargeStation:
                 ShipSimRef?.RemoveRechargeStation();

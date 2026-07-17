@@ -115,6 +115,53 @@ public class ShipBuildTargetFixtureUpkeepTest
 
     [TestCase]
     [RequireGodotRuntime]
+    public async Task UninstallingTheSwitch_TurnsOffTheRoomLight_SoItDoesNotStayStuckOnAfterwards()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+
+        // Not MakeHarness — ShipSim only ever builds a PowerSystem at all when HasPowerGrid is
+        // set (see ShipSim._Ready), and that has to be set before the node enters the tree, which
+        // MakeHarness doesn't leave room for. None of this suite's other tests need real power.
+        var shipRoot = AutoFree(new Node3D());
+        sceneTree.Root.AddChild(shipRoot);
+
+        var shipSim = new ShipSim { HasPowerGrid = true };
+        shipRoot.AddChild(shipSim);
+
+        var buildTarget = new ShipBuildTarget { ShipSimRef = shipSim, ShipRoot = shipRoot };
+        shipRoot.AddChild(buildTarget);
+
+        buildTarget.RoomLight = AutoFree(new OmniLight3D());
+
+        // A real charged battery + closed switch, both on the same edge — matches how the
+        // existing battery/switch fixture tests each place a single machine there. Needed so the
+        // light is legitimately on (driven by ToggleLightVerbTarget's own _PhysicsProcess) before
+        // the switch is removed, rather than just asserting on a value nothing ever set.
+        buildTarget.ApplyBuildState(new BuildTargetSaveData
+        {
+            Machines =
+            [
+                new MachineCoord("battery", 0, 0, 1, 0, "1"),
+                new MachineCoord("switch", 0, 0, 1, 0, null),
+            ],
+        });
+
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.1), SceneTreeTimer.SignalName.Timeout);
+        AssertBool(buildTarget.RoomLight!.Visible).IsTrue();
+
+        var switchNode = buildTarget.GetChildren().OfType<ToggleLightVerbTarget>().Single();
+        switchNode.ExecuteVerb(new Verb("uninstall_switch", "VERB_UNINSTALL_SWITCH", DurationSeconds: 0.2f) { IsDestructive = true }, inventory: null!);
+
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+
+        // Regression: ToggleLightVerbTarget's own _PhysicsProcess is what keeps RoomLight synced
+        // with power state — once its node is freed, nothing else ever updates RoomLight again,
+        // so it must be turned off at removal time rather than left in whatever state it had.
+        AssertBool(buildTarget.RoomLight!.Visible).IsFalse();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
     public void RechargeStationVerbTarget_OffersRepairVerb_AndReportsCondition_WhenItsFixtureIsDamaged()
     {
         var (buildTarget, shipSim) = MakeHarness((SceneTree)Engine.GetMainLoop());
