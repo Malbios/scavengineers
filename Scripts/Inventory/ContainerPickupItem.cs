@@ -61,6 +61,10 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget, IPhysicsPre
 
     public override void _Ready()
     {
+        var shapeKind = ItemCatalog.ShapeKind(ItemId);
+        AddChild(ItemVisualBuilder.BuildVisual(ItemId, shapeKind));
+        AddChild(new CollisionShape3D { Shape = ItemVisualBuilder.BuildCollisionShape(shapeKind) });
+
         AddToGroup("dropped_container");
         LinearDamp = ZeroGSettleDamp;
         AngularDamp = ZeroGSettleDamp;

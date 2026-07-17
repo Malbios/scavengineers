@@ -80,6 +80,13 @@ public static class ItemCatalog
     public static bool FitsInStorage(string itemId) =>
         !Items.TryGetValue(itemId, out var item) || item.FitsInStorage;
 
+    /// <summary>Which primitive-composition kind ItemVisualBuilder should use for this item's
+    /// world-pickup visual/collision shape — null (the default, and the fallback for an unknown
+    /// item id) falls back to ItemVisualBuilder's own plain-box default, same safe-fallback
+    /// spirit as <see cref="MaxStackSize"/>.</summary>
+    public static string? ShapeKind(string itemId) =>
+        Items.TryGetValue(itemId, out var item) ? item.ShapeKind : null;
+
     private static Dictionary<string, ItemDefinition> Items => _items ??= Load();
 
     /// <summary>Test-only seam: lets Scavengineers.Scripts.Tests seed the catalog directly,
@@ -128,5 +135,8 @@ public static class ItemCatalog
 
         [JsonPropertyName("fitsInStorage")]
         public bool FitsInStorage { get; set; } = true;
+
+        [JsonPropertyName("shapeKind")]
+        public string? ShapeKind { get; set; }
     }
 }

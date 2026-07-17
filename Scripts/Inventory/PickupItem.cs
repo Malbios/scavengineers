@@ -61,6 +61,10 @@ public partial class PickupItem : RigidBody3D, IVerbTarget, IPhysicsPresenceAwar
 
     public override void _Ready()
     {
+        var shapeKind = ItemCatalog.ShapeKind(ItemId);
+        AddChild(ItemVisualBuilder.BuildVisual(ItemId, shapeKind));
+        AddChild(new CollisionShape3D { Shape = ItemVisualBuilder.BuildCollisionShape(shapeKind) });
+
         LinearDamp = ZeroGSettleDamp;
         AngularDamp = ZeroGSettleDamp;
 
