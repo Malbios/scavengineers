@@ -286,7 +286,7 @@ public partial class Player : CharacterBody3D
     /// TryEquipBackpackFromHand) — no dedicated verb needed to buy or hold one. "ration_bar"/
     /// "water_bottle" are likewise ordinary holdable items until F consumes whichever's held
     /// (see UseHeldItem) — no dedicated equip path either.</summary>
-    public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell", "battery", "switch", "recharge_station", "backpack", "ration_bar", "water_bottle", "wrench", "pda", "health_scan_cartridge"];
+    public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell", "battery", "switch", "recharge_station", "thruster", "n2_tank", "backpack", "ration_bar", "water_bottle", "wrench", "pda", "health_scan_cartridge"];
 
     private enum Hand { Left, Right }
 

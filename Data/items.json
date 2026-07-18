@@ -6,6 +6,7 @@
   { "id": "battery", "maxStackSize": 1, "color": "#E6990D", "shapeKind": "battery_unit" },
   { "id": "switch", "maxStackSize": 5, "color": "#E6261A", "shapeKind": "switch" },
   { "id": "recharge_station", "maxStackSize": 1, "color": "#1ACCB3", "shapeKind": "recharge_station" },
+  { "id": "thruster", "maxStackSize": 5, "color": "#FF8533", "shapeKind": "thruster" },
   { "id": "backpack", "maxStackSize": 1, "color": "#7A5230", "shapeKind": "bag" },
   { "id": "ration_bar", "maxStackSize": 10, "color": "#C9A356", "hungerRestore": 40, "shapeKind": "bar" },
   { "id": "water_bottle", "maxStackSize": 10, "color": "#4FA8D8", "thirstRestore": 40, "shapeKind": "bottle" },

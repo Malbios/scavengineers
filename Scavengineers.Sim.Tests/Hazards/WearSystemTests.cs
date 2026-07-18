@@ -39,6 +39,21 @@ public class WearSystemTests
     }
 
     [Fact]
+    public void Tick_NeverDecaysAThrusterFixture_ConditionMeansN2ChargeThereNotWear()
+    {
+        var deck = new Deck();
+        var cell = new CellCoord(0, 0);
+        deck.AddCell(cell);
+        deck.AddFixture(new ThrusterFixture("thruster", cell, FixtureSurface.WallInner));
+        var wear = new WearSystem(deck);
+
+        wear.Tick(3600);
+
+        var thruster = deck.Fixtures.Single(f => f.Id == "thruster");
+        Assert.Equal(1f, thruster.Condition);
+    }
+
+    [Fact]
     public void Tick_DecaysFloorAndCeilingHealth_ForEveryPresentCell()
     {
         var deck = new Deck();

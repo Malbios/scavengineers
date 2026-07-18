@@ -1,6 +1,10 @@
+using System.Threading.Tasks;
+
 using GdUnit4;
 using Godot;
 using Scavengineers.Scripts.Ship;
+using Scavengineers.Sim.Grid;
+using Scavengineers.Sim.ShipModel;
 
 using static GdUnit4.Assertions;
 
@@ -145,5 +149,67 @@ public class TravelConsoleVerbTargetTest
         console.BeginTravel(1);
 
         AssertBool(console.CurrentVerbProgress is not null).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task BeginTravel_WithFueledThrusters_ProgressesFasterThanWithNone()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (bareConsole, _, _) = CreateConsole(sceneTree, 1);
+        var (fueledConsole, _, _) = CreateConsole(sceneTree, 1);
+
+        fueledConsole.ShipSimRef!.InstallThruster("t1", new CellCoord(0, 0), FixtureSurface.WallInner);
+        fueledConsole.ShipSimRef!.InstallThruster("t2", new CellCoord(2, 0), FixtureSurface.WallInner);
+        fueledConsole.ShipSimRef!.InstallThruster("t3", new CellCoord(4, 0), FixtureSurface.WallInner);
+
+        bareConsole.BeginTravel(1);
+        fueledConsole.BeginTravel(1);
+
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.5), SceneTreeTimer.SignalName.Timeout);
+
+        // Same elapsed real time, but the fueled console's own trip is much shorter (3 fueled
+        // thrusters hits MinTravelSeconds via BaseTravelSeconds - 3*ReductionPerThruster), so its
+        // progress fraction must be further along than the unfueled console's own still-mostly-
+        // BaseTravelSeconds-long trip.
+        AssertFloat(fueledConsole.CurrentVerbProgress!.Value).IsGreater(bareConsole.CurrentVerbProgress!.Value);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task BeginTravel_ThrustersAtZeroCharge_DoNotCountTowardTheSpeedBonus()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (bareConsole, _, _) = CreateConsole(sceneTree, 1);
+        var (emptyThrusterConsole, _, _) = CreateConsole(sceneTree, 1);
+
+        emptyThrusterConsole.ShipSimRef!.InstallThruster("t1", new CellCoord(0, 0), FixtureSurface.WallInner);
+        emptyThrusterConsole.ShipSimRef!.SetThrusterCharge("t1", 0f);
+
+        bareConsole.BeginTravel(1);
+        emptyThrusterConsole.BeginTravel(1);
+
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.5), SceneTreeTimer.SignalName.Timeout);
+
+        AssertFloat(emptyThrusterConsole.CurrentVerbProgress!.Value).IsEqual(bareConsole.CurrentVerbProgress!.Value);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task Traveling_DrainsEveryFueledThrustersN2_ButLeavesAnAlreadyEmptyOneAtZero()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (console, _, _) = CreateConsole(sceneTree, 1);
+
+        console.ShipSimRef!.InstallThruster("fueled", new CellCoord(0, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.InstallThruster("empty", new CellCoord(2, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.SetThrusterCharge("empty", 0f);
+
+        console.BeginTravel(1);
+
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+
+        AssertFloat(console.ShipSimRef!.ThrusterChargeFraction("fueled")).IsLess(1f);
+        AssertFloat(console.ShipSimRef!.ThrusterChargeFraction("empty")).IsEqual(0f);
     }
 }

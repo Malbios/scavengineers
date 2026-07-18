@@ -29,11 +29,23 @@ namespace Scavengineers.Scripts.Ship;
 /// </summary>
 public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IStateSaveable
 {
-    // Placeholder/tunable — dropped to near-instant for testing, was 4s for "a real beat."
+    // TravelVerb.DurationSeconds only seeds _travelTimer's default before the first real
+    // BeginTravel call recomputes WaitTime from the formula below.
     private static readonly Verb TravelVerb = new("travel", "VERB_TRAVEL", DurationSeconds: 0.2f);
+
+    // Placeholder/tunable — base travel duration before thruster reduction, restoring the
+    // original "a real beat" value (previously dropped to near-instant for testing) now that
+    // installed+fueled thrusters make the duration mean something (see BeginTravel).
+    private const float BaseTravelSeconds = 4f;
+    private const float ReductionPerThruster = 1f;
+    private const float MinTravelSeconds = 1f;
 
     // Placeholder/tunable, matching SuitResources's drain-constant convention.
     private const float BatteryDrainPerSecond = 0.05f;
+
+    // Placeholder/tunable — independent per thruster, so N fueled thrusters drain N times as
+    // fast in total (no shared pool).
+    private const float ThrusterDrainPerSecond = 0.02f;
 
     // Same two-tier upkeep as everything else with a Deck-tracked Condition (see
     // MaintenanceTier) — this console's own fixture (ShipSim.TravelConsoleFixtureId) has been
@@ -182,6 +194,17 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         if (_traveling)
         {
             ShipSimRef?.DrainBattery(BatteryDrainPerSecond * (float)delta);
+
+            if (ShipSimRef is not null)
+            {
+                foreach (var thruster in ShipSimRef.Deck.Fixtures.OfType<ThrusterFixture>())
+                {
+                    if (thruster.Condition > 0f)
+                    {
+                        thruster.Condition = Math.Max(0f, thruster.Condition - ThrusterDrainPerSecond * (float)delta);
+                    }
+                }
+            }
         }
     }
 
@@ -252,7 +275,13 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 
         _pendingDestination = destinationId;
         _traveling = true;
-        _travelTimer!.Start();
+
+        // Computed once at the start of the trip, not re-evaluated mid-flight — matches
+        // DrainBattery's own existing behavior of having zero effect on an already-running timer
+        // if the battery empties mid-trip.
+        var fueledCount = ShipSimRef?.Deck.Fixtures.OfType<ThrusterFixture>().Count(f => f.Condition > 0f) ?? 0;
+        _travelTimer!.WaitTime = Math.Max(MinTravelSeconds, BaseTravelSeconds - fueledCount * ReductionPerThruster);
+        _travelTimer.Start();
     }
 
     public int CurrentDestinationId => _currentDestination;

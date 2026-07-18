@@ -59,6 +59,7 @@ VERB_EXTEND_FLOOR,Extend Floor,Boden erweitern
 ITEM_BATTERY,Battery,Batterie
 ITEM_SWITCH,Switch,Schalter
 ITEM_RECHARGE_STATION,Recharge Station,Ladestation
+ITEM_THRUSTER,Thruster,Triebwerk
 VERB_INSTALL_BATTERY,Install Battery,Batterie einbauen
 VERB_UNINSTALL_BATTERY,Uninstall Battery,Batterie ausbauen
 VERB_SCRAP_BATTERY,Scrap Battery,Batterie verschrotten
@@ -68,6 +69,11 @@ VERB_SCRAP_SWITCH,Scrap Switch,Schalter verschrotten
 VERB_INSTALL_RECHARGE_STATION,Install Recharge Station,Ladestation einbauen
 VERB_UNINSTALL_RECHARGE_STATION,Uninstall Recharge Station,Ladestation ausbauen
 VERB_SCRAP_RECHARGE_STATION,Scrap Recharge Station,Ladestation verschrotten
+OBJECT_THRUSTER,Thruster,Triebwerk
+VERB_INSTALL_THRUSTER,Install Thruster,Triebwerk einbauen
+VERB_UNINSTALL_THRUSTER,Uninstall Thruster,Triebwerk ausbauen
+VERB_SCRAP_THRUSTER,Scrap Thruster,Triebwerk verschrotten
+VERB_REFUEL_THRUSTER,Refuel Thruster,Triebwerk auftanken
 ITEM_BACKPACK,Backpack,Rucksack
 ITEM_RATION_BAR,Ration Bar,Nahrungsriegel
 ITEM_WATER_BOTTLE,Water Bottle,Wasserflasche

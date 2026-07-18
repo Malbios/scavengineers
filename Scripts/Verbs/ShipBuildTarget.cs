@@ -183,6 +183,18 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private static readonly Verb UninstallRechargeStationVerb = new("uninstall_recharge_station", "VERB_UNINSTALL_RECHARGE_STATION", DurationSeconds: 0.2f) { IsDestructive = true };
     private static readonly Verb ScrapRechargeStationVerb = new("scrap_recharge_station", "VERB_SCRAP_RECHARGE_STATION", DurationSeconds: 0.2f) { IsDestructive = true };
 
+    // Thruster — same Install/Uninstall/Scrap shape as Battery/Switch/RechargeStation above, but
+    // NOT MachineType-based (see _placedThrusters): many can be installed at once, one per edge.
+    // Its own Refuel verb lives on ThrusterVerbTarget instead, mirroring how Battery's Recharge
+    // verb lives on BatteryVerbTarget rather than here.
+    private static readonly Verb InstallThrusterVerb = new("install_thruster", "VERB_INSTALL_THRUSTER", DurationSeconds: 0.2f)
+    {
+        Requirements = [new ItemRequirement("thruster", 1)],
+    };
+
+    private static readonly Verb UninstallThrusterVerb = new("uninstall_thruster", "VERB_UNINSTALL_THRUSTER", DurationSeconds: 0.2f) { IsDestructive = true };
+    private static readonly Verb ScrapThrusterVerb = new("scrap_thruster", "VERB_SCRAP_THRUSTER", DurationSeconds: 0.2f) { IsDestructive = true };
+
     // How close (in meters) the aim point needs to be to a tile boundary before it resolves to
     // that edge instead of the tile itself — half of this margin on each side of every boundary.
     private const float EdgeMargin = 0.25f;
@@ -256,6 +268,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private const float SwitchRoomOffset = 0.1f;
     private const float RechargeStationHeight = 0.5f;
     private const float RechargeStationRoomOffset = 0.3f;
+    private const float ThrusterHeight = 1f;
+    private const float ThrusterRoomOffset = 0.1f;
 
     // The 4 cardinal neighbor tiles a floor conduit checks for its connection-aware shape (see
     // BuildFloorConduitVisual) — AlongX says whether that direction's arm needs the 90-degree
@@ -321,6 +335,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         InstallMachine,
         UninstallMachine,
         ScrapMachine,
+        InstallThruster,
+        UninstallThruster,
+        ScrapThruster,
         MaintainFloor,
         RepairFloor,
         MaintainCeiling,
@@ -501,6 +518,15 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public Material? RechargeStationMaterial { get; set; }
 
+    [Export]
+    public Mesh? ThrusterMesh { get; set; }
+
+    [Export]
+    public Shape3D? ThrusterShape { get; set; }
+
+    [Export]
+    public Material? ThrusterMaterial { get; set; }
+
     /// <summary>The Home Ship's single room light — wired directly to a dynamically spawned
     /// Switch's own TargetLight, since it's no longer a fixed sibling node the switch's own
     /// scene declaration can NodePath to.</summary>
@@ -525,6 +551,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// singular _battery field and fixed Switch/RechargeFixtureId — installing a second one
     /// elsewhere isn't offered while one already exists (see ResolveAvailableVerbs).</summary>
     private readonly Dictionary<MachineType, (CellCoord EdgeA, CellCoord EdgeB, Node3D Node)> _placedMachines = new();
+
+    /// <summary>Unlike <see cref="_placedMachines"/>, many thrusters can exist at once — keyed by
+    /// <see cref="Deck.Normalize"/> of the mounting edge (not the raw aim-resolved _edgeA/_edgeB
+    /// pair) so aiming at the same interior wall from either side resolves to the same entry
+    /// instead of allowing a duplicate install on the far side.</summary>
+    private readonly Dictionary<(CellCoord, CellCoord), ThrusterVerbTarget> _placedThrusters = new();
 
     private Timer? _cycleTimer;
     private MeshInstance3D? _ghost;
@@ -1258,6 +1290,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             yield break;
         }
 
+        // Thrusters aren't MachineType-based (see _placedThrusters) and are keyed by the
+        // normalized edge, unlike _edgeA/_edgeB's raw aim-resolved pair — check this edge for one
+        // first, same "occupied here means only Uninstall/Scrap, no stacking" rule Battery/Switch/
+        // RechargeStation already apply to each other below.
+        if (_placedThrusters.ContainsKey(Deck.Normalize(_edgeA, _edgeB)))
+        {
+            yield return UninstallThrusterVerb;
+            yield return ScrapThrusterVerb;
+            yield break;
+        }
+
         var here = _placedMachines.FirstOrDefault(kv => kv.Value.EdgeA == _edgeA && kv.Value.EdgeB == _edgeB);
         if (here.Value.Node is not null)
         {
@@ -1275,6 +1318,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         {
             yield return InstallVerbFor(type);
         }
+
+        // No "already placed anywhere" cap, unlike the loop above — that's the whole point of
+        // thrusters over the single-instance MachineType system.
+        yield return InstallThrusterVerb;
     }
 
     private static Verb InstallVerbFor(MachineType type) => type switch
@@ -1368,6 +1415,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     internal IReadOnlyList<Verb> MachineRemovalVerbs(MachineType type) =>
         _placedMachines.ContainsKey(type) ? [UninstallVerbFor(type), ScrapVerbFor(type)] : [];
 
+    /// <summary>Same idea as <see cref="MachineRemovalVerbs"/> for thrusters — a thruster's own
+    /// ThrusterVerbTarget exists only while installed, so this is unconditional (unlike
+    /// MachineRemovalVerbs' placement check, which guards against a MachineType that might not be
+    /// placed at all).</summary>
+    internal IReadOnlyList<Verb> ThrusterRemovalVerbs => [UninstallThrusterVerb, ScrapThrusterVerb];
+
     /// <summary>Same idea as <see cref="MachineRemovalVerbs"/>, for the Maintain/Repair pair — a
     /// machine's own VerbTarget script (ToggleLightVerbTarget, RechargeStationVerbTarget) merges
     /// this into its own AvailableVerbs too. Empty for Battery (see <see
@@ -1417,6 +1470,40 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         _pendingMachineType = type;
         _pendingEdgeA = placed.EdgeA;
         _pendingEdgeB = placed.EdgeB;
+        _pendingInventory = inventory;
+        _cycling = true;
+        _cycleTimer!.Start();
+    }
+
+    /// <summary>Counterpart to <see cref="ExecuteMachineRemoval"/> for thrusters — exposed so
+    /// ThrusterVerbTarget's own Uninstall/Scrap verbs (aimed at the thruster's own collider, not
+    /// this edge) can dispatch through the same cycle-timer mechanism. Takes the edge explicitly,
+    /// since thrusters aren't MachineType-keyed and ThrusterVerbTarget already knows its own
+    /// mounting edge.</summary>
+    internal void ExecuteThrusterRemoval(CellCoord edgeA, CellCoord edgeB, Verb verb, PlayerInventory inventory)
+    {
+        if (_cycling || !_placedThrusters.ContainsKey(Deck.Normalize(edgeA, edgeB)))
+        {
+            return;
+        }
+
+        PendingAction action;
+        if (verb.Id == UninstallThrusterVerb.Id)
+        {
+            action = PendingAction.UninstallThruster;
+        }
+        else if (verb.Id == ScrapThrusterVerb.Id)
+        {
+            action = PendingAction.ScrapThruster;
+        }
+        else
+        {
+            return;
+        }
+
+        _pendingAction = action;
+        _pendingEdgeA = edgeA;
+        _pendingEdgeB = edgeB;
         _pendingInventory = inventory;
         _cycling = true;
         _cycleTimer!.Start();
@@ -1484,6 +1571,23 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         if (IsMachineVerb(verb))
         {
             ExecuteMachineVerb(verb, inventory);
+            return;
+        }
+
+        if (verb.Id == InstallThrusterVerb.Id)
+        {
+            _pendingAction = PendingAction.InstallThruster;
+            _pendingEdgeA = _edgeA;
+            _pendingEdgeB = _edgeB;
+            _pendingInventory = inventory;
+            _cycling = true;
+            _cycleTimer!.Start();
+            return;
+        }
+
+        if (verb.Id == UninstallThrusterVerb.Id || verb.Id == ScrapThrusterVerb.Id)
+        {
+            ExecuteThrusterRemoval(_edgeA, _edgeB, verb, inventory);
             return;
         }
 
@@ -1715,6 +1819,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             case PendingAction.ScrapMachine:
                 RemoveMachine(_pendingMachineType);
                 AddOrDrop(inventory, "scrap_metal", ScrapYieldFor(_pendingMachineType));
+                break;
+            case PendingAction.InstallThruster:
+                InstallThruster(_pendingEdgeA, _pendingEdgeB);
+                break;
+            case PendingAction.UninstallThruster:
+                RemoveThruster(_pendingEdgeA, _pendingEdgeB);
+                AddOrDrop(inventory, "thruster", 1);
+                break;
+            case PendingAction.ScrapThruster:
+                RemoveThruster(_pendingEdgeA, _pendingEdgeB);
+                AddOrDrop(inventory, "scrap_metal", ThrusterScrapYield);
                 break;
             case PendingAction.MaintainFloor:
             case PendingAction.RepairFloor:
@@ -2191,6 +2306,66 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         _placedMachines[MachineType.RechargeStation] = (edgeA, edgeB, node);
     }
 
+    // Placeholder/tunable — roughly matches Switch/RechargeStation's own ScrapYieldFor tier.
+    private const int ThrusterScrapYield = 2;
+
+    /// <summary>Unlike Battery/Switch/RechargeStation's single fixed constant id, each installed
+    /// thruster needs its own — derived from its normalized mounting edge so it's stable and
+    /// reproducible from either side of the wall (see _placedThrusters).</summary>
+    private static string ThrusterFixtureId(CellCoord edgeA, CellCoord edgeB)
+    {
+        var (a, b) = Deck.Normalize(edgeA, edgeB);
+        return $"thruster_{a.X}_{a.Y}_{b.X}_{b.Y}";
+    }
+
+    /// <summary>Same shape as <see cref="InstallBattery"/>/etc, but not MachineType-based — see
+    /// <see cref="_placedThrusters"/>. <paramref name="savedState"/> is the thruster's own N2
+    /// charge fraction, stringified (see ThrusterVerbTarget.ApplySaveState).</summary>
+    private void InstallThruster(CellCoord edgeA, CellCoord edgeB, string? savedState = null)
+    {
+        var nearTile = new Vector2I(edgeA.X, edgeA.Y);
+        var (position, rotation) = WallMountTransform(edgeA, edgeB, nearTile, ThrusterHeight, ThrusterRoomOffset);
+        var fixtureId = ThrusterFixtureId(edgeA, edgeB);
+
+        var node = new ThrusterVerbTarget
+        {
+            ShipSimRef = ShipSimRef,
+            BuildTarget = this,
+            FixtureId = fixtureId,
+            EdgeA = edgeA,
+            EdgeB = edgeB,
+        };
+        AddChild(node);
+        node.Position = position;
+        node.RotationDegrees = rotation;
+
+        var mesh = new MeshInstance3D { Mesh = ThrusterMesh };
+        mesh.SetSurfaceOverrideMaterial(0, ThrusterMaterial);
+        node.AddChild(mesh);
+
+        node.AddChild(new CollisionShape3D { Shape = ThrusterShape });
+
+        ShipSimRef!.InstallThruster(fixtureId, edgeA, FixtureSurface.WallInner);
+
+        if (savedState is not null)
+        {
+            node.ApplySaveState(savedState);
+        }
+
+        _placedThrusters[Deck.Normalize(edgeA, edgeB)] = node;
+    }
+
+    private void RemoveThruster(CellCoord edgeA, CellCoord edgeB)
+    {
+        if (!_placedThrusters.Remove(Deck.Normalize(edgeA, edgeB), out var node))
+        {
+            return;
+        }
+
+        ShipSimRef?.RemoveThruster(node.FixtureId);
+        node.QueueFree();
+    }
+
     private void RemoveMachine(MachineType type)
     {
         if (!_placedMachines.Remove(type, out var placed))
@@ -2523,6 +2698,16 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             data.Machines.Add(new MachineCoord(ItemIdFor(type), placed.EdgeA.X, placed.EdgeA.Y, placed.EdgeB.X, placed.EdgeB.Y, MachineStateOf(type, placed.Node), machineHealth));
         }
 
+        // Thrusters share the same flat Machines list (Type "thruster") rather than a dedicated
+        // field — MachineCoord already supports arbitrary rows and multiple entries of the same
+        // Type, so no BuildTargetSaveData schema change is needed for "many instead of one."
+        // Condition is left at its default (1f): ThrusterFixture is excluded from wear, same as
+        // Battery, so there's nothing but charge (State) to round-trip.
+        foreach (var (edge, node) in _placedThrusters)
+        {
+            data.Machines.Add(new MachineCoord("thruster", edge.Item1.X, edge.Item1.Y, edge.Item2.X, edge.Item2.Y, node.GetSaveState()));
+        }
+
         foreach (var cell in _extendedCells)
         {
             data.ExtendedCells.Add(new TileCoord(cell.X, cell.Y));
@@ -2659,6 +2844,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
         foreach (var machine in state.Machines)
         {
+            if (machine.Type == "thruster")
+            {
+                InstallThruster(new CellCoord(machine.EdgeAX, machine.EdgeAY), new CellCoord(machine.EdgeBX, machine.EdgeBY), machine.State);
+                continue;
+            }
+
             if (MachineTypeFromItemId(machine.Type) is not { } type)
             {
                 GD.PushWarning($"[ShipBuildTarget] Save references unknown machine type '{machine.Type}' — skipping.");
@@ -2714,6 +2905,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         foreach (var type in _placedMachines.Keys.ToList())
         {
             RemoveMachine(type);
+        }
+
+        foreach (var (a, b) in _placedThrusters.Keys.ToList())
+        {
+            RemoveThruster(a, b);
         }
 
         // A load that doesn't include a previously-extended cell must actually remove it —

@@ -29,6 +29,8 @@ public partial class VendorVerbTarget : StaticBody3D, IVerbTarget
         ["battery"] = (40, 15),
         ["switch"] = (10, 4),
         ["recharge_station"] = (30, 12),
+        ["thruster"] = (25, 10),
+        ["n2_tank"] = (15, 6),
         ["backpack"] = (25, 10),
         ["ration_bar"] = (8, 3),
         ["water_bottle"] = (6, 2),

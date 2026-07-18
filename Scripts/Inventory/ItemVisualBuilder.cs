@@ -78,6 +78,7 @@ public static class ItemVisualBuilder
         "switch" => new BoxShape3D { Size = new Vector3(0.12f, 0.09f, 0.1f) },
         "battery_unit" => new BoxShape3D { Size = new Vector3(0.18f, 0.17f, 0.1f) },
         "recharge_station" => new BoxShape3D { Size = new Vector3(0.16f, 0.45f, 0.14f) },
+        "thruster" => new BoxShape3D { Size = new Vector3(0.2f, 0.18f, 0.32f) },
         "tablet" => new BoxShape3D { Size = new Vector3(0.18f, 0.02f, 0.28f) },
         "cartridge" => new BoxShape3D { Size = new Vector3(0.08f, 0.015f, 0.12f) },
         "suit_torso" => new BoxShape3D { Size = new Vector3(0.4f, 0.3f, 0.14f) },
@@ -166,6 +167,11 @@ public static class ItemVisualBuilder
             new Rect2(0.3f, 0.35f, 0.4f, 0.55f),
             new Rect2(0.46f, 0.08f, 0.08f, 0.27f),
         ],
+        "thruster" =>
+        [
+            new Rect2(0.25f, 0.5f, 0.5f, 0.3f),
+            new Rect2(0.35f, 0.2f, 0.3f, 0.35f),
+        ],
         "tablet" => [new Rect2(0.15f, 0.38f, 0.7f, 0.22f)],
         "cartridge" => [new Rect2(0.3f, 0.42f, 0.4f, 0.16f)],
         "suit_torso" =>
@@ -249,6 +255,11 @@ public static class ItemVisualBuilder
         [
             Box(new Vector3(0.16f, 0.3f, 0.14f), Vector3.Zero),
             Cylinder(0.01f, 0.01f, 0.15f, new Vector3(0, 0.225f, 0)),
+        ],
+        "thruster" =>
+        [
+            Box(new Vector3(0.16f, 0.16f, 0.1f), Vector3.Zero),
+            Cylinder(0.1f, 0.06f, 0.18f, new Vector3(0, 0, 0.14f), new Vector3(90, 0, 0)),
         ],
         "tablet" => [Box(new Vector3(0.18f, 0.02f, 0.28f), Vector3.Zero)],
         "cartridge" => [Box(new Vector3(0.08f, 0.015f, 0.12f), Vector3.Zero)],

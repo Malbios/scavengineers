@@ -46,3 +46,12 @@ public sealed class MachineFixture(string id, CellCoord tile, FixtureSurface sur
 /// </summary>
 public sealed class BatteryFixture(string id, CellCoord tile, FixtureSurface surface)
     : Fixture(id, tile, surface);
+
+/// <summary>
+/// A player-installable ship engine block. Same "Condition overloaded as charge, not wear" idea
+/// as <see cref="BatteryFixture"/> — here it's the block's own internal N2 tank fraction, drained
+/// during travel rather than by passive wear. Unlike Battery there can be many of these on a ship
+/// at once, one per installed thruster (see ShipBuildTarget's own per-edge tracking).
+/// </summary>
+public sealed class ThrusterFixture(string id, CellCoord tile, FixtureSurface surface)
+    : Fixture(id, tile, surface);

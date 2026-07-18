@@ -518,4 +518,35 @@ public partial class ShipSim : Node, IShipLayoutSaveable
         Deck.AddFixture(new MachineFixture(RechargeFixtureId, cell, surface));
 
     public void RemoveRechargeStation() => Deck.RemoveFixture(RechargeFixtureId);
+
+    // Thrusters take a caller-supplied id rather than a single fixed constant (unlike
+    // Battery/Switch/RechargeStation above) — there can be many installed at once, one per
+    // edge ShipBuildTarget tracks in its own _placedThrusters (see that class for the id shape).
+    public void InstallThruster(string id, CellCoord cell, FixtureSurface surface) =>
+        Deck.AddFixture(new ThrusterFixture(id, cell, surface) { Condition = 1f });
+
+    public void RemoveThruster(string id) => Deck.RemoveFixture(id);
+
+    public void RechargeThruster(string id, float amount)
+    {
+        if (Deck.Fixtures.FirstOrDefault(f => f.Id == id) is ThrusterFixture thruster)
+        {
+            thruster.Condition = Mathf.Clamp(thruster.Condition + amount, 0f, 1f);
+        }
+    }
+
+    public void SetThrusterCharge(string id, float value)
+    {
+        if (Deck.Fixtures.FirstOrDefault(f => f.Id == id) is ThrusterFixture thruster)
+        {
+            thruster.Condition = Mathf.Clamp(value, 0f, 1f);
+        }
+    }
+
+    /// <summary>0-1 charge fraction for a specific thruster's own N2 tank — 0 if the given id
+    /// isn't (or is no longer) an installed thruster. Draining during travel reads/writes
+    /// ThrusterFixture.Condition directly off Deck.Fixtures instead of going through here (see
+    /// TravelConsoleVerbTarget) since that loop already holds a live fixture reference.</summary>
+    public float ThrusterChargeFraction(string id) =>
+        Deck.Fixtures.FirstOrDefault(f => f.Id == id) is ThrusterFixture thruster ? thruster.Condition : 0f;
 }
