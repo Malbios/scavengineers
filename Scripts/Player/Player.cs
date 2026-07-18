@@ -2166,6 +2166,7 @@ public partial class Player : CharacterBody3D
         }
 
         _pdaCartridgeSlot!.Container = pdaContents;
+        _pdaCartridgeSlot2!.Container = pdaContents;
 
         // Unlike the backpack/suit/pda contents above (reached by itemId, always safe to
         // dereference), _openThruster is a live Node reference that Uninstall/Scrap can

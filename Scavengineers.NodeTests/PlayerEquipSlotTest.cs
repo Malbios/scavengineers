@@ -543,5 +543,11 @@ public class PlayerEquipSlotTest
         var cartridgeSlot = player.GetNode<InventorySlotUI>("HUD/PdaWindow/Layout/PdaGrid/Cartridge1");
         AssertBool(ReferenceEquals(cartridgeSlot.Container, player.Inventory.GetPersistentContents("pda"))).IsTrue();
         AssertBool(cartridgeSlot.Container!.CountOf("health_scan_cartridge") == 1).IsTrue();
+
+        // The second cartridge pocket (power_scan_cartridge) must be wired up the exact same
+        // way — a real bug this test would have caught: it was left permanently un-bound
+        // (Container always null), silently rejecting any drag-and-drop into it.
+        var cartridgeSlot2 = player.GetNode<InventorySlotUI>("HUD/PdaWindow/Layout/PdaGrid/Cartridge2");
+        AssertBool(ReferenceEquals(cartridgeSlot2.Container, player.Inventory.GetPersistentContents("pda"))).IsTrue();
     }
 }
