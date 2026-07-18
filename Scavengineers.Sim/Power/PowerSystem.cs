@@ -68,8 +68,12 @@ public sealed class PowerSystem : IConnectivityGraph<PowerNodeId>
     private Fixture? FindFixture(PowerNodeId node) =>
         _deck.Fixtures.FirstOrDefault(f => f.Id == node.Value);
 
+    // A Thruster's own conductivity is charge-gated, unlike every other type here — an empty
+    // thruster isn't being used, so it neither draws power itself nor relays it to anything
+    // wired only through it (see ShipSim.IsPowered's own callers in TravelConsoleVerbTarget).
     private static bool IsConductive(Fixture fixture) =>
-        fixture is ConduitFixture or SwitchFixture or MachineFixture or BatteryFixture or ThrusterFixture;
+        fixture is ConduitFixture or SwitchFixture or MachineFixture or BatteryFixture ||
+        fixture is ThrusterFixture { Condition: > 0f };
 
     private static bool IsOpenSwitch(Fixture fixture) =>
         fixture is SwitchFixture { IsOpen: true };

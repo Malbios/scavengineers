@@ -199,7 +199,9 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
             {
                 foreach (var thruster in ShipSimRef.Deck.Fixtures.OfType<ThrusterFixture>())
                 {
-                    if (thruster.Condition > 0f && ShipSimRef.IsPowered(thruster.Id))
+                    // IsPowered alone already implies charge (see PowerSystem.IsConductive) — no
+                    // separate Condition check needed.
+                    if (ShipSimRef.IsPowered(thruster.Id))
                     {
                         thruster.Condition = Math.Max(0f, thruster.Condition - ThrusterDrainPerSecond * (float)delta);
                     }
@@ -265,7 +267,9 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 
     /// <summary>Called back from the travel map (via Player.ConfirmTravel) once a destination is
     /// picked and confirmed — the actual timed-travel trigger. A no-op for the destination
-    /// already occupied, an out-of-range id, or while a travel is already in flight.</summary>
+    /// already occupied, an out-of-range id, while a travel is already in flight, or (see
+    /// fueledCount below) with no working thruster at all — the ship physically can't fly without
+    /// at least one.</summary>
     public void BeginTravel(int destinationId)
     {
         if (_traveling || destinationId == _currentDestination || destinationId < 0 || destinationId > DerelictCount)
@@ -273,13 +277,19 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
             return;
         }
 
-        _pendingDestination = destinationId;
-        _traveling = true;
-
         // Computed once at the start of the trip, not re-evaluated mid-flight — matches
         // DrainBattery's own existing behavior of having zero effect on an already-running timer
-        // if the battery empties mid-trip.
-        var fueledCount = ShipSimRef?.Deck.Fixtures.OfType<ThrusterFixture>().Count(f => f.Condition > 0f && ShipSimRef!.IsPowered(f.Id)) ?? 0;
+        // if the battery empties mid-trip. IsPowered alone already implies charge (see
+        // PowerSystem.IsConductive's own charge-gating for ThrusterFixture), so no separate
+        // Condition check is needed here.
+        var fueledCount = ShipSimRef?.Deck.Fixtures.OfType<ThrusterFixture>().Count(f => ShipSimRef!.IsPowered(f.Id)) ?? 0;
+        if (fueledCount == 0)
+        {
+            return;
+        }
+
+        _pendingDestination = destinationId;
+        _traveling = true;
         _travelTimer!.WaitTime = Math.Max(MinTravelSeconds, BaseTravelSeconds - fueledCount * ReductionPerThruster);
         _travelTimer.Start();
     }

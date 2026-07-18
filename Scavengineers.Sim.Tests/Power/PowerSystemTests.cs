@@ -99,6 +99,35 @@ public class PowerSystemTests
     }
 
     [Fact]
+    public void ThrusterFixtureWithNoCharge_IsNeverPowered_EvenWhenDirectlyAdjacentToASource()
+    {
+        var deck = new Deck();
+        deck.AddFixture(new BatteryFixture("battery-fixture", new CellCoord(0, 0), FixtureSurface.WallInner));
+        deck.AddFixture(new ThrusterFixture("dead-thruster", new CellCoord(1, 0), FixtureSurface.WallInner) { Condition = 0f });
+
+        var system = new PowerSystem(deck);
+        system.MarkSource(new PowerNodeId("battery-fixture"));
+
+        Assert.False(system.IsPowered(new PowerNodeId("dead-thruster")));
+    }
+
+    [Fact]
+    public void ThrusterFixtureWithNoCharge_DoesNotRelayPowerToWhateversWiredBeyondIt()
+    {
+        var deck = new Deck();
+        deck.AddFixture(new BatteryFixture("battery-fixture", new CellCoord(0, 0), FixtureSurface.WallInner));
+        deck.AddFixture(new ThrusterFixture("dead-thruster", new CellCoord(1, 0), FixtureSurface.WallInner) { Condition = 0f });
+        deck.AddFixture(new MachineFixture("lamp", new CellCoord(2, 0), FixtureSurface.CeilingUnderside));
+
+        var system = new PowerSystem(deck);
+        system.MarkSource(new PowerNodeId("battery-fixture"));
+
+        // Not being used means it neither draws power itself (covered above) nor conducts it
+        // through to whatever's wired only via it — the dead thruster breaks this chain.
+        Assert.False(system.IsPowered(new PowerNodeId("lamp")));
+    }
+
+    [Fact]
     public void NodeNotConnectedToAnySource_IsNotPowered()
     {
         var deck = new Deck();

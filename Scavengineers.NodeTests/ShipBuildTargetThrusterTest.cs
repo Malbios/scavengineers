@@ -147,6 +147,12 @@ public class ShipBuildTargetThrusterTest
         // actually connect back to the seeded battery+switch, not just that the thrusters exist
         // visually — the automated version of "hook them up to the already existing wires."
         AssertBool(thrusters.All(t => shipSim.IsPowered(t.Id))).IsTrue();
+
+        // Requirement 3: genuinely fueled, not just numerically charged — each engine's own
+        // ThrusterVerbTarget.Contents holds a full physical n2_tank, not just Condition == 1.
+        var thrusterNodes = buildTarget.GetChildren().OfType<ThrusterVerbTarget>().ToList();
+        AssertInt(thrusterNodes.Count).IsEqual(2);
+        AssertBool(thrusterNodes.All(t => t.Contents.Slots[0] is { ItemId: "n2_tank", Charge: >= 0.999f })).IsTrue();
     }
 
     [TestCase]

@@ -991,8 +991,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             InstallBattery(BatteryEdge.A, BatteryEdge.B, savedState: null);
             InstallSwitch(SwitchEdge.A, SwitchEdge.B, savedState: null);
             InstallRechargeStation(RechargeStationEdge.A, RechargeStationEdge.B, savedState: null);
-            InstallThruster(ThrusterEdge1.A, ThrusterEdge1.B, savedState: null);
-            InstallThruster(ThrusterEdge2.A, ThrusterEdge2.B, savedState: null);
+            // Full engine charge AND a full docked N2 tank ("1|n2_tank|1" — see
+            // ThrusterVerbTarget.ApplySaveState's own pipe-delimited format) — unlike a fresh
+            // player-bought install (which now starts empty, see ShipSim.InstallThruster), the
+            // Home Ship's own two engines start genuinely fueled, not just numerically charged.
+            InstallThruster(ThrusterEdge1.A, ThrusterEdge1.B, savedState: "1|n2_tank|1");
+            InstallThruster(ThrusterEdge2.A, ThrusterEdge2.B, savedState: "1|n2_tank|1");
 
             // Wire the whole default layout together (see DefaultConduitRoute) — real,
             // player-removable conduits through the same InstallConduit a player's own wiring

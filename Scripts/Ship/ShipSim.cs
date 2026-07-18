@@ -522,8 +522,12 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     // Thrusters take a caller-supplied id rather than a single fixed constant (unlike
     // Battery/Switch/RechargeStation above) — there can be many installed at once, one per
     // edge ShipBuildTarget tracks in its own _placedThrusters (see that class for the id shape).
+    // Starts at Condition = 0f (empty), not full — a freshly installed thruster has no fuel until
+    // a real N2 tank is docked in its own ThrusterVerbTarget.Contents; ShipBuildTarget's own
+    // ApplySaveState/SeedDefaultShipLayout callers override this via an explicit savedState when
+    // a real charge (and tank) should carry over.
     public void InstallThruster(string id, CellCoord cell, FixtureSurface surface) =>
-        Deck.AddFixture(new ThrusterFixture(id, cell, surface) { Condition = 1f });
+        Deck.AddFixture(new ThrusterFixture(id, cell, surface) { Condition = 0f });
 
     public void RemoveThruster(string id) => Deck.RemoveFixture(id);
 

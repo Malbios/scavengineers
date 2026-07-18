@@ -147,7 +147,13 @@ public class TravelConsoleVerbTargetTest
     public void BeginTravel_ToADifferentDestination_StartsTraveling()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
-        var (console, _, _) = CreateConsole(sceneTree, 2);
+        var (console, _, _) = CreateConsole(sceneTree, 2, homeShipHasPowerGrid: true);
+
+        // At least one working thruster is now mandatory for BeginTravel to succeed at all (see
+        // BeginTravel_WithNoFueledThrusters_RefusesToStartTraveling below).
+        console.ShipSimRef!.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.SetThrusterCharge("t1", 1f);
 
         console.BeginTravel(1);
 
@@ -156,30 +162,51 @@ public class TravelConsoleVerbTargetTest
 
     [TestCase]
     [RequireGodotRuntime]
-    public async Task BeginTravel_WithFueledThrusters_ProgressesFasterThanWithNone()
+    public void BeginTravel_WithNoFueledThrusters_RefusesToStartTraveling()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
-        var (bareConsole, _, _) = CreateConsole(sceneTree, 1);
-        var (fueledConsole, _, _) = CreateConsole(sceneTree, 1, homeShipHasPowerGrid: true);
+        var (console, _, _) = CreateConsole(sceneTree, 1); // no power, no thrusters at all
+
+        console.BeginTravel(1);
+
+        // Same observable shape as every other rejected BeginTravel call — nothing happens.
+        AssertBool(console.CurrentVerbProgress is null).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task BeginTravel_WithMoreFueledThrusters_ProgressesFasterThanWithJustOne()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (oneThrusterConsole, _, _) = CreateConsole(sceneTree, 1, homeShipHasPowerGrid: true);
+        var (threeThrusterConsole, _, _) = CreateConsole(sceneTree, 1, homeShipHasPowerGrid: true);
 
         // A chain of Manhattan-adjacent fixtures back to the battery — no conduit needed, the
         // same direct-adjacency shortcut Battery+Switch's own default placement already relies
         // on (see ShipBuildTarget.BatteryEdge/SwitchEdge's doc comment).
-        fueledConsole.ShipSimRef!.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
-        fueledConsole.ShipSimRef!.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);
-        fueledConsole.ShipSimRef!.InstallThruster("t2", new CellCoord(2, 0), FixtureSurface.WallInner);
-        fueledConsole.ShipSimRef!.InstallThruster("t3", new CellCoord(3, 0), FixtureSurface.WallInner);
+        oneThrusterConsole.ShipSimRef!.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
+        oneThrusterConsole.ShipSimRef!.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);
+        oneThrusterConsole.ShipSimRef!.SetThrusterCharge("t1", 1f);
 
-        bareConsole.BeginTravel(1);
-        fueledConsole.BeginTravel(1);
+        threeThrusterConsole.ShipSimRef!.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
+        threeThrusterConsole.ShipSimRef!.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);
+        threeThrusterConsole.ShipSimRef!.InstallThruster("t2", new CellCoord(2, 0), FixtureSurface.WallInner);
+        threeThrusterConsole.ShipSimRef!.InstallThruster("t3", new CellCoord(3, 0), FixtureSurface.WallInner);
+        threeThrusterConsole.ShipSimRef!.SetThrusterCharge("t1", 1f);
+        threeThrusterConsole.ShipSimRef!.SetThrusterCharge("t2", 1f);
+        threeThrusterConsole.ShipSimRef!.SetThrusterCharge("t3", 1f);
+
+        oneThrusterConsole.BeginTravel(1);
+        threeThrusterConsole.BeginTravel(1);
 
         await sceneTree.ToSignal(sceneTree.CreateTimer(0.5), SceneTreeTimer.SignalName.Timeout);
 
-        // Same elapsed real time, but the fueled console's own trip is much shorter (3 fueled
-        // thrusters hits MinTravelSeconds via BaseTravelSeconds - 3*ReductionPerThruster), so its
-        // progress fraction must be further along than the unfueled console's own still-mostly-
-        // BaseTravelSeconds-long trip.
-        AssertFloat(fueledConsole.CurrentVerbProgress!.Value).IsGreater(bareConsole.CurrentVerbProgress!.Value);
+        // Same elapsed real time, but the 3-thruster console's own trip is much shorter (hits
+        // MinTravelSeconds via BaseTravelSeconds - 3*ReductionPerThruster), so its progress
+        // fraction must be further along than the 1-thruster console's own still-mostly-
+        // BaseTravelSeconds-long trip. Both sides can actually travel at all now — the floor case
+        // is one thruster, not zero.
+        AssertFloat(threeThrusterConsole.CurrentVerbProgress!.Value).IsGreater(oneThrusterConsole.CurrentVerbProgress!.Value);
     }
 
     [TestCase]
@@ -187,21 +214,28 @@ public class TravelConsoleVerbTargetTest
     public async Task BeginTravel_ThrustersAtZeroCharge_DoNotCountTowardTheSpeedBonus()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
-        var (bareConsole, _, _) = CreateConsole(sceneTree, 1);
-        var (emptyThrusterConsole, _, _) = CreateConsole(sceneTree, 1, homeShipHasPowerGrid: true);
+        var (oneThrusterConsole, _, _) = CreateConsole(sceneTree, 1, homeShipHasPowerGrid: true);
+        var (plusEmptyThrusterConsole, _, _) = CreateConsole(sceneTree, 1, homeShipHasPowerGrid: true);
 
-        // Powered (adjacent to a real battery) so charge is the only variable under test — not
-        // an incidental "unpowered" exclusion masquerading as the zero-charge one.
-        emptyThrusterConsole.ShipSimRef!.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
-        emptyThrusterConsole.ShipSimRef!.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);
-        emptyThrusterConsole.ShipSimRef!.SetThrusterCharge("t1", 0f);
+        // Both sides get the same one real, fueled thruster (so both can actually travel) —
+        // plusEmptyThrusterConsole additionally gets a second, zero-charge thruster, which should
+        // contribute nothing to the speed formula.
+        oneThrusterConsole.ShipSimRef!.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
+        oneThrusterConsole.ShipSimRef!.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);
+        oneThrusterConsole.ShipSimRef!.SetThrusterCharge("t1", 1f);
 
-        bareConsole.BeginTravel(1);
-        emptyThrusterConsole.BeginTravel(1);
+        plusEmptyThrusterConsole.ShipSimRef!.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
+        plusEmptyThrusterConsole.ShipSimRef!.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);
+        plusEmptyThrusterConsole.ShipSimRef!.SetThrusterCharge("t1", 1f);
+        plusEmptyThrusterConsole.ShipSimRef!.InstallThruster("t2", new CellCoord(2, 0), FixtureSurface.WallInner);
+        plusEmptyThrusterConsole.ShipSimRef!.SetThrusterCharge("t2", 0f);
+
+        oneThrusterConsole.BeginTravel(1);
+        plusEmptyThrusterConsole.BeginTravel(1);
 
         await sceneTree.ToSignal(sceneTree.CreateTimer(0.5), SceneTreeTimer.SignalName.Timeout);
 
-        AssertFloat(emptyThrusterConsole.CurrentVerbProgress!.Value).IsEqual(bareConsole.CurrentVerbProgress!.Value);
+        AssertFloat(plusEmptyThrusterConsole.CurrentVerbProgress!.Value).IsEqual(oneThrusterConsole.CurrentVerbProgress!.Value);
     }
 
     [TestCase]
@@ -213,6 +247,7 @@ public class TravelConsoleVerbTargetTest
 
         console.ShipSimRef!.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
         console.ShipSimRef!.InstallThruster("fueled", new CellCoord(1, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.SetThrusterCharge("fueled", 1f);
         console.ShipSimRef!.InstallThruster("empty", new CellCoord(2, 0), FixtureSurface.WallInner);
         console.ShipSimRef!.SetThrusterCharge("empty", 0f);
 
