@@ -117,6 +117,14 @@ public static class PlayerTestHarness
         pdaLayout.AddChild(pdaGrid);
         pdaGrid.AddChild(MakeSlot("Cartridge1"));
 
+        var thrusterWindow = MakeWindow("ThrusterWindow");
+        hud.AddChild(thrusterWindow);
+        var thrusterLayout = new Node { Name = "Layout" };
+        thrusterWindow.AddChild(thrusterLayout);
+        var thrusterGrid = new Node { Name = "ThrusterGrid" };
+        thrusterLayout.AddChild(thrusterGrid);
+        thrusterGrid.AddChild(MakeSlot("Tank1"));
+
         var travelMapPanel = new TravelMapPanel { Name = "TravelMapPanel" };
         travelMapPanel.TravelButton = new Button();
         travelMapPanel.CancelButton = new Button();

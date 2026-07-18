@@ -1834,11 +1834,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 InstallThruster(_pendingEdgeA, _pendingEdgeB);
                 break;
             case PendingAction.UninstallThruster:
-                RemoveThruster(_pendingEdgeA, _pendingEdgeB);
+                RemoveThruster(_pendingEdgeA, _pendingEdgeB, inventory);
                 AddOrDrop(inventory, "thruster", 1);
                 break;
             case PendingAction.ScrapThruster:
-                RemoveThruster(_pendingEdgeA, _pendingEdgeB);
+                RemoveThruster(_pendingEdgeA, _pendingEdgeB, inventory);
                 AddOrDrop(inventory, "scrap_metal", ThrusterScrapYield);
                 break;
             case PendingAction.MaintainFloor:
@@ -2365,11 +2365,18 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         _placedThrusters[Deck.Normalize(edgeA, edgeB)] = node;
     }
 
-    private void RemoveThruster(CellCoord edgeA, CellCoord edgeB)
+    private void RemoveThruster(CellCoord edgeA, CellCoord edgeB, PlayerInventory? inventory)
     {
         if (!_placedThrusters.Remove(Deck.Normalize(edgeA, edgeB), out var node))
         {
             return;
+        }
+
+        // Any N2 tank still docked inside goes back to the player/world, same as every other
+        // uninstall/scrap refund below — it's real player property, not scenery.
+        if (node.Contents.Slots[0] is { } tank)
+        {
+            AddOrDrop(inventory, tank.ItemId, tank.Count);
         }
 
         ShipSimRef?.RemoveThruster(node.FixtureId);
@@ -2919,7 +2926,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
         foreach (var (a, b) in _placedThrusters.Keys.ToList())
         {
-            RemoveThruster(a, b);
+            RemoveThruster(a, b, inventory: null);
         }
 
         // A load that doesn't include a previously-extended cell must actually remove it —

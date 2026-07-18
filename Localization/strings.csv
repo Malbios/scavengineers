@@ -73,7 +73,7 @@ OBJECT_THRUSTER,Thruster,Triebwerk
 VERB_INSTALL_THRUSTER,Install Thruster,Triebwerk einbauen
 VERB_UNINSTALL_THRUSTER,Uninstall Thruster,Triebwerk ausbauen
 VERB_SCRAP_THRUSTER,Scrap Thruster,Triebwerk verschrotten
-VERB_REFUEL_THRUSTER,Refuel Thruster,Triebwerk auftanken
+VERB_OPEN_THRUSTER,Open Thruster,Triebwerk öffnen
 ITEM_BACKPACK,Backpack,Rucksack
 ITEM_RATION_BAR,Ration Bar,Nahrungsriegel
 ITEM_WATER_BOTTLE,Water Bottle,Wasserflasche

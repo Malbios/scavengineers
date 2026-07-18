@@ -214,6 +214,12 @@ public partial class Player : CharacterBody3D
     private DraggableWindow? _pdaWindow;
     private InventorySlotUI? _pdaCartridgeSlot;
 
+    /// <summary>A thruster's own N2 tank slot window — one static slot, same shape as the PDA's
+    /// single cartridge pocket above, just pointed at whichever ThrusterVerbTarget's own Contents
+    /// is currently open (see _openThruster) instead of a PlayerInventory-owned container.</summary>
+    private DraggableWindow? _thrusterWindow;
+    private InventorySlotUI? _thrusterTankSlot;
+
     /// <summary>Toggled by the scan-mode key (see _Input) — only ever true while
     /// <see cref="CanScan"/> also holds; forced back off the moment it stops holding (checked
     /// once a frame alongside every other HUD-state refresh), so taking off the PDA/cartridge/
@@ -275,9 +281,20 @@ public partial class Player : CharacterBody3D
     /// open at once — there's no ordering to get wrong between them.</summary>
     private bool _shopOpen;
 
+    /// <summary>Whether a thruster's own N2 tank slot window is currently open — same
+    /// suppress-everything gating as Shop/TravelMap (verb-triggered from a world object, not a
+    /// right-click-on-held-item sub-window like Suit/Backpack/PDA), via <see cref="AnyPanelOpen"/>.</summary>
+    private bool _thrusterInventoryOpen;
+
+    /// <summary>Which thruster's own SlotContainer the window is currently pointed at — a live
+    /// node reference (not an itemId lookup like _openBackpackItemId, since a thruster isn't
+    /// reachable through PlayerInventory) that can be QueueFree()'d out from under the window via
+    /// Uninstall/Scrap while it's open — see UpdateInventoryHud's IsInstanceValid guard.</summary>
+    private ThrusterVerbTarget? _openThruster;
+
     /// <summary>Any full-screen-ish HUD panel that should suppress normal gameplay input while
     /// open — shared gate for every _Input branch that used to check _inventoryOpen alone.</summary>
-    private bool AnyPanelOpen => _inventoryOpen || _travelMapOpen || _shopOpen;
+    private bool AnyPanelOpen => _inventoryOpen || _travelMapOpen || _shopOpen || _thrusterInventoryOpen;
 
     /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-9, 0) —
     /// also reused by VendorVerbTarget as the set of things Buy can offer, since there's
@@ -421,6 +438,10 @@ public partial class Player : CharacterBody3D
         _pdaCartridgeSlot = GetNode<InventorySlotUI>("HUD/PdaWindow/Layout/PdaGrid/Cartridge1");
         _pdaCartridgeSlot.PlayerRef = this;
 
+        _thrusterWindow = GetNode<DraggableWindow>("HUD/ThrusterWindow");
+        _thrusterTankSlot = GetNode<InventorySlotUI>("HUD/ThrusterWindow/Layout/ThrusterGrid/Tank1");
+        _thrusterTankSlot.PlayerRef = this;
+
         // X button / right-click-on-background — each window closes exactly the way its own
         // existing toggle-off path already does (see ToggleItemWindow's closing branches/
         // CloseInventory), just reachable without needing to re-press the same hotkey/re-click
@@ -443,6 +464,7 @@ public partial class Player : CharacterBody3D
             _pdaWindow!.Visible = false;
             _openPdaItemId = null;
         };
+        _thrusterWindow.CloseRequested += CloseThrusterInventory;
 
         // Placeholder/tunable starting stipend for testing the free-form conduit wiring
         // extensively — same "don't wait on it" spirit as the near-instant verb durations.
@@ -549,6 +571,10 @@ public partial class Player : CharacterBody3D
             else if (_shopOpen)
             {
                 CloseShop();
+            }
+            else if (_thrusterInventoryOpen)
+            {
+                CloseThrusterInventory();
             }
             else if (_inventoryOpen)
             {
@@ -1139,6 +1165,25 @@ public partial class Player : CharacterBody3D
         _shopOpen = false;
         _openShopVendor = null;
         _shopPanel!.Visible = false;
+        CaptureMouse();
+    }
+
+    /// <summary>Called by ThrusterVerbTarget.ExecuteVerb — same shape as OpenShop/OpenTravelMap
+    /// (a world-verb-triggered panel, not a right-click-on-held-item sub-window), since a thruster
+    /// is interacted with directly in the world rather than reached through PlayerInventory.</summary>
+    public void OpenThrusterInventory(ThrusterVerbTarget thruster)
+    {
+        _thrusterInventoryOpen = true;
+        _openThruster = thruster;
+        _thrusterWindow!.Visible = true;
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+    }
+
+    public void CloseThrusterInventory()
+    {
+        _thrusterInventoryOpen = false;
+        _openThruster = null;
+        _thrusterWindow!.Visible = false;
         CaptureMouse();
     }
 
@@ -1866,6 +1911,7 @@ public partial class Player : CharacterBody3D
                 : new List<SlotSaveData?>(),
             PdaSlotCount = ownedPdaContents?.Slots.Count ?? PlayerInventory.PdaSlotCount,
             PdaWindow = new WindowPosition(_pdaWindow!.Position.X, _pdaWindow.Position.Y),
+            ThrusterWindow = new WindowPosition(_thrusterWindow!.Position.X, _thrusterWindow.Position.Y),
         };
     }
 
@@ -2009,6 +2055,11 @@ public partial class Player : CharacterBody3D
             _pdaWindow!.Position = new Vector2(pdaWindowPos.X, pdaWindowPos.Y);
         }
 
+        if (data.ThrusterWindow is { } thrusterWindowPos)
+        {
+            _thrusterWindow!.Position = new Vector2(thrusterWindowPos.X, thrusterWindowPos.Y);
+        }
+
         if (data.SuitWindow is { } suitWindowPos)
         {
             _suitWindow!.Position = new Vector2(suitWindowPos.X, suitWindowPos.Y);
@@ -2089,6 +2140,17 @@ public partial class Player : CharacterBody3D
         }
 
         _pdaCartridgeSlot!.Container = pdaContents;
+
+        // Unlike the backpack/suit/pda contents above (reached by itemId, always safe to
+        // dereference), _openThruster is a live Node reference that Uninstall/Scrap can
+        // QueueFree() out from under this window while it's open — check validity before touching
+        // it at all, not just before reading its Contents.
+        if (_thrusterInventoryOpen && !GodotObject.IsInstanceValid(_openThruster))
+        {
+            CloseThrusterInventory();
+        }
+
+        _thrusterTankSlot!.Container = _openThruster?.Contents;
 
         // Force scan mode off the moment its gate stops holding (PDA/cartridge/helmet removed
         // mid-scan) — see _scanModeOn's own doc comment.

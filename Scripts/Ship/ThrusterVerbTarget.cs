@@ -7,23 +7,27 @@ using Scavengineers.Sim.Grid;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Scripts.Verbs;
+using PlayerScript = Scavengineers.Scripts.Player.Player;
 
 namespace Scavengineers.Scripts.Ship;
 
 /// <summary>
 /// A player-installable ship engine block with its own internal N2 tank — more of these,
-/// fueled, means faster travel (see TravelConsoleVerbTarget). Same "finite charge, refilled by
-/// consuming an item" shape as <see cref="BatteryVerbTarget"/>'s Recharge, but unlike Battery
-/// there can be many of these at once (see ShipBuildTarget's own _placedThrusters), so each
-/// instance carries its own fixture id and mounting edge rather than relying on a single fixed
-/// ShipSim constant/MachineType slot.
+/// fueled, means faster travel (see TravelConsoleVerbTarget). Unlike Battery there can be many of
+/// these at once (see ShipBuildTarget's own _placedThrusters), so each instance carries its own
+/// fixture id and mounting edge rather than relying on a single fixed ShipSim constant/MachineType
+/// slot. Fueling is a physical dock, not an instant top-off: a real n2_tank item sits in <see
+/// cref="Contents"/> and continuously feeds the fixture's own charge (see _PhysicsProcess) until
+/// the tank itself runs dry — the same "swap the empty one for a full one" loop the EVA suit's own
+/// N2 tank slot already uses, just world-object-owned instead of player-owned.
 /// </summary>
 public partial class ThrusterVerbTarget : StaticBody3D, IVerbTarget, IStateSaveable
 {
-    private static readonly Verb RefuelVerb = new("refuel_thruster", "VERB_REFUEL_THRUSTER", DurationSeconds: 0.2f)
-    {
-        Requirements = [new ItemRequirement("n2_tank", 1)],
-    };
+    private static readonly Verb OpenThrusterVerb = new("open_thruster", "VERB_OPEN_THRUSTER", DurationSeconds: 0f);
+
+    // Placeholder/tunable — independent of TravelConsoleVerbTarget's own ThrusterDrainPerSecond,
+    // so refueling isn't tied 1:1 to travel drain.
+    private const float TankTransferPerSecond = 0.05f;
 
     [Export]
     public ShipSim? ShipSimRef { get; set; }
@@ -47,6 +51,14 @@ public partial class ThrusterVerbTarget : StaticBody3D, IVerbTarget, IStateSavea
 
     public CellCoord EdgeB { get; set; }
 
+    /// <summary>The docked N2 tank, if any — a single-slot SlotContainer rather than a new
+    /// primitive, so the existing generic drag-and-drop (InventorySlotUI.Container/
+    /// SlotContainer.MoveBetween) works with zero new mechanism. Any item can technically be
+    /// dropped in here (nothing enforces "n2_tank only," matching how ordinary backpack slots
+    /// don't restrict item type either); _PhysicsProcess below simply ignores anything that isn't
+    /// a charged n2_tank.</summary>
+    public SlotContainer Contents { get; } = new(1);
+
     [Export]
     public string SaveId { get; set; } = "";
 
@@ -58,19 +70,37 @@ public partial class ThrusterVerbTarget : StaticBody3D, IVerbTarget, IStateSavea
 
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 
-    // Hidden once already full — same reasoning as BatteryVerbTarget's RechargeVerb gating.
     public IReadOnlyList<Verb> AvailableVerbs =>
-        (ShipSimRef is not null && ShipSimRef.ThrusterChargeFraction(FixtureId) < 1f
-            ? new List<Verb> { RefuelVerb with { DisplaySuffix = $"{ShipSimRef.ThrusterChargeFraction(FixtureId) * 100:F0}%" } }
-            : [])
-        .Concat(BuildTarget?.ThrusterRemovalVerbs ?? [])
-        .ToList();
+        new List<Verb> { OpenThrusterVerb }
+            .Concat(BuildTarget?.ThrusterRemovalVerbs ?? [])
+            .ToList();
+
+    public override void _PhysicsProcess(double delta)
+    {
+        if (ShipSimRef is null || Contents.Slots[0] is not { ItemId: "n2_tank" } tank || tank.Charge <= 0f)
+        {
+            return;
+        }
+
+        if (ShipSimRef.ThrusterChargeFraction(FixtureId) >= 1f)
+        {
+            return;
+        }
+
+        var transferred = Mathf.Min(TankTransferPerSecond * (float)delta, tank.Charge);
+        ShipSimRef.RechargeThruster(FixtureId, transferred);
+        Contents.SetSlot(0, (tank.ItemId, tank.Count, tank.Charge - transferred));
+    }
 
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
-        if (verb.Id == RefuelVerb.Id)
+        if (verb.Id == OpenThrusterVerb.Id)
         {
-            ShipSimRef?.SetThrusterCharge(FixtureId, 1f);
+            if (GetTree().GetFirstNodeInGroup("player") is PlayerScript player)
+            {
+                player.OpenThrusterInventory(this);
+            }
+
             return;
         }
 
@@ -82,14 +112,28 @@ public partial class ThrusterVerbTarget : StaticBody3D, IVerbTarget, IStateSavea
         // Instant, already complete by the time anyone could cancel it — nothing to do.
     }
 
-    public string GetSaveState() =>
-        (ShipSimRef?.ThrusterChargeFraction(FixtureId) ?? 1f).ToString(CultureInfo.InvariantCulture);
+    /// <summary>Condition alone, or condition plus the docked tank's own remaining charge
+    /// (pipe-delimited) — still a single string in MachineCoord.State, no BuildTargetSaveData
+    /// schema change needed just because a thruster now has its own sub-item.</summary>
+    public string GetSaveState()
+    {
+        var condition = (ShipSimRef?.ThrusterChargeFraction(FixtureId) ?? 1f).ToString(CultureInfo.InvariantCulture);
+        return Contents.Slots[0] is { } tank
+            ? $"{condition}|{tank.ItemId}|{tank.Charge.ToString(CultureInfo.InvariantCulture)}"
+            : condition;
+    }
 
     public void ApplySaveState(string state)
     {
-        if (float.TryParse(state, NumberStyles.Float, CultureInfo.InvariantCulture, out var charge))
+        var parts = state.Split('|');
+        if (float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var condition))
         {
-            ShipSimRef?.SetThrusterCharge(FixtureId, charge);
+            ShipSimRef?.SetThrusterCharge(FixtureId, condition);
+        }
+
+        if (parts.Length >= 3 && float.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var tankCharge))
+        {
+            Contents.SetSlot(0, (parts[1], 1, tankCharge));
         }
     }
 }

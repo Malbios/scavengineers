@@ -341,4 +341,6 @@ public sealed class PlayerSaveData
     public int PdaSlotCount { get; set; } = PlayerInventory.PdaSlotCount;
 
     public WindowPosition? PdaWindow { get; set; }
+
+    public WindowPosition? ThrusterWindow { get; set; }
 }

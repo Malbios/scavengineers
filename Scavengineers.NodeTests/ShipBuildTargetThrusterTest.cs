@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 
 using GdUnit4;
 using Godot;
+using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Scripts.Ship;
 using Scavengineers.Scripts.Verbs;
@@ -146,5 +147,55 @@ public class ShipBuildTargetThrusterTest
         // actually connect back to the seeded battery+switch, not just that the thrusters exist
         // visually — the automated version of "hook them up to the already existing wires."
         AssertBool(thrusters.All(t => shipSim.IsPowered(t.Id))).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void SaveRoundTrip_PreservesBothTheFixturesConditionAndTheDockedTanksRemainingCharge()
+    {
+        var (buildTarget, _) = MakeHarness((SceneTree)Engine.GetMainLoop());
+        buildTarget.ApplyBuildState(new BuildTargetSaveData
+        {
+            Machines = [new MachineCoord("thruster", 0, 0, 1, 0, "0.6|n2_tank|0.4")],
+        });
+
+        var captured = buildTarget.CaptureBuildState();
+        var row = captured.Machines.Single(m => m.Type == "thruster");
+        AssertBool(row.State == "0.6|n2_tank|0.4").IsTrue();
+
+        var (buildTarget2, shipSim2) = MakeHarness((SceneTree)Engine.GetMainLoop());
+        buildTarget2.ApplyBuildState(captured);
+
+        var thruster2 = buildTarget2.GetChildren().OfType<ThrusterVerbTarget>().Single();
+        AssertFloat(shipSim2.Deck.Fixtures.OfType<ThrusterFixture>().Single().Condition).IsEqual(0.6f);
+        AssertFloat(thruster2.Contents.Slots[0]!.Value.Charge).IsEqual(0.4f);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task Uninstall_RefundsAnyDockedTankIntoTheInventory()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (buildTarget, _) = MakeHarness(sceneTree);
+        buildTarget.ApplyBuildState(new BuildTargetSaveData
+        {
+            Machines = [new MachineCoord("thruster", 0, 0, 1, 0, "1|n2_tank|0.4")],
+        });
+
+        var thrusterNode = buildTarget.GetChildren().OfType<ThrusterVerbTarget>().Single();
+        var inventory = new PlayerInventory();
+
+        // ExecuteThrusterRemoval is internal to ShipBuildTarget (not visible from this assembly)
+        // — go through the thruster's own public ExecuteVerb, same as every other machine
+        // removal test in this suite already does (see ShipBuildTargetFixtureUpkeepTest).
+        thrusterNode.ExecuteVerb(
+            new Verb("uninstall_thruster", "VERB_UNINSTALL_THRUSTER", DurationSeconds: 0.2f) { IsDestructive = true },
+            inventory);
+
+        // Only starts the cycle timer — the actual removal (and refund) happens in
+        // OnCycleComplete once the verb's own duration elapses.
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+
+        AssertBool(inventory.Has("n2_tank", 1)).IsTrue();
     }
 }
