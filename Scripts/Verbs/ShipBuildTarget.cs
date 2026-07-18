@@ -297,6 +297,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private static readonly (CellCoord A, CellCoord B) SwitchEdge = (new CellCoord(5, 0), new CellCoord(5, -1));
     private static readonly (CellCoord A, CellCoord B) RechargeStationEdge = (new CellCoord(9, 0), new CellCoord(9, -1));
 
+    // Two default thrusters, one per room (RoomSplitColumns = [6] splits room 1 at columns 0-5
+    // from room 2 at 6-11) — free row-0 boundary columns, verified against every other seeded
+    // fixture's own cell (TravelConsole/StationAirlock/InteriorDoor/DerelictAirlock/Bunk).
+    private static readonly (CellCoord A, CellCoord B) ThrusterEdge1 = (new CellCoord(3, 0), new CellCoord(3, -1));
+    private static readonly (CellCoord A, CellCoord B) ThrusterEdge2 = (new CellCoord(8, 0), new CellCoord(8, -1));
+
     // Default wiring for the Home Ship's seeded layout (see SeedDefaultShipLayout) — a straight
     // utility spine along the row-2 doorway line (already unsealed at the room-split boundary,
     // and already passing next to every airlock/interior-door fixture on that row) plus one
@@ -310,6 +316,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         new(4, 1), // spine (4,2) -> Battery (4,0)
         new(5, 1), // InteriorDoor (5,2) -> Switch (5,0)
         new(9, 1), // spine (9,2) -> RechargeStation (9,0)
+        new(3, 1), // spine (3,2) -> Thruster 1 (3,0)
+        new(8, 1), // spine (8,2) -> Thruster 2 (8,0)
     ];
 
     private enum AimKind { None, Tile, Ceiling, Edge }
@@ -983,6 +991,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             InstallBattery(BatteryEdge.A, BatteryEdge.B, savedState: null);
             InstallSwitch(SwitchEdge.A, SwitchEdge.B, savedState: null);
             InstallRechargeStation(RechargeStationEdge.A, RechargeStationEdge.B, savedState: null);
+            InstallThruster(ThrusterEdge1.A, ThrusterEdge1.B, savedState: null);
+            InstallThruster(ThrusterEdge2.A, ThrusterEdge2.B, savedState: null);
 
             // Wire the whole default layout together (see DefaultConduitRoute) — real,
             // player-removable conduits through the same InstallConduit a player's own wiring

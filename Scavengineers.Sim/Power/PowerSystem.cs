@@ -7,7 +7,8 @@ namespace Scavengineers.Sim.Power;
 /// <summary>
 /// A pure reader of a <see cref="Deck"/> (the shared structural tier — see
 /// docs/architecture/ship-model.md): graph nodes are the deck's conductive fixtures
-/// (<see cref="ConduitFixture"/>/<see cref="SwitchFixture"/>/<see cref="MachineFixture"/>),
+/// (<see cref="ConduitFixture"/>/<see cref="SwitchFixture"/>/<see cref="MachineFixture"/>/
+/// <see cref="BatteryFixture"/>/<see cref="ThrusterFixture"/>),
 /// connected by adjacent-cell connectivity (the option the ship-model doc recommends for
 /// MVP over explicit port-to-port routing) — a switch on the connecting tile-pair that
 /// is open conducts nowhere. Reuses <see cref="ConnectivitySolver"/> — the same solver
@@ -68,7 +69,7 @@ public sealed class PowerSystem : IConnectivityGraph<PowerNodeId>
         _deck.Fixtures.FirstOrDefault(f => f.Id == node.Value);
 
     private static bool IsConductive(Fixture fixture) =>
-        fixture is ConduitFixture or SwitchFixture or MachineFixture or BatteryFixture;
+        fixture is ConduitFixture or SwitchFixture or MachineFixture or BatteryFixture or ThrusterFixture;
 
     private static bool IsOpenSwitch(Fixture fixture) =>
         fixture is SwitchFixture { IsOpen: true };

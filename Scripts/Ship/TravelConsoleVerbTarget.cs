@@ -199,7 +199,7 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
             {
                 foreach (var thruster in ShipSimRef.Deck.Fixtures.OfType<ThrusterFixture>())
                 {
-                    if (thruster.Condition > 0f)
+                    if (thruster.Condition > 0f && ShipSimRef.IsPowered(thruster.Id))
                     {
                         thruster.Condition = Math.Max(0f, thruster.Condition - ThrusterDrainPerSecond * (float)delta);
                     }
@@ -279,7 +279,7 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         // Computed once at the start of the trip, not re-evaluated mid-flight — matches
         // DrainBattery's own existing behavior of having zero effect on an already-running timer
         // if the battery empties mid-trip.
-        var fueledCount = ShipSimRef?.Deck.Fixtures.OfType<ThrusterFixture>().Count(f => f.Condition > 0f) ?? 0;
+        var fueledCount = ShipSimRef?.Deck.Fixtures.OfType<ThrusterFixture>().Count(f => f.Condition > 0f && ShipSimRef!.IsPowered(f.Id)) ?? 0;
         _travelTimer!.WaitTime = Math.Max(MinTravelSeconds, BaseTravelSeconds - fueledCount * ReductionPerThruster);
         _travelTimer.Start();
     }

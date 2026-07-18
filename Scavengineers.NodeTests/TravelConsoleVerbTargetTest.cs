@@ -16,9 +16,12 @@ namespace Scavengineers.NodeTests;
 [TestSuite]
 public class TravelConsoleVerbTargetTest
 {
-    private static (TravelConsoleVerbTarget Console, Node3D StationGroup, Node3D[] DerelictGroups) CreateConsole(SceneTree sceneTree, int derelictCount)
+    private static (TravelConsoleVerbTarget Console, Node3D StationGroup, Node3D[] DerelictGroups) CreateConsole(SceneTree sceneTree, int derelictCount, bool homeShipHasPowerGrid = false)
     {
-        var homeShip = AutoFree(new ShipSim());
+        // HasPowerGrid must be set before the node enters the tree (see
+        // ShipBuildTargetFixtureUpkeepTest.MakePoweredHarness) — defaults false so the other,
+        // non-thruster test cases below stay on the plain bare-ShipSim harness they already use.
+        var homeShip = AutoFree(new ShipSim { HasPowerGrid = homeShipHasPowerGrid });
         sceneTree.Root.AddChild(homeShip);
 
         var stationShip = AutoFree(new ShipSim());
@@ -157,11 +160,15 @@ public class TravelConsoleVerbTargetTest
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var (bareConsole, _, _) = CreateConsole(sceneTree, 1);
-        var (fueledConsole, _, _) = CreateConsole(sceneTree, 1);
+        var (fueledConsole, _, _) = CreateConsole(sceneTree, 1, homeShipHasPowerGrid: true);
 
-        fueledConsole.ShipSimRef!.InstallThruster("t1", new CellCoord(0, 0), FixtureSurface.WallInner);
+        // A chain of Manhattan-adjacent fixtures back to the battery — no conduit needed, the
+        // same direct-adjacency shortcut Battery+Switch's own default placement already relies
+        // on (see ShipBuildTarget.BatteryEdge/SwitchEdge's doc comment).
+        fueledConsole.ShipSimRef!.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
+        fueledConsole.ShipSimRef!.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);
         fueledConsole.ShipSimRef!.InstallThruster("t2", new CellCoord(2, 0), FixtureSurface.WallInner);
-        fueledConsole.ShipSimRef!.InstallThruster("t3", new CellCoord(4, 0), FixtureSurface.WallInner);
+        fueledConsole.ShipSimRef!.InstallThruster("t3", new CellCoord(3, 0), FixtureSurface.WallInner);
 
         bareConsole.BeginTravel(1);
         fueledConsole.BeginTravel(1);
@@ -181,9 +188,12 @@ public class TravelConsoleVerbTargetTest
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var (bareConsole, _, _) = CreateConsole(sceneTree, 1);
-        var (emptyThrusterConsole, _, _) = CreateConsole(sceneTree, 1);
+        var (emptyThrusterConsole, _, _) = CreateConsole(sceneTree, 1, homeShipHasPowerGrid: true);
 
-        emptyThrusterConsole.ShipSimRef!.InstallThruster("t1", new CellCoord(0, 0), FixtureSurface.WallInner);
+        // Powered (adjacent to a real battery) so charge is the only variable under test — not
+        // an incidental "unpowered" exclusion masquerading as the zero-charge one.
+        emptyThrusterConsole.ShipSimRef!.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
+        emptyThrusterConsole.ShipSimRef!.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);
         emptyThrusterConsole.ShipSimRef!.SetThrusterCharge("t1", 0f);
 
         bareConsole.BeginTravel(1);
@@ -199,9 +209,10 @@ public class TravelConsoleVerbTargetTest
     public async Task Traveling_DrainsEveryFueledThrustersN2_ButLeavesAnAlreadyEmptyOneAtZero()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
-        var (console, _, _) = CreateConsole(sceneTree, 1);
+        var (console, _, _) = CreateConsole(sceneTree, 1, homeShipHasPowerGrid: true);
 
-        console.ShipSimRef!.InstallThruster("fueled", new CellCoord(0, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.InstallThruster("fueled", new CellCoord(1, 0), FixtureSurface.WallInner);
         console.ShipSimRef!.InstallThruster("empty", new CellCoord(2, 0), FixtureSurface.WallInner);
         console.ShipSimRef!.SetThrusterCharge("empty", 0f);
 

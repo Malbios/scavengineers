@@ -73,6 +73,32 @@ public class PowerSystemTests
     }
 
     [Fact]
+    public void ThrusterFixtureActingAsConsumer_IsPoweredWhenConnectedToASource()
+    {
+        var deck = new Deck();
+        deck.AddFixture(new BatteryFixture("battery-fixture", new CellCoord(0, 0), FixtureSurface.WallInner));
+        deck.AddFixture(new ThrusterFixture("thruster", new CellCoord(1, 0), FixtureSurface.WallInner));
+
+        var system = new PowerSystem(deck);
+        system.MarkSource(new PowerNodeId("battery-fixture"));
+
+        Assert.True(system.IsPowered(new PowerNodeId("thruster")));
+    }
+
+    [Fact]
+    public void ThrusterFixture_IsNotPowered_WhenNotConnectedToAnySource()
+    {
+        var deck = new Deck();
+        deck.AddFixture(new BatteryFixture("battery-fixture", new CellCoord(0, 0), FixtureSurface.WallInner));
+        deck.AddFixture(new ThrusterFixture("thruster", new CellCoord(5, 5), FixtureSurface.WallInner));
+
+        var system = new PowerSystem(deck);
+        system.MarkSource(new PowerNodeId("battery-fixture"));
+
+        Assert.False(system.IsPowered(new PowerNodeId("thruster")));
+    }
+
+    [Fact]
     public void NodeNotConnectedToAnySource_IsNotPowered()
     {
         var deck = new Deck();

@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Threading.Tasks;
 
 using GdUnit4;
 using Godot;
@@ -110,5 +111,40 @@ public class ShipBuildTargetThrusterTest
         AssertInt(reloadedCharges.Count).IsEqual(2);
         AssertFloat(reloadedCharges[0]).IsEqual(0.25f);
         AssertFloat(reloadedCharges[1]).IsEqual(0.6f);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task SeedDefaultShipLayout_InstallsTwoFullyFueledThrusters_AlreadyWiredIntoTheDefaultSpine()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var shipRoot = AutoFree(new Node3D());
+        sceneTree.Root.AddChild(shipRoot);
+
+        var shipSim = new ShipSim { HasPowerGrid = true };
+        shipRoot.AddChild(shipSim);
+
+        var buildTarget = new ShipBuildTarget
+        {
+            ShipSimRef = shipSim,
+            ShipRoot = shipRoot,
+            SeedDefaultLayout = true,
+            BatteryMesh = new BoxMesh(), // SeedDefaultShipLayout's own "opted into this system" gate.
+        };
+        shipRoot.AddChild(buildTarget);
+
+        // SeedDefaultShipLayout runs via CallDeferred from _Ready — await past the flush, same
+        // pattern TravelConsoleDerelictPresenceRaceTest already uses for its own deferred seeding.
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+
+        var thrusters = shipSim.Deck.Fixtures.OfType<ThrusterFixture>().ToList();
+
+        AssertInt(thrusters.Count).IsEqual(2);
+        AssertBool(thrusters.All(t => t.Condition >= 0.999f)).IsTrue();
+
+        // Proves the seeded spur conduits (DefaultConduitRoute's new(3,1)/new(8,1) entries)
+        // actually connect back to the seeded battery+switch, not just that the thrusters exist
+        // visually — the automated version of "hook them up to the already existing wires."
+        AssertBool(thrusters.All(t => shipSim.IsPowered(t.Id))).IsTrue();
     }
 }
