@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 
 using GdUnit4;
@@ -257,5 +258,57 @@ public class TravelConsoleVerbTargetTest
 
         AssertFloat(console.ShipSimRef!.ThrusterChargeFraction("fueled")).IsLess(1f);
         AssertFloat(console.ShipSimRef!.ThrusterChargeFraction("empty")).IsEqual(0f);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task Traveling_SetsThrusterAndConsoleDrawToActive_AndBackToIdleOnceNotTraveling()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (console, _, _) = CreateConsole(sceneTree, 1, homeShipHasPowerGrid: true);
+
+        console.ShipSimRef!.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.SetThrusterCharge("t1", 1f);
+
+        var thruster = console.ShipSimRef!.Deck.Fixtures.Single(f => f.Id == "t1");
+        var consoleFixture = console.ShipSimRef!.Deck.Fixtures.Single(f => f.Id == ShipSim.TravelConsoleFixtureId);
+
+        AssertFloat(thruster.PowerDraw).IsEqual(ShipSim.IdleDraw);
+        AssertFloat(consoleFixture.PowerDraw).IsEqual(ShipSim.IdleDraw);
+
+        console.BeginTravel(1);
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.1), SceneTreeTimer.SignalName.Timeout);
+
+        AssertFloat(thruster.PowerDraw).IsEqual(ShipSim.ThrusterActiveDraw);
+        AssertFloat(consoleFixture.PowerDraw).IsEqual(ShipSim.TravelConsoleActiveDraw);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task Traveling_WithActiveDemandExceedingCapacity_PausesN2DrainForAsLongAsTheBrownoutPersists()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (console, _, _) = CreateConsole(sceneTree, 1, homeShipHasPowerGrid: true);
+
+        console.ShipSimRef!.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.InstallThruster("t2", new CellCoord(2, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.InstallThruster("t3", new CellCoord(3, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.SetThrusterCharge("t1", 1f);
+        console.ShipSimRef!.SetThrusterCharge("t2", 1f);
+        console.ShipSimRef!.SetThrusterCharge("t3", 1f);
+
+        // While traveling: TravelConsoleActiveDraw(8) + 3 * ThrusterActiveDraw(6) = 26, over
+        // BatteryCapacity(20) — the ship-wide brownout this active-draw spike is meant to prove.
+        console.BeginTravel(1);
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+
+        // Never actually powered for even a moment, so never drained at all — not just "drained
+        // slower."
+        AssertFloat(console.ShipSimRef!.ThrusterChargeFraction("t1")).IsEqual(1f);
+
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+        AssertFloat(console.ShipSimRef!.ThrusterChargeFraction("t1")).IsEqual(1f);
     }
 }

@@ -22,5 +22,6 @@
   { "id": "co2_filter", "maxStackSize": 1, "color": "#996633", "shapeKind": "canister" },
   { "id": "wrench", "maxStackSize": 1, "color": "#B3B3B3", "shapeKind": "tool_wrench" },
   { "id": "pda", "maxStackSize": 1, "color": "#4D4D66", "equipSlot": "pda", "shapeKind": "tablet" },
-  { "id": "health_scan_cartridge", "maxStackSize": 1, "color": "#33CC99", "shapeKind": "cartridge" }
+  { "id": "health_scan_cartridge", "maxStackSize": 1, "color": "#33CC99", "shapeKind": "cartridge" },
+  { "id": "power_scan_cartridge", "maxStackSize": 1, "color": "#E6C619", "shapeKind": "cartridge" }
 ]

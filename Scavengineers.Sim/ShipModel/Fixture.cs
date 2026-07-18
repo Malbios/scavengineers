@@ -16,6 +16,13 @@ public abstract class Fixture(string id, CellCoord tile, FixtureSurface surface)
     public FixtureSurface Surface { get; } = surface;
 
     public float Condition { get; set; } = 1.0f;
+
+    /// <summary>Current instantaneous power draw, in the same abstract units as
+    /// ShipSim.BatteryCapacity — mutable and script-owned like Condition, but a genuinely
+    /// separate concept (this is "how much power right now," not "how charged/worn is this").
+    /// Zero by default: a relay (conduit/switch) or the battery/source itself never draws, so only
+    /// the consumer types that actually need a nonzero value ever set one.</summary>
+    public float PowerDraw { get; set; }
 }
 
 public enum FixtureSurface

@@ -164,6 +164,7 @@ public partial class Player : CharacterBody3D
     private Label? _targetNameLabel;
     private Label? _verbLabel;
     private ProgressBar? _verbProgressBar;
+    private Label? _powerInfoLabel;
     private ProgressBar? _o2Bar;
     private Label? _co2Label;
     private ProgressBar? _co2Bar;
@@ -208,11 +209,12 @@ public partial class Player : CharacterBody3D
     private DraggableWindow? _suitWindow;
     private readonly InventorySlotUI?[] _suitPocketSlots = new InventorySlotUI?[2];
 
-    /// <summary>The PDA's own window — its single cartridge pocket is a static scene node (like
-    /// the suit's pockets above), room to grow into more slots later without a rebuild
-    /// mechanism being needed yet.</summary>
+    /// <summary>The PDA's own window — two cartridge pockets, both static scene nodes (like
+    /// the suit's pockets above): the original health-scan slot and (see <see
+    /// cref="_pdaCartridgeSlot2"/>) the power-info one.</summary>
     private DraggableWindow? _pdaWindow;
     private InventorySlotUI? _pdaCartridgeSlot;
+    private InventorySlotUI? _pdaCartridgeSlot2;
 
     /// <summary>A thruster's own N2 tank slot window — one static slot, same shape as the PDA's
     /// single cartridge pocket above, just pointed at whichever ThrusterVerbTarget's own Contents
@@ -239,6 +241,16 @@ public partial class Player : CharacterBody3D
         && pda.Contents.CountOf("health_scan_cartridge") > 0
         && _inventory.Head is { ItemId: { } headItemId }
         && ItemCatalog.EquipSlot(headItemId) == "head";
+
+    /// <summary>Toggled by the power-info key (see _Input) — same "forced back off the moment its
+    /// gate stops holding" shape as <see cref="_scanModeOn"/>. Only needs the PDA worn with its
+    /// power cartridge loaded — unlike CanScan, no helmet requirement: checking your own ship's
+    /// power grid isn't an EVA/environmental concern the way the health scan is.</summary>
+    private bool _powerInfoOn;
+
+    private bool CanShowPowerInfo =>
+        _inventory.GetEquippedContainer("pda") is { } pda
+        && pda.Contents.CountOf("power_scan_cartridge") > 0;
 
     private readonly SuitResources _suitResources = new();
     private readonly PlayerNeeds _needs = new();
@@ -303,7 +315,7 @@ public partial class Player : CharacterBody3D
     /// TryEquipBackpackFromHand) — no dedicated verb needed to buy or hold one. "ration_bar"/
     /// "water_bottle" are likewise ordinary holdable items until F consumes whichever's held
     /// (see UseHeldItem) — no dedicated equip path either.</summary>
-    public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell", "battery", "switch", "recharge_station", "thruster", "n2_tank", "backpack", "ration_bar", "water_bottle", "wrench", "pda", "health_scan_cartridge"];
+    public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell", "battery", "switch", "recharge_station", "thruster", "n2_tank", "backpack", "ration_bar", "water_bottle", "wrench", "pda", "health_scan_cartridge", "power_scan_cartridge"];
 
     private enum Hand { Left, Right }
 
@@ -377,6 +389,7 @@ public partial class Player : CharacterBody3D
         _targetNameLabel = GetNode<Label>("HUD/TargetNameLabel");
         _verbLabel = GetNode<Label>("HUD/VerbLabel");
         _verbProgressBar = GetNode<ProgressBar>("HUD/VerbProgressBar");
+        _powerInfoLabel = GetNode<Label>("HUD/PowerInfoLabel");
         _o2Bar = GetNode<ProgressBar>("HUD/ResourcesPanel/O2Bar");
         _co2Label = GetNode<Label>("HUD/ResourcesPanel/CO2Label");
         _co2Bar = GetNode<ProgressBar>("HUD/ResourcesPanel/CO2Bar");
@@ -437,6 +450,8 @@ public partial class Player : CharacterBody3D
         _pdaWindow = GetNode<DraggableWindow>("HUD/PdaWindow");
         _pdaCartridgeSlot = GetNode<InventorySlotUI>("HUD/PdaWindow/Layout/PdaGrid/Cartridge1");
         _pdaCartridgeSlot.PlayerRef = this;
+        _pdaCartridgeSlot2 = GetNode<InventorySlotUI>("HUD/PdaWindow/Layout/PdaGrid/Cartridge2");
+        _pdaCartridgeSlot2.PlayerRef = this;
 
         _thrusterWindow = GetNode<DraggableWindow>("HUD/ThrusterWindow");
         _thrusterTankSlot = GetNode<InventorySlotUI>("HUD/ThrusterWindow/Layout/ThrusterGrid/Tank1");
@@ -499,6 +514,7 @@ public partial class Player : CharacterBody3D
         _inventory.Add("wrench", 1);
         _inventory.EquipContainerDirectly("pda", "pda", new SlotContainer(PlayerInventory.PdaSlotCount));
         _inventory.GetPersistentContents("pda")?.Add("health_scan_cartridge", 1);
+        _inventory.GetPersistentContents("pda")?.Add("power_scan_cartridge", 1);
 
         _flashlightOn = true; // starts on, same as before this was toggleable, but F now turns it off too
 
@@ -594,6 +610,11 @@ public partial class Player : CharacterBody3D
             // Always allowed to turn off; only turns on if the gate (PDA worn + cartridge loaded
             // + any helmet worn) actually passes — see CanScan.
             _scanModeOn = !_scanModeOn && CanScan;
+        }
+        else if (@event is InputEventKey { Keycode: Key.P, Pressed: true } && !IsBusy && !AnyPanelOpen)
+        {
+            // Same "always allowed to turn off, only turns on if the gate passes" shape as V/CanScan.
+            _powerInfoOn = !_powerInfoOn && CanShowPowerInfo;
         }
         else if (@event is InputEventKey { Pressed: true } hotbarKey && !IsBusy)
         {
@@ -2015,17 +2036,22 @@ public partial class Player : CharacterBody3D
 
         // Same owned-anywhere-first shape as the backpack/suit above — an old save predating
         // HasPda falls back to the worn-only marker (PdaItemId), since that was the only signal
-        // available for "does this item exist" back then.
+        // available for "does this item exist" back then. Math.Max (not the raw saved value):
+        // a save from before the power-scan cartridge existed was captured with PdaSlotCount == 1
+        // — grow it to the current slot count on load instead of leaving it permanently stuck at
+        // its old, smaller size.
+        var pdaSlotCount = System.Math.Max(data.PdaSlotCount, PlayerInventory.PdaSlotCount);
+
         if (data.HasPda || data.PdaItemId is not null)
         {
-            var pdaContents = new SlotContainer(data.PdaSlotCount);
+            var pdaContents = new SlotContainer(pdaSlotCount);
             SlotSaveDataConverter.Restore(pdaContents, data.PdaSlots);
             _inventory.RestorePersistentContents("pda", pdaContents);
         }
 
         if (data.PdaItemId is { } pdaItemId)
         {
-            _inventory.EquipContainerDirectly("pda", pdaItemId, new SlotContainer(data.PdaSlotCount));
+            _inventory.EquipContainerDirectly("pda", pdaItemId, new SlotContainer(pdaSlotCount));
         }
 
         // Only applied when present — an old save predating this feature leaves every window at
@@ -2157,6 +2183,20 @@ public partial class Player : CharacterBody3D
         if (_scanModeOn && !CanScan)
         {
             _scanModeOn = false;
+        }
+
+        // Same "force off the moment its gate stops holding" shape as scan mode above.
+        if (_powerInfoOn && !CanShowPowerInfo)
+        {
+            _powerInfoOn = false;
+        }
+
+        _powerInfoLabel!.Visible = _powerInfoOn;
+        if (_powerInfoOn)
+        {
+            var demand = Mathf.RoundToInt(ShipSimRef?.DemandedPower() ?? 0f);
+            var capacity = Mathf.RoundToInt(ShipSim.BatteryCapacity);
+            _powerInfoLabel.Text = $"Power: {demand} / {capacity}";
         }
 
         _creditsLabel!.Text = Tr("HUD_CREDITS") + $": {_credits}";

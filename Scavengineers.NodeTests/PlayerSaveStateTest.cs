@@ -264,6 +264,13 @@ public class PlayerSaveStateTest
         };
 
         player.ApplyPlayerState(data);
+
+        // The actual upgrade this test guards: a save captured before the power-scan cartridge
+        // existed (PdaSlotCount == 1) grows to the current slot count on load, not stuck forever
+        // at its old, smaller size.
+        var pdaContents = player.Inventory.GetEquippedContainer("pda");
+        AssertInt(pdaContents!.Contents.Slots.Count).IsEqual(PlayerInventory.PdaSlotCount);
+
         var roundTripped = player.CapturePlayerState();
 
         AssertBool(roundTripped.PdaItemId == "pda").IsTrue();

@@ -191,20 +191,39 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 
     public override void _PhysicsProcess(double delta)
     {
+        if (ShipSimRef is null)
+        {
+            return;
+        }
+
+        // Every fixture's draw is synced FIRST, in its own pass, before any drain/overload
+        // decision reads it this tick — otherwise the first thruster processed in the loop below
+        // would see a partially-updated (understated) total demand and briefly drain despite an
+        // overload that only becomes visible once its later siblings' draw also updates.
+        if (ConsoleFixture is { } consoleFixture)
+        {
+            consoleFixture.PowerDraw = _traveling ? ShipSim.TravelConsoleActiveDraw : ShipSim.IdleDraw;
+        }
+
+        foreach (var thruster in ShipSimRef.Deck.Fixtures.OfType<ThrusterFixture>())
+        {
+            thruster.PowerDraw = _traveling ? ShipSim.ThrusterActiveDraw : ShipSim.IdleDraw;
+        }
+
         if (_traveling)
         {
-            ShipSimRef?.DrainBattery(BatteryDrainPerSecond * (float)delta);
+            ShipSimRef.DrainBattery(BatteryDrainPerSecond * (float)delta);
 
-            if (ShipSimRef is not null)
+            foreach (var thruster in ShipSimRef.Deck.Fixtures.OfType<ThrusterFixture>())
             {
-                foreach (var thruster in ShipSimRef.Deck.Fixtures.OfType<ThrusterFixture>())
+                // IsPowered alone already implies charge (see PowerSystem.IsConductive) — no
+                // separate Condition check needed. Re-checked live every tick: a brownout
+                // triggered by this very draw spike (or anything else on the grid) simply pauses
+                // N2 consumption for as long as it persists, rather than crashing or derailing
+                // the trip's own already-fixed duration.
+                if (ShipSimRef.IsPowered(thruster.Id))
                 {
-                    // IsPowered alone already implies charge (see PowerSystem.IsConductive) — no
-                    // separate Condition check needed.
-                    if (ShipSimRef.IsPowered(thruster.Id))
-                    {
-                        thruster.Condition = Math.Max(0f, thruster.Condition - ThrusterDrainPerSecond * (float)delta);
-                    }
+                    thruster.Condition = Math.Max(0f, thruster.Condition - ThrusterDrainPerSecond * (float)delta);
                 }
             }
         }

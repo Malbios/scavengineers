@@ -94,6 +94,7 @@ ITEM_CO2_FILTER,CO2 Filter,CO2-Filter
 ITEM_WRENCH,Wrench,Schraubenschlüssel
 ITEM_PDA,PDA,PDA
 ITEM_HEALTH_SCAN_CARTRIDGE,Health Scan Cartridge,Zustandsscanner-Modul
+ITEM_POWER_SCAN_CARTRIDGE,Power Scan Cartridge,Energiescanner-Modul
 HUD_SUIT_O2_SLOT,O2 Tank,O2-Tank
 HUD_SUIT_N2_SLOT,N2 Tank,N2-Tank
 HUD_SUIT_FILTER_SLOT,CO2 Filter,CO2-Filter

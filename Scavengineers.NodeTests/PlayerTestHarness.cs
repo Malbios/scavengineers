@@ -45,6 +45,7 @@ public static class PlayerTestHarness
         hud.AddChild(new Label { Name = "TargetNameLabel" });
         hud.AddChild(new Label { Name = "VerbLabel" });
         hud.AddChild(new ProgressBar { Name = "VerbProgressBar" });
+        hud.AddChild(new Label { Name = "PowerInfoLabel" });
 
         var resourcesPanel = new Control { Name = "ResourcesPanel" };
         hud.AddChild(resourcesPanel);
@@ -116,6 +117,7 @@ public static class PlayerTestHarness
         var pdaGrid = new Node { Name = "PdaGrid" };
         pdaLayout.AddChild(pdaGrid);
         pdaGrid.AddChild(MakeSlot("Cartridge1"));
+        pdaGrid.AddChild(MakeSlot("Cartridge2"));
 
         var thrusterWindow = MakeWindow("ThrusterWindow");
         hud.AddChild(thrusterWindow);

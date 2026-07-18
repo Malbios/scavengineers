@@ -31,7 +31,7 @@ public sealed class PlayerInventory
 
     // The PDA's one cartridge pocket — room to grow later (see the PDA equip slot's own doc
     // comment) without a redesign.
-    public const int PdaSlotCount = 1;
+    public const int PdaSlotCount = 2;
 
     // The fixed slot-name priority Add/TryRemove/Unequip use when more than one container is
     // worn at once — matches this codebase's original "backpack before hand" behavior exactly

@@ -142,6 +142,7 @@ public class ShipBuildTargetThrusterTest
 
         AssertInt(thrusters.Count).IsEqual(2);
         AssertBool(thrusters.All(t => t.Condition >= 0.999f)).IsTrue();
+        AssertBool(thrusters.All(t => t.PowerDraw == ShipSim.IdleDraw)).IsTrue();
 
         // Proves the seeded spur conduits (DefaultConduitRoute's new(3,1)/new(8,1) entries)
         // actually connect back to the seeded battery+switch, not just that the thrusters exist

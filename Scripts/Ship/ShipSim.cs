@@ -132,6 +132,16 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     // this fraction of a full charge.
     public const float PowerCellRechargeAmount = 0.5f;
 
+    // Placeholder/tunable power budget — a battery can only actually sustain this much total
+    // draw at once (see DemandedPower/IsOverloaded); every consumer's own baseline is the same
+    // flat idle draw, with the three "working" devices spiking to their own active draw only
+    // while genuinely in use (Recharge Station recharging, Travel Console/Thrusters traveling).
+    public const float BatteryCapacity = 20f;
+    public const float IdleDraw = 1f;
+    public const float RechargeStationActiveDraw = 10f;
+    public const float TravelConsoleActiveDraw = 8f;
+    public const float ThrusterActiveDraw = 6f;
+
     [Export]
     public bool HasPowerGrid { get; set; }
 
@@ -262,7 +272,7 @@ public partial class ShipSim : Node, IShipLayoutSaveable
         // fixed (5,2) is a nominal placeholder shared across every ship type (the Derelict's own
         // door actually sits at a different column) — harmless today since nothing reads this
         // fixture's cell for position, only WearSystem's blanket per-tick decay and lookup-by-Id.
-        Deck.AddFixture(new MachineFixture(InteriorDoorFixtureId, InteriorDoorCell, FixtureSurface.FloorUnderside));
+        Deck.AddFixture(new MachineFixture(InteriorDoorFixtureId, InteriorDoorCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
 
         if (HasPowerGrid)
         {
@@ -272,16 +282,16 @@ public partial class ShipSim : Node, IShipLayoutSaveable
             // player-install/uninstall-able construction parts (see ShipBuildTarget's
             // MachineType), seeded (for the Home Ship) through the exact same
             // Install*/Remove* calls below that a player action or a save replay uses.
-            Deck.AddFixture(new MachineFixture(TravelConsoleFixtureId, TravelConsoleCell, FixtureSurface.WallInner));
-            Deck.AddFixture(new MachineFixture(StationAirlockFixtureId, StationAirlockCell, FixtureSurface.FloorUnderside));
-            Deck.AddFixture(new MachineFixture(DerelictAirlockFixtureId, DerelictAirlockCell, FixtureSurface.FloorUnderside));
+            Deck.AddFixture(new MachineFixture(TravelConsoleFixtureId, TravelConsoleCell, FixtureSurface.WallInner) { PowerDraw = IdleDraw });
+            Deck.AddFixture(new MachineFixture(StationAirlockFixtureId, StationAirlockCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
+            Deck.AddFixture(new MachineFixture(DerelictAirlockFixtureId, DerelictAirlockCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
 
             _power = new PowerSystem(Deck);
         }
 
         if (HasBunk)
         {
-            Deck.AddFixture(new MachineFixture(BunkFixtureId, BunkCell, FixtureSurface.FloorUnderside));
+            Deck.AddFixture(new MachineFixture(BunkFixtureId, BunkCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
         }
 
         if (HasFireHazard)
@@ -440,13 +450,27 @@ public partial class ShipSim : Node, IShipLayoutSaveable
         return AtmosphereVolume.Vacuum;
     }
 
-    /// <summary>Topologically connected to a source AND (if this ship has a battery at all)
-    /// that battery actually has charge — a ship with no battery (e.g. the Derelict, whose only
-    /// source is the always-on fire hazard generator) is never gated by this second check.</summary>
+    /// <summary>Topologically connected to a source, (if this ship has a battery at all) that
+    /// battery actually has charge — a ship with no battery (e.g. the Derelict, whose only
+    /// source is the always-on fire hazard generator) is never gated by this second check — AND
+    /// the circuit isn't currently overloaded (see IsOverloaded): a ship-wide brownout, not a
+    /// per-device cutoff, so every fixture's own IsPowered flips false at once the moment total
+    /// demand exceeds BatteryCapacity, and recovers the instant it drops back under again.</summary>
     public bool IsPowered(string fixtureId) =>
         _power is not null &&
         _power.IsPowered(new PowerNodeId(fixtureId)) &&
-        (_battery is null || _battery.Condition > 0f);
+        (_battery is null || _battery.Condition > 0f) &&
+        !IsOverloaded;
+
+    /// <summary>Sum of PowerDraw over every fixture topologically reachable from a source —
+    /// deliberately calls _power.IsPowered directly rather than the full IsPowered above, to
+    /// avoid the circularity of "demand decides overload decides IsPowered decides demand".
+    /// What the circuit is currently asking for, regardless of whether supply can actually cover
+    /// it — this is the number a power readout should show as "required."</summary>
+    public float DemandedPower() =>
+        _power is null ? 0f : Deck.Fixtures.Where(f => _power.IsPowered(new PowerNodeId(f.Id))).Sum(f => f.PowerDraw);
+
+    private bool IsOverloaded => DemandedPower() > BatteryCapacity;
 
     /// <summary>0-1 charge fraction for HUD/verb-suffix display — 0 for a ship with no battery.</summary>
     public float BatteryChargeFraction => _battery?.Condition ?? 0f;
@@ -515,7 +539,7 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     public void RemoveSwitch() => Deck.RemoveFixture(SwitchFixtureId);
 
     public void InstallRechargeStation(CellCoord cell, FixtureSurface surface) =>
-        Deck.AddFixture(new MachineFixture(RechargeFixtureId, cell, surface));
+        Deck.AddFixture(new MachineFixture(RechargeFixtureId, cell, surface) { PowerDraw = IdleDraw });
 
     public void RemoveRechargeStation() => Deck.RemoveFixture(RechargeFixtureId);
 
@@ -527,7 +551,7 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     // ApplySaveState/SeedDefaultShipLayout callers override this via an explicit savedState when
     // a real charge (and tank) should carry over.
     public void InstallThruster(string id, CellCoord cell, FixtureSurface surface) =>
-        Deck.AddFixture(new ThrusterFixture(id, cell, surface) { Condition = 0f });
+        Deck.AddFixture(new ThrusterFixture(id, cell, surface) { Condition = 0f, PowerDraw = IdleDraw });
 
     public void RemoveThruster(string id) => Deck.RemoveFixture(id);
 
