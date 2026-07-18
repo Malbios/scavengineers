@@ -165,7 +165,7 @@ public partial class InventorySlotUI : Control
         {
             Tooltip.Text = Tr("HUD_SLOT_BLOCKED_BY_SUIT");
         }
-        else if (BatteryCharge() is { } charge)
+        else if (ChargeableSlotCharge() is { } charge)
         {
             // A specialized slot's Count is always the synthetic "1" from CurrentSlot() —
             // showing charge instead is the actually useful number here (how much is left), not
@@ -192,11 +192,12 @@ public partial class InventorySlotUI : Control
     }
 
     /// <summary>Charge fraction (0-1) for the drill/flashlight battery slots specifically, or for
-    /// an ordinary hand/backpack slot that happens to hold a loose "battery" item (see
-    /// SlotContainer's own per-slot Charge) — null for every other slot, including a
-    /// battery-less drill/flashlight (that case already falls through to CurrentSlot() returning
-    /// null, i.e. "empty slot" tooltip handling).</summary>
-    private float? BatteryCharge()
+    /// an ordinary hand/backpack/thruster-tank-dock slot that happens to hold any of
+    /// PlayerInventory.ChargeableItemIds (battery, o2_tank, n2_tank, co2_filter — see SlotContainer's
+    /// own per-slot Charge) — null for every other slot, including an empty drill/flashlight
+    /// (that case already falls through to CurrentSlot() returning null, i.e. "empty slot"
+    /// tooltip handling).</summary>
+    private float? ChargeableSlotCharge()
     {
         if (SpecializedSlotKey.Length > 0)
         {
@@ -205,16 +206,17 @@ public partial class InventorySlotUI : Control
 
         if (IsBackSlot || EquippedSlotName.Length > 0 || IsUnusedBodySlot)
         {
-            // None of these represent a literal "battery" item slot — a worn backpack/torso/
+            // None of these represent a literal chargeable-item slot — a worn backpack/torso/
             // helmet, or an always-empty Legs/feet slot, never has its own Charge to show. Without
             // this guard they'd fall through to the generic Container/SlotIndex check below, whose
             // Container/SlotIndex (set to Hands/0 by Player._Ready's blanket EquipSlots loop) is
-            // otherwise meaningless here — coincidentally showing a battery charge from whatever's
-            // in the player's left hand.
+            // otherwise meaningless here — coincidentally showing a charge from whatever's in the
+            // player's left hand.
             return null;
         }
 
-        return Container is { } c && SlotIndex >= 0 && SlotIndex < c.Slots.Count && c.Slots[SlotIndex] is { ItemId: "battery" } slot2
+        return Container is { } c && SlotIndex >= 0 && SlotIndex < c.Slots.Count && c.Slots[SlotIndex] is { } slot2
+            && PlayerInventory.ChargeableItemIds.Contains(slot2.ItemId)
             ? slot2.Charge
             : null;
     }

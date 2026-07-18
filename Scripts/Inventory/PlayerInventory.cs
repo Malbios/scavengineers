@@ -234,6 +234,14 @@ public sealed class PlayerInventory
     /// inventory.</summary>
     public static string? SpecializedSlotAcceptedItemId(string key) => SpecializedSlotAcceptedItemIds.GetValueOrDefault(key);
 
+    /// <summary>Every item id that ever carries a meaningful per-slot Charge (the distinct value
+    /// set of <see cref="SpecializedSlotAcceptedItemIds"/> — a tank/filter/battery keeps its real
+    /// charge whether it's docked in its own specialized slot or just sitting loose in an
+    /// ordinary hand/backpack/thruster slot, see SlotContainer's own Charge field). Used by
+    /// InventorySlotUI's tooltip to show "X%" instead of a meaningless "1" for any of these, not
+    /// just "battery" specifically.</summary>
+    public static readonly IReadOnlySet<string> ChargeableItemIds = SpecializedSlotAcceptedItemIds.Values.ToHashSet();
+
     /// <summary>The raw per-slot view of the two hands (see InventorySlotUI) — a worn
     /// backpack's own contents are addressed separately via <see cref="Backpack"/>.Contents,
     /// never merged in here.</summary>
