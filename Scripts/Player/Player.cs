@@ -165,6 +165,11 @@ public partial class Player : CharacterBody3D
     private Label? _verbLabel;
     private ProgressBar? _verbProgressBar;
     private Label? _powerInfoLabel;
+    private Label? _savedLabel;
+    private Timer? _savedFlashTimer;
+
+    // Placeholder/tunable — how long the "Saved" confirmation stays visible after a save.
+    private const float SavedFlashSeconds = 2f;
     private ProgressBar? _o2Bar;
     private Label? _co2Label;
     private ProgressBar? _co2Bar;
@@ -390,6 +395,10 @@ public partial class Player : CharacterBody3D
         _verbLabel = GetNode<Label>("HUD/VerbLabel");
         _verbProgressBar = GetNode<ProgressBar>("HUD/VerbProgressBar");
         _powerInfoLabel = GetNode<Label>("HUD/PowerInfoLabel");
+        _savedLabel = GetNode<Label>("HUD/SavedLabel");
+        _savedFlashTimer = new Timer { OneShot = true, WaitTime = SavedFlashSeconds };
+        AddChild(_savedFlashTimer);
+        _savedFlashTimer.Timeout += () => _savedLabel!.Visible = false;
         _o2Bar = GetNode<ProgressBar>("HUD/ResourcesPanel/O2Bar");
         _co2Label = GetNode<Label>("HUD/ResourcesPanel/CO2Label");
         _co2Bar = GetNode<ProgressBar>("HUD/ResourcesPanel/CO2Bar");
@@ -2095,6 +2104,17 @@ public partial class Player : CharacterBody3D
     }
 
     public void RefillSuitResources() => _suitResources.RestoreFrom(100f, 100f);
+
+    /// <summary>Called by SaveManager.Save() at the end of every successful save — F5 and
+    /// autosave both funnel through that one method, so both trigger this the same way. A brief
+    /// visible confirmation, the same "set visible, (re)start a one-shot timer that hides it
+    /// again" shape RechargeStationVerbTarget's own active-draw spike already uses.</summary>
+    public void ShowSavedFlash()
+    {
+        _savedLabel!.Visible = true;
+        _savedLabel.Text = Tr("HUD_SAVED");
+        _savedFlashTimer!.Start();
+    }
 
     /// <summary>Hard death from 0 Health (see the O2-driven drain in SuitResources.Tick) —
     /// reloads the last save so the player picks back up from wherever they last saved.

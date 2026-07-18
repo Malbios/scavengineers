@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 using GdUnit4;
 using Godot;
@@ -164,6 +165,77 @@ public class SaveManagerTest
 
             AssertBool(secondBoot.LayoutSeed == rolledSeed).IsTrue();
             AssertBool(secondBoot.GridWidth == rolledGridWidth).IsTrue();
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task Autosave_FiresAfterTheConfiguredInterval_WritingTheSaveFile()
+    {
+        var tempPath = Path.Combine(Path.GetTempPath(), $"scavengineers-test-{Guid.NewGuid()}.json");
+        try
+        {
+            var sceneTree = (SceneTree)Engine.GetMainLoop();
+            var player = PlayerTestHarness.CreateAttached(sceneTree);
+
+            // AutosaveIntervalSeconds must be set before AddChild — the Timer it drives is built
+            // in _Ready(), same timing constraint SavePath already has.
+            var manager = AutoFree(new SaveManager { PlayerRef = player, SavePath = tempPath, AutosaveIntervalSeconds = 0.1f });
+            sceneTree.Root.AddChild(manager);
+
+            AssertBool(File.Exists(tempPath)).IsFalse();
+
+            await sceneTree.ToSignal(sceneTree.CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+
+            AssertBool(File.Exists(tempPath)).IsTrue();
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void Save_ShowsThePlayersSavedFlash()
+    {
+        var tempPath = Path.GetTempFileName();
+        try
+        {
+            var (player, manager) = MakeHarness(tempPath);
+
+            manager.Save();
+
+            AssertBool(player.GetNode<Label>("HUD/SavedLabel").Visible).IsTrue();
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task SavedFlash_HidesAgain_AfterItsOwnWindowElapses()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var tempPath = Path.GetTempFileName();
+        try
+        {
+            var (player, manager) = MakeHarness(tempPath);
+
+            manager.Save();
+            var savedLabel = player.GetNode<Label>("HUD/SavedLabel");
+            AssertBool(savedLabel.Visible).IsTrue();
+
+            // Past the 2s flash window with real margin.
+            await sceneTree.ToSignal(sceneTree.CreateTimer(2.5), SceneTreeTimer.SignalName.Timeout);
+
+            AssertBool(savedLabel.Visible).IsFalse();
         }
         finally
         {

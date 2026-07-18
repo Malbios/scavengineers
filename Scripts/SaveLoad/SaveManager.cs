@@ -27,14 +27,24 @@ public partial class SaveManager : Node
     /// instead of the player's real save data — every production caller just uses the default.</summary>
     public string SavePath { get; set; } = DefaultSavePath;
 
+    /// <summary>Placeholder/tunable — how often autosave fires. Instance property, not a
+    /// constant, for the same reason SavePath already is one: a test needs to point this at a
+    /// much shorter interval than real play ever would, set before this node enters the tree.</summary>
+    public float AutosaveIntervalSeconds { get; set; } = 300f;
+
     [Export]
     public PlayerScript? PlayerRef { get; set; }
 
     private PlayerScript? _player;
+    private Timer? _autosaveTimer;
 
     public override void _Ready()
     {
         _player = PlayerRef;
+
+        _autosaveTimer = new Timer { WaitTime = AutosaveIntervalSeconds, Autostart = true };
+        AddChild(_autosaveTimer);
+        _autosaveTimer.Timeout += Save;
     }
 
     public override void _Input(InputEvent @event)
@@ -99,6 +109,7 @@ public partial class SaveManager : Node
 
         File.WriteAllText(SavePath, JsonSerializer.Serialize(data));
         GD.Print($"[SaveManager] Saved to {SavePath}");
+        _player?.ShowSavedFlash();
     }
 
     /// <summary>Returns whether a save was actually applied — false (no-op, logged) for a missing

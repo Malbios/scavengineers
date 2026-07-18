@@ -48,6 +48,7 @@ HUD_TRAVEL_MAP_PROMPT,Select a destination,Ziel auswählen
 HUD_TRAVEL_MAP_CANCEL,Cancel,Abbrechen
 HUD_SHOP_CLOSE,Close,Schließen
 HUD_CREDITS,Credits,Credits
+HUD_SAVED,Saved,Gespeichert
 ITEM_POWER_CELL,Power Cell,Energiezelle
 VERB_RECHARGE_BATTERY,Recharge Battery,Batterie aufladen
 OBJECT_BATTERY,Battery,Batterie

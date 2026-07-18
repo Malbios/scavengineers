@@ -46,6 +46,7 @@ public static class PlayerTestHarness
         hud.AddChild(new Label { Name = "VerbLabel" });
         hud.AddChild(new ProgressBar { Name = "VerbProgressBar" });
         hud.AddChild(new Label { Name = "PowerInfoLabel" });
+        hud.AddChild(new Label { Name = "SavedLabel" });
 
         var resourcesPanel = new Control { Name = "ResourcesPanel" };
         hud.AddChild(resourcesPanel);

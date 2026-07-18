@@ -198,6 +198,18 @@ grow_horizontal = 2
 theme_override_styles/normal = SubResource("HudLabelBackground")
 horizontal_alignment = 1
 
+[node name="SavedLabel" type="Label" parent="HUD"]
+visible = false
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -100.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 40.0
+grow_horizontal = 0
+theme_override_styles/normal = SubResource("HudLabelBackground")
+horizontal_alignment = 1
+
 [node name="LeftHandLabel" type="Label" parent="HUD"]
 offset_left = 16.0
 offset_top = 16.0
