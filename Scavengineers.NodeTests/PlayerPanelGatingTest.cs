@@ -1,7 +1,12 @@
+using System.Linq;
+using System.Threading.Tasks;
+
 using GdUnit4;
 using Godot;
+using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.Ship;
 using DraggableWindowScript = Scavengineers.Scripts.Player.DraggableWindow;
+using InventorySlotUIScript = Scavengineers.Scripts.Player.InventorySlotUI;
 
 using static GdUnit4.Assertions;
 
@@ -34,5 +39,38 @@ public class PlayerPanelGatingTest
         player._Input(new InputEventKey { Keycode = Key.Tab, Pressed = true });
 
         AssertBool(player.GetNode<DraggableWindowScript>("HUD/InventoryPanel").Visible).IsFalse();
+    }
+
+    /// <summary>Regression coverage for a bug found right after shipping storage: StorageGrid's
+    /// visible=false (copied from BackpackGrid's own template) never got flipped back to true —
+    /// unlike Backpack's own "_backpackGrid!.Visible = backpackContents is not null;" line in
+    /// UpdateInventoryHud, which storage's own block was missing entirely. The window itself
+    /// opened fine; its grid — and therefore every slot in it — just stayed invisible.</summary>
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task OpeningAStorageUnit_MakesTheGridVisible_WithOneSlotUIPerContentsSlot()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        var storage = AutoFree(new StorageVerbTarget { ItemId = "shelf", Contents = new SlotContainer(6) });
+
+        // Unlike Player.tscn (visible = false on both StorageGrid itself and its SlotTemplate),
+        // the hand-built harness leaves both at Godot's own Control default (true) — pin both so
+        // this test actually proves UpdateInventoryHud flips the grid visible and the count below
+        // reflects only the 6 real duplicated slots, not the permanent template itself.
+        var grid = player.GetNode<Control>("HUD/StorageWindow/Layout/StorageGrid");
+        grid.Visible = false;
+        player.GetNode<InventorySlotUIScript>("HUD/StorageWindow/Layout/StorageGrid/SlotTemplate").Visible = false;
+
+        player.OpenStorageInventory(storage);
+
+        // UpdateInventoryHud (where the rebuild/visibility logic lives) runs from
+        // _PhysicsProcess, not synchronously on Open — let a couple of real ticks run, same
+        // pattern PlayerToolDurabilityTest already uses.
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+
+        AssertBool(grid.Visible).IsTrue();
+        AssertInt(grid.GetChildren().OfType<InventorySlotUIScript>().Count(s => s.Visible)).IsEqual(6);
     }
 }

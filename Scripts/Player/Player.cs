@@ -2294,6 +2294,7 @@ public partial class Player : CharacterBody3D
         }
 
         var storageContents = GodotObject.IsInstanceValid(_openStorage) ? _openStorage!.Contents : null;
+        _storageGrid!.Visible = storageContents is not null;
         var storageSlotCount = storageContents?.Slots.Count ?? 0;
         if (storageSlotCount != _storageSlotUICount)
         {
