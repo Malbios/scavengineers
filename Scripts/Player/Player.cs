@@ -586,7 +586,7 @@ public partial class Player : CharacterBody3D
         {
             CaptureMouse();
         }
-        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy && !_travelMapOpen && !_shopOpen && !_deathOpen)
+        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy && !_travelMapOpen && !_shopOpen && !_thrusterInventoryOpen && !_deathOpen)
         {
             if (_inventoryOpen)
             {
@@ -1093,9 +1093,16 @@ public partial class Player : CharacterBody3D
     // Player's lifetime, so Godot auto-disconnects it when this instance is freed (e.g. on a
     // scene change). A static method's connection has no instance to track, so travelling
     // between scenes would try to reconnect the exact same callable and hit "already connected."
+    // Not mechanically covered by an automated test: SuppressMouseCaptureForTests (see its own
+    // doc comment) makes every CaptureMouse() call a no-op for the whole NodeTests suite, on
+    // purpose, so it can't observe the AnyPanelOpen branch below either — the same flag that
+    // protects the developer's real cursor during a test run also hides this exact bug from
+    // being test-driven. Verified by code review only: regaining OS window focus (FocusEntered,
+    // wired below) used to unconditionally recapture the mouse even with a panel open, yanking
+    // it into FPS-look mode with e.g. the shop still visible underneath.
     private void CaptureMouse()
     {
-        if (SuppressMouseCaptureForTests)
+        if (SuppressMouseCaptureForTests || AnyPanelOpen)
         {
             return;
         }
