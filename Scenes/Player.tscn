@@ -10,6 +10,8 @@
 [ext_resource type="Script" path="res://Scripts/Player/WorldDropZone.cs" id="8"]
 [ext_resource type="Shader" path="res://Shaders/scan_highlight.gdshader" id="9"]
 [ext_resource type="Script" path="res://Scripts/Player/DeathPanel.cs" id="10"]
+[ext_resource type="Script" path="res://Scripts/Travel/DockingMinigamePanel.cs" id="11"]
+[ext_resource type="Script" path="res://Scripts/Travel/DockingView.cs" id="12"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -1644,6 +1646,68 @@ text = "TRAVEL"
 layout_mode = 2
 text = "CANCEL"
 show_percentage = false
+
+[node name="DockingPanel" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("View", "StatusLabel", "DockButton")]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -240.0
+offset_right = 280.0
+offset_bottom = 240.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("OpaquePanelBackground")
+script = ExtResource("11")
+View = NodePath("Layout/DockingArea/DockingView")
+StatusLabel = NodePath("Layout/StatusLabel")
+DockButton = NodePath("Layout/DockButton")
+
+[node name="Layout" type="VBoxContainer" parent="HUD/DockingPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TitleBar" type="Label" parent="HUD/DockingPanel/Layout"]
+layout_mode = 2
+mouse_filter = 0
+theme_override_styles/normal = SubResource("HudLabelBackground")
+text = "DOCKING"
+horizontal_alignment = 1
+
+[node name="DockingArea" type="Control" parent="HUD/DockingPanel/Layout"]
+custom_minimum_size = Vector2(540, 350)
+layout_mode = 2
+
+[node name="SpaceBackground" type="Control" parent="HUD/DockingPanel/Layout/DockingArea"]
+mouse_filter = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("6")
+
+[node name="DockingView" type="Control" parent="HUD/DockingPanel/Layout/DockingArea"]
+mouse_filter = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("12")
+
+[node name="StatusLabel" type="Label" parent="HUD/DockingPanel/Layout"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("HudLabelBackground")
+horizontal_alignment = 1
+
+[node name="DockButton" type="Button" parent="HUD/DockingPanel/Layout"]
+layout_mode = 2
+disabled = true
+text = "DOCK"
 
 [node name="ShopPanel" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("BuyList", "SellList", "CloseButton")]
 visible = false

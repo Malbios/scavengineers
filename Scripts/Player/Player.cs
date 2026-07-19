@@ -184,6 +184,8 @@ public partial class Player : CharacterBody3D
     private DraggableWindow? _backpackWindow;
     private TravelMapPanel? _travelMapPanel;
     private TravelConsoleVerbTarget? _openTravelConsole;
+    private DockingMinigamePanel? _dockingPanel;
+    private TravelConsoleVerbTarget? _openDockingConsole;
     private ShopPanel? _shopPanel;
     private VendorVerbTarget? _openShopVendor;
     private DeathPanel? _deathPanel;
@@ -317,6 +319,13 @@ public partial class Player : CharacterBody3D
     /// interact with something else behind it.</summary>
     private bool _travelMapOpen;
 
+    /// <summary>Whether the docking minigame is currently open — same suppress-everything gating
+    /// as every other panel, via <see cref="AnyPanelOpen"/>, plus its own movement freeze (like
+    /// <see cref="_deathOpen"/>) since WASD is repurposed as minigame thrust input while this is
+    /// open. Deliberately NOT in the Escape-key chain — same "no silent abandon" reasoning as the
+    /// death screen; the only ways out are a successful dock or an in-minigame abort-and-retry.</summary>
+    private bool _dockingOpen;
+
     /// <summary>Whether the station trade console's shop screen is currently open — same
     /// suppress-everything gating as _inventoryOpen/_travelMapOpen, via <see cref="AnyPanelOpen"/>.
     /// Interact() is already gated by AnyPanelOpen, so Shop and the travel map can never both be
@@ -352,7 +361,7 @@ public partial class Player : CharacterBody3D
 
     /// <summary>Any full-screen-ish HUD panel that should suppress normal gameplay input while
     /// open — shared gate for every _Input branch that used to check _inventoryOpen alone.</summary>
-    private bool AnyPanelOpen => _inventoryOpen || _travelMapOpen || _shopOpen || _thrusterInventoryOpen || _storageOpen || _deathOpen;
+    private bool AnyPanelOpen => _inventoryOpen || _travelMapOpen || _dockingOpen || _shopOpen || _thrusterInventoryOpen || _storageOpen || _deathOpen;
 
     /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-9, 0) —
     /// also reused by VendorVerbTarget as the set of things Buy can offer, since there's
@@ -467,6 +476,8 @@ public partial class Player : CharacterBody3D
         _backpackGrid = GetNode<Control>("HUD/BackpackWindow/Layout/BackpackGrid");
         _travelMapPanel = GetNode<TravelMapPanel>("HUD/TravelMapPanel");
         _travelMapPanel.PlayerRef = this;
+        _dockingPanel = GetNode<DockingMinigamePanel>("HUD/DockingPanel");
+        _dockingPanel.PlayerRef = this;
         _shopPanel = GetNode<ShopPanel>("HUD/ShopPanel");
         _shopPanel.PlayerRef = this;
         _deathPanel = GetNode<DeathPanel>("HUD/DeathPanel");
@@ -623,7 +634,7 @@ public partial class Player : CharacterBody3D
         {
             CaptureMouse();
         }
-        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy && !_travelMapOpen && !_shopOpen && !_thrusterInventoryOpen && !_storageOpen && !_deathOpen)
+        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy && !_travelMapOpen && !_dockingOpen && !_shopOpen && !_thrusterInventoryOpen && !_storageOpen && !_deathOpen)
         {
             if (_inventoryOpen)
             {
@@ -1214,6 +1225,35 @@ public partial class Player : CharacterBody3D
         CaptureMouse();
     }
 
+    /// <summary>Called by TravelConsoleVerbTarget.OnTravelComplete — opens automatically once the
+    /// travel timer elapses (not requiring a second console interaction, since the player already
+    /// committed via the travel map) and starts the minigame's first attempt.</summary>
+    public void OpenDockingMinigame(TravelConsoleVerbTarget console)
+    {
+        _dockingOpen = true;
+        _openDockingConsole = console;
+        _dockingPanel!.Visible = true;
+        _dockingPanel.ResetAttempt();
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+    }
+
+    /// <summary>Called by DockingMinigamePanel's Dock button once it succeeds — resolves arrival
+    /// on whichever console opened the minigame, then closes it. No cancel/Escape path exists
+    /// (see _dockingOpen's own doc comment) — this is the only way the panel ever closes.</summary>
+    public void CompleteDocking()
+    {
+        _openDockingConsole?.CompleteDocking();
+        CloseDockingMinigame();
+    }
+
+    public void CloseDockingMinigame()
+    {
+        _dockingOpen = false;
+        _openDockingConsole = null;
+        _dockingPanel!.Visible = false;
+        CaptureMouse();
+    }
+
     /// <summary>Called by VendorVerbTarget.ExecuteVerb — opens the shop panel instead of
     /// the old per-item Buy/Sell verb-cycling, same shape as OpenTravelMap.</summary>
     public void OpenShop(VendorVerbTarget vendor)
@@ -1377,7 +1417,7 @@ public partial class Player : CharacterBody3D
             // checked explicitly rather than just SuitN2 non-null.
             var hasWorkingThrusters = _inventory.Torso is not null && _inventory.SuitN2 is { HasItem: true, Charge: > 0f };
 
-            if (!IsBusy && !_deathOpen)
+            if (!IsBusy && !_deathOpen && !_dockingOpen)
             {
                 var thrust = Vector3.Zero;
                 if (Input.IsPhysicalKeyPressed(Key.W))
@@ -1495,7 +1535,7 @@ public partial class Player : CharacterBody3D
                 velocity.Y -= Gravity * (float)delta;
             }
 
-            if (IsBusy || _deathOpen)
+            if (IsBusy || _deathOpen || _dockingOpen)
             {
                 velocity.X = 0;
                 velocity.Z = 0;

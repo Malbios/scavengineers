@@ -144,6 +144,15 @@ public static class PlayerTestHarness
         travelMapPanel.AddChild(travelMapPanel.CancelButton);
         hud.AddChild(travelMapPanel);
 
+        var dockingPanel = new DockingMinigamePanel { Name = "DockingPanel" };
+        dockingPanel.View = new DockingView();
+        dockingPanel.StatusLabel = new Label();
+        dockingPanel.DockButton = new Button();
+        dockingPanel.AddChild(dockingPanel.View);
+        dockingPanel.AddChild(dockingPanel.StatusLabel);
+        dockingPanel.AddChild(dockingPanel.DockButton);
+        hud.AddChild(dockingPanel);
+
         var shopPanel = new ShopPanel { Name = "ShopPanel" };
         shopPanel.CloseButton = new Button();
         shopPanel.AddChild(shopPanel.CloseButton);

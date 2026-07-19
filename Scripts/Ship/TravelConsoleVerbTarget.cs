@@ -114,6 +114,12 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 
     private Timer? _travelTimer;
     private bool _traveling;
+
+    /// <summary>True once the travel timer elapses but before the docking minigame's own Dock
+    /// button succeeds — the ship has "arrived in open space" near the target but isn't there
+    /// yet. See CompleteDocking, called by Player once the minigame's Dock button succeeds.</summary>
+    private bool _docking;
+
     private int _currentDestination; // 0 = Station, 1..DerelictCount = Derelict N
     private int _pendingDestination;
     private readonly List<Node3D> _derelictGroups = new();
@@ -145,10 +151,18 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 
     public float? Condition => ConsoleFixture?.Condition;
 
+    // Docking (see _docking) deliberately reports no progress here — there's no single 0-1
+    // fraction for an open-ended alignment attempt; the docking panel has its own distance/speed
+    // readout instead.
     public float? CurrentVerbProgress =>
         _traveling ? 1f - (float)(_travelTimer!.TimeLeft / _travelTimer.WaitTime)
         : _maintaining ? 1f - (float)(_maintenanceTimer!.TimeLeft / _maintenanceTimer.WaitTime)
         : null;
+
+    /// <summary>Still actively maneuvering/burning fuel through the docking phase, not idle —
+    /// covers both halves of "in flight" for the PowerDraw sync/battery-drain/N2-drain below,
+    /// which don't otherwise care which half they're in.</summary>
+    private bool IsActivelyFlying => _traveling || _docking;
 
     public override void _Ready()
     {
@@ -202,15 +216,15 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         // overload that only becomes visible once its later siblings' draw also updates.
         if (ConsoleFixture is { } consoleFixture)
         {
-            consoleFixture.PowerDraw = _traveling ? ShipSim.TravelConsoleActiveDraw : ShipSim.IdleDraw;
+            consoleFixture.PowerDraw = IsActivelyFlying ? ShipSim.TravelConsoleActiveDraw : ShipSim.IdleDraw;
         }
 
         foreach (var thruster in ShipSimRef.Deck.Fixtures.OfType<ThrusterFixture>())
         {
-            thruster.PowerDraw = _traveling ? ShipSim.ThrusterActiveDraw : ShipSim.IdleDraw;
+            thruster.PowerDraw = IsActivelyFlying ? ShipSim.ThrusterActiveDraw : ShipSim.IdleDraw;
         }
 
-        if (_traveling)
+        if (IsActivelyFlying)
         {
             ShipSimRef.DrainBattery(BatteryDrainPerSecond * (float)delta);
 
@@ -328,9 +342,27 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         return entries;
     }
 
+    /// <summary>The travel timer elapsing no longer resolves arrival directly — the ship has
+    /// "arrived in open space" near the target, and needs the docking minigame's own Dock button
+    /// to succeed (see CompleteDocking) before anything about _currentDestination actually
+    /// changes. Opens the minigame automatically rather than requiring a second console
+    /// interaction, since the player already committed via the travel map.</summary>
     private void OnTravelComplete()
     {
         _traveling = false;
+        _docking = true;
+
+        if (GetTree().GetFirstNodeInGroup("player") is PlayerScript player)
+        {
+            player.OpenDockingMinigame(this);
+        }
+    }
+
+    /// <summary>Called by Player once the docking minigame's Dock button succeeds — exactly what
+    /// OnTravelComplete used to do unconditionally before docking existed.</summary>
+    public void CompleteDocking()
+    {
+        _docking = false;
         _currentDestination = _pendingDestination;
         ApplyCurrentLocation();
     }
