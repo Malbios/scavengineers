@@ -148,9 +148,11 @@ public static class PlayerTestHarness
         dockingPanel.View = new DockingView();
         dockingPanel.StatusLabel = new Label();
         dockingPanel.DockButton = new Button();
+        dockingPanel.HintLabel = new Label();
         dockingPanel.AddChild(dockingPanel.View);
         dockingPanel.AddChild(dockingPanel.StatusLabel);
         dockingPanel.AddChild(dockingPanel.DockButton);
+        dockingPanel.AddChild(dockingPanel.HintLabel);
         hud.AddChild(dockingPanel);
 
         var shopPanel = new ShopPanel { Name = "ShopPanel" };

@@ -131,3 +131,4 @@ VERB_SCRAP_STORAGE,Scrap Storage,Lagerung verschrotten
 VERB_OPEN_STORAGE,Open Storage,Lagerung öffnen
 VERB_DOCK,Dock,Andocken
 HUD_DOCKING_ABORTED,Docking aborted — try again,Andockvorgang abgebrochen — erneut versuchen
+HUD_DOCKING_CONTROLS,WASD align · Space thrust · Ctrl reverse thrust · release to slow,WASD ausrichten · Leertaste Schub · Strg Gegenschub · loslassen zum Abbremsen

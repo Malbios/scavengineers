@@ -7,8 +7,9 @@ namespace Scavengineers.Scripts.Travel;
 /// same "own reference back to Player, Player owns the reference to whichever world target is
 /// currently open" shape TravelMapPanel/ThrusterVerbTarget's own windows already use (see
 /// Player._openDockingConsole): lateral alignment (WASD, inertia-based, same accelerate/drag
-/// shape as Player's own zero-g thrust) and closing distance (Space). Too fast (combined
-/// velocity) or too misaligned aborts the attempt — a free retry via a brief message + reset,
+/// shape as Player's own zero-g thrust) and closing distance (Space to thrust in, Ctrl to
+/// actively back off). Too fast (combined velocity) or too misaligned aborts the attempt — a
+/// free retry via a brief message + reset,
 /// not a failed trip. The Dock button only does anything once all three tolerances hold at
 /// once.</summary>
 public partial class DockingMinigamePanel : PanelContainer
@@ -21,6 +22,9 @@ public partial class DockingMinigamePanel : PanelContainer
 
     [Export]
     public Button? DockButton { get; set; }
+
+    [Export]
+    public Label? HintLabel { get; set; }
 
     /// <summary>Set by Player._Ready, same self-addressing shape InventorySlotUI.PlayerRef and
     /// every other panel's own PlayerRef already use.</summary>
@@ -60,6 +64,7 @@ public partial class DockingMinigamePanel : PanelContainer
     {
         DockButton!.Text = Tr("VERB_DOCK");
         DockButton.Pressed += OnDockPressed;
+        HintLabel!.Text = Tr("HUD_DOCKING_CONTROLS");
 
         _abortResetTimer = new Timer { OneShot = true, WaitTime = AbortMessageSeconds };
         AddChild(_abortResetTimer);
@@ -121,15 +126,32 @@ public partial class DockingMinigamePanel : PanelContainer
             thrust.X += 1;
         }
 
-        Tick((float)delta, thrust, Input.IsPhysicalKeyPressed(Key.Space));
+        // Space = closing thrust (toward the port), Ctrl = its counter (actively backing off) —
+        // same paired-opposite-keys shape Player's own zero-g float movement already uses for
+        // its own Space-up/Ctrl-down thrust pair, not a new convention.
+        var closingAxis = 0f;
+        if (Input.IsPhysicalKeyPressed(Key.Space))
+        {
+            closingAxis += 1f;
+        }
+
+        if (Input.IsPhysicalKeyPressed(Key.Ctrl))
+        {
+            closingAxis -= 1f;
+        }
+
+        Tick((float)delta, thrust, closingAxis);
     }
 
     /// <summary>The minigame's own pure simulation step, factored out of _PhysicsProcess so it
     /// can be driven with synthetic input directly — Input.IsPhysicalKeyPressed reflects real,
     /// continuously-held OS key state that NodeTests has no established way to fake (unlike the
     /// one-shot InputEventKey Player's own tests already simulate), so this is what actually
-    /// makes the abort/tolerance logic testable at all.</summary>
-    public void Tick(float dt, Vector2 lateralThrust, bool closingThrust)
+    /// makes the abort/tolerance logic testable at all. closingAxis is signed (+1 = Space,
+    /// -1 = Ctrl, 0 = neither/both) rather than a bool, so the closing velocity can go negative
+    /// (actively backing away from the port) instead of only ever decaying passively toward
+    /// zero.</summary>
+    public void Tick(float dt, Vector2 lateralThrust, float closingAxis)
     {
         if (_aborted)
         {
@@ -144,9 +166,9 @@ public partial class DockingMinigamePanel : PanelContainer
         _lateralVelocity = _lateralVelocity.MoveToward(Vector2.Zero, LateralDrag * dt);
         _lateralOffset += _lateralVelocity * dt;
 
-        if (closingThrust)
+        if (closingAxis != 0f)
         {
-            _closingVelocity += ClosingThrustAcceleration * dt;
+            _closingVelocity += closingAxis * ClosingThrustAcceleration * dt;
         }
 
         _closingVelocity = Mathf.MoveToward(_closingVelocity, 0f, ClosingDrag * dt);

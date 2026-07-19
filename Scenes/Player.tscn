@@ -1647,7 +1647,7 @@ layout_mode = 2
 text = "CANCEL"
 show_percentage = false
 
-[node name="DockingPanel" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("View", "StatusLabel", "DockButton")]
+[node name="DockingPanel" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("View", "StatusLabel", "DockButton", "HintLabel")]
 visible = false
 anchors_preset = 8
 anchor_left = 0.5
@@ -1665,6 +1665,7 @@ script = ExtResource("11")
 View = NodePath("Layout/DockingArea/DockingView")
 StatusLabel = NodePath("Layout/StatusLabel")
 DockButton = NodePath("Layout/DockButton")
+HintLabel = NodePath("Layout/HintLabel")
 
 [node name="Layout" type="VBoxContainer" parent="HUD/DockingPanel"]
 layout_mode = 2
@@ -1676,6 +1677,11 @@ mouse_filter = 0
 theme_override_styles/normal = SubResource("HudLabelBackground")
 text = "DOCKING"
 horizontal_alignment = 1
+
+[node name="HintLabel" type="Label" parent="HUD/DockingPanel/Layout"]
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 2
 
 [node name="DockingArea" type="Control" parent="HUD/DockingPanel/Layout"]
 custom_minimum_size = Vector2(540, 350)
