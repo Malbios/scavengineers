@@ -19,6 +19,26 @@ Each entry:
 
 ---
 
+## Missions / contracts
+
+**What:** A mission board or console offering discrete objectives with a payout, three variants
+raised together: retrieve a specific item from a specific derelict, fly cargo from A to B, carry
+a passenger from A to B.
+
+**Why it's good:** Gives travel and salvage runs an externally-set goal instead of pure
+self-directed scavenging; cargo/passenger delivery would reuse the existing travel-console
+destination system. Overlaps with — but is more concrete than — the already-logged NPC/crew
+"station contract board" idea below.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-19) — not evaluated against current
+dev state in detail. Likely needs some kind of objective/reward tracking that doesn't exist yet,
+and cargo/passenger delivery specifically implies a cargo-hold/passenger-carrying mechanic that
+doesn't exist either.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+---
+
 ## Low-health warning
 
 **What:** A pulsing red vignette (and maybe an audio cue) once Health drops under some threshold
