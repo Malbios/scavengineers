@@ -102,6 +102,22 @@ dev state in detail.
 
 ---
 
+## Zero-g debris fields
+
+**What:** Loose floating clutter blocking a vented room's path that has to be manually pushed/
+cleared rather than just walked around, reusing the shove-on-collision physics that already
+exists for loose items (`ItemPushImpulse` in `Player.cs`).
+
+**Why it's good:** Turns navigating a breached room into a small physical puzzle instead of just
+a stat-drain hazard to walk through.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-19) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+---
+
 ## Low-health warning
 
 **What:** A pulsing red vignette (and maybe an audio cue) once Health drops under some threshold
