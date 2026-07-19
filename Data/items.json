@@ -15,7 +15,7 @@
   { "id": "debug_backpack", "maxStackSize": 1, "color": "#CC00CC", "shapeKind": "bag" },
   { "id": "flashlight", "maxStackSize": 1, "color": "#E6D659", "isToggleableLight": true, "shapeKind": "flashlight" },
   { "id": "debug_flashlight", "maxStackSize": 1, "color": "#CC00CC", "isToggleableLight": true, "shapeKind": "flashlight" },
-  { "id": "eva_torso_suit", "maxStackSize": 1, "color": "#4D6B57", "equipSlot": "torso", "fitsInStorage": false, "shapeKind": "suit_torso" },
+  { "id": "eva_torso_suit", "maxStackSize": 1, "color": "#4DBF80", "equipSlot": "torso", "fitsInStorage": false, "shapeKind": "suit_torso" },
   { "id": "eva_helmet", "maxStackSize": 1, "color": "#3A5A6B", "equipSlot": "head", "shapeKind": "helmet" },
   { "id": "o2_tank", "maxStackSize": 1, "color": "#3399FF", "shapeKind": "tank" },
   { "id": "n2_tank", "maxStackSize": 1, "color": "#66CC66", "shapeKind": "tank" },
@@ -26,5 +26,5 @@
   { "id": "power_scan_cartridge", "maxStackSize": 1, "color": "#E6C619", "shapeKind": "cartridge" },
   { "id": "small_bin", "maxStackSize": 5, "color": "#8FA6A3", "storageSlotCount": 2 },
   { "id": "shelf", "maxStackSize": 5, "color": "#6B8B87", "storageSlotCount": 6 },
-  { "id": "large_shelf", "maxStackSize": 5, "color": "#47615E", "storageSlotCount": 10 }
+  { "id": "large_shelf", "maxStackSize": 5, "color": "#2F8A7D", "storageSlotCount": 10 }
 ]
