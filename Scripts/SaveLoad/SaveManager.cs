@@ -61,6 +61,12 @@ public partial class SaveManager : Node
 
     public void Save()
     {
+        if (_player?.IsAwaitingDeathChoice == true)
+        {
+            GD.Print("[SaveManager] Skipping save — death screen awaiting a choice.");
+            return;
+        }
+
         var data = new SaveData
         {
             Version = SaveData.CurrentVersion,

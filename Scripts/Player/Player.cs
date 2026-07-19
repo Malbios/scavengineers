@@ -186,6 +186,7 @@ public partial class Player : CharacterBody3D
     private TravelConsoleVerbTarget? _openTravelConsole;
     private ShopPanel? _shopPanel;
     private VendorVerbTarget? _openShopVendor;
+    private DeathPanel? _deathPanel;
     private WorldDropZone? _worldDropZone;
     private Control? _backpackGrid;
     private InventorySlotUI? _backpackSlotTemplate;
@@ -309,9 +310,16 @@ public partial class Player : CharacterBody3D
     /// Uninstall/Scrap while it's open — see UpdateInventoryHud's IsInstanceValid guard.</summary>
     private ThrusterVerbTarget? _openThruster;
 
+    /// <summary>Whether the death screen is currently up, awaiting a Reload/Quit choice — same
+    /// suppress-everything gating as Shop/TravelMap/ThrusterInventory, via <see
+    /// cref="AnyPanelOpen"/>, plus its own movement freeze (see the zero-g/grounded blocks in
+    /// _PhysicsProcess) since a 0-Health player standing around or drifting behind the screen
+    /// isn't something any other panel needs to prevent.</summary>
+    private bool _deathOpen;
+
     /// <summary>Any full-screen-ish HUD panel that should suppress normal gameplay input while
     /// open — shared gate for every _Input branch that used to check _inventoryOpen alone.</summary>
-    private bool AnyPanelOpen => _inventoryOpen || _travelMapOpen || _shopOpen || _thrusterInventoryOpen;
+    private bool AnyPanelOpen => _inventoryOpen || _travelMapOpen || _shopOpen || _thrusterInventoryOpen || _deathOpen;
 
     /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-9, 0) —
     /// also reused by VendorVerbTarget as the set of things Buy can offer, since there's
@@ -427,6 +435,8 @@ public partial class Player : CharacterBody3D
         _travelMapPanel.PlayerRef = this;
         _shopPanel = GetNode<ShopPanel>("HUD/ShopPanel");
         _shopPanel.PlayerRef = this;
+        _deathPanel = GetNode<DeathPanel>("HUD/DeathPanel");
+        _deathPanel.PlayerRef = this;
         _worldDropZone = GetNode<WorldDropZone>("HUD/WorldDropZone");
         _worldDropZone.PlayerRef = this;
 
@@ -576,7 +586,7 @@ public partial class Player : CharacterBody3D
         {
             CaptureMouse();
         }
-        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy && !_travelMapOpen && !_shopOpen)
+        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy && !_travelMapOpen && !_shopOpen && !_deathOpen)
         {
             if (_inventoryOpen)
             {
@@ -1302,7 +1312,7 @@ public partial class Player : CharacterBody3D
             // checked explicitly rather than just SuitN2 non-null.
             var hasWorkingThrusters = _inventory.Torso is not null && _inventory.SuitN2 is { HasItem: true, Charge: > 0f };
 
-            if (!IsBusy)
+            if (!IsBusy && !_deathOpen)
             {
                 var thrust = Vector3.Zero;
                 if (Input.IsPhysicalKeyPressed(Key.W))
@@ -1420,7 +1430,7 @@ public partial class Player : CharacterBody3D
                 velocity.Y -= Gravity * (float)delta;
             }
 
-            if (IsBusy)
+            if (IsBusy || _deathOpen)
             {
                 velocity.X = 0;
                 velocity.Z = 0;
@@ -1557,7 +1567,7 @@ public partial class Player : CharacterBody3D
         _coldOverlay!.Visible = _suitResources.IsFreezing;
         _burnOverlay!.Visible = _suitResources.IsBurning;
 
-        if (_suitResources.HealthPercent <= 0f)
+        if (_suitResources.HealthPercent <= 0f && !_deathOpen)
         {
             Die();
         }
@@ -2117,19 +2127,44 @@ public partial class Player : CharacterBody3D
     }
 
     /// <summary>Hard death from 0 Health (see the O2-driven drain in SuitResources.Tick) —
-    /// reloads the last save so the player picks back up from wherever they last saved.
-    /// Falls back to a full O2/Health restore in place (no position/inventory reset — there's
-    /// nothing more specific to reset to yet) if there's no save to reload, e.g. a fresh game
-    /// that died before ever pressing F5. No dedicated "you died" screen yet — a later polish
-    /// pass, not this one.</summary>
+    /// opens DeathPanel and waits for a Reload/Quit choice instead of reloading immediately.
+    /// The call site guards this with !_deathOpen, so it only fires once per death, not every
+    /// physics frame HealthPercent stays at/below 0 while the panel waits.</summary>
     private void Die()
     {
-        GD.Print("[Player] Died — reloading last save.");
+        GD.Print("[Player] Died — awaiting reload/quit choice.");
+        _deathOpen = true;
+        _deathPanel!.Visible = true;
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+    }
+
+    /// <summary>DeathPanel's Reload button — reloads the last save so the player picks back up
+    /// from wherever they last saved. Falls back to a full O2/Health restore in place (no
+    /// position/inventory reset — there's nothing more specific to reset to yet) if there's no
+    /// save to reload, e.g. a fresh game that died before ever pressing F5 or autosave firing
+    /// once.</summary>
+    public void ReloadAfterDeath()
+    {
+        GD.Print("[Player] Reload chosen — reloading last save.");
         if (SaveManagerRef is not { } saveManager || !saveManager.Load())
         {
             RefillSuitResources();
         }
+
+        _deathOpen = false;
+        _deathPanel!.Visible = false;
+        CaptureMouse();
     }
+
+    /// <summary>DeathPanel's Quit button — no confirmation dialog; death is already the "are you
+    /// sure" moment.</summary>
+    public void QuitAfterDeath() => GetTree().Quit();
+
+    /// <summary>True while the death screen is up, waiting on a Reload/Quit choice — checked by
+    /// SaveManager.Save() so autosave/F5 can't silently overwrite the last good save with this
+    /// 0-Health state while the player hasn't chosen yet (which would make Reload immediately
+    /// re-trigger death from the very save it just loaded).</summary>
+    public bool IsAwaitingDeathChoice => _deathOpen;
 
     /// <summary>The Bunk's Sleep-completion hook — a full night's rest.</summary>
     public void RestEnergy() => _needs.Rest(100f);

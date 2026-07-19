@@ -140,6 +140,13 @@ public static class PlayerTestHarness
         shopPanel.AddChild(shopPanel.CloseButton);
         hud.AddChild(shopPanel);
 
+        var deathPanel = new Scavengineers.Scripts.Player.DeathPanel { Name = "DeathPanel" };
+        deathPanel.ReloadButton = new Button();
+        deathPanel.QuitButton = new Button();
+        deathPanel.AddChild(deathPanel.ReloadButton);
+        deathPanel.AddChild(deathPanel.QuitButton);
+        hud.AddChild(deathPanel);
+
         hud.AddChild(new Scavengineers.Scripts.Player.WorldDropZone { Name = "WorldDropZone" });
 
         sceneTree.Root.AddChild(player);

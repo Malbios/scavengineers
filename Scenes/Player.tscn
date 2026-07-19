@@ -9,6 +9,7 @@
 [ext_resource type="Script" path="res://Scripts/Shop/ShopPanel.cs" id="7"]
 [ext_resource type="Script" path="res://Scripts/Player/WorldDropZone.cs" id="8"]
 [ext_resource type="Shader" path="res://Shaders/scan_highlight.gdshader" id="9"]
+[ext_resource type="Script" path="res://Scripts/Player/DeathPanel.cs" id="10"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -1603,6 +1604,48 @@ theme_override_constants/separation = 4
 [node name="CloseButton" type="Button" parent="HUD/ShopPanel/Layout"]
 layout_mode = 2
 text = "CLOSE"
+
+[node name="DeathPanel" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("ReloadButton", "QuitButton")]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -240.0
+offset_right = 280.0
+offset_bottom = 240.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("OpaquePanelBackground")
+script = ExtResource("10")
+ReloadButton = NodePath("Layout/ButtonsRow/ReloadButton")
+QuitButton = NodePath("Layout/ButtonsRow/QuitButton")
+
+[node name="Layout" type="VBoxContainer" parent="HUD/DeathPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TitleBar" type="Label" parent="HUD/DeathPanel/Layout"]
+layout_mode = 2
+mouse_filter = 0
+theme_override_styles/normal = SubResource("HudLabelBackground")
+text = "YOU DIED"
+horizontal_alignment = 1
+
+[node name="ButtonsRow" type="HBoxContainer" parent="HUD/DeathPanel/Layout"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 10
+
+[node name="ReloadButton" type="Button" parent="HUD/DeathPanel/Layout/ButtonsRow"]
+layout_mode = 2
+text = "RELOAD"
+
+[node name="QuitButton" type="Button" parent="HUD/DeathPanel/Layout/ButtonsRow"]
+layout_mode = 2
+text = "QUIT"
 
 [node name="ScanHighlightOverlay" type="ColorRect" parent="HUD"]
 anchors_preset = 15
