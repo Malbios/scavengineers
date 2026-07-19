@@ -118,6 +118,56 @@ dev state in detail.
 
 ---
 
+## Breach repair method choice (foam patch vs. weld)
+
+**What:** A quick foam patch (consumes a canister, temporary, can fail again under stress) vs. a
+full weld (consumes spare parts, permanent) as two different ways to repair an existing breach.
+
+**Why it's good:** Distinct from the hull-stress idea above — that's about *new* breaches
+appearing over time from wear; this is about how you fix one that's already there, trading speed
+for permanence.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-19) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+---
+
+## Cold/vacuum-sensitive cargo
+
+**What:** Some salvaged items degrade if carried through a vented or frozen room too long
+unprotected.
+
+**Why it's good:** Adds route-planning tension when hauling something delicate back through a
+hazard, instead of every item being equally indifferent to the environment.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-19) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+---
+
+## Randomized object values + economy scanner
+
+**What:** Salvageable objects carry a randomized value (within reason, not wildly swingy), plus
+a new PDA cartridge/scan mode that shows current economy info about nearby objects — effectively
+an appraisal tool.
+
+**Why it's good:** Turns "is this worth grabbing" into a real per-item judgment call rather than
+every instance of an item being worth the same flat price; reuses the existing PDA
+cartridge/scan-mode pattern (health scan, power scan) for the new mode. Related to — but
+distinct from — the already-logged dynamic vendor economy idea, which is about prices drifting
+from your own recent selling activity rather than per-object value variance.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-19) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+---
+
 ## Low-health warning
 
 **What:** A pulsing red vignette (and maybe an audio cue) once Health drops under some threshold
