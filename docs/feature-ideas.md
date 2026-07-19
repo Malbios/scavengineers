@@ -198,6 +198,67 @@ hesitation, not a firm commitment like the rest of this list.
 
 ---
 
+## Ship condition affects travel performance
+
+**What:** A beat-up hull/thruster set (low WearSystem condition) actually flies worse — slower
+travel, higher N2 burn, or a chance of a mid-transit stall.
+
+**Why it's good:** Connects two systems that already exist (wear tracking, travel console)
+without adding a new one — makes the maintenance loop matter somewhere beyond "don't die."
+
+**Why not now:** Flagged as "for later" when raised (2026-07-19) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+---
+
+## Structural collapse risk from careless work
+
+**What:** Using a loud tool (drill, cutting torch) near a section with critically low Condition
+risks knocking something loose — a localized, immediate consequence, distinct from the (also
+postponed) hull-stress idea's gradual time-based decay. Reuses WearSystem's existing Condition
+tracking directly.
+
+**Why it's good:** Makes "how you work," not just "whether you repair," a real decision.
+
+**Why not now:** Flagged as "maybe later, not sure" when raised (2026-07-19) — the least firm
+commitment on this list.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+---
+
+## Passive verb-skill progression
+
+**What:** Repeated use of a verb (install/repair/maintain) makes you incrementally faster at
+it — a soft skill curve with no new UI, just a per-verb-type counter feeding into
+`DurationSeconds`.
+
+**Why it's good:** Gives repeated maintenance work its own small sense of progression.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-19) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+---
+
+## Environmental storytelling via derelict logs
+
+**What:** Readable pickups (a dead crew's logs/black box) found in wrecks that reveal what
+happened there — a new pickup type and a text-display verb, no new mechanic underneath.
+
+**Why it's good:** The first purely narrative system raised so far — gives derelicts some
+identity beyond their layout/hazards.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-19) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+---
+
 ## Random travel encounters
 
 **What:** During transit between derelicts (currently a pure time-skip), roll occasional events —
