@@ -23,5 +23,8 @@
   { "id": "wrench", "maxStackSize": 1, "color": "#B3B3B3", "shapeKind": "tool_wrench" },
   { "id": "pda", "maxStackSize": 1, "color": "#4D4D66", "equipSlot": "pda", "shapeKind": "tablet" },
   { "id": "health_scan_cartridge", "maxStackSize": 1, "color": "#33CC99", "shapeKind": "cartridge" },
-  { "id": "power_scan_cartridge", "maxStackSize": 1, "color": "#E6C619", "shapeKind": "cartridge" }
+  { "id": "power_scan_cartridge", "maxStackSize": 1, "color": "#E6C619", "shapeKind": "cartridge" },
+  { "id": "small_bin", "maxStackSize": 5, "color": "#8FA6A3", "storageSlotCount": 2 },
+  { "id": "shelf", "maxStackSize": 5, "color": "#6B8B87", "storageSlotCount": 6 },
+  { "id": "large_shelf", "maxStackSize": 5, "color": "#47615E", "storageSlotCount": 10 }
 ]

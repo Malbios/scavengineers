@@ -128,6 +128,14 @@ public static class PlayerTestHarness
         thrusterLayout.AddChild(thrusterGrid);
         thrusterGrid.AddChild(MakeSlot("Tank1"));
 
+        var storageWindow = MakeWindow("StorageWindow");
+        hud.AddChild(storageWindow);
+        var storageLayout = new Node { Name = "Layout" };
+        storageWindow.AddChild(storageLayout);
+        var storageGrid = new Control { Name = "StorageGrid" };
+        storageLayout.AddChild(storageGrid);
+        storageGrid.AddChild(MakeSlot("SlotTemplate"));
+
         var travelMapPanel = new TravelMapPanel { Name = "TravelMapPanel" };
         travelMapPanel.TravelButton = new Button();
         travelMapPanel.CancelButton = new Button();

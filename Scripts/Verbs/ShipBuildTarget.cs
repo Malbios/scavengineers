@@ -195,6 +195,13 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private static readonly Verb UninstallThrusterVerb = new("uninstall_thruster", "VERB_UNINSTALL_THRUSTER", DurationSeconds: 0.2f) { IsDestructive = true };
     private static readonly Verb ScrapThrusterVerb = new("scrap_thruster", "VERB_SCRAP_THRUSTER", DurationSeconds: 0.2f) { IsDestructive = true };
 
+    // Storage (shelves/bins) — same "many per ship, one per edge" shape as Thruster above, but
+    // Install is generated per catalog item (see MachineVerbsFor) rather than one static Verb per
+    // tier, since the set of storage items is genuinely data-driven (ItemCatalog.StorageItemIds).
+    // Uninstall/Scrap are shared across every tier — removal doesn't care which one it is.
+    private static readonly Verb UninstallStorageVerb = new("uninstall_storage", "VERB_UNINSTALL_STORAGE", DurationSeconds: 0.2f) { IsDestructive = true };
+    private static readonly Verb ScrapStorageVerb = new("scrap_storage", "VERB_SCRAP_STORAGE", DurationSeconds: 0.2f) { IsDestructive = true };
+
     // How close (in meters) the aim point needs to be to a tile boundary before it resolves to
     // that edge instead of the tile itself — half of this margin on each side of every boundary.
     private const float EdgeMargin = 0.25f;
@@ -270,6 +277,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private const float RechargeStationRoomOffset = 0.3f;
     private const float ThrusterHeight = 1f;
     private const float ThrusterRoomOffset = 0.1f;
+    private const float StorageHeight = 1f;
+    private const float StorageRoomOffset = 0.1f;
 
     // The 4 cardinal neighbor tiles a floor conduit checks for its connection-aware shape (see
     // BuildFloorConduitVisual) — AlongX says whether that direction's arm needs the 90-degree
@@ -346,6 +355,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         InstallThruster,
         UninstallThruster,
         ScrapThruster,
+        InstallStorage,
+        UninstallStorage,
+        ScrapStorage,
         MaintainFloor,
         RepairFloor,
         MaintainCeiling,
@@ -535,6 +547,18 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public Material? ThrusterMaterial { get; set; }
 
+    // Shared across every storage tier (small_bin/shelf/large_shelf) rather than one set per
+    // tier — Phase 1 is explicitly "entirely in cubes and capsules," visual differentiation per
+    // tier is a Phase 3 art-pass concern, not this feature's.
+    [Export]
+    public Mesh? StorageMesh { get; set; }
+
+    [Export]
+    public Shape3D? StorageShape { get; set; }
+
+    [Export]
+    public Material? StorageMaterial { get; set; }
+
     /// <summary>The Home Ship's single room light — wired directly to a dynamically spawned
     /// Switch's own TargetLight, since it's no longer a fixed sibling node the switch's own
     /// scene declaration can NodePath to.</summary>
@@ -566,6 +590,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// instead of allowing a duplicate install on the far side.</summary>
     private readonly Dictionary<(CellCoord, CellCoord), ThrusterVerbTarget> _placedThrusters = new();
 
+    /// <summary>Same edge-keyed, uncapped shape as <see cref="_placedThrusters"/> — many shelves/
+    /// bins can exist at once, one per wall edge.</summary>
+    private readonly Dictionary<(CellCoord, CellCoord), StorageVerbTarget> _placedStorage = new();
+
     private Timer? _cycleTimer;
     private MeshInstance3D? _ghost;
     private bool _cycling;
@@ -593,6 +621,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private CellCoord _pendingEdgeA;
     private CellCoord _pendingEdgeB;
     private MachineType _pendingMachineType;
+    private string _pendingStorageItemId = "";
     private PlayerInventory? _pendingInventory;
 
     public IReadOnlyList<Verb> AvailableVerbs => ResolveAvailableVerbs();
@@ -1315,6 +1344,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             yield break;
         }
 
+        // Same "occupied here means only Uninstall/Scrap, no stacking" rule as Thruster above —
+        // a storage unit claims its edge exclusively too, which is what makes it genuinely "take
+        // up space" rather than stacking infinitely.
+        if (_placedStorage.TryGetValue(Deck.Normalize(_edgeA, _edgeB), out var storageHere))
+        {
+            var suffix = Tr($"ITEM_{storageHere.ItemId.ToUpperInvariant()}");
+            yield return UninstallStorageVerb with { DisplaySuffix = suffix };
+            yield return ScrapStorageVerb with { DisplaySuffix = suffix };
+            yield break;
+        }
+
         var here = _placedMachines.FirstOrDefault(kv => kv.Value.EdgeA == _edgeA && kv.Value.EdgeB == _edgeB);
         if (here.Value.Node is not null)
         {
@@ -1336,6 +1376,19 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         // No "already placed anywhere" cap, unlike the loop above — that's the whole point of
         // thrusters over the single-instance MachineType system.
         yield return InstallThrusterVerb;
+
+        // One generated Install verb per storage catalog item — genuinely data-driven (see
+        // ItemCatalog.StorageItemIds), so a new storage tier needs only an items.json entry, no
+        // new C# Verb. Shared label + a DisplaySuffix naming the specific item, same "label
+        // (suffix)" shape BatteryVerbTarget's own Recharge verb already uses for its charge %.
+        foreach (var itemId in ItemCatalog.StorageItemIds)
+        {
+            yield return new Verb($"install_storage:{itemId}", "VERB_INSTALL_STORAGE", DurationSeconds: 0.2f)
+            {
+                Requirements = [new ItemRequirement(itemId, 1)],
+                DisplaySuffix = Tr($"ITEM_{itemId.ToUpperInvariant()}"),
+            };
+        }
     }
 
     private static Verb InstallVerbFor(MachineType type) => type switch
@@ -1523,6 +1576,42 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         _cycleTimer!.Start();
     }
 
+    /// <summary>Same idea as <see cref="ThrusterRemovalVerbs"/> for storage — a shelf/bin's own
+    /// StorageVerbTarget exists only while installed, so this is unconditional too.</summary>
+    internal IReadOnlyList<Verb> StorageRemovalVerbs => [UninstallStorageVerb, ScrapStorageVerb];
+
+    /// <summary>Counterpart to <see cref="ExecuteThrusterRemoval"/> for storage — same shape,
+    /// takes the edge explicitly since storage (like Thruster) isn't MachineType-keyed.</summary>
+    internal void ExecuteStorageRemoval(CellCoord edgeA, CellCoord edgeB, Verb verb, PlayerInventory inventory)
+    {
+        if (_cycling || !_placedStorage.TryGetValue(Deck.Normalize(edgeA, edgeB), out var placed))
+        {
+            return;
+        }
+
+        PendingAction action;
+        if (verb.Id == UninstallStorageVerb.Id)
+        {
+            action = PendingAction.UninstallStorage;
+        }
+        else if (verb.Id == ScrapStorageVerb.Id)
+        {
+            action = PendingAction.ScrapStorage;
+        }
+        else
+        {
+            return;
+        }
+
+        _pendingAction = action;
+        _pendingStorageItemId = placed.ItemId;
+        _pendingEdgeA = edgeA;
+        _pendingEdgeB = edgeB;
+        _pendingInventory = inventory;
+        _cycling = true;
+        _cycleTimer!.Start();
+    }
+
     /// <summary>Counterpart to <see cref="MachineMaintainRepairVerbs"/> — same delegation shape as
     /// <see cref="ExecuteMachineRemoval"/>.</summary>
     internal void ExecuteMachineMaintainRepair(MachineType type, Verb verb, PlayerInventory inventory)
@@ -1602,6 +1691,24 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         if (verb.Id == UninstallThrusterVerb.Id || verb.Id == ScrapThrusterVerb.Id)
         {
             ExecuteThrusterRemoval(_edgeA, _edgeB, verb, inventory);
+            return;
+        }
+
+        if (verb.Id.StartsWith("install_storage:"))
+        {
+            _pendingAction = PendingAction.InstallStorage;
+            _pendingStorageItemId = verb.Id["install_storage:".Length..];
+            _pendingEdgeA = _edgeA;
+            _pendingEdgeB = _edgeB;
+            _pendingInventory = inventory;
+            _cycling = true;
+            _cycleTimer!.Start();
+            return;
+        }
+
+        if (verb.Id == UninstallStorageVerb.Id || verb.Id == ScrapStorageVerb.Id)
+        {
+            ExecuteStorageRemoval(_edgeA, _edgeB, verb, inventory);
             return;
         }
 
@@ -1844,6 +1951,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             case PendingAction.ScrapThruster:
                 RemoveThruster(_pendingEdgeA, _pendingEdgeB, inventory);
                 AddOrDrop(inventory, "scrap_metal", ThrusterScrapYield);
+                break;
+            case PendingAction.InstallStorage:
+                InstallStorage(_pendingStorageItemId, _pendingEdgeA, _pendingEdgeB, savedState: null);
+                break;
+            case PendingAction.UninstallStorage:
+                RemoveStorage(_pendingEdgeA, _pendingEdgeB, inventory);
+                AddOrDrop(inventory, _pendingStorageItemId, 1);
+                break;
+            case PendingAction.ScrapStorage:
+                RemoveStorage(_pendingEdgeA, _pendingEdgeB, inventory);
+                AddOrDrop(inventory, "scrap_metal", Mathf.Max(1, ItemCatalog.StorageSlotCount(_pendingStorageItemId) / 3));
                 break;
             case PendingAction.MaintainFloor:
             case PendingAction.RepairFloor:
@@ -2387,6 +2505,78 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         node.QueueFree();
     }
 
+    /// <summary>Same shape as <see cref="ThrusterFixtureId"/>, distinct prefix — one id per
+    /// installed shelf/bin, derived from its normalized mounting edge.</summary>
+    private static string StorageFixtureId(CellCoord edgeA, CellCoord edgeB)
+    {
+        var (a, b) = Deck.Normalize(edgeA, edgeB);
+        return $"storage_{a.X}_{a.Y}_{b.X}_{b.Y}";
+    }
+
+    /// <summary>Same shape as <see cref="InstallThruster"/>, but <paramref name="savedState"/> —
+    /// when present — sizes <see cref="StorageVerbTarget.Contents"/> from its own segment count
+    /// instead of consulting <see cref="ItemCatalog.StorageSlotCount"/>: a reload restores
+    /// exactly the slots that existed at save time, even if items.json later changes that tier's
+    /// capacity, and it never needs a real ItemCatalog lookup to reconstruct (NodeTests has no
+    /// items.json of its own — see the plan's own note on this). A fresh, verb-triggered install
+    /// (savedState null) does consult ItemCatalog, since there's no saved shape to preserve yet.</summary>
+    private void InstallStorage(string itemId, CellCoord edgeA, CellCoord edgeB, string? savedState = null)
+    {
+        var nearTile = new Vector2I(edgeA.X, edgeA.Y);
+        var (position, rotation) = WallMountTransform(edgeA, edgeB, nearTile, StorageHeight, StorageRoomOffset);
+        var fixtureId = StorageFixtureId(edgeA, edgeB);
+
+        var node = new StorageVerbTarget
+        {
+            ShipSimRef = ShipSimRef,
+            BuildTarget = this,
+            FixtureId = fixtureId,
+            EdgeA = edgeA,
+            EdgeB = edgeB,
+            ItemId = itemId,
+            Contents = new SlotContainer(savedState is not null ? savedState.Split(';').Length : ItemCatalog.StorageSlotCount(itemId)),
+        };
+        AddChild(node);
+        node.Position = position;
+        node.RotationDegrees = rotation;
+
+        var mesh = new MeshInstance3D { Mesh = StorageMesh };
+        mesh.SetSurfaceOverrideMaterial(0, StorageMaterial);
+        node.AddChild(mesh);
+
+        node.AddChild(new CollisionShape3D { Shape = StorageShape });
+
+        ShipSimRef!.InstallStorage(fixtureId, edgeA, FixtureSurface.WallInner);
+
+        if (savedState is not null)
+        {
+            node.ApplySaveState(savedState);
+        }
+
+        _placedStorage[Deck.Normalize(edgeA, edgeB)] = node;
+    }
+
+    private void RemoveStorage(CellCoord edgeA, CellCoord edgeB, PlayerInventory? inventory)
+    {
+        if (!_placedStorage.Remove(Deck.Normalize(edgeA, edgeB), out var node))
+        {
+            return;
+        }
+
+        // Every slot still holding something goes back to the player/world, same refund
+        // philosophy as Thruster's own docked-tank refund above.
+        foreach (var slot in node.Contents.Slots)
+        {
+            if (slot is { } item)
+            {
+                AddOrDrop(inventory, item.ItemId, item.Count);
+            }
+        }
+
+        ShipSimRef?.RemoveStorage(node.FixtureId);
+        node.QueueFree();
+    }
+
     private void RemoveMachine(MachineType type)
     {
         if (!_placedMachines.Remove(type, out var placed))
@@ -2729,6 +2919,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             data.Machines.Add(new MachineCoord("thruster", edge.Item1.X, edge.Item1.Y, edge.Item2.X, edge.Item2.Y, node.GetSaveState()));
         }
 
+        // Type is "storage:" + the storage item's own id ("storage:small_bin", etc.) rather than
+        // a fixed string — the prefix lets ApplyBuildState recognize a storage row on sight
+        // (StartsWith, below) without ever consulting ItemCatalog, which stays reliable even in
+        // Scavengineers.NodeTests' own isolated environment (no items.json there — see this
+        // feature's own plan notes). Condition is left at its default (1f) — storage has no
+        // charge/wear concept.
+        foreach (var (edge, node) in _placedStorage)
+        {
+            data.Machines.Add(new MachineCoord($"storage:{node.ItemId}", edge.Item1.X, edge.Item1.Y, edge.Item2.X, edge.Item2.Y, node.GetSaveState()));
+        }
+
         foreach (var cell in _extendedCells)
         {
             data.ExtendedCells.Add(new TileCoord(cell.X, cell.Y));
@@ -2871,6 +3072,13 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 continue;
             }
 
+            if (machine.Type.StartsWith("storage:"))
+            {
+                var storageItemId = machine.Type["storage:".Length..];
+                InstallStorage(storageItemId, new CellCoord(machine.EdgeAX, machine.EdgeAY), new CellCoord(machine.EdgeBX, machine.EdgeBY), machine.State);
+                continue;
+            }
+
             if (MachineTypeFromItemId(machine.Type) is not { } type)
             {
                 GD.PushWarning($"[ShipBuildTarget] Save references unknown machine type '{machine.Type}' — skipping.");
@@ -2931,6 +3139,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         foreach (var (a, b) in _placedThrusters.Keys.ToList())
         {
             RemoveThruster(a, b, inventory: null);
+        }
+
+        foreach (var (a, b) in _placedStorage.Keys.ToList())
+        {
+            RemoveStorage(a, b, inventory: null);
         }
 
         // A load that doesn't include a previously-extended cell must actually remove it —

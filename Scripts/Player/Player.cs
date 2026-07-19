@@ -228,6 +228,16 @@ public partial class Player : CharacterBody3D
     private DraggableWindow? _thrusterWindow;
     private InventorySlotUI? _thrusterTankSlot;
 
+    /// <summary>An installed shelf/bin's own storage window — unlike the thruster's single fixed
+    /// slot, a storage unit's slot count is genuinely variable per instance, so this follows the
+    /// Backpack's rebuild-on-count-change shape (see _backpackSlotTemplate/_backpackSlotUIs/
+    /// _backpackSlotUICount) rather than the Thruster's single static slot.</summary>
+    private DraggableWindow? _storageWindow;
+    private Control? _storageGrid;
+    private InventorySlotUI? _storageSlotTemplate;
+    private readonly List<InventorySlotUI> _storageSlotUIs = new();
+    private int _storageSlotUICount = -1;
+
     /// <summary>Toggled by the scan-mode key (see _Input) — only ever true while
     /// <see cref="CanScan"/> also holds; forced back off the moment it stops holding (checked
     /// once a frame alongside every other HUD-state refresh), so taking off the PDA/cartridge/
@@ -310,6 +320,15 @@ public partial class Player : CharacterBody3D
     /// Uninstall/Scrap while it's open — see UpdateInventoryHud's IsInstanceValid guard.</summary>
     private ThrusterVerbTarget? _openThruster;
 
+    /// <summary>Whether a shelf/bin's own storage window is currently open — same shape as
+    /// _thrusterInventoryOpen above.</summary>
+    private bool _storageOpen;
+
+    /// <summary>Which storage unit's own SlotContainer the window is currently pointed at — same
+    /// shape as _openThruster above (a live node reference that can be QueueFree()'d out from
+    /// under the window via Uninstall/Scrap while it's open).</summary>
+    private StorageVerbTarget? _openStorage;
+
     /// <summary>Whether the death screen is currently up, awaiting a Reload/Quit choice — same
     /// suppress-everything gating as Shop/TravelMap/ThrusterInventory, via <see
     /// cref="AnyPanelOpen"/>, plus its own movement freeze (see the zero-g/grounded blocks in
@@ -319,7 +338,7 @@ public partial class Player : CharacterBody3D
 
     /// <summary>Any full-screen-ish HUD panel that should suppress normal gameplay input while
     /// open — shared gate for every _Input branch that used to check _inventoryOpen alone.</summary>
-    private bool AnyPanelOpen => _inventoryOpen || _travelMapOpen || _shopOpen || _thrusterInventoryOpen || _deathOpen;
+    private bool AnyPanelOpen => _inventoryOpen || _travelMapOpen || _shopOpen || _thrusterInventoryOpen || _storageOpen || _deathOpen;
 
     /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-9, 0) —
     /// also reused by VendorVerbTarget as the set of things Buy can offer, since there's
@@ -328,7 +347,7 @@ public partial class Player : CharacterBody3D
     /// TryEquipBackpackFromHand) — no dedicated verb needed to buy or hold one. "ration_bar"/
     /// "water_bottle" are likewise ordinary holdable items until F consumes whichever's held
     /// (see UseHeldItem) — no dedicated equip path either.</summary>
-    public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell", "battery", "switch", "recharge_station", "thruster", "n2_tank", "backpack", "ration_bar", "water_bottle", "wrench", "pda", "health_scan_cartridge", "power_scan_cartridge"];
+    public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell", "battery", "switch", "recharge_station", "thruster", "n2_tank", "backpack", "ration_bar", "water_bottle", "wrench", "pda", "health_scan_cartridge", "power_scan_cartridge", "small_bin", "shelf", "large_shelf"];
 
     private enum Hand { Left, Right }
 
@@ -476,6 +495,10 @@ public partial class Player : CharacterBody3D
         _thrusterTankSlot = GetNode<InventorySlotUI>("HUD/ThrusterWindow/Layout/ThrusterGrid/Tank1");
         _thrusterTankSlot.PlayerRef = this;
 
+        _storageWindow = GetNode<DraggableWindow>("HUD/StorageWindow");
+        _storageGrid = GetNode<Control>("HUD/StorageWindow/Layout/StorageGrid");
+        _storageSlotTemplate = GetNode<InventorySlotUI>("HUD/StorageWindow/Layout/StorageGrid/SlotTemplate");
+
         // X button / right-click-on-background — each window closes exactly the way its own
         // existing toggle-off path already does (see ToggleItemWindow's closing branches/
         // CloseInventory), just reachable without needing to re-press the same hotkey/re-click
@@ -499,6 +522,7 @@ public partial class Player : CharacterBody3D
             _openPdaItemId = null;
         };
         _thrusterWindow.CloseRequested += CloseThrusterInventory;
+        _storageWindow.CloseRequested += CloseStorageInventory;
 
         // Placeholder/tunable starting stipend for testing the free-form conduit wiring
         // extensively — same "don't wait on it" spirit as the near-instant verb durations.
@@ -586,7 +610,7 @@ public partial class Player : CharacterBody3D
         {
             CaptureMouse();
         }
-        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy && !_travelMapOpen && !_shopOpen && !_thrusterInventoryOpen && !_deathOpen)
+        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy && !_travelMapOpen && !_shopOpen && !_thrusterInventoryOpen && !_storageOpen && !_deathOpen)
         {
             if (_inventoryOpen)
             {
@@ -610,6 +634,10 @@ public partial class Player : CharacterBody3D
             else if (_thrusterInventoryOpen)
             {
                 CloseThrusterInventory();
+            }
+            else if (_storageOpen)
+            {
+                CloseStorageInventory();
             }
             else if (_inventoryOpen)
             {
@@ -1231,6 +1259,23 @@ public partial class Player : CharacterBody3D
         _thrusterInventoryOpen = false;
         _openThruster = null;
         _thrusterWindow!.Visible = false;
+        CaptureMouse();
+    }
+
+    /// <summary>Called by StorageVerbTarget.ExecuteVerb — same shape as OpenThrusterInventory.</summary>
+    public void OpenStorageInventory(StorageVerbTarget storage)
+    {
+        _storageOpen = true;
+        _openStorage = storage;
+        _storageWindow!.Visible = true;
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+    }
+
+    public void CloseStorageInventory()
+    {
+        _storageOpen = false;
+        _openStorage = null;
+        _storageWindow!.Visible = false;
         CaptureMouse();
     }
 
@@ -2241,6 +2286,25 @@ public partial class Player : CharacterBody3D
 
         _thrusterTankSlot!.Container = _openThruster?.Contents;
 
+        // Same IsInstanceValid guard as _openThruster above — a storage unit's own slot count is
+        // genuinely variable, so this also follows the backpack's rebuild-on-count-change shape.
+        if (_storageOpen && !GodotObject.IsInstanceValid(_openStorage))
+        {
+            CloseStorageInventory();
+        }
+
+        var storageContents = GodotObject.IsInstanceValid(_openStorage) ? _openStorage!.Contents : null;
+        var storageSlotCount = storageContents?.Slots.Count ?? 0;
+        if (storageSlotCount != _storageSlotUICount)
+        {
+            RebuildStorageSlotUIs(storageSlotCount);
+        }
+
+        foreach (var slot in _storageSlotUIs)
+        {
+            slot.Container = storageContents;
+        }
+
         // Force scan mode off the moment its gate stops holding (PDA/cartridge/helmet removed
         // mid-scan) — see _scanModeOn's own doc comment.
         if (_scanModeOn && !CanScan)
@@ -2297,5 +2361,30 @@ public partial class Player : CharacterBody3D
         }
 
         _backpackSlotUICount = slotCount;
+    }
+
+    /// <summary>Same shape as <see cref="RebuildBackpackSlotUIs"/> — a storage unit's own slot
+    /// count varies per catalog item (small_bin/shelf/large_shelf), so StorageGrid only ever
+    /// carries one hidden template node too, not a fixed slot count.</summary>
+    private void RebuildStorageSlotUIs(int slotCount)
+    {
+        foreach (var slot in _storageSlotUIs)
+        {
+            slot.QueueFree();
+        }
+
+        _storageSlotUIs.Clear();
+
+        for (var i = 0; i < slotCount; i++)
+        {
+            var slot = (InventorySlotUI)_storageSlotTemplate!.Duplicate();
+            slot.Visible = true;
+            slot.SlotIndex = i;
+            slot.PlayerRef = this;
+            _storageGrid!.AddChild(slot);
+            _storageSlotUIs.Add(slot);
+        }
+
+        _storageSlotUICount = slotCount;
     }
 }

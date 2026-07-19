@@ -87,6 +87,18 @@ public static class ItemCatalog
     public static string? ShapeKind(string itemId) =>
         Items.TryGetValue(itemId, out var item) ? item.ShapeKind : null;
 
+    /// <summary>Inventory slots available when this item is installed as ship storage (a shelf/
+    /// bin — see ShipBuildTarget.InstallStorage) — 0 (the default) for anything that isn't
+    /// installable storage, same safe-fallback spirit as <see cref="MaxStackSize"/>.</summary>
+    public static int StorageSlotCount(string itemId) =>
+        Items.TryGetValue(itemId, out var item) ? item.StorageSlotCount : 0;
+
+    /// <summary>Every item id with a nonzero <see cref="StorageSlotCount"/> — ShipBuildTarget's
+    /// storage install verbs are generated from this instead of a hardcoded list, so a new
+    /// storage tier needs only an items.json entry, no code change.</summary>
+    public static IReadOnlyCollection<string> StorageItemIds =>
+        Items.Where(kv => kv.Value.StorageSlotCount > 0).Select(kv => kv.Key).ToList();
+
     private static Dictionary<string, ItemDefinition> Items => _items ??= Load();
 
     /// <summary>Test-only seam: lets Scavengineers.Scripts.Tests seed the catalog directly,
@@ -138,5 +150,8 @@ public static class ItemCatalog
 
         [JsonPropertyName("shapeKind")]
         public string? ShapeKind { get; set; }
+
+        [JsonPropertyName("storageSlotCount")]
+        public int StorageSlotCount { get; set; }
     }
 }

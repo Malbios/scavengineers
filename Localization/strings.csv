@@ -122,3 +122,10 @@ VERB_MAINTAIN_AIRLOCK,Maintain Airlock,Luftschleuse warten
 VERB_REPAIR_AIRLOCK,Repair Airlock,Luftschleuse reparieren
 VERB_MAINTAIN_INTERIOR_DOOR,Maintain Door,Tür warten
 VERB_REPAIR_INTERIOR_DOOR,Repair Door,Tür reparieren
+ITEM_SMALL_BIN,Bin,Behälter
+ITEM_SHELF,Shelf,Regal
+ITEM_LARGE_SHELF,Large Shelf,Großes Regal
+VERB_INSTALL_STORAGE,Install Storage,Lagerung einbauen
+VERB_UNINSTALL_STORAGE,Uninstall Storage,Lagerung ausbauen
+VERB_SCRAP_STORAGE,Scrap Storage,Lagerung verschrotten
+VERB_OPEN_STORAGE,Open Storage,Lagerung öffnen

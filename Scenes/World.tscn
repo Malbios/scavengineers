@@ -107,6 +107,15 @@ size = Vector3(0.4, 0.4, 0.6)
 [sub_resource type="StandardMaterial3D" id="ThrusterMaterial"]
 albedo_color = Color(0.85, 0.35, 0.1, 1)
 
+[sub_resource type="BoxShape3D" id="StorageShape"]
+size = Vector3(0.5, 0.6, 0.25)
+
+[sub_resource type="BoxMesh" id="StorageMesh"]
+size = Vector3(0.5, 0.6, 0.25)
+
+[sub_resource type="StandardMaterial3D" id="StorageMaterial"]
+albedo_color = Color(0.42, 0.55, 0.53, 1)
+
 [sub_resource type="StandardMaterial3D" id="ScrapMetalMaterial"]
 albedo_color = Color(0.55, 0.55, 0.6, 1)
 
@@ -360,6 +369,9 @@ RechargeStationMaterial = SubResource("RechargeStationMaterial")
 ThrusterMesh = SubResource("ThrusterMesh")
 ThrusterShape = SubResource("ThrusterShape")
 ThrusterMaterial = SubResource("ThrusterMaterial")
+StorageMesh = SubResource("StorageMesh")
+StorageShape = SubResource("StorageShape")
+StorageMaterial = SubResource("StorageMaterial")
 RoomLight = NodePath("../RoomLight")
 SaveId = "home_ship_build_target"
 GhostMaterial = SubResource("ConduitGhostMaterial")

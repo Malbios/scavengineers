@@ -62,3 +62,13 @@ public sealed class BatteryFixture(string id, CellCoord tile, FixtureSurface sur
 /// </summary>
 public sealed class ThrusterFixture(string id, CellCoord tile, FixtureSurface surface)
     : Fixture(id, tile, surface);
+
+/// <summary>
+/// A player-installable shelf/bin — a pure marker, same shape as <see cref="ThrusterFixture"/>.
+/// Draws no power (PowerDraw stays at its base-class default of 0) and has no charge/wear
+/// concept of its own; it exists here purely so it's discoverable via Deck.Fixtures like every
+/// other wall-mounted machine, one per installed shelf/bin (see ShipBuildTarget's own per-edge
+/// tracking).
+/// </summary>
+public sealed class StorageFixture(string id, CellCoord tile, FixtureSurface surface)
+    : Fixture(id, tile, surface);

@@ -16,6 +16,9 @@ public class ItemCatalogTests : IDisposable
             ["eva_helmet"] = new() { Id = "eva_helmet", MaxStackSize = 1, EquipSlot = "head" },
             ["backpack"] = new() { Id = "backpack", MaxStackSize = 1 },
             ["pda"] = new() { Id = "pda", MaxStackSize = 1, EquipSlot = "pda" },
+            ["small_bin"] = new() { Id = "small_bin", MaxStackSize = 5, StorageSlotCount = 2 },
+            ["shelf"] = new() { Id = "shelf", MaxStackSize = 5, StorageSlotCount = 6 },
+            ["large_shelf"] = new() { Id = "large_shelf", MaxStackSize = 5, StorageSlotCount = 10 },
         });
     }
 
@@ -51,5 +54,24 @@ public class ItemCatalogTests : IDisposable
     public void FitsInStorage_IsFalseOnlyForTheEvaTorsoSuit_TrueForEverythingElseIncludingUnknownIds(string itemId, bool expected)
     {
         Assert.Equal(expected, ItemCatalog.FitsInStorage(itemId));
+    }
+
+    [Theory]
+    [InlineData("small_bin", 2)]
+    [InlineData("shelf", 6)]
+    [InlineData("large_shelf", 10)]
+    [InlineData("widget", 0)]
+    [InlineData("unknown_item", 0)]
+    public void StorageSlotCount_ReturnsTheDeclaredCount_ZeroForAnythingNotInstallableAsStorage(string itemId, int expected)
+    {
+        Assert.Equal(expected, ItemCatalog.StorageSlotCount(itemId));
+    }
+
+    [Fact]
+    public void StorageItemIds_ContainsExactlyEveryItemWithANonzeroStorageSlotCount()
+    {
+        Assert.Equal(
+            new HashSet<string> { "small_bin", "shelf", "large_shelf" },
+            ItemCatalog.StorageItemIds.ToHashSet());
     }
 }

@@ -38,6 +38,9 @@ public partial class VendorVerbTarget : StaticBody3D, IVerbTarget
         ["pda"] = (20, 8),
         ["health_scan_cartridge"] = (10, 4),
         ["power_scan_cartridge"] = (10, 4),
+        ["small_bin"] = (15, 6),
+        ["shelf"] = (30, 12),
+        ["large_shelf"] = (50, 20),
     };
 
     private static readonly Verb ShopVerb = new("open_shop", "VERB_TRADE", DurationSeconds: 0f);

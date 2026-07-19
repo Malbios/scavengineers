@@ -555,6 +555,13 @@ public partial class ShipSim : Node, IShipLayoutSaveable
 
     public void RemoveThruster(string id) => Deck.RemoveFixture(id);
 
+    /// <summary>PowerDraw stays at the base default (0) — a shelf/bin draws no power at all,
+    /// unlike every other installable fixture here.</summary>
+    public void InstallStorage(string id, CellCoord cell, FixtureSurface surface) =>
+        Deck.AddFixture(new StorageFixture(id, cell, surface));
+
+    public void RemoveStorage(string id) => Deck.RemoveFixture(id);
+
     public void RechargeThruster(string id, float amount)
     {
         if (Deck.Fixtures.FirstOrDefault(f => f.Id == id) is ThrusterFixture thruster)
