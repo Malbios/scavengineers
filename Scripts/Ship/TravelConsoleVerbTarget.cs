@@ -33,18 +33,27 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     // BeginTravel call recomputes WaitTime from the formula below.
     private static readonly Verb TravelVerb = new("travel", "VERB_TRAVEL", DurationSeconds: 0.2f);
 
-    // Placeholder/tunable — base travel duration before thruster reduction, restoring the
-    // original "a real beat" value (previously dropped to near-instant for testing) now that
-    // installed+fueled thrusters make the duration mean something (see BeginTravel).
-    private const float BaseTravelSeconds = 4f;
-    private const float ReductionPerThruster = 1f;
-    private const float MinTravelSeconds = 1f;
+    /// <summary>Offered instead of TravelVerb whenever _docking is true — how the player gets
+    /// back into a docking attempt that didn't auto-open (see OnTravelComplete's own doc
+    /// comment).</summary>
+    private static readonly Verb ResumeDockingVerb = new("resume_docking", "VERB_RESUME_DOCKING", DurationSeconds: 0.2f);
 
-    // Placeholder/tunable, matching SuitResources's drain-constant convention.
-    private const float BatteryDrainPerSecond = 0.05f;
+    // Placeholder/tunable — base travel duration before thruster reduction, giving transit a
+    // real sense of taking a while. Public settable (not const), matching this codebase's own
+    // SaveManager.AutosaveIntervalSeconds-style testability convention, so tests can dial the
+    // wait down instead of really waiting out a pacing-only duration.
+    public float BaseTravelSeconds { get; set; } = 20f;
+    public float ReductionPerThruster { get; set; } = 2f;
+    public float MinTravelSeconds { get; set; } = 8f;
+
+    // Placeholder/tunable, matching SuitResources's drain-constant convention. Only applied
+    // during the bounded _traveling phase (see the drain block in _PhysicsProcess) — the
+    // open-ended _docking phase that follows costs nothing per-second, or a slow/careful docking
+    // attempt could drain the whole battery regardless of how short the actual trip was.
+    private const float BatteryDrainPerSecond = 0.01f;
 
     // Placeholder/tunable — independent per thruster, so N fueled thrusters drain N times as
-    // fast in total (no shared pool).
+    // fast in total (no shared pool). Same "_traveling only" bound as BatteryDrainPerSecond.
     private const float ThrusterDrainPerSecond = 0.02f;
 
     // Same two-tier upkeep as everything else with a Deck-tracked Condition (see
@@ -136,7 +145,8 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 
     public IReadOnlyList<Verb> AvailableVerbs =>
         [
-            .. ShipSimRef is not null && ShipSimRef.IsPowered(ShipSim.TravelConsoleFixtureId) ? new[] { TravelVerb } : [],
+            .. _docking ? new[] { ResumeDockingVerb }
+                : ShipSimRef is not null && ShipSimRef.IsPowered(ShipSim.TravelConsoleFixtureId) ? new[] { TravelVerb } : [],
             // Offered regardless of current power state — a console you can't currently use to
             // travel should still be repairable.
             .. ConsoleFixture is { } fixture && MaintenanceTier.PickVerb(fixture.Condition, MaintainTravelConsoleVerb, RepairTravelConsoleVerb) is { } upkeepVerb ? new[] { upkeepVerb } : [],
@@ -159,9 +169,11 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         : _maintaining ? 1f - (float)(_maintenanceTimer!.TimeLeft / _maintenanceTimer.WaitTime)
         : null;
 
-    /// <summary>Still actively maneuvering/burning fuel through the docking phase, not idle —
-    /// covers both halves of "in flight" for the PowerDraw sync/battery-drain/N2-drain below,
-    /// which don't otherwise care which half they're in.</summary>
+    /// <summary>Still actively drawing power through the docking phase, not idle — covers both
+    /// halves of "in flight" for the PowerDraw sync only (see _PhysicsProcess). Deliberately NOT
+    /// used to gate actual battery/N2 consumption below: _docking is open-ended (waits on player
+    /// skill in the minigame), so tying real drain to it would let a slow/careful attempt burn an
+    /// unbounded amount of battery regardless of how short the timed trip itself was.</summary>
     private bool IsActivelyFlying => _traveling || _docking;
 
     public override void _Ready()
@@ -224,7 +236,7 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
             thruster.PowerDraw = IsActivelyFlying ? ShipSim.ThrusterActiveDraw : ShipSim.IdleDraw;
         }
 
-        if (IsActivelyFlying)
+        if (_traveling)
         {
             ShipSimRef.DrainBattery(BatteryDrainPerSecond * (float)delta);
 
@@ -261,7 +273,17 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
             return;
         }
 
-        if (verb.Id != TravelVerb.Id || _traveling)
+        if (verb.Id == ResumeDockingVerb.Id)
+        {
+            if (_docking && GetTree().GetFirstNodeInGroup("player") is PlayerScript dockingPlayer)
+            {
+                dockingPlayer.OpenDockingMinigame(this);
+            }
+
+            return;
+        }
+
+        if (verb.Id != TravelVerb.Id || _traveling || _docking)
         {
             return;
         }
@@ -305,7 +327,7 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     /// at least one.</summary>
     public void BeginTravel(int destinationId)
     {
-        if (_traveling || destinationId == _currentDestination || destinationId < 0 || destinationId > DerelictCount)
+        if (_traveling || _docking || destinationId == _currentDestination || destinationId < 0 || destinationId > DerelictCount)
         {
             return;
         }
@@ -345,14 +367,18 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     /// <summary>The travel timer elapsing no longer resolves arrival directly — the ship has
     /// "arrived in open space" near the target, and needs the docking minigame's own Dock button
     /// to succeed (see CompleteDocking) before anything about _currentDestination actually
-    /// changes. Opens the minigame automatically rather than requiring a second console
-    /// interaction, since the player already committed via the travel map.</summary>
+    /// changes. _docking becomes true either way (the ship has arrived regardless of where the
+    /// player is), but the panel only pops open automatically if the player happens to be looking
+    /// at this console right now — the travel map closes the instant BeginTravel fires, so the
+    /// player is free to wander off during the wait, and yanking a modal panel open on top of
+    /// whatever else they're doing would be jarring. If it doesn't auto-open here,
+    /// ResumeDockingVerb (see AvailableVerbs/ExecuteVerb) is how the player gets back into it.</summary>
     private void OnTravelComplete()
     {
         _traveling = false;
         _docking = true;
 
-        if (GetTree().GetFirstNodeInGroup("player") is PlayerScript player)
+        if (GetTree().GetFirstNodeInGroup("player") is PlayerScript player && player.IsLookingAt(this))
         {
             player.OpenDockingMinigame(this);
         }

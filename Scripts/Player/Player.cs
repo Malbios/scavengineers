@@ -1743,6 +1743,14 @@ public partial class Player : CharacterBody3D
         return spaceState.IntersectRay(query).Count == 0;
     }
 
+    /// <summary>Whether the player's interact ray is on this exact target right now — used by
+    /// TravelConsoleVerbTarget to decide whether arrival should pop the docking panel open
+    /// immediately or wait for the player to interact with the console again (see
+    /// TravelConsoleVerbTarget.OnTravelComplete). Re-raycasts via GetCurrentVerbTarget rather
+    /// than reading a cached "last interacted target," matching how every other "is the player
+    /// looking at X" question in this codebase is answered live, not from stale state.</summary>
+    public bool IsLookingAt(IVerbTarget target) => ReferenceEquals(GetCurrentVerbTarget(), target);
+
     private IVerbTarget? GetCurrentVerbTarget()
     {
         if (_interactRay is null || !_interactRay.IsColliding())
