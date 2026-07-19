@@ -39,6 +39,69 @@ doesn't exist either.
 
 ---
 
+## Active thermal management
+
+**What:** Heaters/coolers/insulation panels as installable ship fixtures — a second resource
+budget (heat generated vs. lost vs. capacity) running parallel to the existing power system.
+
+**Why it's good:** Temperature currently only exists reactively (a breach goes cold, a fire gets
+hot) — this gives the player active control over it instead of just reacting to it.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-19) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+---
+
+## Radiation hazard + shielding
+
+**What:** A third hazard type (distinct from breach/fire) in derelicts with reactor damage,
+gated by a new suit resource (rad shielding tank/plating) reusing the existing O2/N2/filter/
+battery suit-slot pattern, with an exposure timer.
+
+**Why it's good:** Adds hazard variety beyond breach/fire using an already-proven suit-slot
+mechanism, plus a genuine "how long do I stay" time-pressure decision.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-19) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+---
+
+## Bulky-cargo hauling
+
+**What:** A cart or magnetic sled fixture for moving large salvage that doesn't fit in a
+backpack slot back to the ship, instead of everything needing to be pocket-sized.
+
+**Why it's good:** Ties directly into the "carry capacity/priority is an actual choice" language
+from the Phase 1 exit gate — lets salvage runs include genuinely large finds. Distinct from the
+missions idea's "cargo A→B" above, which is a delivery contract, not the physical act of moving
+something oversized.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-19) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+---
+
+## Hydroponics / CO2-scrubber loop
+
+**What:** An installable life-support fixture that converts CO2 back to O2 and trickles out a
+small amount of food over time.
+
+**Why it's good:** Gives the home ship an active self-sufficiency system tied into the existing
+atmosphere solver, instead of every resource being externally sourced via vendor purchases only.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-19) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+---
+
 ## Low-health warning
 
 **What:** A pulsing red vignette (and maybe an audio cue) once Health drops under some threshold
