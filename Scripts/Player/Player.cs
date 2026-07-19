@@ -537,8 +537,6 @@ public partial class Player : CharacterBody3D
         _inventory.Add("crowbar", 1);
         _inventory.Add("power_drill", 1);
         _inventory.AttachSpecializedSlot("drill_battery", hasItem: true, charge: 1f);
-        _inventory.Add("flashlight", 1);
-        _inventory.AttachSpecializedSlot("flashlight_battery", hasItem: true, charge: 1f);
         _inventory.Add("debug_flashlight", 1);
 
         // Starter EVA suit, fully suited and fully charged — dev convenience for testing the
