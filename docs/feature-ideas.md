@@ -168,6 +168,36 @@ dev state in detail.
 
 ---
 
+## Emergency O2 candle
+
+**What:** A burnable consumable/installable chemical O2 generator, distinct from tanks — adds O2
+to the room's atmosphere directly rather than the suit, submarine-style.
+
+**Why it's good:** A genuine "we're almost out" backup option that doesn't require a suit/tank
+already being in good shape.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-19) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+---
+
+## Barter trading
+
+**What:** The vendor accepts specific salvaged goods in exchange for specific goods, instead of
+every transaction running through credits.
+
+**Why it's good:** A different transaction model than price tuning alone — makes "what do I have
+that they want" its own kind of decision.
+
+**Why not now:** Flagged as "for later, maybe" when raised (2026-07-19) — noted with some
+hesitation, not a firm commitment like the rest of this list.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+---
+
 ## Low-health warning
 
 **What:** A pulsing red vignette (and maybe an audio cue) once Health drops under some threshold
