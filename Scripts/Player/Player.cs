@@ -285,6 +285,20 @@ public partial class Player : CharacterBody3D
     private ColorRect? _smokeOverlay;
     private ColorRect? _coldOverlay;
     private ColorRect? _burnOverlay;
+    private ColorRect? _lowHealthOverlay;
+
+    // Placeholder/tunable — Health at/below this fraction shows the pulsing warning. Every other
+    // player stat (O2, freezing, burning, smoke) already gets a full-screen cue; Health is the
+    // one that currently ends the run (via the death screen) with zero advance warning.
+    private const float LowHealthThreshold = 25f;
+
+    // Placeholder/tunable — how the pulse's visible alpha oscillates, multiplied against the
+    // overlay's own base alpha (see LowHealthOverlay's color in Player.tscn). Sine-driven off
+    // Time.GetTicksMsec() rather than a manually ticked field — one less bit of state to keep in
+    // sync with delta time.
+    private const float LowHealthPulseBaseAlpha = 0.5f;
+    private const float LowHealthPulseAmplitude = 0.5f;
+    private const float LowHealthPulseSpeed = 2.5f;
 
     /// <summary>The death fallback's reload target — SaveManager already holds the reverse
     /// PlayerRef (World.tscn), this is the same reference the other way round.</summary>
@@ -442,6 +456,7 @@ public partial class Player : CharacterBody3D
         _smokeOverlay = GetNode<ColorRect>("HUD/SmokeOverlay");
         _coldOverlay = GetNode<ColorRect>("HUD/ColdOverlay");
         _burnOverlay = GetNode<ColorRect>("HUD/BurnOverlay");
+        _lowHealthOverlay = GetNode<ColorRect>("HUD/LowHealthOverlay");
         _leftHandLabel = GetNode<Label>("HUD/LeftHandLabel");
         _rightHandLabel = GetNode<Label>("HUD/RightHandLabel");
         _creditsLabel = GetNode<Label>("HUD/CreditsLabel");
@@ -1616,6 +1631,14 @@ public partial class Player : CharacterBody3D
         _healthBar!.Value = _suitResources.HealthPercent;
         _coldOverlay!.Visible = _suitResources.IsFreezing;
         _burnOverlay!.Visible = _suitResources.IsBurning;
+
+        var lowHealth = _suitResources.HealthPercent <= LowHealthThreshold;
+        _lowHealthOverlay!.Visible = lowHealth;
+        if (lowHealth)
+        {
+            var pulse = LowHealthPulseBaseAlpha + LowHealthPulseAmplitude * Mathf.Sin(Time.GetTicksMsec() / 1000f * LowHealthPulseSpeed);
+            _lowHealthOverlay.Modulate = new Color(1f, 1f, 1f, pulse);
+        }
 
         if (_suitResources.HealthPercent <= 0f && !_deathOpen)
         {

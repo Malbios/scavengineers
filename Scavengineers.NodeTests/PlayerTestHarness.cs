@@ -66,6 +66,7 @@ public static class PlayerTestHarness
         hud.AddChild(new ColorRect { Name = "SmokeOverlay" });
         hud.AddChild(new ColorRect { Name = "ColdOverlay" });
         hud.AddChild(new ColorRect { Name = "BurnOverlay" });
+        hud.AddChild(new ColorRect { Name = "LowHealthOverlay" });
         hud.AddChild(new Label { Name = "LeftHandLabel" });
         hud.AddChild(new Label { Name = "RightHandLabel" });
         hud.AddChild(new Label { Name = "CreditsLabel" });

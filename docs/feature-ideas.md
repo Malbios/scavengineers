@@ -198,23 +198,6 @@ hesitation, not a firm commitment like the rest of this list.
 
 ---
 
-## Low-health warning
-
-**What:** A pulsing red vignette (and maybe an audio cue) once Health drops under some threshold
-(e.g. 25%) — reuses the existing `ColdOverlay`/`BurnOverlay`/`SmokeOverlay` full-screen-cue
-pattern in `Player.cs`, just keyed off `HealthPercent` instead of temperature/smoke.
-
-**Why it's good:** Every other player stat (O2, freezing, burning, smoke) already gets a
-full-screen visual cue — Health is the one stat that currently ends the run (via the death
-screen) with zero advance warning. Complements the death screen directly.
-
-**Why not now:** Not rejected as premature like the rest of this list — just not the one picked
-when it came up on 2026-07-19; "something else" was chosen for that session instead.
-
-**Revisit when:** Any time — ready to build whenever it's picked up, no prerequisite.
-
----
-
 ## Random travel encounters
 
 **What:** During transit between derelicts (currently a pure time-skip), roll occasional events —
