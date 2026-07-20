@@ -1,0 +1,6 @@
+[
+  { "id": "retrieve_common", "type": "RetrieveItem", "itemPool": ["crowbar", "wrench", "power_drill", "o2_tank", "n2_tank", "co2_filter", "health_scan_cartridge", "power_scan_cartridge"], "rewardMin": 30, "rewardMax": 60, "deadlineSeconds": 180, "failureFee": 20 },
+  { "id": "cargo_delivery", "type": "CargoDelivery", "rewardMin": 40, "rewardMax": 80, "deadlineSeconds": 240, "failureFee": 30 },
+  { "id": "salvage_quota", "type": "SalvageQuota", "itemPool": ["scrap_metal", "spare_parts"], "countMin": 10, "countMax": 25, "rewardMin": 20, "rewardMax": 50, "deadlineSeconds": 200, "failureFee": 15 },
+  { "id": "survey_scan", "type": "Survey", "rewardMin": 25, "rewardMax": 45, "deadlineSeconds": 150, "failureFee": 15 }
+]

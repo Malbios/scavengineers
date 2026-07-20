@@ -33,6 +33,9 @@
     <Compile Include="..\Scripts\Inventory\PlayerInventory.cs" Link="Scripts\Inventory\PlayerInventory.cs" />
     <Compile Include="..\Scripts\Inventory\SlotContainer.cs" Link="Scripts\Inventory\SlotContainer.cs" />
     <Compile Include="..\Scripts\Inventory\ItemCatalog.cs" Link="Scripts\Inventory\ItemCatalog.cs" />
+    <Compile Include="..\Scripts\Contracts\ContractType.cs" Link="Scripts\Contracts\ContractType.cs" />
+    <Compile Include="..\Scripts\Contracts\Contract.cs" Link="Scripts\Contracts\Contract.cs" />
+    <Compile Include="..\Scripts\Contracts\ContractCatalog.cs" Link="Scripts\Contracts\ContractCatalog.cs" />
     <Compile Include="..\Scripts\Ship\ShipLayoutCatalog.cs" Link="Scripts\Ship\ShipLayoutCatalog.cs" />
     <Compile Include="..\Scripts\Ship\ShipLayoutGenerator.cs" Link="Scripts\Ship\ShipLayoutGenerator.cs" />
     <Compile Include="..\Scripts\Verbs\Verb.cs" Link="Scripts\Verbs\Verb.cs" />
