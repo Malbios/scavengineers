@@ -4,6 +4,7 @@ using System.Linq;
 using Godot;
 using Scavengineers.Sim.Atmosphere;
 using Scavengineers.Sim.Grid;
+using Scavengineers.Scripts.Contracts;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Scripts.Ship;
@@ -188,6 +189,8 @@ public partial class Player : CharacterBody3D
     private TravelConsoleVerbTarget? _openDockingConsole;
     private ShopPanel? _shopPanel;
     private VendorVerbTarget? _openShopVendor;
+    private ContractBoardPanel? _contractBoardPanel;
+    private ContractGiverVerbTarget? _openContractGiver;
     private DeathPanel? _deathPanel;
     private WorldDropZone? _worldDropZone;
     private Control? _backpackGrid;
@@ -339,6 +342,10 @@ public partial class Player : CharacterBody3D
     /// open at once — there's no ordering to get wrong between them.</summary>
     private bool _shopOpen;
 
+    /// <summary>Whether the contract-giver's board screen is currently open — same
+    /// suppress-everything gating as Shop, via <see cref="AnyPanelOpen"/>.</summary>
+    private bool _contractBoardOpen;
+
     /// <summary>Whether a thruster's own N2 tank slot window is currently open — same
     /// suppress-everything gating as Shop/TravelMap (verb-triggered from a world object, not a
     /// right-click-on-held-item sub-window like Suit/Backpack/PDA), via <see cref="AnyPanelOpen"/>.</summary>
@@ -368,7 +375,7 @@ public partial class Player : CharacterBody3D
 
     /// <summary>Any full-screen-ish HUD panel that should suppress normal gameplay input while
     /// open — shared gate for every _Input branch that used to check _inventoryOpen alone.</summary>
-    private bool AnyPanelOpen => _inventoryOpen || _travelMapOpen || _dockingOpen || _shopOpen || _thrusterInventoryOpen || _storageOpen || _deathOpen;
+    private bool AnyPanelOpen => _inventoryOpen || _travelMapOpen || _dockingOpen || _shopOpen || _contractBoardOpen || _thrusterInventoryOpen || _storageOpen || _deathOpen;
 
     /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-9, 0) —
     /// also reused by VendorVerbTarget as the set of things Buy can offer, since there's
@@ -411,6 +418,20 @@ public partial class Player : CharacterBody3D
         _credits -= amount;
         return true;
     }
+
+    /// <summary>Accepted-but-not-yet-resolved contracts — ticked down every physics frame (see
+    /// TickActiveContracts) and checked for arrival-triggered completion (see
+    /// OnArrivedAtDestination). Owned by Player, not by whichever ContractGiverVerbTarget the job
+    /// came from — a contract is the player's own obligation, not tied to a specific giver
+    /// instance for tracking purposes.</summary>
+    private readonly List<Contract> _activeContracts = new();
+
+    // Placeholder/tunable starting value (never owed until a contract is actually missed) —
+    // accrued by TickActiveContracts on expiry, paid down by SettlePendingDebt on arrival at any
+    // Station.
+    private int _pendingDebt;
+
+    public int PendingDebt => _pendingDebt;
 
     /// <summary>The build target whose ghost we last turned on — tracked so we can turn it back
     /// off the moment the player looks somewhere else (SetGhostVisible is only ever called on
@@ -487,6 +508,8 @@ public partial class Player : CharacterBody3D
         _dockingPanel.PlayerRef = this;
         _shopPanel = GetNode<ShopPanel>("HUD/ShopPanel");
         _shopPanel.PlayerRef = this;
+        _contractBoardPanel = GetNode<ContractBoardPanel>("HUD/ContractBoardPanel");
+        _contractBoardPanel.PlayerRef = this;
         _deathPanel = GetNode<DeathPanel>("HUD/DeathPanel");
         _deathPanel.PlayerRef = this;
         _worldDropZone = GetNode<WorldDropZone>("HUD/WorldDropZone");
@@ -641,7 +664,7 @@ public partial class Player : CharacterBody3D
         {
             CaptureMouse();
         }
-        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy && !_travelMapOpen && !_dockingOpen && !_shopOpen && !_thrusterInventoryOpen && !_storageOpen && !_deathOpen)
+        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy && !_travelMapOpen && !_dockingOpen && !_shopOpen && !_contractBoardOpen && !_thrusterInventoryOpen && !_storageOpen && !_deathOpen)
         {
             if (_inventoryOpen)
             {
@@ -661,6 +684,10 @@ public partial class Player : CharacterBody3D
             else if (_shopOpen)
             {
                 CloseShop();
+            }
+            else if (_contractBoardOpen)
+            {
+                CloseContractBoard();
             }
             else if (_thrusterInventoryOpen)
             {
@@ -1303,6 +1330,139 @@ public partial class Player : CharacterBody3D
         CaptureMouse();
     }
 
+    /// <summary>Called by ContractGiverVerbTarget.ExecuteVerb — same shape as OpenShop.</summary>
+    public void OpenContractBoard(ContractGiverVerbTarget giver)
+    {
+        _contractBoardOpen = true;
+        _openContractGiver = giver;
+        RefreshContractBoard();
+        _contractBoardPanel!.Visible = true;
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+    }
+
+    /// <summary>Called by ContractBoardPanel's Available-tab row buttons — moves the named offer
+    /// from the giver's own board into this player's active list (so it can't be double-accepted
+    /// — see ContractGiverVerbTarget.TryTakeOffer), seeding its own countdown from the rolled
+    /// Contract.RemainingSeconds.</summary>
+    public void AcceptContract(string instanceId)
+    {
+        if (_openContractGiver?.TryTakeOffer(instanceId) is { } contract)
+        {
+            _activeContracts.Add(contract);
+        }
+
+        RefreshContractBoard();
+    }
+
+    /// <summary>Called by ContractBoardPanel's Active-tab row buttons — only ever wired up as
+    /// actionable (see RefreshContractBoard's own ActionAvailable check) for RetrieveItem/
+    /// SalvageQuota, whose turn-in is a player-initiated interaction; CargoDelivery/Survey
+    /// complete automatically on arrival instead (see OnArrivedAtDestination) and never get a
+    /// live button here, so the type check below is a defensive backstop, not the primary gate.</summary>
+    public void TryTurnInContract(string instanceId)
+    {
+        var contract = _activeContracts.FirstOrDefault(c => c.InstanceId == instanceId);
+        if (contract is { } found
+            && (found.Type == ContractType.RetrieveItem || found.Type == ContractType.SalvageQuota)
+            && found.ItemId is { } itemId
+            && _inventory.Has(itemId, found.Count)
+            && _inventory.TryRemove(itemId, found.Count))
+        {
+            AddCredits(found.Reward);
+            _activeContracts.Remove(found);
+        }
+
+        RefreshContractBoard();
+    }
+
+    private void RefreshContractBoard()
+    {
+        if (_openContractGiver is null)
+        {
+            return;
+        }
+
+        var activeEntries = _activeContracts
+            .Select(c => new ContractBoardEntry(
+                c.InstanceId,
+                _openContractGiver.Describe(c),
+                ActionAvailable: (c.Type == ContractType.RetrieveItem || c.Type == ContractType.SalvageQuota)
+                    && c.ItemId is { } itemId && _inventory.Has(itemId, c.Count)))
+            .ToList();
+
+        _contractBoardPanel!.Populate(_openContractGiver.BuildAvailableEntries(), activeEntries);
+    }
+
+    public void CloseContractBoard()
+    {
+        _contractBoardOpen = false;
+        _openContractGiver = null;
+        _contractBoardPanel!.Visible = false;
+        CaptureMouse();
+    }
+
+    /// <summary>Called every physics frame regardless of any panel being open — a contract's own
+    /// deadline keeps running whether or not the board is currently on screen. Expiry (not
+    /// completed in time) removes it and adds its FailureFee to PendingDebt rather than the
+    /// contract just quietly vanishing.</summary>
+    private void TickActiveContracts(double delta)
+    {
+        foreach (var contract in _activeContracts.ToList())
+        {
+            contract.RemainingSeconds -= (float)delta;
+            if (contract.RemainingSeconds <= 0f)
+            {
+                _pendingDebt += contract.FailureFee;
+                _activeContracts.Remove(contract);
+            }
+        }
+    }
+
+    /// <summary>Called by TravelConsoleVerbTarget.CompleteDocking right after a real arrival (not
+    /// a save-load restore, which calls ApplyCurrentLocation directly without this hook) —
+    /// settles any owed debt the instant the ship docks at any Station, and auto-completes
+    /// CargoDelivery/Survey contracts targeting wherever it just arrived. RetrieveItem/
+    /// SalvageQuota deliberately aren't checked here — those complete via TryTurnInContract
+    /// instead (see ContractType's own doc comment on why the four types split this way).</summary>
+    public void OnArrivedAtDestination(int destinationId, bool isStation)
+    {
+        if (isStation)
+        {
+            SettlePendingDebt();
+        }
+
+        foreach (var contract in _activeContracts.ToList())
+        {
+            var completed = contract.Type switch
+            {
+                ContractType.CargoDelivery => isStation && contract.DestinationStationId == destinationId,
+                ContractType.Survey => contract.TargetDestinationId == destinationId && HasCartridgeEquipped(contract.ItemId),
+                _ => false,
+            };
+
+            if (completed)
+            {
+                AddCredits(contract.Reward);
+                _activeContracts.Remove(contract);
+            }
+        }
+    }
+
+    private bool HasCartridgeEquipped(string? cartridgeId) =>
+        cartridgeId is not null && _inventory.GetEquippedContainer("pda") is { } pda && pda.Contents.CountOf(cartridgeId) > 0;
+
+    /// <summary>Pays down PendingDebt by whatever's affordable right now (never negative Credits,
+    /// same guarded shape as TrySpendCredits) — any shortfall just carries over to the next
+    /// Station arrival rather than blocking anything.</summary>
+    private void SettlePendingDebt()
+    {
+        var payment = System.Math.Min(_pendingDebt, _credits);
+        if (payment > 0 && TrySpendCredits(payment))
+        {
+            _pendingDebt -= payment;
+        }
+    }
+
     /// <summary>Called by ThrusterVerbTarget.ExecuteVerb — same shape as OpenShop/OpenTravelMap
     /// (a world-verb-triggered panel, not a right-click-on-held-item sub-window), since a thruster
     /// is interacted with directly in the world rather than reached through PlayerInventory.</summary>
@@ -1376,6 +1536,8 @@ public partial class Player : CharacterBody3D
 
     public override void _PhysicsProcess(double delta)
     {
+        TickActiveContracts(delta);
+
         if (IsBusy && _busyTarget!.CurrentVerbProgress is null)
         {
             // The task we started has finished naturally — no refund, unlike an explicit cancel.

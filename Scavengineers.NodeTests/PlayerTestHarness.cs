@@ -1,5 +1,6 @@
 using GdUnit4;
 using Godot;
+using Scavengineers.Scripts.Contracts;
 using Scavengineers.Scripts.Shop;
 using Scavengineers.Scripts.Travel;
 using PlayerScript = Scavengineers.Scripts.Player.Player;
@@ -159,6 +160,15 @@ public static class PlayerTestHarness
         shopPanel.CloseButton = new Button();
         shopPanel.AddChild(shopPanel.CloseButton);
         hud.AddChild(shopPanel);
+
+        var contractBoardPanel = new ContractBoardPanel { Name = "ContractBoardPanel" };
+        contractBoardPanel.AvailableList = new Control();
+        contractBoardPanel.ActiveList = new Control();
+        contractBoardPanel.CloseButton = new Button();
+        contractBoardPanel.AddChild(contractBoardPanel.AvailableList);
+        contractBoardPanel.AddChild(contractBoardPanel.ActiveList);
+        contractBoardPanel.AddChild(contractBoardPanel.CloseButton);
+        hud.AddChild(contractBoardPanel);
 
         var deathPanel = new Scavengineers.Scripts.Player.DeathPanel { Name = "DeathPanel" };
         deathPanel.ReloadButton = new Button();

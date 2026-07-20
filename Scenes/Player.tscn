@@ -12,6 +12,7 @@
 [ext_resource type="Script" path="res://Scripts/Player/DeathPanel.cs" id="10"]
 [ext_resource type="Script" path="res://Scripts/Travel/DockingMinigamePanel.cs" id="11"]
 [ext_resource type="Script" path="res://Scripts/Travel/DockingView.cs" id="12"]
+[ext_resource type="Script" path="res://Scripts/Contracts/ContractBoardPanel.cs" id="13"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -1767,6 +1768,61 @@ size_flags_horizontal = 3
 theme_override_constants/separation = 4
 
 [node name="CloseButton" type="Button" parent="HUD/ShopPanel/Layout"]
+layout_mode = 2
+text = "CLOSE"
+
+[node name="ContractBoardPanel" type="PanelContainer" parent="HUD" node_paths=PackedStringArray("AvailableList", "ActiveList", "CloseButton")]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -240.0
+offset_right = 280.0
+offset_bottom = 240.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("OpaquePanelBackground")
+script = ExtResource("13")
+AvailableList = NodePath("Layout/Tabs/Available/AvailableList")
+ActiveList = NodePath("Layout/Tabs/Active/ActiveList")
+CloseButton = NodePath("Layout/CloseButton")
+
+[node name="Layout" type="VBoxContainer" parent="HUD/ContractBoardPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TitleBar" type="Label" parent="HUD/ContractBoardPanel/Layout"]
+layout_mode = 2
+mouse_filter = 0
+theme_override_styles/normal = SubResource("HudLabelBackground")
+text = "CONTRACTS"
+horizontal_alignment = 1
+
+[node name="Tabs" type="TabContainer" parent="HUD/ContractBoardPanel/Layout"]
+custom_minimum_size = Vector2(540, 350)
+layout_mode = 2
+
+[node name="Available" type="ScrollContainer" parent="HUD/ContractBoardPanel/Layout/Tabs"]
+layout_mode = 2
+
+[node name="AvailableList" type="VBoxContainer" parent="HUD/ContractBoardPanel/Layout/Tabs/Available"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="Active" type="ScrollContainer" parent="HUD/ContractBoardPanel/Layout/Tabs"]
+visible = false
+layout_mode = 2
+
+[node name="ActiveList" type="VBoxContainer" parent="HUD/ContractBoardPanel/Layout/Tabs/Active"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="CloseButton" type="Button" parent="HUD/ContractBoardPanel/Layout"]
 layout_mode = 2
 text = "CLOSE"
 

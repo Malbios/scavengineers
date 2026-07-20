@@ -4,10 +4,13 @@ namespace Scavengineers.Scripts.Contracts;
 /// (the data-driven, unrolled JSON row): a template describes a *kind* of job with ranges
 /// (reward, count, deadline); a Contract is one specific offer/acceptance with those ranges
 /// already resolved. Target destination ids (which Derelict/Station) are deliberately left for
-/// whoever rolls this (see ContractGiverVerbTarget in Part 3) rather than ContractCatalog itself,
-/// since picking a real target needs live access to TravelConsoleVerbTarget's current Derelict/
-/// Station counts — data outside what a pure catalog loader should know about.</summary>
-public sealed class Contract
+/// whoever rolls this (see ContractGiverVerbTarget) rather than ContractCatalog itself, since
+/// picking a real target needs live access to TravelConsoleVerbTarget's current Derelict/Station
+/// counts — data outside what a pure catalog loader should know about. A record (not a plain
+/// class), matching this codebase's own convention for small immutable-ish data shapes (Verb,
+/// TravelMapEntry, ShopEntry) — ContractGiverVerbTarget fills in the destination fields left null
+/// by ContractCatalog.Roll via a `with` expression rather than mutating the original.</summary>
+public sealed record Contract
 {
     public required string InstanceId { get; init; }
 

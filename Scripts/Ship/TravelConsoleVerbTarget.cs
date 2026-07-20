@@ -422,12 +422,20 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     }
 
     /// <summary>Called by Player once the docking minigame's Dock button succeeds — exactly what
-    /// OnTravelComplete used to do unconditionally before docking existed.</summary>
+    /// OnTravelComplete used to do unconditionally before docking existed. Also notifies Player of
+    /// the real arrival (not ApplySaveState's own call to ApplyCurrentLocation, which restores
+    /// existing state rather than a fresh arrival) — see Player.OnArrivedAtDestination for the
+    /// contract-completion/debt-settlement side effects this triggers.</summary>
     public void CompleteDocking()
     {
         _docking = false;
         _currentDestination = _pendingDestination;
         ApplyCurrentLocation();
+
+        if (GetTree().GetFirstNodeInGroup("player") is PlayerScript player)
+        {
+            player.OnArrivedAtDestination(_currentDestination, isStation: _currentDestination < StationCount);
+        }
     }
 
     /// <summary>Emits "station_{i}" going forward — legacy bare "station" (predating multi-station

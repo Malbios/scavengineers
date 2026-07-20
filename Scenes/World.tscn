@@ -25,6 +25,7 @@
 [ext_resource type="Material" path="res://Assets/Materials/station_ceiling_material.tres" id="27"]
 [ext_resource type="PackedScene" path="res://Scenes/Derelict.tscn" id="28"]
 [ext_resource type="Script" path="res://Scripts/Environment/BreathingIdle.cs" id="29"]
+[ext_resource type="Script" path="res://Scripts/Ship/ContractGiverVerbTarget.cs" id="30"]
 
 [sub_resource type="ShaderMaterial" id="StarfieldSkyMaterial"]
 shader = ExtResource("24")
@@ -274,6 +275,12 @@ albedo_color = Color(0.25, 0.35, 0.3, 1)
 
 [sub_resource type="StandardMaterial3D" id="FigureHeadMaterial"]
 albedo_color = Color(0.75, 0.6, 0.5, 1)
+
+[sub_resource type="StandardMaterial3D" id="ContractFigureSuitMaterial"]
+albedo_color = Color(0.5, 0.32, 0.12, 1)
+
+[sub_resource type="StandardMaterial3D" id="ContractFigureHeadMaterial"]
+albedo_color = Color(0.68, 0.58, 0.5, 1)
 
 [node name="World" type="Node3D" unique_id=474587780]
 
@@ -721,6 +728,43 @@ surface_material_override/0 = SubResource("FigureSuitMaterial")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.36, 1.15, 0)
 mesh = SubResource("FigureArmMesh")
 surface_material_override/0 = SubResource("FigureSuitMaterial")
+
+[node name="ContractFigure" type="StaticBody3D" parent="Station" node_paths=PackedStringArray("ConsoleRef")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0, 0, -2.4)
+script = ExtResource("30")
+ConsoleRef = NodePath("../../HomeShip/TravelConsole")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Station/ContractFigure"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("FigureBodyShape")
+
+[node name="Visual" type="Node3D" parent="Station/ContractFigure"]
+script = ExtResource("29")
+
+[node name="Legs" type="MeshInstance3D" parent="Station/ContractFigure/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+mesh = SubResource("FigureLegsMesh")
+surface_material_override/0 = SubResource("ContractFigureSuitMaterial")
+
+[node name="Torso" type="MeshInstance3D" parent="Station/ContractFigure/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+mesh = SubResource("FigureTorsoMesh")
+surface_material_override/0 = SubResource("ContractFigureSuitMaterial")
+
+[node name="Head" type="MeshInstance3D" parent="Station/ContractFigure/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.65, 0)
+mesh = SubResource("FigureHeadMesh")
+surface_material_override/0 = SubResource("ContractFigureHeadMaterial")
+
+[node name="ArmLeft" type="MeshInstance3D" parent="Station/ContractFigure/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.36, 1.15, 0)
+mesh = SubResource("FigureArmMesh")
+surface_material_override/0 = SubResource("ContractFigureSuitMaterial")
+
+[node name="ArmRight" type="MeshInstance3D" parent="Station/ContractFigure/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.36, 1.15, 0)
+mesh = SubResource("FigureArmMesh")
+surface_material_override/0 = SubResource("ContractFigureSuitMaterial")
 
 [node name="StationAirlock" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipARef", "ShipBRef", "SlabMesh", "SlabCollision") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 1.0, -0.8)
