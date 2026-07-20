@@ -134,3 +134,9 @@ VERB_RESUME_DOCKING,Resume Docking,Andockvorgang fortsetzen
 HUD_DOCKING_ABORTED,Docking aborted — try again,Andockvorgang abgebrochen — erneut versuchen
 HUD_DOCKING_CONTROLS,WASD align · Space thrust · Ctrl reverse thrust · release to slow,WASD ausrichten · Leertaste Schub · Strg Gegenschub · loslassen zum Abbremsen
 OBJECT_STATION_2,Station 2,Station 2
+OBJECT_CONTRACT_GIVER,Contract Giver,Auftraggeber
+VERB_OPEN_CONTRACT_BOARD,View Contracts,Aufträge ansehen
+CONTRACT_TYPE_RETRIEVEITEM,Retrieve,Beschaffen
+CONTRACT_TYPE_CARGODELIVERY,Cargo Delivery,Frachtlieferung
+CONTRACT_TYPE_SALVAGEQUOTA,Salvage Quota,Bergungsquote
+CONTRACT_TYPE_SURVEY,Survey,Untersuchung
