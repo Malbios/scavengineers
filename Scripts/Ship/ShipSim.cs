@@ -59,6 +59,7 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     private static readonly CellCoord TravelConsoleCell = new(0, 0);
     private static readonly CellCoord InteriorDoorCell = new(5, 2);
     private static readonly CellCoord StationAirlockCell = new(0, 2);
+    private static readonly CellCoord Station2AirlockCell = new(1, 2);
     private static readonly CellCoord DerelictAirlockCell = new(11, 2);
     private static readonly CellCoord BunkCell = new(0, 1);
 
@@ -125,6 +126,7 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     public const string TravelConsoleFixtureId = "travel_console_power";
     public const string InteriorDoorFixtureId = "interior_door_power";
     public const string StationAirlockFixtureId = "station_airlock_power";
+    public const string Station2AirlockFixtureId = "station2_airlock_power";
     public const string DerelictAirlockFixtureId = "derelict_airlock_power";
     public const string BunkFixtureId = "bunk";
 
@@ -291,6 +293,7 @@ public partial class ShipSim : Node, IShipLayoutSaveable
             // Install*/Remove* calls below that a player action or a save replay uses.
             Deck.AddFixture(new MachineFixture(TravelConsoleFixtureId, TravelConsoleCell, FixtureSurface.WallInner) { PowerDraw = IdleDraw });
             Deck.AddFixture(new MachineFixture(StationAirlockFixtureId, StationAirlockCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
+            Deck.AddFixture(new MachineFixture(Station2AirlockFixtureId, Station2AirlockCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
             Deck.AddFixture(new MachineFixture(DerelictAirlockFixtureId, DerelictAirlockCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
 
             _power = new PowerSystem(Deck);

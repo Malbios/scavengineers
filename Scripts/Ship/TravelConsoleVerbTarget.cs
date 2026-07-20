@@ -15,17 +15,21 @@ namespace Scavengineers.Scripts.Ship;
 /// <summary>
 /// The Home Ship's simplified/abstracted travel step (docs/project-plan.md §4 — not full
 /// Newtonian piloting, just a timed wait standing in for undocking, flying, and docking).
-/// Owns which of the Home Ship's possible destinations (the Station plus a data-authored list of
-/// Derelicts) it currently occupies, and keeps both AirlockDoorVerbTargets' <see
-/// cref="AirlockDoorVerbTarget.Docked"/> flag in sync. Doesn't touch either airlock's open/closed
-/// state itself — whatever you left a door doing when you left is still what it's doing when
-/// you're back (see AirlockDoorVerbTarget's own handling of an open-but-undocked door venting to
-/// vacuum instead of auto-closing).
+/// Owns which of the Home Ship's possible destinations (a data-authored list of Stations plus a
+/// data-authored list of Derelicts) it currently occupies, and keeps every AirlockDoorVerbTarget's
+/// <see cref="AirlockDoorVerbTarget.Docked"/> flag in sync. Doesn't touch any airlock's own
+/// open/closed state itself — whatever you left a door doing when you left is still what it's
+/// doing when you're back (see AirlockDoorVerbTarget's own handling of an open-but-undocked door
+/// venting to vacuum instead of auto-closing).
 ///
-/// A destination is a single unified int: 0 = Station, 1..DerelictCount = Derelict N. Executing
-/// the Travel verb doesn't start traveling directly anymore — it opens the travel map (see
-/// Player.OpenTravelMap), which calls back into <see cref="BeginTravel"/> once the player picks
-/// and confirms a destination.
+/// A destination is a single unified int: 0..StationCount-1 = Station N, StationCount..
+/// StationCount+DerelictCount-1 = Derelict N. Every Station gets its own dedicated, never-shared
+/// airlock (see StationAirlockPaths) — unlike Derelicts, which all share one rebindable airlock
+/// (DerelictAirlock.RebindFarSide) since only one Derelict is ever "current" at a time; a Station
+/// is a permanent fixture, not a rotating "away mission" target, so it just gets its own door like
+/// the original single Station always has. Executing the Travel verb doesn't start traveling
+/// directly anymore — it opens the travel map (see Player.OpenTravelMap), which calls back into
+/// <see cref="BeginTravel"/> once the player picks and confirms a destination.
 /// </summary>
 public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IStateSaveable
 {
@@ -78,29 +82,30 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     [Export]
     public ShipSim? ShipSimRef { get; set; }
 
-    [Export]
-    public AirlockDoorVerbTarget? StationAirlock { get; set; }
-
     /// <summary>The one shared "away mission" airlock — its far side gets repointed at whichever
     /// Derelict is the current travel target (see AirlockDoorVerbTarget.RebindFarSide), rather
     /// than each Derelict getting its own always-wired door.</summary>
     [Export]
     public AirlockDoorVerbTarget? DerelictAirlock { get; set; }
 
-    /// <summary>The Station structure itself (not its connecting corridor — that's the Home
-    /// Ship's own boarding-tube apparatus, always present) — hidden and decollided while the Home
-    /// Ship isn't docked there, so it and whichever Derelict is current aren't both spatially
-    /// present at once. The airlock alone only fakes this from ground level (see
-    /// AirlockDoorVerbTarget's own "opens to space while undocked" doc) — flying outside in
-    /// zero-g would otherwise reveal both ships floating right next to each other regardless of
-    /// which one's actually docked.</summary>
+    /// <summary>Parallel arrays, index i describing Station i across all three — same mechanism
+    /// as the Derelict arrays below, plus a dedicated airlock per entry (unlike Derelicts, every
+    /// Station gets its own permanent, never-rebound door — see AirlockDoorVerbTarget.
+    /// RebindFarSide's doc comment for why Derelicts need the shared/rebindable trick and Stations
+    /// don't). Each group is hidden and decollided while the Home Ship isn't docked there, so it
+    /// and whichever other destination is current aren't both spatially present at once — the
+    /// airlock alone only fakes this from ground level (see AirlockDoorVerbTarget's own "opens to
+    /// space while undocked" doc); flying outside in zero-g would otherwise reveal every ship
+    /// floating right next to each other regardless of which one's actually docked.</summary>
     [Export]
-    public Node3D? StationGroup { get; set; }
+    public Godot.Collections.Array<NodePath> StationGroupPaths { get; set; } = new();
 
-    // Placeholder/tunable — roughly centered among the derelicts below, for the travel map's
-    // spatial layout only; has no gameplay effect (no travel-time/distance mechanic yet).
     [Export]
-    public Vector2 StationMapPosition { get; set; } = new(220, 180);
+    public Godot.Collections.Array<NodePath> StationAirlockPaths { get; set; } = new();
+
+    // Placeholder/tunable — arbitrary spatial layout for the travel map, no gameplay effect.
+    [Export]
+    public Godot.Collections.Array<Vector2> StationMapPositions { get; set; } = new();
 
     /// <summary>Parallel arrays, index i describing Derelict i+1 across all three — the same
     /// per-instance-override mechanism ShipSim's own GridWidth/RoomSplitColumns already use,
@@ -132,8 +137,10 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     /// yet. See CompleteDocking, called by Player once the minigame's Dock button succeeds.</summary>
     private bool _docking;
 
-    private int _currentDestination; // 0 = Station, 1..DerelictCount = Derelict N
+    private int _currentDestination; // 0..StationCount-1 = Station N, StationCount.. = Derelict N
     private int _pendingDestination;
+    private readonly List<Node3D> _stationGroups = new();
+    private readonly List<AirlockDoorVerbTarget> _stationAirlocks = new();
     private readonly List<Node3D> _derelictGroups = new();
     private readonly List<ShipSim> _derelictShipSims = new();
 
@@ -142,8 +149,12 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     private Timer? _maintenanceTimer;
     private bool _maintaining;
 
-    /// <summary>Bounds every loop/lookup below defensively against the three parallel arrays
-    /// above being resized inconsistently by hand in the inspector.</summary>
+    /// <summary>Bounds every loop/lookup below defensively against the three parallel Station
+    /// arrays being resized inconsistently by hand in the inspector.</summary>
+    private int StationCount => Math.Min(_stationGroups.Count, Math.Min(_stationAirlocks.Count, StationMapPositions.Count));
+
+    /// <summary>Bounds every loop/lookup below defensively against the three parallel Derelict
+    /// arrays above being resized inconsistently by hand in the inspector.</summary>
     private int DerelictCount => Math.Min(_derelictGroups.Count, Math.Min(_derelictShipSims.Count, DerelictMapPositions.Count));
 
     public IReadOnlyList<Verb> AvailableVerbs =>
@@ -181,9 +192,24 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 
     public override void _Ready()
     {
+        if (StationGroupPaths.Count != StationAirlockPaths.Count || StationGroupPaths.Count != StationMapPositions.Count)
+        {
+            GD.PushWarning("[TravelConsoleVerbTarget] Mismatched station array lengths — extra entries ignored.");
+        }
+
         if (DerelictGroupPaths.Count != DerelictShipSimPaths.Count || DerelictGroupPaths.Count != DerelictMapPositions.Count)
         {
             GD.PushWarning("[TravelConsoleVerbTarget] Mismatched derelict array lengths — extra entries ignored.");
+        }
+
+        foreach (var path in StationGroupPaths)
+        {
+            _stationGroups.Add(GetNode<Node3D>(path));
+        }
+
+        foreach (var path in StationAirlockPaths)
+        {
+            _stationAirlocks.Add(GetNode<AirlockDoorVerbTarget>(path));
         }
 
         foreach (var path in DerelictGroupPaths)
@@ -330,7 +356,7 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     /// at least one.</summary>
     public void BeginTravel(int destinationId)
     {
-        if (_traveling || _docking || destinationId == _currentDestination || destinationId < 0 || destinationId > DerelictCount)
+        if (_traveling || _docking || destinationId == _currentDestination || destinationId < 0 || destinationId >= StationCount + DerelictCount)
         {
             return;
         }
@@ -354,14 +380,22 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 
     public int CurrentDestinationId => _currentDestination;
 
-    /// <summary>Station first, then every Derelict — for the travel map to render uniformly
-    /// without special-casing Station vs. Derelict itself.</summary>
+    /// <summary>Every Station first, then every Derelict — for the travel map to render uniformly
+    /// without special-casing individual destinations itself. Station 0 keeps the original
+    /// "OBJECT_STATION" key (no "_1" suffix) so the existing, already-localized single-station
+    /// save doesn't need a fresh translation just to keep reading the same on screen.</summary>
     public IReadOnlyList<TravelMapEntry> BuildMapEntries()
     {
-        var entries = new List<TravelMapEntry> { new(0, "OBJECT_STATION", StationMapPosition, _currentDestination == 0) };
+        var entries = new List<TravelMapEntry>();
+        for (var i = 0; i < StationCount; i++)
+        {
+            var key = i == 0 ? "OBJECT_STATION" : $"OBJECT_STATION_{i + 1}";
+            entries.Add(new(i, key, StationMapPositions[i], _currentDestination == i));
+        }
+
         for (var i = 0; i < DerelictCount; i++)
         {
-            entries.Add(new(i + 1, $"OBJECT_DERELICT_{i + 1}", DerelictMapPositions[i], _currentDestination == i + 1));
+            entries.Add(new(StationCount + i, $"OBJECT_DERELICT_{i + 1}", DerelictMapPositions[i], _currentDestination == StationCount + i));
         }
 
         return entries;
@@ -396,47 +430,61 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         ApplyCurrentLocation();
     }
 
-    public string GetSaveState() => _currentDestination == 0 ? "station" : $"derelict_{_currentDestination}";
+    /// <summary>Emits "station_{i}" going forward — legacy bare "station" (predating multi-station
+    /// support) is still accepted on load (see ApplySaveState) and always means Station 0, the
+    /// original single Station. Derelict strings are unaffected: "derelict_{n}" already encodes
+    /// semantic identity, not the raw destination int, so it stays correct even though that int
+    /// now shifts by StationCount-1 once more than one Station exists.</summary>
+    public string GetSaveState() => _currentDestination < StationCount
+        ? $"station_{_currentDestination}"
+        : $"derelict_{_currentDestination - StationCount + 1}";
 
     public void ApplySaveState(string state)
     {
         _currentDestination = state switch
         {
-            "station" => 0,
-            "derelict" => 1, // legacy pre-map save (bare "derelict") -> Derelict 1 specifically,
-                              // preserving "I was away from the station" intent rather than a
-                              // generic reset back to Station.
+            "station" => 0, // legacy pre-multi-station save (bare "station") -> Station 0 specifically.
+            "derelict" => StationCount, // legacy pre-map save (bare "derelict") -> Derelict 1
+                                        // specifically, preserving "I was away from the station"
+                                        // intent rather than a generic reset back to a Station.
+            _ when state.StartsWith("station_") && int.TryParse(state.AsSpan("station_".Length), out var s)
+                && s >= 0 && s < StationCount => s,
             _ when state.StartsWith("derelict_") && int.TryParse(state.AsSpan("derelict_".Length), out var n)
-                && n >= 1 && n <= DerelictCount => n,
-            _ => 0, // unrecognized -> Station, matching this codebase's existing fallback shape.
+                && n >= 1 && n <= DerelictCount => StationCount + n - 1,
+            _ => 0, // unrecognized -> Station 0, matching this codebase's existing fallback shape.
         };
         ApplyCurrentLocation();
     }
 
     private void ApplyCurrentLocation()
     {
-        var atStation = _currentDestination == 0;
-        var derelictIndex = _currentDestination - 1;
+        // -1 (not a valid station index) whenever the current destination is actually a Derelict.
+        var stationIndex = _currentDestination < StationCount ? _currentDestination : -1;
+        var derelictIndex = _currentDestination - StationCount;
 
-        if (StationAirlock is not null)
+        for (var i = 0; i < _stationAirlocks.Count; i++)
         {
-            StationAirlock.Docked = atStation;
+            _stationAirlocks[i].Docked = i == stationIndex;
         }
 
         if (DerelictAirlock is not null)
         {
-            if (!atStation && derelictIndex >= 0 && derelictIndex < _derelictShipSims.Count)
+            if (stationIndex < 0 && derelictIndex >= 0 && derelictIndex < _derelictShipSims.Count)
             {
                 DerelictAirlock.RebindFarSide(_derelictShipSims[derelictIndex]);
             }
 
-            DerelictAirlock.Docked = !atStation;
+            DerelictAirlock.Docked = stationIndex < 0;
         }
 
-        SetShipPresence(StationGroup, atStation);
+        for (var i = 0; i < _stationGroups.Count; i++)
+        {
+            SetShipPresence(_stationGroups[i], i == stationIndex);
+        }
+
         for (var i = 0; i < _derelictGroups.Count; i++)
         {
-            SetShipPresence(_derelictGroups[i], !atStation && i == derelictIndex);
+            SetShipPresence(_derelictGroups[i], stationIndex < 0 && i == derelictIndex);
         }
     }
 

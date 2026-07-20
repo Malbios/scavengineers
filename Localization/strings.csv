@@ -133,3 +133,4 @@ VERB_DOCK,Dock,Andocken
 VERB_RESUME_DOCKING,Resume Docking,Andockvorgang fortsetzen
 HUD_DOCKING_ABORTED,Docking aborted — try again,Andockvorgang abgebrochen — erneut versuchen
 HUD_DOCKING_CONTROLS,WASD align · Space thrust · Ctrl reverse thrust · release to slow,WASD ausrichten · Leertaste Schub · Strg Gegenschub · loslassen zum Abbremsen
+OBJECT_STATION_2,Station 2,Station 2

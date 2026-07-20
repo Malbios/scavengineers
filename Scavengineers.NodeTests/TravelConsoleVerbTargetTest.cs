@@ -61,9 +61,10 @@ public class TravelConsoleVerbTargetTest
         var console = AutoFree(new TravelConsoleVerbTarget
         {
             ShipSimRef = homeShip,
-            StationAirlock = stationAirlock,
             DerelictAirlock = derelictAirlock,
-            StationGroup = stationGroup,
+            StationGroupPaths = new Godot.Collections.Array<NodePath> { new("../StationGroup") },
+            StationAirlockPaths = new Godot.Collections.Array<NodePath> { new("../StationAirlock") },
+            StationMapPositions = new Godot.Collections.Array<Vector2> { new(220, 180) },
             DerelictGroupPaths = derelictGroupPaths,
             DerelictShipSimPaths = derelictShipSimPaths,
             DerelictMapPositions = derelictMapPositions,
@@ -121,8 +122,11 @@ public class TravelConsoleVerbTargetTest
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var (console, _, _) = CreateConsole(sceneTree, 2);
 
+        // GetSaveState emits "station_0" going forward even though bare "station" is still
+        // accepted on load (see ApplySaveState) — this test's own name predates multi-station
+        // support, when "station" (no index) was the only form that ever existed.
         console.ApplySaveState("station");
-        AssertBool(console.GetSaveState() == "station").IsTrue();
+        AssertBool(console.GetSaveState() == "station_0").IsTrue();
 
         console.ApplySaveState("derelict_1");
         AssertBool(console.GetSaveState() == "derelict_1").IsTrue();

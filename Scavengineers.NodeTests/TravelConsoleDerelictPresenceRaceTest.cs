@@ -69,9 +69,10 @@ public class TravelConsoleDerelictPresenceRaceTest
         var console = new TravelConsoleVerbTarget
         {
             ShipSimRef = homeShip,
-            StationAirlock = stationAirlock,
             DerelictAirlock = derelictAirlock,
-            StationGroup = stationGroup,
+            StationGroupPaths = new Godot.Collections.Array<NodePath> { new("../StationGroup") },
+            StationAirlockPaths = new Godot.Collections.Array<NodePath> { new("../StationAirlock") },
+            StationMapPositions = new Godot.Collections.Array<Vector2> { new(220, 180) },
             DerelictGroupPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1") },
             DerelictShipSimPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/ShipSim") },
             DerelictMapPositions = new Godot.Collections.Array<Vector2> { Vector2.Zero },
