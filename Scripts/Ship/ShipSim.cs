@@ -140,7 +140,14 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     public const float IdleDraw = 1f;
     public const float RechargeStationActiveDraw = 10f;
     public const float TravelConsoleActiveDraw = 8f;
-    public const float ThrusterActiveDraw = 6f;
+
+    // Per-thruster, not shared — N installed thrusters draw N times this while traveling. Low
+    // enough that a normal loadout (up to ~4 thrusters, already past the point of useful travel-
+    // time reduction against BaseTravelSeconds/MinTravelSeconds's floor) never trips IsOverloaded
+    // by itself; stacking thrusters well beyond that (or recharging mid-flight, on top of
+    // TravelConsoleActiveDraw) still can, keeping the ship-wide brownout a real but avoidable
+    // consequence of over-equipping rather than a guaranteed side effect of every trip.
+    public const float ThrusterActiveDraw = 2f;
 
     [Export]
     public bool HasPowerGrid { get; set; }

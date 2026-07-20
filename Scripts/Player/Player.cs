@@ -251,6 +251,13 @@ public partial class Player : CharacterBody3D
     /// existing narrow test-accessor pattern (see <see cref="SuppressMouseCaptureForTests"/>).</summary>
     public bool ScanModeOn => _scanModeOn;
 
+    /// <summary>Test-only override for scan mode's toggle state — <see cref="CanScan"/> requires a
+    /// helmet resolved via ItemCatalog.EquipSlot, which the isolated NodeTests catalog can't
+    /// resolve (see PlayerScanModeTest's own doc comment), so scan mode can't be turned on through
+    /// the real input gate in that project. Same narrow test-accessor pattern as
+    /// <see cref="SuppressMouseCaptureForTests"/>/<see cref="ScanModeOn"/>.</summary>
+    public void SetScanModeOnForTests(bool on) => _scanModeOn = on;
+
     /// <summary>Gates scan mode: the PDA worn, its one cartridge pocket holding the health-scan
     /// cartridge, and *any* helmet worn (checked via ItemCatalog.EquipSlot rather than hardcoding
     /// "eva_helmet" — a future helmet type qualifies automatically).</summary>
@@ -1990,7 +1997,14 @@ public partial class Player : CharacterBody3D
 
         foreach (var visual in _highlightedVisuals)
         {
-            visual.SetLayerMaskValue(ScanHighlightLayer, false);
+            // Guards against a target that was destroyed (uninstalled/scrapped/dismantled) while
+            // still scan-highlighted — its VisualInstance3D children are freed along with it, but
+            // this list isn't rebuilt until the next differing `desired` (see below), so a stale
+            // reference can reach here. Same guard convention as _openThruster/_openStorage above.
+            if (GodotObject.IsInstanceValid(visual))
+            {
+                visual.SetLayerMaskValue(ScanHighlightLayer, false);
+            }
         }
 
         foreach (var visual in desired)

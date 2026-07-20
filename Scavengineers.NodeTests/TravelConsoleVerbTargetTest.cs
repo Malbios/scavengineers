@@ -292,15 +292,17 @@ public class TravelConsoleVerbTargetTest
         var (console, _, _) = CreateConsole(sceneTree, 1, homeShipHasPowerGrid: true);
 
         console.ShipSimRef!.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
-        console.ShipSimRef!.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);
-        console.ShipSimRef!.InstallThruster("t2", new CellCoord(2, 0), FixtureSurface.WallInner);
-        console.ShipSimRef!.InstallThruster("t3", new CellCoord(3, 0), FixtureSurface.WallInner);
-        console.ShipSimRef!.SetThrusterCharge("t1", 1f);
-        console.ShipSimRef!.SetThrusterCharge("t2", 1f);
-        console.ShipSimRef!.SetThrusterCharge("t3", 1f);
+        for (var i = 1; i <= 7; i++)
+        {
+            console.ShipSimRef!.InstallThruster($"t{i}", new CellCoord(i, 0), FixtureSurface.WallInner);
+            console.ShipSimRef!.SetThrusterCharge($"t{i}", 1f);
+        }
 
-        // While traveling: TravelConsoleActiveDraw(8) + 3 * ThrusterActiveDraw(6) = 26, over
-        // BatteryCapacity(20) — the ship-wide brownout this active-draw spike is meant to prove.
+        // While traveling: TravelConsoleActiveDraw(8) + 7 * ThrusterActiveDraw(2) = 22, over
+        // BatteryCapacity(20) — the ship-wide brownout this active-draw spike is meant to prove
+        // still exists once a ship is equipped well past the point of useful travel-time reduction
+        // (BaseTravelSeconds/MinTravelSeconds's floor caps out well before 7 thrusters actually
+        // help).
         console.BeginTravel(1);
         await sceneTree.ToSignal(sceneTree.CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
 
@@ -310,5 +312,32 @@ public class TravelConsoleVerbTargetTest
 
         await sceneTree.ToSignal(sceneTree.CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
         AssertFloat(console.ShipSimRef!.ThrusterChargeFraction("t1")).IsEqual(1f);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task Traveling_WithANormalTwoThrusterLoadout_DoesNotBrownoutTheShip()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (console, _, _) = CreateConsole(sceneTree, 1, homeShipHasPowerGrid: true);
+
+        console.ShipSimRef!.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.InstallThruster("t2", new CellCoord(2, 0), FixtureSurface.WallInner);
+        console.ShipSimRef!.SetThrusterCharge("t1", 1f);
+        console.ShipSimRef!.SetThrusterCharge("t2", 1f);
+
+        console.BeginTravel(1);
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+
+        // A 2-thruster ship is a normal, expected loadout (installing a 2nd thruster to shorten
+        // the trip is the obvious move) — it must not brownout the whole grid the instant travel
+        // starts. Demand: TravelConsoleActiveDraw(8) + 2 * ThrusterActiveDraw(2) = 12, comfortably
+        // under BatteryCapacity(20). This harness only wires the console/thrusters/battery
+        // together (no Bunk/airlock conduits — see CreateConsole/ShipSim's own "added unwired"
+        // comment), so IsPowered is checked against the console fixture itself; on a real, fully-
+        // conduited ship the same non-overload means every other device on the grid (airlocks,
+        // lights) stays powered too.
+        AssertBool(console.ShipSimRef!.IsPowered(ShipSim.TravelConsoleFixtureId)).IsTrue();
     }
 }
