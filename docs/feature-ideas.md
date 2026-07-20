@@ -369,3 +369,137 @@ fabricator or upgrade-vendor system exists.
 outright good-but-early.
 
 **Revisit when:** Worth a closer look sooner than the rest of this list, but not fleshed out yet.
+
+## Time acceleration (real skip-forward system)
+
+**What:** `docs/project-plan.md`'s settled time-acceleration rule (fast-forward advances the full
+clock and pays full cost — fatigue, hunger, suit O2, power all tick — available only when settled:
+repair/wait/transit, disabled during active real-time hazards/EVA) isn't actually built. Sleep,
+repairs, and travel today are all just flat real-time waits (3s/0.6s/3s) rather than a genuine
+skip-forward.
+
+**Why it's good:** Replaces today's per-verb `DurationSeconds` tuning band-aid with the actual
+intended mechanism — pacing becomes "does this action want to fast-forward," not a constant to
+hand-tune per verb.
+
+**Why not now:** Explicitly deferred (2026-07-20) — "let's put time acceleration in for later."
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+## Airlock cycling (pressure equalization delay)
+
+**What:** Opening a door between two zones at different pressure triggers a real equalize/vent
+sequence (using the already-built atmosphere solver) before it actually opens, instead of an
+instant power-gated toggle.
+
+**Why it's good:** Gives the atmosphere system a second visible use beyond breach hazards, and
+makes airlocks feel like real airlocks instead of power-gated doors.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-20) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+## Mag-boots toggle for zero-g
+
+**What:** A player-activated override that keeps you grounded/stable in a vented room instead of
+today's automatic float-on-vacuum (`Player.cs`'s `inZeroG`/`MotionMode` switch, driven purely by
+room O2Fraction with no player input at all).
+
+**Why it's good:** Trades mobility for control as a real player choice, using the free-float
+system already validated in the Phase 0 spike instead of leaving it purely automatic.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-20) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+## Suit breach / EVA suit integrity
+
+**What:** The player's own suit (distinct from ship hull) can take damage from a hazard, causing
+a leak that drains the O2 tank faster until patched — a personal, portable version of the ship's
+own breach mechanic.
+
+**Why it's good:** A resource-pressure hazard distinct from both ship hull breaches and the
+already-logged Health/wound-focused "injury/first-aid" idea — this is about suit hardware, not the
+player's body.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-20) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+## Carry weight / encumbrance
+
+**What:** Total carried mass (not per-item bulk) slows movement speed past a threshold, distinct
+from the already-logged "bulky-cargo hauling" idea (that's about individual oversized items
+needing a cart, not cumulative weight).
+
+**Why it's good:** Makes "how much can I carry back" a real tradeoff on every salvage run, not
+just a matter of backpack slot count.
+
+**Why not now:** Flagged as "a strong maybe" when raised (2026-07-20) — more promising than a
+typical entry on this list, but not evaluated against current dev state in detail yet.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+## Rotating derelict roster + lazy generation
+
+**What:** The navigation console's derelict list isn't fixed — some entries disappear over time,
+new ones appear to take their place. Each derelict is only "really" generated and laid out the
+first time the player actually docks there (matching how `ShipSim.ProcedurallyGenerate` already
+seeds a layout from a stable seed on demand) rather than every possible derelict existing fully
+built from the start.
+
+**Why it's good:** Makes the nav console feel alive across a playthrough instead of a fixed,
+exhaustible list, and keeps memory/setup cost down by only building a derelict's real layout once
+it's actually visited.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-20) — refines the earlier "derelict
+decay window" pitch (soft countdown per-site) into this roster-rotation + lazy-generation shape
+instead; not evaluated against current dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+## Tool condition affects performance, not just failure
+
+**What:** A worn-down drill (or other durable tool) doesn't just eventually stop working — while
+worn it extracts slower or yields less scrap, distinct from today's binary works/broken state.
+
+**Why it's good:** Makes "keep using it a bit longer vs. repair now" a live, continuous tradeoff
+instead of a single breakpoint.
+
+**Why not now:** Flagged as "a maybe, later" when raised (2026-07-20) — softer than a firm
+commitment, not evaluated against current dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+## Cheap, unreliable field patches
+
+**What:** A bad-but-cheap repair option for damaged items — patches the item back to working
+using minimal materials, but at reduced/temporary effectiveness compared to a real repair.
+Replaces an earlier "cannibalize two items into one" pitch, which the user felt didn't fit this
+game's world; this reframes the same "get more mileage out of marginal salvage" goal as a
+realistic field-patch instead.
+
+**Why it's good:** A cheap-but-worse option distinct from the existing Maintain/Repair tiers,
+giving a genuine "patch it now vs. do it properly later" tradeoff.
+
+**Why not now:** Flagged as "for later" when raised (2026-07-20) — not evaluated against current
+dev state in detail.
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+## Boarding hazard puzzle
+
+**What:** A static trap left in a derelict (armed turret, tripwire, alarm) that must be disabled
+before looting the room it guards — deliberately not AI/NPC-driven, to stay distinct from the
+already-logged (much-later) NPC/crew mechanics.
+
+**Why it's good:** A skill/puzzle hazard flavor distinct from breach/fire, reusing the verb system
+(a "disable" verb) rather than any new combat/AI system. Confirmed as "a good idea" by the user
+(2026-07-20).
+
+**Why not now:** Flagged as "for later" when raised (2026-07-20).
+
+**Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
