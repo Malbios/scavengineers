@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
+using Scavengineers.Scripts.Contracts;
 using Scavengineers.Scripts.Inventory;
 
 namespace Scavengineers.Scripts.SaveLoad;
@@ -343,4 +344,43 @@ public sealed class PlayerSaveData
     public WindowPosition? PdaWindow { get; set; }
 
     public WindowPosition? ThrusterWindow { get; set; }
+
+    /// <summary>Accepted-but-not-yet-resolved contracts (see Player._activeContracts) — purely
+    /// additive: empty for any save predating the contract system, same "missing = default"
+    /// convention as every other collection field here.</summary>
+    public List<ContractSaveData> ActiveContracts { get; set; } = new();
+
+    /// <summary>Owed from a missed contract deadline, paid down capped at what's affordable
+    /// whenever the ship docks at any Station (see Player.SettlePendingDebt) — 0 for any save
+    /// predating the contract system, same "missing = default" convention as everything else
+    /// here.</summary>
+    public int PendingDebt { get; set; }
+}
+
+/// <summary>An accepted Contract's full save state — plain-DTO twin of the live Contract record,
+/// same "domain type needs a save-safe copy" pattern DroppedContainerSaveData already uses for
+/// ContainerPickupItem.</summary>
+public sealed class ContractSaveData
+{
+    public string InstanceId { get; set; } = "";
+
+    public string TemplateId { get; set; } = "";
+
+    public ContractType Type { get; set; }
+
+    public string? ItemId { get; set; }
+
+    public int Count { get; set; } = 1;
+
+    public int? TargetDestinationId { get; set; }
+
+    public int? OriginStationId { get; set; }
+
+    public int? DestinationStationId { get; set; }
+
+    public int Reward { get; set; }
+
+    public int FailureFee { get; set; }
+
+    public float RemainingSeconds { get; set; }
 }

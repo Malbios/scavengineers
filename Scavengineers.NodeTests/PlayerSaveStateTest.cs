@@ -3,6 +3,7 @@ using System.Linq;
 
 using GdUnit4;
 using Godot;
+using Scavengineers.Scripts.Contracts;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.Player;
 using Scavengineers.Scripts.SaveLoad;
@@ -307,5 +308,61 @@ public class PlayerSaveStateTest
         AssertBool(roundTripped.PdaItemId is null).IsTrue();
         AssertBool(roundTripped.HasPda).IsTrue();
         AssertBool(roundTripped.PdaSlots.Any(s => s?.ItemId == "health_scan_cartridge")).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void ApplyThenCapturePlayerState_RoundTripsActiveContractsAndPendingDebt()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+
+        var data = new PlayerSaveData
+        {
+            ActiveContracts = new List<ContractSaveData>
+            {
+                new()
+                {
+                    InstanceId = "c1",
+                    TemplateId = "salvage_quota",
+                    Type = ContractType.SalvageQuota,
+                    ItemId = "scrap_metal",
+                    Count = 5,
+                    Reward = 20,
+                    FailureFee = 10,
+                    RemainingSeconds = 123.5f,
+                },
+            },
+            PendingDebt = 15,
+        };
+
+        player.ApplyPlayerState(data);
+        var roundTripped = player.CapturePlayerState();
+
+        AssertInt(roundTripped.ActiveContracts.Count).IsEqual(1);
+        var restored = roundTripped.ActiveContracts[0];
+        AssertBool(restored.InstanceId == "c1").IsTrue();
+        AssertBool(restored.TemplateId == "salvage_quota").IsTrue();
+        AssertBool(restored.Type == ContractType.SalvageQuota).IsTrue();
+        AssertBool(restored.ItemId == "scrap_metal").IsTrue();
+        AssertInt(restored.Count).IsEqual(5);
+        AssertInt(restored.Reward).IsEqual(20);
+        AssertInt(restored.FailureFee).IsEqual(10);
+        AssertBool(Mathf.IsEqualApprox(restored.RemainingSeconds, 123.5f)).IsTrue();
+        AssertInt(roundTripped.PendingDebt).IsEqual(15);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void ApplyPlayerState_WithNoSavedContracts_LeavesActiveContractsEmptyAndDebtZero()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+
+        player.ApplyPlayerState(new PlayerSaveData()); // every contract-related field at its default
+
+        var captured = player.CapturePlayerState();
+        AssertInt(captured.ActiveContracts.Count).IsEqual(0);
+        AssertInt(captured.PendingDebt).IsEqual(0);
     }
 }

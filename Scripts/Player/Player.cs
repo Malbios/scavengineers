@@ -2249,6 +2249,21 @@ public partial class Player : CharacterBody3D
             PdaSlotCount = ownedPdaContents?.Slots.Count ?? PlayerInventory.PdaSlotCount,
             PdaWindow = new WindowPosition(_pdaWindow!.Position.X, _pdaWindow.Position.Y),
             ThrusterWindow = new WindowPosition(_thrusterWindow!.Position.X, _thrusterWindow.Position.Y),
+            ActiveContracts = _activeContracts.Select(c => new ContractSaveData
+            {
+                InstanceId = c.InstanceId,
+                TemplateId = c.TemplateId,
+                Type = c.Type,
+                ItemId = c.ItemId,
+                Count = c.Count,
+                TargetDestinationId = c.TargetDestinationId,
+                OriginStationId = c.OriginStationId,
+                DestinationStationId = c.DestinationStationId,
+                Reward = c.Reward,
+                FailureFee = c.FailureFee,
+                RemainingSeconds = c.RemainingSeconds,
+            }).ToList(),
+            PendingDebt = _pendingDebt,
         };
     }
 
@@ -2408,6 +2423,23 @@ public partial class Player : CharacterBody3D
         }
 
         _credits = data.Credits;
+
+        _activeContracts.Clear();
+        _activeContracts.AddRange(data.ActiveContracts.Select(c => new Contract
+        {
+            InstanceId = c.InstanceId,
+            TemplateId = c.TemplateId,
+            Type = c.Type,
+            ItemId = c.ItemId,
+            Count = c.Count,
+            TargetDestinationId = c.TargetDestinationId,
+            OriginStationId = c.OriginStationId,
+            DestinationStationId = c.DestinationStationId,
+            Reward = c.Reward,
+            FailureFee = c.FailureFee,
+            RemainingSeconds = c.RemainingSeconds,
+        }));
+        _pendingDebt = data.PendingDebt;
     }
 
     public void RefillSuitResources() => _suitResources.RestoreFrom(100f, 100f);
