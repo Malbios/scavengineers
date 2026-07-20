@@ -16,7 +16,7 @@ namespace Scavengineers.Scripts.Verbs;
 /// </summary>
 public partial class RechargeStationVerbTarget : StaticBody3D, IVerbTarget
 {
-    private static readonly Verb RechargeVerb = new("recharge", "VERB_RECHARGE", DurationSeconds: 0.2f);
+    private static readonly Verb RechargeVerb = new("recharge", "VERB_RECHARGE", DurationSeconds: 0.6f);
 
     // Placeholder/tunable — Recharge is a near-instant 0.2s action with no other "in progress"
     // signal to hook a sustained draw off (ExecuteVerb only fires once Player's own generic

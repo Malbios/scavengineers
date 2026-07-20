@@ -77,7 +77,7 @@ public class AirlockUpkeepTest
 
         airlock.ExecuteVerb(new Verb("repair_airlock", "VERB_REPAIR_AIRLOCK", DurationSeconds: 0.2f), inventory: null!);
 
-        await sceneTree.ToSignal(sceneTree.CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.7), SceneTreeTimer.SignalName.Timeout);
 
         // Not exactly 1f: ShipSim's own WearSystem keeps passively decaying every physics tick
         // in the background, including the ones this await let run.

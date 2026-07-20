@@ -24,7 +24,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 {
     // Public so Player can compare its filtered/affordable verb against these exact instances to
     // decide when the placement ghost should show, without duplicating verb ids as strings.
-    public static readonly Verb InstallConduitVerb = new("install_conduit", "VERB_INSTALL_CONDUIT", DurationSeconds: 0.2f)
+    public static readonly Verb InstallConduitVerb = new("install_conduit", "VERB_INSTALL_CONDUIT", DurationSeconds: 0.6f)
     {
         Requirements = [new ItemRequirement("scrap_metal", 1)],
     };
@@ -34,14 +34,14 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     // Player.IsAffordable/Interact's drill-specific clauses).
     private static readonly ItemRequirement PowerDrillRequirement = new("power_drill", 1) { Consumed = false };
 
-    public static readonly Verb InstallWallVerb = new("build_wall", "VERB_BUILD_WALL", DurationSeconds: 0.2f)
+    public static readonly Verb InstallWallVerb = new("build_wall", "VERB_BUILD_WALL", DurationSeconds: 0.6f)
     {
         Requirements = [new ItemRequirement("wall_panel", 1), PowerDrillRequirement],
     };
 
-    private static readonly Verb RemoveConduitVerb = new("remove_conduit", "VERB_REMOVE_CONDUIT", DurationSeconds: 0.2f) { IsDestructive = true };
+    private static readonly Verb RemoveConduitVerb = new("remove_conduit", "VERB_REMOVE_CONDUIT", DurationSeconds: 0.6f) { IsDestructive = true };
 
-    private static readonly Verb RemoveWallVerb = new("remove_wall", "VERB_REMOVE_WALL", DurationSeconds: 0.2f)
+    private static readonly Verb RemoveWallVerb = new("remove_wall", "VERB_REMOVE_WALL", DurationSeconds: 0.6f)
     {
         IsDestructive = true,
         Requirements = [PowerDrillRequirement],
@@ -50,23 +50,23 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     // Floor and ceiling panels reuse the same wall_panel construction-part item as walls —
     // one item covers all three rather than inventing two more catalog entries for the same
     // purpose.
-    private static readonly Verb InstallFloorVerb = new("install_floor", "VERB_INSTALL_FLOOR", DurationSeconds: 0.2f)
+    private static readonly Verb InstallFloorVerb = new("install_floor", "VERB_INSTALL_FLOOR", DurationSeconds: 0.6f)
     {
         Requirements = [new ItemRequirement("wall_panel", 1), PowerDrillRequirement],
     };
 
-    private static readonly Verb RemoveFloorVerb = new("remove_floor", "VERB_REMOVE_FLOOR", DurationSeconds: 0.2f)
+    private static readonly Verb RemoveFloorVerb = new("remove_floor", "VERB_REMOVE_FLOOR", DurationSeconds: 0.6f)
     {
         IsDestructive = true,
         Requirements = [PowerDrillRequirement],
     };
 
-    private static readonly Verb InstallCeilingVerb = new("install_ceiling", "VERB_INSTALL_CEILING", DurationSeconds: 0.2f)
+    private static readonly Verb InstallCeilingVerb = new("install_ceiling", "VERB_INSTALL_CEILING", DurationSeconds: 0.6f)
     {
         Requirements = [new ItemRequirement("wall_panel", 1), PowerDrillRequirement],
     };
 
-    private static readonly Verb RemoveCeilingVerb = new("remove_ceiling", "VERB_REMOVE_CEILING", DurationSeconds: 0.2f)
+    private static readonly Verb RemoveCeilingVerb = new("remove_ceiling", "VERB_REMOVE_CEILING", DurationSeconds: 0.6f)
     {
         IsDestructive = true,
         Requirements = [PowerDrillRequirement],
@@ -76,7 +76,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     // brand-new cell instead of repairing an existing one's panel. Only offered alongside
     // InstallWallVerb on a boundary edge that's currently open (see ResolveAvailableVerbs) — you
     // extend through a gap you've made, not through an intact wall.
-    private static readonly Verb ExtendFloorVerb = new("extend_floor", "VERB_EXTEND_FLOOR", DurationSeconds: 0.2f)
+    private static readonly Verb ExtendFloorVerb = new("extend_floor", "VERB_EXTEND_FLOOR", DurationSeconds: 0.6f)
     {
         Requirements = [new ItemRequirement("wall_panel", 1), PowerDrillRequirement],
     };
@@ -90,44 +90,44 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private static readonly ItemRequirement WrenchRequirement = new("wrench", 1) { Consumed = false };
     private static readonly ItemRequirement SparePartsRequirement = new("spare_parts", 1);
 
-    private static readonly Verb MaintainFloorVerb = new("maintain_floor", "VERB_MAINTAIN_FLOOR", DurationSeconds: 0.2f)
+    private static readonly Verb MaintainFloorVerb = new("maintain_floor", "VERB_MAINTAIN_FLOOR", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement],
     };
 
-    private static readonly Verb RepairFloorVerb = new("repair_floor", "VERB_REPAIR_FLOOR", DurationSeconds: 0.2f)
+    private static readonly Verb RepairFloorVerb = new("repair_floor", "VERB_REPAIR_FLOOR", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement, SparePartsRequirement],
     };
 
-    private static readonly Verb MaintainCeilingVerb = new("maintain_ceiling", "VERB_MAINTAIN_CEILING", DurationSeconds: 0.2f)
+    private static readonly Verb MaintainCeilingVerb = new("maintain_ceiling", "VERB_MAINTAIN_CEILING", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement],
     };
 
-    private static readonly Verb RepairCeilingVerb = new("repair_ceiling", "VERB_REPAIR_CEILING", DurationSeconds: 0.2f)
+    private static readonly Verb RepairCeilingVerb = new("repair_ceiling", "VERB_REPAIR_CEILING", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement, SparePartsRequirement],
     };
 
-    private static readonly Verb MaintainWallVerb = new("maintain_wall", "VERB_MAINTAIN_WALL", DurationSeconds: 0.2f)
+    private static readonly Verb MaintainWallVerb = new("maintain_wall", "VERB_MAINTAIN_WALL", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement],
     };
 
-    private static readonly Verb RepairWallVerb = new("repair_wall", "VERB_REPAIR_WALL", DurationSeconds: 0.2f)
+    private static readonly Verb RepairWallVerb = new("repair_wall", "VERB_REPAIR_WALL", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement, SparePartsRequirement],
     };
 
     // Same two-tier upkeep for a placed conduit fixture (ConduitFixture.Condition) — offered
     // alongside its Remove verb, never instead of it.
-    private static readonly Verb MaintainConduitVerb = new("maintain_conduit", "VERB_MAINTAIN_CONDUIT", DurationSeconds: 0.2f)
+    private static readonly Verb MaintainConduitVerb = new("maintain_conduit", "VERB_MAINTAIN_CONDUIT", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement],
     };
 
-    private static readonly Verb RepairConduitVerb = new("repair_conduit", "VERB_REPAIR_CONDUIT", DurationSeconds: 0.2f)
+    private static readonly Verb RepairConduitVerb = new("repair_conduit", "VERB_REPAIR_CONDUIT", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement, SparePartsRequirement],
     };
@@ -135,22 +135,22 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     // Same two-tier upkeep for Switch/RechargeStation machine fixtures — Battery deliberately
     // has no Maintain/Repair pair, since its own Condition already means charge, not wear (see
     // WearSystem and BatteryFixture's own doc comment).
-    private static readonly Verb MaintainSwitchVerb = new("maintain_switch", "VERB_MAINTAIN_SWITCH", DurationSeconds: 0.2f)
+    private static readonly Verb MaintainSwitchVerb = new("maintain_switch", "VERB_MAINTAIN_SWITCH", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement],
     };
 
-    private static readonly Verb RepairSwitchVerb = new("repair_switch", "VERB_REPAIR_SWITCH", DurationSeconds: 0.2f)
+    private static readonly Verb RepairSwitchVerb = new("repair_switch", "VERB_REPAIR_SWITCH", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement, SparePartsRequirement],
     };
 
-    private static readonly Verb MaintainRechargeStationVerb = new("maintain_recharge_station", "VERB_MAINTAIN_RECHARGE_STATION", DurationSeconds: 0.2f)
+    private static readonly Verb MaintainRechargeStationVerb = new("maintain_recharge_station", "VERB_MAINTAIN_RECHARGE_STATION", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement],
     };
 
-    private static readonly Verb RepairRechargeStationVerb = new("repair_recharge_station", "VERB_REPAIR_RECHARGE_STATION", DurationSeconds: 0.2f)
+    private static readonly Verb RepairRechargeStationVerb = new("repair_recharge_station", "VERB_REPAIR_RECHARGE_STATION", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement, SparePartsRequirement],
     };
@@ -159,48 +159,48 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     // (bought from a trade console, or refunded by a prior Uninstall); Uninstall gives that same
     // item back, Scrap gives partial scrap_metal instead (a real tradeoff, same shape as
     // DamagedConduitVerbTarget's Repair-vs-Scrap).
-    private static readonly Verb InstallBatteryVerb = new("install_battery", "VERB_INSTALL_BATTERY", DurationSeconds: 0.2f)
+    private static readonly Verb InstallBatteryVerb = new("install_battery", "VERB_INSTALL_BATTERY", DurationSeconds: 0.6f)
     {
         Requirements = [new ItemRequirement("battery", 1)],
     };
 
-    private static readonly Verb UninstallBatteryVerb = new("uninstall_battery", "VERB_UNINSTALL_BATTERY", DurationSeconds: 0.2f) { IsDestructive = true };
-    private static readonly Verb ScrapBatteryVerb = new("scrap_battery", "VERB_SCRAP_BATTERY", DurationSeconds: 0.2f) { IsDestructive = true };
+    private static readonly Verb UninstallBatteryVerb = new("uninstall_battery", "VERB_UNINSTALL_BATTERY", DurationSeconds: 0.6f) { IsDestructive = true };
+    private static readonly Verb ScrapBatteryVerb = new("scrap_battery", "VERB_SCRAP_BATTERY", DurationSeconds: 0.6f) { IsDestructive = true };
 
-    private static readonly Verb InstallSwitchVerb = new("install_switch", "VERB_INSTALL_SWITCH", DurationSeconds: 0.2f)
+    private static readonly Verb InstallSwitchVerb = new("install_switch", "VERB_INSTALL_SWITCH", DurationSeconds: 0.6f)
     {
         Requirements = [new ItemRequirement("switch", 1)],
     };
 
-    private static readonly Verb UninstallSwitchVerb = new("uninstall_switch", "VERB_UNINSTALL_SWITCH", DurationSeconds: 0.2f) { IsDestructive = true };
-    private static readonly Verb ScrapSwitchVerb = new("scrap_switch", "VERB_SCRAP_SWITCH", DurationSeconds: 0.2f) { IsDestructive = true };
+    private static readonly Verb UninstallSwitchVerb = new("uninstall_switch", "VERB_UNINSTALL_SWITCH", DurationSeconds: 0.6f) { IsDestructive = true };
+    private static readonly Verb ScrapSwitchVerb = new("scrap_switch", "VERB_SCRAP_SWITCH", DurationSeconds: 0.6f) { IsDestructive = true };
 
-    private static readonly Verb InstallRechargeStationVerb = new("install_recharge_station", "VERB_INSTALL_RECHARGE_STATION", DurationSeconds: 0.2f)
+    private static readonly Verb InstallRechargeStationVerb = new("install_recharge_station", "VERB_INSTALL_RECHARGE_STATION", DurationSeconds: 0.6f)
     {
         Requirements = [new ItemRequirement("recharge_station", 1)],
     };
 
-    private static readonly Verb UninstallRechargeStationVerb = new("uninstall_recharge_station", "VERB_UNINSTALL_RECHARGE_STATION", DurationSeconds: 0.2f) { IsDestructive = true };
-    private static readonly Verb ScrapRechargeStationVerb = new("scrap_recharge_station", "VERB_SCRAP_RECHARGE_STATION", DurationSeconds: 0.2f) { IsDestructive = true };
+    private static readonly Verb UninstallRechargeStationVerb = new("uninstall_recharge_station", "VERB_UNINSTALL_RECHARGE_STATION", DurationSeconds: 0.6f) { IsDestructive = true };
+    private static readonly Verb ScrapRechargeStationVerb = new("scrap_recharge_station", "VERB_SCRAP_RECHARGE_STATION", DurationSeconds: 0.6f) { IsDestructive = true };
 
     // Thruster — same Install/Uninstall/Scrap shape as Battery/Switch/RechargeStation above, but
     // NOT MachineType-based (see _placedThrusters): many can be installed at once, one per edge.
     // Its own Refuel verb lives on ThrusterVerbTarget instead, mirroring how Battery's Recharge
     // verb lives on BatteryVerbTarget rather than here.
-    private static readonly Verb InstallThrusterVerb = new("install_thruster", "VERB_INSTALL_THRUSTER", DurationSeconds: 0.2f)
+    private static readonly Verb InstallThrusterVerb = new("install_thruster", "VERB_INSTALL_THRUSTER", DurationSeconds: 0.6f)
     {
         Requirements = [new ItemRequirement("thruster", 1)],
     };
 
-    private static readonly Verb UninstallThrusterVerb = new("uninstall_thruster", "VERB_UNINSTALL_THRUSTER", DurationSeconds: 0.2f) { IsDestructive = true };
-    private static readonly Verb ScrapThrusterVerb = new("scrap_thruster", "VERB_SCRAP_THRUSTER", DurationSeconds: 0.2f) { IsDestructive = true };
+    private static readonly Verb UninstallThrusterVerb = new("uninstall_thruster", "VERB_UNINSTALL_THRUSTER", DurationSeconds: 0.6f) { IsDestructive = true };
+    private static readonly Verb ScrapThrusterVerb = new("scrap_thruster", "VERB_SCRAP_THRUSTER", DurationSeconds: 0.6f) { IsDestructive = true };
 
     // Storage (shelves/bins) — same "many per ship, one per edge" shape as Thruster above, but
     // Install is generated per catalog item (see MachineVerbsFor) rather than one static Verb per
     // tier, since the set of storage items is genuinely data-driven (ItemCatalog.StorageItemIds).
     // Uninstall/Scrap are shared across every tier — removal doesn't care which one it is.
-    private static readonly Verb UninstallStorageVerb = new("uninstall_storage", "VERB_UNINSTALL_STORAGE", DurationSeconds: 0.2f) { IsDestructive = true };
-    private static readonly Verb ScrapStorageVerb = new("scrap_storage", "VERB_SCRAP_STORAGE", DurationSeconds: 0.2f) { IsDestructive = true };
+    private static readonly Verb UninstallStorageVerb = new("uninstall_storage", "VERB_UNINSTALL_STORAGE", DurationSeconds: 0.6f) { IsDestructive = true };
+    private static readonly Verb ScrapStorageVerb = new("scrap_storage", "VERB_SCRAP_STORAGE", DurationSeconds: 0.6f) { IsDestructive = true };
 
     // How close (in meters) the aim point needs to be to a tile boundary before it resolves to
     // that edge instead of the tile itself — half of this margin on each side of every boundary.
@@ -1383,7 +1383,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         // (suffix)" shape BatteryVerbTarget's own Recharge verb already uses for its charge %.
         foreach (var itemId in ItemCatalog.StorageItemIds)
         {
-            yield return new Verb($"install_storage:{itemId}", "VERB_INSTALL_STORAGE", DurationSeconds: 0.2f)
+            yield return new Verb($"install_storage:{itemId}", "VERB_INSTALL_STORAGE", DurationSeconds: 0.6f)
             {
                 Requirements = [new ItemRequirement(itemId, 1)],
                 DisplaySuffix = Tr($"ITEM_{itemId.ToUpperInvariant()}"),

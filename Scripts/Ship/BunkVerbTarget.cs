@@ -26,12 +26,12 @@ public partial class BunkVerbTarget : StaticBody3D, IVerbTarget
     private static readonly ItemRequirement WrenchRequirement = new("wrench", 1) { Consumed = false };
     private static readonly ItemRequirement SparePartsRequirement = new("spare_parts", 1);
 
-    private static readonly Verb MaintainBunkVerb = new("maintain_bunk", "VERB_MAINTAIN_BUNK", DurationSeconds: 0.2f)
+    private static readonly Verb MaintainBunkVerb = new("maintain_bunk", "VERB_MAINTAIN_BUNK", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement],
     };
 
-    private static readonly Verb RepairBunkVerb = new("repair_bunk", "VERB_REPAIR_BUNK", DurationSeconds: 0.2f)
+    private static readonly Verb RepairBunkVerb = new("repair_bunk", "VERB_REPAIR_BUNK", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement, SparePartsRequirement],
     };

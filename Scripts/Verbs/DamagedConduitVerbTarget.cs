@@ -21,12 +21,12 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, IStat
     private enum ConduitState { Damaged, Repaired, Scrapped }
 
     // Placeholder/tunable — kept short for fast testing.
-    private static readonly Verb RepairVerb = new("repair", "VERB_REPAIR", DurationSeconds: 0.2f)
+    private static readonly Verb RepairVerb = new("repair", "VERB_REPAIR", DurationSeconds: 0.6f)
     {
         Requirements = [new ItemRequirement("spare_parts", 1)],
     };
 
-    private static readonly Verb ScrapVerb = new("scrap", "VERB_SCRAP", DurationSeconds: 0.2f) { IsDestructive = true };
+    private static readonly Verb ScrapVerb = new("scrap", "VERB_SCRAP", DurationSeconds: 0.6f) { IsDestructive = true };
 
     [Export]
     public ShipSim? ShipSimRef { get; set; }

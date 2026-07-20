@@ -23,8 +23,8 @@ namespace Scavengineers.Scripts.Ship;
 /// </summary>
 public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveable
 {
-    private static readonly Verb OpenVerb = new("open_door", "VERB_OPEN_DOOR", DurationSeconds: 0.2f);
-    private static readonly Verb CloseVerb = new("close_door", "VERB_CLOSE_DOOR", DurationSeconds: 0.2f);
+    private static readonly Verb OpenVerb = new("open_door", "VERB_OPEN_DOOR", DurationSeconds: 0.6f);
+    private static readonly Verb CloseVerb = new("close_door", "VERB_CLOSE_DOOR", DurationSeconds: 0.6f);
 
     // Placeholder/tunable — longer than the powered open/close to feel like real manual effort.
     private static readonly Verb PryVerb = new("pry_door", "VERB_PRY_DOOR", DurationSeconds: 1.5f)
@@ -47,12 +47,12 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
     private static readonly ItemRequirement WrenchRequirement = new("wrench", 1) { Consumed = false };
     private static readonly ItemRequirement SparePartsRequirement = new("spare_parts", 1);
 
-    private static readonly Verb MaintainInteriorDoorVerb = new("maintain_interior_door", "VERB_MAINTAIN_INTERIOR_DOOR", DurationSeconds: 0.2f)
+    private static readonly Verb MaintainInteriorDoorVerb = new("maintain_interior_door", "VERB_MAINTAIN_INTERIOR_DOOR", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement],
     };
 
-    private static readonly Verb RepairInteriorDoorVerb = new("repair_interior_door", "VERB_REPAIR_INTERIOR_DOOR", DurationSeconds: 0.2f)
+    private static readonly Verb RepairInteriorDoorVerb = new("repair_interior_door", "VERB_REPAIR_INTERIOR_DOOR", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement, SparePartsRequirement],
     };

@@ -33,8 +33,8 @@ namespace Scavengineers.Scripts.Ship;
 /// </summary>
 public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveable
 {
-    private static readonly Verb OpenVerb = new("open_airlock", "VERB_OPEN_AIRLOCK", DurationSeconds: 0.2f);
-    private static readonly Verb CloseVerb = new("close_airlock", "VERB_CLOSE_AIRLOCK", DurationSeconds: 0.2f);
+    private static readonly Verb OpenVerb = new("open_airlock", "VERB_OPEN_AIRLOCK", DurationSeconds: 0.6f);
+    private static readonly Verb CloseVerb = new("close_airlock", "VERB_CLOSE_AIRLOCK", DurationSeconds: 0.6f);
 
     // Placeholder/tunable — longer than the powered open/close to feel like real manual effort,
     // matching InteriorDoorVerbTarget's own PryVerb. Reuses VERB_PRY_DOOR's text rather than a
@@ -53,12 +53,12 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     private static readonly ItemRequirement WrenchRequirement = new("wrench", 1) { Consumed = false };
     private static readonly ItemRequirement SparePartsRequirement = new("spare_parts", 1);
 
-    private static readonly Verb MaintainAirlockVerb = new("maintain_airlock", "VERB_MAINTAIN_AIRLOCK", DurationSeconds: 0.2f)
+    private static readonly Verb MaintainAirlockVerb = new("maintain_airlock", "VERB_MAINTAIN_AIRLOCK", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement],
     };
 
-    private static readonly Verb RepairAirlockVerb = new("repair_airlock", "VERB_REPAIR_AIRLOCK", DurationSeconds: 0.2f)
+    private static readonly Verb RepairAirlockVerb = new("repair_airlock", "VERB_REPAIR_AIRLOCK", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement, SparePartsRequirement],
     };

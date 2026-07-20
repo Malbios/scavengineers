@@ -76,7 +76,7 @@ public class BunkUpkeepTest
 
         bunk.ExecuteVerb(new Verb("maintain_bunk", "VERB_MAINTAIN_BUNK", DurationSeconds: 0.2f), inventory: null!);
 
-        await sceneTree.ToSignal(sceneTree.CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.7), SceneTreeTimer.SignalName.Timeout);
 
         // Not exactly 1f: ShipSim's own WearSystem keeps passively decaying every physics tick
         // in the background, including the ones this await let run.

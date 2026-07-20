@@ -31,20 +31,23 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 {
     // TravelVerb.DurationSeconds only seeds _travelTimer's default before the first real
     // BeginTravel call recomputes WaitTime from the formula below.
-    private static readonly Verb TravelVerb = new("travel", "VERB_TRAVEL", DurationSeconds: 0.2f);
+    private static readonly Verb TravelVerb = new("travel", "VERB_TRAVEL", DurationSeconds: 0.6f);
 
     /// <summary>Offered instead of TravelVerb whenever _docking is true — how the player gets
     /// back into a docking attempt that didn't auto-open (see OnTravelComplete's own doc
     /// comment).</summary>
-    private static readonly Verb ResumeDockingVerb = new("resume_docking", "VERB_RESUME_DOCKING", DurationSeconds: 0.2f);
+    private static readonly Verb ResumeDockingVerb = new("resume_docking", "VERB_RESUME_DOCKING", DurationSeconds: 0.6f);
 
-    // Placeholder/tunable — base travel duration before thruster reduction, giving transit a
-    // real sense of taking a while. Public settable (not const), matching this codebase's own
-    // SaveManager.AutosaveIntervalSeconds-style testability convention, so tests can dial the
-    // wait down instead of really waiting out a pacing-only duration.
-    public float BaseTravelSeconds { get; set; } = 20f;
-    public float ReductionPerThruster { get; set; } = 2f;
-    public float MinTravelSeconds { get; set; } = 8f;
+    // Placeholder/tunable — dialed down for the current testing phase so transit doesn't cost
+    // real waiting time while iterating on other mechanics; still long enough to see the verb
+    // progress bar actually sweep rather than jump-cutting. Public settable (not const), matching
+    // this codebase's own SaveManager.AutosaveIntervalSeconds-style testability convention, so
+    // tests can dial the wait down further instead of really waiting out a pacing-only duration.
+    // Revisit upward for a real sense of transit taking a while once pacing is being tuned for
+    // release rather than for fast iteration.
+    public float BaseTravelSeconds { get; set; } = 3f;
+    public float ReductionPerThruster { get; set; } = 0.3f;
+    public float MinTravelSeconds { get; set; } = 1f;
 
     // Placeholder/tunable, matching SuitResources's drain-constant convention. Only applied
     // during the bounded _traveling phase (see the drain block in _PhysicsProcess) — the
@@ -62,12 +65,12 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     private static readonly ItemRequirement WrenchRequirement = new("wrench", 1) { Consumed = false };
     private static readonly ItemRequirement SparePartsRequirement = new("spare_parts", 1);
 
-    private static readonly Verb MaintainTravelConsoleVerb = new("maintain_travel_console", "VERB_MAINTAIN_TRAVEL_CONSOLE", DurationSeconds: 0.2f)
+    private static readonly Verb MaintainTravelConsoleVerb = new("maintain_travel_console", "VERB_MAINTAIN_TRAVEL_CONSOLE", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement],
     };
 
-    private static readonly Verb RepairTravelConsoleVerb = new("repair_travel_console", "VERB_REPAIR_TRAVEL_CONSOLE", DurationSeconds: 0.2f)
+    private static readonly Verb RepairTravelConsoleVerb = new("repair_travel_console", "VERB_REPAIR_TRAVEL_CONSOLE", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement, SparePartsRequirement],
     };

@@ -18,7 +18,7 @@ namespace Scavengineers.Scripts.Ship;
 /// </summary>
 public partial class BatteryVerbTarget : StaticBody3D, IVerbTarget, IStateSaveable
 {
-    private static readonly Verb RechargeVerb = new("recharge_battery", "VERB_RECHARGE_BATTERY", DurationSeconds: 0.2f)
+    private static readonly Verb RechargeVerb = new("recharge_battery", "VERB_RECHARGE_BATTERY", DurationSeconds: 0.6f)
     {
         Requirements = [new ItemRequirement("power_cell", 1)],
     };

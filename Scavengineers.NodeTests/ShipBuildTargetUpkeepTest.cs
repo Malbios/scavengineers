@@ -116,7 +116,7 @@ public class ShipBuildTargetUpkeepTest
         buildTarget.SetAimPoint(CellZeroZeroCenter);
         buildTarget.ExecuteVerb(new Verb("maintain_floor", "VERB_MAINTAIN_FLOOR", DurationSeconds: 0.2f), inventory: null!);
 
-        await sceneTree.ToSignal(sceneTree.CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.7), SceneTreeTimer.SignalName.Timeout);
 
         // Not exactly 1f: ShipSim's own WearSystem keeps passively decaying every physics tick
         // in the background (including the ones this await let run), same as any other cell.
@@ -137,7 +137,7 @@ public class ShipBuildTargetUpkeepTest
         buildTarget.SetAimPoint(new Vector3(-2.1f, 0f, -2.5f));
         buildTarget.ExecuteVerb(new Verb("repair_wall", "VERB_REPAIR_WALL", DurationSeconds: 0.2f), inventory: null!);
 
-        await sceneTree.ToSignal(sceneTree.CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.7), SceneTreeTimer.SignalName.Timeout);
 
         // Not exactly 1f: ShipSim's own WearSystem keeps passively decaying every physics tick
         // in the background (including the ones this await let run), same as any other edge.

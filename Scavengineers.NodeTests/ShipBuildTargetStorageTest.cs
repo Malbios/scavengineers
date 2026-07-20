@@ -127,7 +127,7 @@ public class ShipBuildTargetStorageTest
 
         // Only starts the cycle timer — the actual removal (and refund) happens in
         // OnCycleComplete once the verb's own duration elapses.
-        await sceneTree.ToSignal(sceneTree.CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.7), SceneTreeTimer.SignalName.Timeout);
 
         AssertBool(inventory.Has("small_bin", 1)).IsTrue();
         AssertBool(inventory.Has("scrap_metal", 1)).IsTrue();

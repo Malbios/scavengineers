@@ -66,7 +66,7 @@ public class ShipBuildTargetFixtureUpkeepTest
         buildTarget.SetAimPoint(new Vector3(-2.5f, 0f, -2.5f));
         buildTarget.ExecuteVerb(new Verb("repair_conduit", "VERB_REPAIR_CONDUIT", DurationSeconds: 0.2f), inventory: null!);
 
-        await sceneTree.ToSignal(sceneTree.CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.7), SceneTreeTimer.SignalName.Timeout);
 
         // Not exactly 1f: WearSystem keeps passively decaying every physics tick in the
         // background, including the ones this await let run.
@@ -108,7 +108,7 @@ public class ShipBuildTargetFixtureUpkeepTest
         var switchNode = buildTarget.GetChildren().OfType<ToggleLightVerbTarget>().Single();
         switchNode.ExecuteVerb(new Verb("repair_switch", "VERB_REPAIR_SWITCH", DurationSeconds: 0.2f), inventory: null!);
 
-        await sceneTree.ToSignal(sceneTree.CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.7), SceneTreeTimer.SignalName.Timeout);
 
         AssertFloat(switchFixture.Condition).IsGreater(0.999f);
     }
@@ -186,12 +186,12 @@ public class ShipBuildTargetFixtureUpkeepTest
 
         var switchNode = buildTarget.GetChildren().OfType<ToggleLightVerbTarget>().Single();
         switchNode.ExecuteVerb(new Verb("uninstall_switch", "VERB_UNINSTALL_SWITCH", DurationSeconds: 0.2f) { IsDestructive = true }, inventory: null!);
-        await sceneTree.ToSignal(sceneTree.CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.7), SceneTreeTimer.SignalName.Timeout);
         AssertBool(buildTarget.RoomLight!.Visible).IsTrue();
 
         var batteryNode = buildTarget.GetChildren().OfType<BatteryVerbTarget>().Single();
         batteryNode.ExecuteVerb(new Verb("uninstall_battery", "VERB_UNINSTALL_BATTERY", DurationSeconds: 0.2f) { IsDestructive = true }, inventory: null!);
-        await sceneTree.ToSignal(sceneTree.CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        await sceneTree.ToSignal(sceneTree.CreateTimer(0.7), SceneTreeTimer.SignalName.Timeout);
 
         // The original bug report: remove the switch, then remove the battery too — the light
         // must actually go dark once there's genuinely no power left, not stay stuck either way.
