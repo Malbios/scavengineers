@@ -769,7 +769,7 @@ mesh = SubResource("FigureArmMesh")
 surface_material_override/0 = SubResource("ContractFigureSuitMaterial")
 
 [node name="DestinationAirlock" type="StaticBody3D" parent="Station" node_paths=PackedStringArray("ShipARef", "SlabMesh", "SlabCollision", "PartnerDoorRef") groups=["saveable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1.0, -0.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.9, 1.0, -0.8)
 script = ExtResource("15")
 ShipARef = NodePath("../ShipSim")
 PowerFixtureId = "station_destination_airlock_power"
@@ -801,7 +801,7 @@ mesh = SubResource("DoorSlabMesh")
 surface_material_override/0 = SubResource("AirlockDoorMaterial")
 
 [node name="StationAirlock" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipARef", "ShipBRef", "SlabMesh", "SlabCollision", "PartnerDoorRef") groups=["saveable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 1.0, -0.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.9, 1.0, -0.8)
 script = ExtResource("15")
 ShipARef = NodePath("../HomeShip/ShipSim")
 ShipBRef = NodePath("../Station/ShipSim")
@@ -967,7 +967,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 0)
 omni_range = 8.0
 
 [node name="DestinationAirlock" type="StaticBody3D" parent="Station2" node_paths=PackedStringArray("ShipARef", "SlabMesh", "SlabCollision") groups=["saveable"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1.0, -0.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.9, 1.0, -0.8)
 script = ExtResource("15")
 ShipARef = NodePath("../ShipSim")
 PowerFixtureId = "station_destination_airlock_power"
