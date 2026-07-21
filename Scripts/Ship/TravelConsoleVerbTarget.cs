@@ -23,13 +23,18 @@ namespace Scavengineers.Scripts.Ship;
 /// venting to vacuum instead of auto-closing).
 ///
 /// A destination is a single unified int: 0..StationCount-1 = Station N, StationCount..
-/// StationCount+DerelictCount-1 = Derelict N. Every Station gets its own dedicated, never-shared
-/// airlock (see StationAirlockPaths) — unlike Derelicts, which all share one rebindable airlock
-/// (DerelictAirlock.RebindFarSide) since only one Derelict is ever "current" at a time; a Station
-/// is a permanent fixture, not a rotating "away mission" target, so it just gets its own door like
-/// the original single Station always has. Executing the Travel verb doesn't start traveling
-/// directly anymore — it opens the travel map (see Player.OpenTravelMap), which calls back into
-/// <see cref="BeginTravel"/> once the player picks and confirms a destination.
+/// StationCount+DerelictCount-1 = Derelict N. Stations now use the exact same rebind pattern
+/// Derelicts already prove out: one shared Home-Ship-side airlock (StationAirlock) whose far side
+/// gets repointed at whichever Station is current (AirlockDoorVerbTarget.RebindFarSide) — plus,
+/// unlike Derelicts, each Station also has its own destination-side door
+/// (StationDestinationAirlockPaths) living in its own subtree, only ever reachable when that
+/// Station is the current destination (see SetShipPresence). The two doors of a connection only
+/// actually bridge atmosphere when both report open (see AirlockDoorVerbTarget.PartnerDoorRef) —
+/// this is what replaced the old one-dedicated-door-per-Station model, which let two always-
+/// present adjacent doors flood the whole ship when the wrong one was opened. Executing the
+/// Travel verb doesn't start traveling directly anymore — it opens the travel map (see
+/// Player.OpenTravelMap), which calls back into <see cref="BeginTravel"/> once the player picks
+/// and confirms a destination.
 /// </summary>
 public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IStateSaveable
 {
@@ -88,20 +93,28 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     [Export]
     public AirlockDoorVerbTarget? DerelictAirlock { get; set; }
 
-    /// <summary>Parallel arrays, index i describing Station i across all three — same mechanism
-    /// as the Derelict arrays below, plus a dedicated airlock per entry (unlike Derelicts, every
-    /// Station gets its own permanent, never-rebound door — see AirlockDoorVerbTarget.
-    /// RebindFarSide's doc comment for why Derelicts need the shared/rebindable trick and Stations
-    /// don't). Each group is hidden and decollided while the Home Ship isn't docked there, so it
-    /// and whichever other destination is current aren't both spatially present at once — the
-    /// airlock alone only fakes this from ground level (see AirlockDoorVerbTarget's own "opens to
-    /// space while undocked" doc); flying outside in zero-g would otherwise reveal every ship
-    /// floating right next to each other regardless of which one's actually docked.</summary>
+    /// <summary>The one shared Home-Ship-side Station airlock — its far side (and partner door,
+    /// see RebindFarSide's second parameter) gets repointed at whichever Station is the current
+    /// travel target, mirroring DerelictAirlock exactly.</summary>
+    [Export]
+    public AirlockDoorVerbTarget? StationAirlock { get; set; }
+
+    /// <summary>Parallel arrays, index i describing Station i across all four — same mechanism as
+    /// the Derelict arrays below. Each group is hidden and decollided while the Home Ship isn't
+    /// docked there, so it and whichever other destination is current aren't both spatially
+    /// present at once; flying outside in zero-g would otherwise reveal every ship floating right
+    /// next to each other regardless of which one's actually docked.</summary>
     [Export]
     public Godot.Collections.Array<NodePath> StationGroupPaths { get; set; } = new();
 
     [Export]
-    public Godot.Collections.Array<NodePath> StationAirlockPaths { get; set; } = new();
+    public Godot.Collections.Array<NodePath> StationShipSimPaths { get; set; } = new();
+
+    /// <summary>Each Station's own destination-side door — StationAirlock's RebindFarSide
+    /// partner, only ever physically reachable while that Station is the current destination
+    /// (see SetShipPresence). Distinct per Station, unlike StationAirlock itself.</summary>
+    [Export]
+    public Godot.Collections.Array<NodePath> StationDestinationAirlockPaths { get; set; } = new();
 
     // Placeholder/tunable — arbitrary spatial layout for the travel map, no gameplay effect.
     [Export]
@@ -140,7 +153,8 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     private int _currentDestination; // 0..StationCount-1 = Station N, StationCount.. = Derelict N
     private int _pendingDestination;
     private readonly List<Node3D> _stationGroups = new();
-    private readonly List<AirlockDoorVerbTarget> _stationAirlocks = new();
+    private readonly List<ShipSim> _stationShipSims = new();
+    private readonly List<AirlockDoorVerbTarget> _stationDestinationAirlocks = new();
     private readonly List<Node3D> _derelictGroups = new();
     private readonly List<ShipSim> _derelictShipSims = new();
 
@@ -149,9 +163,11 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     private Timer? _maintenanceTimer;
     private bool _maintaining;
 
-    /// <summary>Bounds every loop/lookup below defensively against the three parallel Station
+    /// <summary>Bounds every loop/lookup below defensively against the four parallel Station
     /// arrays being resized inconsistently by hand in the inspector.</summary>
-    private int StationCount => Math.Min(_stationGroups.Count, Math.Min(_stationAirlocks.Count, StationMapPositions.Count));
+    private int StationCount => Math.Min(
+        Math.Min(_stationGroups.Count, _stationShipSims.Count),
+        Math.Min(_stationDestinationAirlocks.Count, StationMapPositions.Count));
 
     /// <summary>Bounds every loop/lookup below defensively against the three parallel Derelict
     /// arrays above being resized inconsistently by hand in the inspector.</summary>
@@ -192,7 +208,9 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 
     public override void _Ready()
     {
-        if (StationGroupPaths.Count != StationAirlockPaths.Count || StationGroupPaths.Count != StationMapPositions.Count)
+        if (StationGroupPaths.Count != StationShipSimPaths.Count
+            || StationGroupPaths.Count != StationDestinationAirlockPaths.Count
+            || StationGroupPaths.Count != StationMapPositions.Count)
         {
             GD.PushWarning("[TravelConsoleVerbTarget] Mismatched station array lengths — extra entries ignored.");
         }
@@ -207,9 +225,14 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
             _stationGroups.Add(GetNode<Node3D>(path));
         }
 
-        foreach (var path in StationAirlockPaths)
+        foreach (var path in StationShipSimPaths)
         {
-            _stationAirlocks.Add(GetNode<AirlockDoorVerbTarget>(path));
+            _stationShipSims.Add(GetNode<ShipSim>(path));
+        }
+
+        foreach (var path in StationDestinationAirlockPaths)
+        {
+            _stationDestinationAirlocks.Add(GetNode<AirlockDoorVerbTarget>(path));
         }
 
         foreach (var path in DerelictGroupPaths)
@@ -470,9 +493,19 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         var stationIndex = _currentDestination < StationCount ? _currentDestination : -1;
         var derelictIndex = _currentDestination - StationCount;
 
-        for (var i = 0; i < _stationAirlocks.Count; i++)
+        for (var i = 0; i < _stationDestinationAirlocks.Count; i++)
         {
-            _stationAirlocks[i].Docked = i == stationIndex;
+            _stationDestinationAirlocks[i].Docked = i == stationIndex;
+        }
+
+        if (StationAirlock is not null)
+        {
+            if (stationIndex >= 0 && stationIndex < _stationShipSims.Count && stationIndex < _stationDestinationAirlocks.Count)
+            {
+                StationAirlock.RebindFarSide(_stationShipSims[stationIndex], _stationDestinationAirlocks[stationIndex]);
+            }
+
+            StationAirlock.Docked = stationIndex >= 0;
         }
 
         if (DerelictAirlock is not null)

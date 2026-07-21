@@ -47,7 +47,9 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     [Export]
     public int EastCorridorLength { get; set; }
 
-    private static readonly int[] DoorwayRows = [2, 3];
+    // Public so AirlockDoorVerbTarget's own configurable edge-seal (station destination doors)
+    // can reuse this instead of re-hardcoding [2, 3].
+    public static readonly int[] DoorwayRows = [2, 3];
 
     // Every device below (the 4 further down) is added unwired — the player must run their own
     // conduits via ShipBuildTarget's free-form placement to connect any of them to the battery.
@@ -59,8 +61,12 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     private static readonly CellCoord TravelConsoleCell = new(0, 0);
     private static readonly CellCoord InteriorDoorCell = new(5, 2);
     private static readonly CellCoord StationAirlockCell = new(0, 2);
-    private static readonly CellCoord Station2AirlockCell = new(1, 2);
     private static readonly CellCoord DerelictAirlockCell = new(11, 2);
+
+    // Nominal placeholder cell for the Station's own destination-side airlock door's wear/power
+    // fixture — shared by every Station instance (Station, Station2, ...), same "one shared id,
+    // no real position read" convention as InteriorDoorCell.
+    private static readonly CellCoord StationDestinationAirlockCell = new(5, 3);
     private static readonly CellCoord BunkCell = new(0, 1);
 
     /// <summary>The Derelict's starting hull breaches — a real gap cut into the wall mesh at
@@ -126,8 +132,11 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     public const string TravelConsoleFixtureId = "travel_console_power";
     public const string InteriorDoorFixtureId = "interior_door_power";
     public const string StationAirlockFixtureId = "station_airlock_power";
-    public const string Station2AirlockFixtureId = "station2_airlock_power";
     public const string DerelictAirlockFixtureId = "derelict_airlock_power";
+
+    // Shared by every Station's own destination-side airlock door (Station, Station2, ...) —
+    // same "one shared id across every instance" convention as InteriorDoorFixtureId.
+    public const string StationDestinationAirlockFixtureId = "station_destination_airlock_power";
     public const string BunkFixtureId = "bunk";
 
     // Placeholder/tunable — one power cell (see VendorVerbTarget's economy) restores
@@ -283,6 +292,11 @@ public partial class ShipSim : Node, IShipLayoutSaveable
         // fixture's cell for position, only WearSystem's blanket per-tick decay and lookup-by-Id.
         Deck.AddFixture(new MachineFixture(InteriorDoorFixtureId, InteriorDoorCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
 
+        // Also unconditional (see InteriorDoorFixtureId's own comment above) — a Station's own
+        // destination-side airlock door needs a wear-tracked fixture on ITS OWN ship regardless
+        // of whether that ship has a power grid at all (Stations don't today).
+        Deck.AddFixture(new MachineFixture(StationDestinationAirlockFixtureId, StationDestinationAirlockCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
+
         if (HasPowerGrid)
         {
             // None of the below are pre-connected — the player must run their own conduits
@@ -293,7 +307,6 @@ public partial class ShipSim : Node, IShipLayoutSaveable
             // Install*/Remove* calls below that a player action or a save replay uses.
             Deck.AddFixture(new MachineFixture(TravelConsoleFixtureId, TravelConsoleCell, FixtureSurface.WallInner) { PowerDraw = IdleDraw });
             Deck.AddFixture(new MachineFixture(StationAirlockFixtureId, StationAirlockCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
-            Deck.AddFixture(new MachineFixture(Station2AirlockFixtureId, Station2AirlockCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
             Deck.AddFixture(new MachineFixture(DerelictAirlockFixtureId, DerelictAirlockCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
 
             _power = new PowerSystem(Deck);

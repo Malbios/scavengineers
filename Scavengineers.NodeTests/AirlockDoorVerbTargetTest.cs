@@ -77,4 +77,28 @@ public class AirlockDoorVerbTargetTest
 
         AssertBool(airlock.IsOpen).IsTrue();
     }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void RebindFarSide_AlsoRebindsThePartnerDoor()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var airlock = CreateUnpoweredAirlock(sceneTree);
+        var originalPartner = AutoFree(new AirlockDoorVerbTarget());
+        sceneTree.Root.AddChild(originalPartner);
+        airlock.PartnerDoorRef = originalPartner;
+
+        var shipC = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(shipC);
+        var newPartner = AutoFree(new AirlockDoorVerbTarget());
+        sceneTree.Root.AddChild(newPartner);
+
+        airlock.RebindFarSide(shipC, newPartner);
+
+        AssertBool(ReferenceEquals(airlock.PartnerDoorRef, newPartner)).IsTrue();
+        // Bidirectional: the new partner points back at this door, and the old one no longer
+        // does — see RebindFarSide's own doc comment for why both directions matter.
+        AssertBool(ReferenceEquals(newPartner.PartnerDoorRef, airlock)).IsTrue();
+        AssertObject(originalPartner.PartnerDoorRef).IsNull();
+    }
 }

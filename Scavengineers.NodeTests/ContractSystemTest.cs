@@ -30,22 +30,36 @@ public class ContractSystemTest
         sceneTree.Root.AddChild(homeShip);
 
         var stationGroupPaths = new Godot.Collections.Array<NodePath>();
-        var stationAirlockPaths = new Godot.Collections.Array<NodePath>();
+        var stationShipSimPaths = new Godot.Collections.Array<NodePath>();
+        var stationDestinationAirlockPaths = new Godot.Collections.Array<NodePath>();
         var stationMapPositions = new Godot.Collections.Array<Vector2>();
+
+        AirlockDoorVerbTarget? stationAirlock = null;
 
         for (var i = 0; i < 2; i++)
         {
-            var stationShip = AutoFree(new ShipSim());
+            var stationShip = AutoFree(new ShipSim { Name = $"StationShip{i}" });
             sceneTree.Root.AddChild(stationShip);
 
             var stationGroup = AutoFree(new Node3D { Name = $"StationGroup{i}" });
             sceneTree.Root.AddChild(stationGroup);
 
-            var stationAirlock = AutoFree(new AirlockDoorVerbTarget { Name = $"StationAirlock{i}", ShipARef = homeShip, ShipBRef = stationShip });
-            sceneTree.Root.AddChild(stationAirlock);
+            var stationDestinationAirlock = AutoFree(new AirlockDoorVerbTarget { Name = $"StationDestinationAirlock{i}", ShipARef = stationShip, OwnsBridge = false });
+            sceneTree.Root.AddChild(stationDestinationAirlock);
+
+            if (i == 0)
+            {
+                // The one shared Home-Ship-side door, initially bound to Station 0 to match
+                // TravelConsoleVerbTarget's own default _currentDestination — the same "initial
+                // ShipBRef matches index 0" convention DerelictAirlock's own harness setup uses.
+                stationAirlock = AutoFree(new AirlockDoorVerbTarget { Name = "StationAirlock", ShipARef = homeShip, ShipBRef = stationShip, PartnerDoorRef = stationDestinationAirlock });
+                sceneTree.Root.AddChild(stationAirlock);
+                stationDestinationAirlock.PartnerDoorRef = stationAirlock; // bidirectional — see AirlockDoorVerbTarget.RefreshBridgeEngagement
+            }
 
             stationGroupPaths.Add(new NodePath($"../StationGroup{i}"));
-            stationAirlockPaths.Add(new NodePath($"../StationAirlock{i}"));
+            stationShipSimPaths.Add(new NodePath($"../StationShip{i}"));
+            stationDestinationAirlockPaths.Add(new NodePath($"../StationDestinationAirlock{i}"));
             stationMapPositions.Add(new Vector2(i * 100, i * 100));
         }
 
@@ -63,7 +77,9 @@ public class ContractSystemTest
             ShipSimRef = homeShip,
             DerelictAirlock = derelictAirlock,
             StationGroupPaths = stationGroupPaths,
-            StationAirlockPaths = stationAirlockPaths,
+            StationAirlock = stationAirlock,
+            StationShipSimPaths = stationShipSimPaths,
+            StationDestinationAirlockPaths = stationDestinationAirlockPaths,
             StationMapPositions = stationMapPositions,
             DerelictGroupPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1") },
             DerelictShipSimPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/ShipSim") },

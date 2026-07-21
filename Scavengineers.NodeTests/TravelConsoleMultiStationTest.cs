@@ -13,37 +13,52 @@ namespace Scavengineers.NodeTests;
 
 /// <summary>Regression coverage for generalizing TravelConsoleVerbTarget's Station handling from
 /// a single hardcoded destination (id 0) into a parallel-array model matching Derelict's own
-/// shape, plus a fourth array since every Station needs its own dedicated, never-shared airlock
-/// (unlike Derelicts, which all share one rebindable one — see AirlockDoorVerbTarget.RebindFarSide
-/// and TravelConsoleVerbTarget's own class doc comment). Destination ids are now
+/// shape. Stations use the exact same rebind pattern as Derelict (one shared Home-Ship-side
+/// StationAirlock, its far side + partner door repointed via RebindFarSide) plus their own
+/// per-station destination-side door (only ever "docked" while that Station is current) — see
+/// TravelConsoleVerbTarget's own class doc comment. Destination ids are
 /// 0..StationCount-1 = Station N, StationCount.. = Derelict N.</summary>
 [TestSuite]
 public class TravelConsoleMultiStationTest
 {
-    private static (TravelConsoleVerbTarget Console, AirlockDoorVerbTarget[] StationAirlocks, AirlockDoorVerbTarget DerelictAirlock) MakeHarness(SceneTree sceneTree)
+    private static (TravelConsoleVerbTarget Console, AirlockDoorVerbTarget StationAirlock, AirlockDoorVerbTarget[] StationDestinationAirlocks, AirlockDoorVerbTarget DerelictAirlock) MakeHarness(SceneTree sceneTree)
     {
         var homeShip = AutoFree(new ShipSim { HasPowerGrid = true });
         sceneTree.Root.AddChild(homeShip);
 
         var stationGroupPaths = new Godot.Collections.Array<NodePath>();
-        var stationAirlockPaths = new Godot.Collections.Array<NodePath>();
+        var stationShipSimPaths = new Godot.Collections.Array<NodePath>();
+        var stationDestinationAirlockPaths = new Godot.Collections.Array<NodePath>();
         var stationMapPositions = new Godot.Collections.Array<Vector2>();
-        var stationAirlocks = new AirlockDoorVerbTarget[2];
+        var stationDestinationAirlocks = new AirlockDoorVerbTarget[2];
+
+        AirlockDoorVerbTarget? stationAirlock = null;
 
         for (var i = 0; i < 2; i++)
         {
-            var stationShip = AutoFree(new ShipSim());
+            var stationShip = AutoFree(new ShipSim { Name = $"StationShip{i}" });
             sceneTree.Root.AddChild(stationShip);
 
             var stationGroup = AutoFree(new Node3D { Name = $"StationGroup{i}" });
             sceneTree.Root.AddChild(stationGroup);
 
-            var stationAirlock = AutoFree(new AirlockDoorVerbTarget { Name = $"StationAirlock{i}", ShipARef = homeShip, ShipBRef = stationShip });
-            sceneTree.Root.AddChild(stationAirlock);
-            stationAirlocks[i] = stationAirlock;
+            var stationDestinationAirlock = AutoFree(new AirlockDoorVerbTarget { Name = $"StationDestinationAirlock{i}", ShipARef = stationShip, OwnsBridge = false });
+            sceneTree.Root.AddChild(stationDestinationAirlock);
+            stationDestinationAirlocks[i] = stationDestinationAirlock;
+
+            if (i == 0)
+            {
+                // The one shared Home-Ship-side door — initially bound to Station 0 to match
+                // TravelConsoleVerbTarget's own default _currentDestination, same as
+                // DerelictAirlock's own harness setup already does for Derelict 1.
+                stationAirlock = AutoFree(new AirlockDoorVerbTarget { Name = "StationAirlock", ShipARef = homeShip, ShipBRef = stationShip, PartnerDoorRef = stationDestinationAirlock });
+                sceneTree.Root.AddChild(stationAirlock);
+                stationDestinationAirlock.PartnerDoorRef = stationAirlock; // bidirectional — see AirlockDoorVerbTarget.RefreshBridgeEngagement
+            }
 
             stationGroupPaths.Add(new NodePath($"../StationGroup{i}"));
-            stationAirlockPaths.Add(new NodePath($"../StationAirlock{i}"));
+            stationShipSimPaths.Add(new NodePath($"../StationShip{i}"));
+            stationDestinationAirlockPaths.Add(new NodePath($"../StationDestinationAirlock{i}"));
             stationMapPositions.Add(new Vector2(i * 100, i * 100));
         }
 
@@ -61,7 +76,9 @@ public class TravelConsoleMultiStationTest
             ShipSimRef = homeShip,
             DerelictAirlock = derelictAirlock,
             StationGroupPaths = stationGroupPaths,
-            StationAirlockPaths = stationAirlockPaths,
+            StationAirlock = stationAirlock,
+            StationShipSimPaths = stationShipSimPaths,
+            StationDestinationAirlockPaths = stationDestinationAirlockPaths,
             StationMapPositions = stationMapPositions,
             DerelictGroupPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1") },
             DerelictShipSimPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/ShipSim") },
@@ -75,7 +92,7 @@ public class TravelConsoleMultiStationTest
         homeShip.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);
         homeShip.SetThrusterCharge("t1", 1f);
 
-        return (console, stationAirlocks, derelictAirlock);
+        return (console, stationAirlock!, stationDestinationAirlocks, derelictAirlock);
     }
 
     private static async Task TravelAndDockAsync(SceneTree sceneTree, TravelConsoleVerbTarget console, int destinationId)
@@ -90,7 +107,7 @@ public class TravelConsoleMultiStationTest
     public void BuildMapEntries_ListsBothStationsFirstThenTheDerelict_WithIdsShiftedPastStationCount()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
-        var (console, _, _) = MakeHarness(sceneTree);
+        var (console, _, _, _) = MakeHarness(sceneTree);
 
         var entries = console.BuildMapEntries();
 
@@ -105,32 +122,35 @@ public class TravelConsoleMultiStationTest
 
     [TestCase]
     [RequireGodotRuntime]
-    public async Task TravelingToTheSecondStation_DocksOnlyItsOwnAirlock()
+    public async Task TravelingToTheSecondStation_RebindsTheSharedAirlockAndDocksOnlyItsOwnDestinationDoor()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
-        var (console, stationAirlocks, derelictAirlock) = MakeHarness(sceneTree);
+        var (console, stationAirlock, stationDestinationAirlocks, derelictAirlock) = MakeHarness(sceneTree);
 
         await TravelAndDockAsync(sceneTree, console, 1);
 
         AssertInt(console.CurrentDestinationId).IsEqual(1);
-        AssertBool(stationAirlocks[0].Docked).IsFalse();
-        AssertBool(stationAirlocks[1].Docked).IsTrue();
+        AssertBool(stationAirlock.Docked).IsTrue();
+        AssertBool(stationAirlock.PartnerDoorRef == stationDestinationAirlocks[1]).IsTrue();
+        AssertBool(stationDestinationAirlocks[0].Docked).IsFalse();
+        AssertBool(stationDestinationAirlocks[1].Docked).IsTrue();
         AssertBool(derelictAirlock.Docked).IsFalse();
     }
 
     [TestCase]
     [RequireGodotRuntime]
-    public async Task TravelingToTheDerelict_UndocksBothStationAirlocks_AndDocksTheDerelictOne()
+    public async Task TravelingToTheDerelict_UndocksTheStationAirlocks_AndDocksTheDerelictOne()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
-        var (console, stationAirlocks, derelictAirlock) = MakeHarness(sceneTree);
+        var (console, stationAirlock, stationDestinationAirlocks, derelictAirlock) = MakeHarness(sceneTree);
 
         // Destination 2 = the Derelict, since StationCount is 2 here (ids 0/1 are the Stations).
         await TravelAndDockAsync(sceneTree, console, 2);
 
         AssertInt(console.CurrentDestinationId).IsEqual(2);
-        AssertBool(stationAirlocks[0].Docked).IsFalse();
-        AssertBool(stationAirlocks[1].Docked).IsFalse();
+        AssertBool(stationAirlock.Docked).IsFalse();
+        AssertBool(stationDestinationAirlocks[0].Docked).IsFalse();
+        AssertBool(stationDestinationAirlocks[1].Docked).IsFalse();
         AssertBool(derelictAirlock.Docked).IsTrue();
     }
 
@@ -139,7 +159,7 @@ public class TravelConsoleMultiStationTest
     public async Task GetSaveState_RoundTrips_ForTheSecondStation()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
-        var (console, _, _) = MakeHarness(sceneTree);
+        var (console, _, _, _) = MakeHarness(sceneTree);
 
         await TravelAndDockAsync(sceneTree, console, 1);
         var saved = console.GetSaveState();
@@ -154,13 +174,14 @@ public class TravelConsoleMultiStationTest
     public void ApplySaveState_LegacyBareStation_ResolvesToStationZero()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
-        var (console, stationAirlocks, _) = MakeHarness(sceneTree);
+        var (console, stationAirlock, stationDestinationAirlocks, _) = MakeHarness(sceneTree);
 
         console.ApplySaveState("station");
 
         AssertInt(console.CurrentDestinationId).IsEqual(0);
-        AssertBool(stationAirlocks[0].Docked).IsTrue();
-        AssertBool(stationAirlocks[1].Docked).IsFalse();
+        AssertBool(stationAirlock.Docked).IsTrue();
+        AssertBool(stationDestinationAirlocks[0].Docked).IsTrue();
+        AssertBool(stationDestinationAirlocks[1].Docked).IsFalse();
     }
 
     [TestCase]
@@ -168,7 +189,7 @@ public class TravelConsoleMultiStationTest
     public void ApplySaveState_LegacyBareDerelict_ResolvesToTheFirstDerelict_ShiftedPastBothStations()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
-        var (console, _, derelictAirlock) = MakeHarness(sceneTree);
+        var (console, _, _, derelictAirlock) = MakeHarness(sceneTree);
 
         console.ApplySaveState("derelict");
 
@@ -183,7 +204,7 @@ public class TravelConsoleMultiStationTest
     public void ApplySaveState_ExistingDerelictString_StillResolvesCorrectly_WithTwoStations()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
-        var (console, _, derelictAirlock) = MakeHarness(sceneTree);
+        var (console, _, _, derelictAirlock) = MakeHarness(sceneTree);
 
         console.ApplySaveState("derelict_1");
 

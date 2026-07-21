@@ -42,14 +42,18 @@ public class TravelConsoleDerelictPresenceRaceTest
         var homeShip = new ShipSim();
         worldRoot.AddChild(homeShip);
 
-        var stationShip = new ShipSim();
+        var stationShip = new ShipSim { Name = "StationShip" };
         worldRoot.AddChild(stationShip);
 
         var stationGroup = new Node3D { Name = "StationGroup" };
         worldRoot.AddChild(stationGroup);
 
-        var stationAirlock = new AirlockDoorVerbTarget { Name = "StationAirlock", ShipARef = homeShip, ShipBRef = stationShip };
+        var stationDestinationAirlock = new AirlockDoorVerbTarget { Name = "StationDestinationAirlock", ShipARef = stationShip, OwnsBridge = false };
+        worldRoot.AddChild(stationDestinationAirlock);
+
+        var stationAirlock = new AirlockDoorVerbTarget { Name = "StationAirlock", ShipARef = homeShip, ShipBRef = stationShip, PartnerDoorRef = stationDestinationAirlock };
         worldRoot.AddChild(stationAirlock);
+        stationDestinationAirlock.PartnerDoorRef = stationAirlock; // bidirectional — see AirlockDoorVerbTarget.RefreshBridgeEngagement
 
         // Real corridor cells (EastCorridorLength) so SeedDefaultShipLayout actually has wall
         // segments to spawn — that's the exact geometry the reported bug blocked movement on.
@@ -71,7 +75,9 @@ public class TravelConsoleDerelictPresenceRaceTest
             ShipSimRef = homeShip,
             DerelictAirlock = derelictAirlock,
             StationGroupPaths = new Godot.Collections.Array<NodePath> { new("../StationGroup") },
-            StationAirlockPaths = new Godot.Collections.Array<NodePath> { new("../StationAirlock") },
+            StationAirlock = stationAirlock,
+            StationShipSimPaths = new Godot.Collections.Array<NodePath> { new("../StationShip") },
+            StationDestinationAirlockPaths = new Godot.Collections.Array<NodePath> { new("../StationDestinationAirlock") },
             StationMapPositions = new Godot.Collections.Array<Vector2> { new(220, 180) },
             DerelictGroupPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1") },
             DerelictShipSimPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/ShipSim") },

@@ -95,6 +95,47 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     [Export]
     public string SaveId { get; set; } = "";
 
+    /// <summary>False for a destination-side door (e.g. a Station's own <c>DestinationAirlock</c>)
+    /// — it shares the connection's single cross-ship <see cref="AirlockBridge"/>/vacuum-breach
+    /// pair via whichever door has <see cref="OwnsBridge"/> true, rather than creating a second,
+    /// redundant one. Defaults true so every existing single-door connection (Derelict) is
+    /// unaffected.</summary>
+    [Export]
+    public bool OwnsBridge { get; set; } = true;
+
+    /// <summary>True for a per-side door that also seals/unseals a real edge within its OWN
+    /// ship's Deck (see <see cref="LocalEdgeColumnNear"/>/<see cref="LocalEdgeColumnFar"/>) —
+    /// the same mechanism InteriorDoorVerbTarget.ApplyEdgeSeal already uses for room-to-room
+    /// doors, generalized to a configurable column boundary. False (the default) preserves
+    /// DerelictAirlock's exact existing behavior, which never seals anything locally.</summary>
+    [Export]
+    public bool SealsLocalEdge { get; set; }
+
+    /// <summary>The two columns (paired with every row in ShipSim.DoorwayRows) sealed/unsealed on
+    /// ShipARef.Deck when SealsLocalEdge is true — e.g. (-1, 0) for the Home Ship's own airlock
+    /// door, (5, 6) for a Station's own destination-side door (its Room1/Room2-style threshold).
+    /// Meaningless when SealsLocalEdge is false.</summary>
+    [Export]
+    public int LocalEdgeColumnNear { get; set; }
+
+    [Export]
+    public int LocalEdgeColumnFar { get; set; }
+
+    /// <summary>The other side's door for this same connection — e.g. the Home Ship's
+    /// StationAirlock and a Station's own DestinationAirlock point at each other. Null (the
+    /// default, and every existing single-door connection like Derelict) means "always treat the
+    /// partner as open" — see ApplyPhysicalState's own bridge-engagement check — so the cross-ship
+    /// bridge behaves exactly as it always has when there's no real partner door.</summary>
+    [Export]
+    public AirlockDoorVerbTarget? PartnerDoorRef { get; set; }
+
+    /// <summary>False for a Station's own destination-side door — Stations have no power grid at
+    /// all today (ShipSim.HasPowerGrid unset), so gating on ShipARef.IsPowered would make that
+    /// door permanently pry-only, which reads as broken rather than a deliberately unpowered
+    /// station. True (the default) preserves every existing door's behavior.</summary>
+    [Export]
+    public bool RequiresPower { get; set; } = true;
+
     private bool _docked = true;
 
     /// <summary>Set by whichever console owns "current docked location" (e.g.
@@ -139,12 +180,13 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     {
         get
         {
-            if (_bridge is null || ShipARef is null)
+            if (ShipARef is null || (OwnsBridge && _bridge is null))
             {
                 return [];
             }
 
-            var verbs = new List<Verb> { ShipARef.IsPowered(PowerFixtureId) ? (IsOpen ? CloseVerb : OpenVerb) : PryVerb };
+            var powered = !RequiresPower || ShipARef.IsPowered(PowerFixtureId);
+            var verbs = new List<Verb> { powered ? (IsOpen ? CloseVerb : OpenVerb) : PryVerb };
 
             if (AirlockFixture is { } fixture && MaintenanceTier.PickVerb(fixture.Condition, MaintainAirlockVerb, RepairAirlockVerb) is { } upkeepVerb)
             {
@@ -173,7 +215,7 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
 
     public override void _Ready()
     {
-        if (ShipARef?.Atmosphere is { } atmosphereA && ShipBRef?.Atmosphere is { } atmosphereB)
+        if (OwnsBridge && ShipARef?.Atmosphere is { } atmosphereA && ShipBRef?.Atmosphere is { } atmosphereB)
         {
             _bridge = new AirlockBridge(
                 atmosphereA, new CellCoord(TileA.X, TileA.Y),
@@ -215,7 +257,7 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
             return;
         }
 
-        if (_bridge is null || _cycling || (verb.Id != OpenVerb.Id && verb.Id != CloseVerb.Id && verb.Id != PryVerb.Id))
+        if (ShipARef is null || (OwnsBridge && _bridge is null) || _cycling || (verb.Id != OpenVerb.Id && verb.Id != CloseVerb.Id && verb.Id != PryVerb.Id))
         {
             return;
         }
@@ -279,7 +321,7 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     /// forced shut first: an "open" state left over from the previous destination has no physical
     /// meaning at a different one, and leaving it open would bridge/vent atmosphere against the
     /// new ship before the caller sets Docked.</summary>
-    public void RebindFarSide(ShipSim newShipB)
+    public void RebindFarSide(ShipSim newShipB, AirlockDoorVerbTarget? newPartnerDoor = null)
     {
         if (ReferenceEquals(ShipBRef, newShipB))
         {
@@ -289,7 +331,22 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
         SetOpen(false);
         ShipBRef = newShipB;
 
-        _bridge = ShipARef?.Atmosphere is { } atmosphereA && newShipB.Atmosphere is { } atmosphereB
+        // Bidirectional: the old partner (if any) no longer refers back to this door, and the
+        // new one does — see RefreshBridgeEngagement's own doc comment for why both directions
+        // matter, not just this door's own PartnerDoorRef field.
+        if (PartnerDoorRef is not null)
+        {
+            PartnerDoorRef.PartnerDoorRef = null;
+        }
+
+        PartnerDoorRef = newPartnerDoor;
+
+        if (newPartnerDoor is not null)
+        {
+            newPartnerDoor.PartnerDoorRef = this;
+        }
+
+        _bridge = OwnsBridge && ShipARef?.Atmosphere is { } atmosphereA && newShipB.Atmosphere is { } atmosphereB
             ? new AirlockBridge(atmosphereA, new CellCoord(TileA.X, TileA.Y), atmosphereB, new CellCoord(TileB.X, TileB.Y))
             : null;
     }
@@ -318,13 +375,61 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
             SlabCollision.Disabled = passable;
         }
 
-        if (_bridge is not null)
+        if (SealsLocalEdge)
         {
-            _bridge.IsOpen = passable;
+            ApplyLocalEdgeSeal(passable);
         }
+
+        // Also re-derives the partner's own bridge engagement (if it owns one) — PartnerDoorRef
+        // is set bidirectionally by RebindFarSide/scene wiring specifically so that opening or
+        // closing EITHER side of a connection immediately re-evaluates the bridge, rather than
+        // only whichever side happens to change last leaving a stale snapshot on the other.
+        RefreshBridgeEngagement();
+        PartnerDoorRef?.RefreshBridgeEngagement();
 
         SetBreached(ShipARef, TileA, ventingToSpace);
         SetBreached(ShipBRef, TileB, ventingToSpace);
+    }
+
+    /// <summary>Only actually bridges/vents once BOTH this connection's doors report open — a
+    /// null PartnerDoorRef (every existing single-door connection, e.g. Derelict) means "always
+    /// treat the partner as open," preserving today's exact behavior.</summary>
+    private void RefreshBridgeEngagement()
+    {
+        if (_bridge is not null)
+        {
+            _bridge.IsOpen = _isOpen && (PartnerDoorRef?.IsOpen ?? true);
+        }
+    }
+
+    /// <summary>Seals/unseals this door's own ship's internal edge (LocalEdgeColumnNear <->
+    /// LocalEdgeColumnFar, across every ShipSim.DoorwayRows row) — the same mechanism
+    /// InteriorDoorVerbTarget.ApplyEdgeSeal uses for room-to-room doors, generalized to a
+    /// configurable column boundary so this same class can represent a per-side airlock door
+    /// instead of only the cross-ship bridge. This is what actually contains a breach/vent to
+    /// this door's own side of the connection when closed, regardless of what the far door or
+    /// far ship is doing.</summary>
+    private void ApplyLocalEdgeSeal(bool open)
+    {
+        if (ShipARef is null)
+        {
+            return;
+        }
+
+        foreach (var row in ShipSim.DoorwayRows)
+        {
+            var near = new CellCoord(LocalEdgeColumnNear, row);
+            var far = new CellCoord(LocalEdgeColumnFar, row);
+
+            if (open)
+            {
+                ShipARef.Deck.UnsealEdge(near, far);
+            }
+            else
+            {
+                ShipARef.Deck.SealEdge(near, far);
+            }
+        }
     }
 
     private static void SetBreached(ShipSim? shipSim, Vector2I tile, bool breached)

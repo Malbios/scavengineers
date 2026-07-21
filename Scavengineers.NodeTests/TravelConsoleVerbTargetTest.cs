@@ -25,14 +25,18 @@ public class TravelConsoleVerbTargetTest
         var homeShip = AutoFree(new ShipSim { HasPowerGrid = homeShipHasPowerGrid });
         sceneTree.Root.AddChild(homeShip);
 
-        var stationShip = AutoFree(new ShipSim());
+        var stationShip = AutoFree(new ShipSim { Name = "StationShip" });
         sceneTree.Root.AddChild(stationShip);
 
         var stationGroup = AutoFree(new Node3D { Name = "StationGroup" });
         sceneTree.Root.AddChild(stationGroup);
 
-        var stationAirlock = AutoFree(new AirlockDoorVerbTarget { Name = "StationAirlock", ShipARef = homeShip, ShipBRef = stationShip });
+        var stationDestinationAirlock = AutoFree(new AirlockDoorVerbTarget { Name = "StationDestinationAirlock", ShipARef = stationShip, OwnsBridge = false });
+        sceneTree.Root.AddChild(stationDestinationAirlock);
+
+        var stationAirlock = AutoFree(new AirlockDoorVerbTarget { Name = "StationAirlock", ShipARef = homeShip, ShipBRef = stationShip, PartnerDoorRef = stationDestinationAirlock });
         sceneTree.Root.AddChild(stationAirlock);
+        stationDestinationAirlock.PartnerDoorRef = stationAirlock; // bidirectional — see AirlockDoorVerbTarget.RefreshBridgeEngagement
 
         var derelictGroups = new Node3D[derelictCount];
         var derelictGroupPaths = new Godot.Collections.Array<NodePath>();
@@ -63,7 +67,9 @@ public class TravelConsoleVerbTargetTest
             ShipSimRef = homeShip,
             DerelictAirlock = derelictAirlock,
             StationGroupPaths = new Godot.Collections.Array<NodePath> { new("../StationGroup") },
-            StationAirlockPaths = new Godot.Collections.Array<NodePath> { new("../StationAirlock") },
+            StationAirlock = stationAirlock,
+            StationShipSimPaths = new Godot.Collections.Array<NodePath> { new("../StationShip") },
+            StationDestinationAirlockPaths = new Godot.Collections.Array<NodePath> { new("../StationDestinationAirlock") },
             StationMapPositions = new Godot.Collections.Array<Vector2> { new(220, 180) },
             DerelictGroupPaths = derelictGroupPaths,
             DerelictShipSimPaths = derelictShipSimPaths,
