@@ -1355,15 +1355,17 @@ public partial class Player : CharacterBody3D
     }
 
     /// <summary>Called by ContractBoardPanel's Active-tab row buttons — only ever wired up as
-    /// actionable (see RefreshContractBoard's own ActionAvailable check) for RetrieveItem/
-    /// SalvageQuota, whose turn-in is a player-initiated interaction; CargoDelivery/Survey
-    /// complete automatically on arrival instead (see OnArrivedAtDestination) and never get a
-    /// live button here, so the type check below is a defensive backstop, not the primary gate.</summary>
+    /// actionable (see RefreshContractBoard's own ActionAvailable check, which uses the same
+    /// CanTurnIn) for RetrieveItem/SalvageQuota (turn-in anywhere) and CargoDelivery (turn-in only
+    /// at the destination Station's own contract-giver — you have to hand the cargo to that
+    /// Station's contractor, not just arrive carrying it); Survey completes automatically on
+    /// arrival instead (see OnArrivedAtDestination) and never gets a live button here. The type/
+    /// location check below is a defensive backstop, not the primary gate.</summary>
     public void TryTurnInContract(string instanceId)
     {
         var contract = _activeContracts.FirstOrDefault(c => c.InstanceId == instanceId);
         if (contract is { } found
-            && (found.Type == ContractType.RetrieveItem || found.Type == ContractType.SalvageQuota)
+            && CanTurnIn(found)
             && found.ItemId is { } itemId
             && _inventory.Has(itemId, found.Count)
             && _inventory.TryRemove(itemId, found.Count))
@@ -1374,6 +1376,19 @@ public partial class Player : CharacterBody3D
 
         RefreshContractBoard();
     }
+
+    /// <summary>Whether `contract` is even the *kind* of contract that turns in via
+    /// TryTurnInContract at all, and — for CargoDelivery specifically — whether the currently open
+    /// contract-giver's own Station is the contract's destination. `_openContractGiver.ConsoleRef`
+    /// is the single shared Home-Ship console, so `CurrentDestinationId` reflects wherever the
+    /// ship is physically docked right now — the same Station the open board's own giver lives
+    /// on, since the board can only ever be open while standing in front of it.</summary>
+    private bool CanTurnIn(Contract contract) => contract.Type switch
+    {
+        ContractType.RetrieveItem or ContractType.SalvageQuota => true,
+        ContractType.CargoDelivery => _openContractGiver?.ConsoleRef?.CurrentDestinationId == contract.DestinationStationId,
+        _ => false,
+    };
 
     private void RefreshContractBoard()
     {
@@ -1386,8 +1401,7 @@ public partial class Player : CharacterBody3D
             .Select(c => new ContractBoardEntry(
                 c.InstanceId,
                 _openContractGiver.Describe(c),
-                ActionAvailable: (c.Type == ContractType.RetrieveItem || c.Type == ContractType.SalvageQuota)
-                    && c.ItemId is { } itemId && _inventory.Has(itemId, c.Count)))
+                ActionAvailable: CanTurnIn(c) && c.ItemId is { } itemId && _inventory.Has(itemId, c.Count)))
             .ToList();
 
         _contractBoardPanel!.Populate(_openContractGiver.BuildAvailableEntries(), activeEntries);
@@ -1420,10 +1434,10 @@ public partial class Player : CharacterBody3D
 
     /// <summary>Called by TravelConsoleVerbTarget.CompleteDocking right after a real arrival (not
     /// a save-load restore, which calls ApplyCurrentLocation directly without this hook) —
-    /// settles any owed debt the instant the ship docks at any Station, and auto-completes
-    /// CargoDelivery/Survey contracts targeting wherever it just arrived. RetrieveItem/
-    /// SalvageQuota deliberately aren't checked here — those complete via TryTurnInContract
-    /// instead (see ContractType's own doc comment on why the four types split this way).</summary>
+    /// settles any owed debt the instant the ship docks at any Station, and auto-completes Survey
+    /// contracts targeting wherever it just arrived. RetrieveItem/SalvageQuota/CargoDelivery
+    /// deliberately aren't checked here — those complete via TryTurnInContract instead (see
+    /// ContractType's own doc comment on why the four types split this way).</summary>
     public void OnArrivedAtDestination(int destinationId, bool isStation)
     {
         if (isStation)
@@ -1435,8 +1449,6 @@ public partial class Player : CharacterBody3D
         {
             var completed = contract.Type switch
             {
-                ContractType.CargoDelivery => isStation && contract.DestinationStationId == destinationId
-                    && contract.ItemId is { } cargoItemId && _inventory.Has(cargoItemId, contract.Count) && _inventory.TryRemove(cargoItemId, contract.Count),
                 ContractType.Survey => contract.TargetDestinationId == destinationId && HasCartridgeEquipped(contract.ItemId),
                 _ => false,
             };

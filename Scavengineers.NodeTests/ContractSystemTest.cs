@@ -228,7 +228,7 @@ public class ContractSystemTest
 
     [TestCase]
     [RequireGodotRuntime]
-    public async Task ArrivingAtTheCargoDestinationStation_CompletesCargoDelivery_WhenCarryingTheCargo()
+    public async Task TurningInCargoDeliveryAtTheDestinationStation_PaysOut_WhenCarryingTheCargo()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var (player, console, giver) = MakeHarness(sceneTree);
@@ -244,13 +244,19 @@ public class ContractSystemTest
 
         await TravelAndDockAsync(sceneTree, console, 1);
 
+        // Arrival alone must not pay out — only handing it over at the destination's own
+        // contract-giver does (see Player.CanTurnIn).
+        AssertInt(player.Credits).IsEqual(startingCredits);
+
+        player.TryTurnInContract("c1");
+
         AssertInt(player.Credits).IsEqual(startingCredits + 50);
-        AssertBool(player.Inventory.Has("cargo_crate", 1)).IsFalse(); // consumed on delivery
+        AssertBool(player.Inventory.Has("cargo_crate", 1)).IsFalse(); // consumed on hand-over
     }
 
     [TestCase]
     [RequireGodotRuntime]
-    public async Task ArrivingAtTheCargoDestinationStation_DoesNotComplete_WithoutTheCargo()
+    public async Task TurningInCargoDeliveryAtTheDestinationStation_DoesNothing_WithoutTheCargo()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var (player, console, giver) = MakeHarness(sceneTree);
@@ -261,8 +267,32 @@ public class ContractSystemTest
         player.AcceptContract("c1");
 
         await TravelAndDockAsync(sceneTree, console, 1);
+        player.TryTurnInContract("c1");
 
         AssertInt(player.Credits).IsEqual(startingCredits);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void TurningInCargoDeliveryAtTheOriginStation_IsRefused_EvenWhileCarryingTheCargo()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (player, _, giver) = MakeHarness(sceneTree);
+        var startingCredits = player.Credits;
+
+        giver.AddOfferForTests(new Contract { InstanceId = "c1", TemplateId = "cargo_delivery", Type = ContractType.CargoDelivery, ItemId = "cargo_crate", Count = 1, OriginStationId = 0, DestinationStationId = 1, Reward = 50, FailureFee = 20, RemainingSeconds = 200f });
+        player.AcceptContract("c1");
+
+        var originStationGroup = sceneTree.Root.GetNode<Node3D>("StationGroup0");
+        var crate = originStationGroup.GetChildren().OfType<PickupItem>().Single();
+        crate.ExecuteVerb(crate.AvailableVerbs[0], player.Inventory);
+
+        // Still docked at the origin (Station 0, the harness's default) — carrying the cargo isn't
+        // enough on its own, it has to be handed over at the destination's own contract-giver.
+        player.TryTurnInContract("c1");
+
+        AssertInt(player.Credits).IsEqual(startingCredits);
+        AssertBool(player.Inventory.Has("cargo_crate", 1)).IsTrue(); // not consumed by the refused attempt
     }
 
     [TestCase]
