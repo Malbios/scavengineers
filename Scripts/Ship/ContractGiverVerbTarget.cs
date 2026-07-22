@@ -84,16 +84,30 @@ public partial class ContractGiverVerbTarget : StaticBody3D, IVerbTarget
     /// <summary>Removes and returns the named offer — called by Player.AcceptContract so an
     /// accepted job leaves the board (can't be double-accepted) rather than just being copied.
     /// Null if the id doesn't match any current offer (e.g. taken by a stale UI click after
-    /// RefreshOffers already replaced it).</summary>
+    /// RefreshOffers already replaced it). For a RetrieveItem offer, also spawns its target item
+    /// onto the target Derelict — nothing else in the loot pipeline ever places a contract's
+    /// specific item anywhere (see ShipBuildTarget.SpawnMissionItem's own doc comment), so without
+    /// this the job could never actually be found or completed.</summary>
     public Contract? TryTakeOffer(string instanceId)
     {
         var offer = _availableOffers.FirstOrDefault(o => o.InstanceId == instanceId);
         if (offer is not null)
         {
             _availableOffers.Remove(offer);
+            SpawnMissionItemIfNeeded(offer);
         }
 
         return offer;
+    }
+
+    private void SpawnMissionItemIfNeeded(Contract offer)
+    {
+        if (offer.Type != ContractType.RetrieveItem || offer.ItemId is not { } itemId || offer.TargetDestinationId is not { } destinationId)
+        {
+            return;
+        }
+
+        ConsoleRef?.GetDerelictBuildTarget(destinationId)?.SpawnMissionItem(itemId, offer.Count, _rng);
     }
 
     /// <summary>Test-only seam: puts a specific, fully-resolved Contract directly onto the board,

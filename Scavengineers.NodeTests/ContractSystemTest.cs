@@ -6,6 +6,7 @@ using Godot;
 using Scavengineers.Scripts.Contracts;
 using Scavengineers.Scripts.Inventory;
 using Scavengineers.Scripts.Ship;
+using Scavengineers.Scripts.Verbs;
 using Scavengineers.Sim.Grid;
 using Scavengineers.Sim.ShipModel;
 using PlayerScript = Scavengineers.Scripts.Player.Player;
@@ -72,6 +73,12 @@ public class ContractSystemTest
         var derelictAirlock = AutoFree(new AirlockDoorVerbTarget { Name = "DerelictAirlock", ShipARef = homeShip, ShipBRef = derelictShip });
         sceneTree.Root.AddChild(derelictAirlock);
 
+        // The Derelict's own Floor (ShipBuildTarget) — needed so a RetrieveItem contract targeting
+        // this Derelict has somewhere real to spawn its item (see
+        // ContractGiverVerbTarget.TryTakeOffer/ShipBuildTarget.SpawnMissionItem).
+        var derelictBuildTarget = AutoFree(new ShipBuildTarget { Name = "Floor", ShipSimRef = derelictShip, ShipRoot = derelictGroup, SaveId = "derelict_build_target_test" });
+        derelictGroup.AddChild(derelictBuildTarget);
+
         var console = AutoFree(new TravelConsoleVerbTarget
         {
             ShipSimRef = homeShip,
@@ -83,6 +90,7 @@ public class ContractSystemTest
             StationMapPositions = stationMapPositions,
             DerelictGroupPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1") },
             DerelictShipSimPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/ShipSim") },
+            DerelictBuildTargetPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/Floor") },
             DerelictMapPositions = new Godot.Collections.Array<Vector2> { new(10, 10) },
             BaseTravelSeconds = 0.3f,
             MinTravelSeconds = 0.1f,
@@ -262,5 +270,46 @@ public class ContractSystemTest
         await TravelAndDockAsync(sceneTree, console, 2);
 
         AssertInt(player.Credits).IsEqual(startingCredits);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void AcceptingARetrieveItemContract_SpawnsTheTargetItem_OnTheTargetDerelict()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (player, _, giver) = MakeHarness(sceneTree);
+
+        // Derelict is destination id 2 here (StationCount is 2, so 0/1 are Stations) — same
+        // convention the existing Survey tests above already use.
+        giver.AddOfferForTests(new Contract { InstanceId = "c1", TemplateId = "retrieve_common", Type = ContractType.RetrieveItem, ItemId = "o2_tank", Count = 1, TargetDestinationId = 2, Reward = 40, FailureFee = 20, RemainingSeconds = 200f });
+
+        var derelictGroup = sceneTree.Root.GetNode<Node3D>("DerelictGroup1");
+        AssertBool(derelictGroup.GetChildren().OfType<PickupItem>().Any()).IsFalse(); // nothing before acceptance
+
+        player.AcceptContract("c1");
+
+        var pickup = derelictGroup.GetChildren().OfType<PickupItem>().Single();
+        AssertString(pickup.ItemId).IsEqual("o2_tank");
+        AssertInt(pickup.Count).IsEqual(1);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void AcceptingARetrieveItemContract_ThenPickingUpTheSpawnedItem_LetsTheContractBeTurnedIn()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (player, _, giver) = MakeHarness(sceneTree);
+        var startingCredits = player.Credits;
+
+        giver.AddOfferForTests(new Contract { InstanceId = "c1", TemplateId = "retrieve_common", Type = ContractType.RetrieveItem, ItemId = "o2_tank", Count = 1, TargetDestinationId = 2, Reward = 40, FailureFee = 20, RemainingSeconds = 200f });
+        player.AcceptContract("c1");
+
+        var derelictGroup = sceneTree.Root.GetNode<Node3D>("DerelictGroup1");
+        var pickup = derelictGroup.GetChildren().OfType<PickupItem>().Single();
+        pickup.ExecuteVerb(pickup.AvailableVerbs[0], player.Inventory);
+
+        player.TryTurnInContract("c1");
+
+        AssertInt(player.Credits).IsEqual(startingCredits + 40);
     }
 }

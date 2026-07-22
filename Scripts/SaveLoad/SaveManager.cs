@@ -6,6 +6,7 @@ using System.Text.Json;
 
 using Godot;
 using Scavengineers.Scripts.Inventory;
+using Scavengineers.Scripts.Verbs;
 using PlayerScript = Scavengineers.Scripts.Player.Player;
 
 namespace Scavengineers.Scripts.SaveLoad;
@@ -113,6 +114,25 @@ public partial class SaveManager : Node
             });
         }
 
+        foreach (var node in GetTree().GetNodesInGroup("mission_item"))
+        {
+            if (node is not PickupItem { MissionOwnerSaveId: not "" } item)
+            {
+                continue;
+            }
+
+            data.MissionItems.Add(new MissionItemSaveData
+            {
+                PosX = item.GlobalPosition.X,
+                PosY = item.GlobalPosition.Y,
+                PosZ = item.GlobalPosition.Z,
+                ItemId = item.ItemId,
+                Count = item.Count,
+                Charge = item.Charge,
+                OwnerBuildTargetSaveId = item.MissionOwnerSaveId,
+            });
+        }
+
         File.WriteAllText(SavePath, JsonSerializer.Serialize(data));
         GD.Print($"[SaveManager] Saved to {SavePath}");
         _player?.ShowSavedFlash();
@@ -215,6 +235,20 @@ public partial class SaveManager : Node
             }
 
             _player!.SpawnDroppedContainer(dropped.ItemId, contents, new Vector3(dropped.PosX, dropped.PosY, dropped.PosZ));
+        }
+
+        foreach (var node in GetTree().GetNodesInGroup("mission_item"))
+        {
+            node.QueueFree();
+        }
+
+        var buildTargetsBySaveId = GetTree().GetNodesInGroup("saveable").OfType<ShipBuildTarget>().ToDictionary(t => t.SaveId);
+        foreach (var missionItem in data.MissionItems)
+        {
+            if (buildTargetsBySaveId.TryGetValue(missionItem.OwnerBuildTargetSaveId, out var owner))
+            {
+                owner.PlaceMissionItem(missionItem.ItemId, missionItem.Count, missionItem.Charge, new Vector3(missionItem.PosX, missionItem.PosY, missionItem.PosZ));
+            }
         }
 
         GD.Print("[SaveManager] Loaded.");

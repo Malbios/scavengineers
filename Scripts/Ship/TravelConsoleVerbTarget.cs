@@ -139,6 +139,15 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     [Export]
     public Godot.Collections.Array<Vector2> DerelictMapPositions { get; set; } = new();
 
+    /// <summary>Each Derelict's own Floor (ShipBuildTarget) — resolves a destination id to a
+    /// spawn point for ContractGiverVerbTarget's RetrieveItem contracts (see
+    /// GetDerelictBuildTarget). Deliberately NOT folded into DerelictCount's own Math.Min: a scene
+    /// that hasn't wired this array yet keeps a fully working travel map regardless, since
+    /// GetDerelictBuildTarget just returns null (contract still gets accepted, nothing to
+    /// physically spawn).</summary>
+    [Export]
+    public Godot.Collections.Array<NodePath> DerelictBuildTargetPaths { get; set; } = new();
+
     [Export]
     public string SaveId { get; set; } = "";
 
@@ -157,6 +166,7 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     private readonly List<AirlockDoorVerbTarget> _stationDestinationAirlocks = new();
     private readonly List<Node3D> _derelictGroups = new();
     private readonly List<ShipSim> _derelictShipSims = new();
+    private readonly List<ShipBuildTarget> _derelictBuildTargets = new();
 
     // A second, independent timer/bool pair — travel and upkeep are two unrelated timed actions
     // on the same object, not worth folding into one PendingAction-style dispatch at this scale.
@@ -243,6 +253,11 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         foreach (var path in DerelictShipSimPaths)
         {
             _derelictShipSims.Add(GetNode<ShipSim>(path));
+        }
+
+        foreach (var path in DerelictBuildTargetPaths)
+        {
+            _derelictBuildTargets.Add(GetNode<ShipBuildTarget>(path));
         }
 
         _travelTimer = new Timer { OneShot = true, WaitTime = TravelVerb.DurationSeconds };
@@ -402,6 +417,16 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     }
 
     public int CurrentDestinationId => _currentDestination;
+
+    /// <summary>Resolves a unified destination id to that Derelict's own ShipBuildTarget, for
+    /// ContractGiverVerbTarget to spawn a RetrieveItem contract's target item onto. Null for a
+    /// Station id, an out-of-range id, or a scene that hasn't wired DerelictBuildTargetPaths yet
+    /// — all safe no-ops for the caller (see SpawnMissionItem's own caller).</summary>
+    public ShipBuildTarget? GetDerelictBuildTarget(int destinationId)
+    {
+        var derelictIndex = destinationId - StationCount;
+        return derelictIndex >= 0 && derelictIndex < _derelictBuildTargets.Count ? _derelictBuildTargets[derelictIndex] : null;
+    }
 
     /// <summary>Every Station first, then every Derelict — for the travel map to render uniformly
     /// without special-casing individual destinations itself. Station 0 keeps the original

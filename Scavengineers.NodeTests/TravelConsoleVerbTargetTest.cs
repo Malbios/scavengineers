@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using GdUnit4;
 using Godot;
 using Scavengineers.Scripts.Ship;
+using Scavengineers.Scripts.Verbs;
 using Scavengineers.Sim.Grid;
 using Scavengineers.Sim.ShipModel;
 
@@ -349,5 +350,84 @@ public class TravelConsoleVerbTargetTest
         // conduited ship the same non-overload means every other device on the grid (airlocks,
         // lights) stays powered too.
         AssertBool(console.ShipSimRef!.IsPowered(ShipSim.TravelConsoleFixtureId)).IsTrue();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void GetDerelictBuildTarget_ReturnsNull_WhenTheSceneHasNotWiredDerelictBuildTargetPaths()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (console, _, _) = CreateConsole(sceneTree, 2);
+
+        // CreateConsole (mirroring a scene predating this feature) never sets
+        // DerelictBuildTargetPaths — GetDerelictBuildTarget must stay a safe no-op rather than
+        // throwing, exactly as ContractGiverVerbTarget.TryTakeOffer relies on via its own `?.`.
+        AssertObject(console.GetDerelictBuildTarget(1)).IsNull(); // Derelict 1 (destination id 1, since StationCount here is 1)
+        AssertObject(console.GetDerelictBuildTarget(0)).IsNull(); // a Station id — never a Derelict
+        AssertObject(console.GetDerelictBuildTarget(99)).IsNull(); // out of range entirely
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void GetDerelictBuildTarget_ResolvesTheRightShipBuildTarget_PerDestinationId()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var homeShip = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(homeShip);
+
+        var stationGroup = AutoFree(new Node3D { Name = "StationGroup" });
+        sceneTree.Root.AddChild(stationGroup);
+
+        var stationShip = AutoFree(new ShipSim { Name = "StationShip" });
+        sceneTree.Root.AddChild(stationShip);
+
+        var stationDestinationAirlock = AutoFree(new AirlockDoorVerbTarget { Name = "StationDestinationAirlock", ShipARef = stationShip, OwnsBridge = false });
+        sceneTree.Root.AddChild(stationDestinationAirlock);
+
+        var derelictBuildTargetPaths = new Godot.Collections.Array<NodePath>();
+        var derelictGroupPaths = new Godot.Collections.Array<NodePath>();
+        var derelictShipSimPaths = new Godot.Collections.Array<NodePath>();
+        var derelictMapPositions = new Godot.Collections.Array<Vector2>();
+        var derelictBuildTargets = new ShipBuildTarget[2];
+
+        for (var i = 0; i < 2; i++)
+        {
+            var group = AutoFree(new Node3D { Name = $"DerelictGroup{i + 1}" });
+            sceneTree.Root.AddChild(group);
+
+            var derelictShip = new ShipSim { Name = "ShipSim" };
+            group.AddChild(derelictShip);
+
+            var buildTarget = new ShipBuildTarget { Name = "Floor", ShipSimRef = derelictShip, ShipRoot = group };
+            group.AddChild(buildTarget);
+            derelictBuildTargets[i] = buildTarget;
+
+            derelictGroupPaths.Add(new NodePath($"../DerelictGroup{i + 1}"));
+            derelictShipSimPaths.Add(new NodePath($"../DerelictGroup{i + 1}/ShipSim"));
+            derelictBuildTargetPaths.Add(new NodePath($"../DerelictGroup{i + 1}/Floor"));
+            derelictMapPositions.Add(new Vector2(i * 10, i * 10));
+        }
+
+        var console = AutoFree(new TravelConsoleVerbTarget
+        {
+            ShipSimRef = homeShip,
+            StationGroupPaths = new Godot.Collections.Array<NodePath> { new("../StationGroup") },
+            StationShipSimPaths = new Godot.Collections.Array<NodePath> { new("../StationShip") },
+            StationDestinationAirlockPaths = new Godot.Collections.Array<NodePath> { new("../StationDestinationAirlock") },
+            StationMapPositions = new Godot.Collections.Array<Vector2> { new(220, 180) },
+            DerelictGroupPaths = derelictGroupPaths,
+            DerelictShipSimPaths = derelictShipSimPaths,
+            DerelictBuildTargetPaths = derelictBuildTargetPaths,
+            DerelictMapPositions = derelictMapPositions,
+        });
+        sceneTree.Root.AddChild(console);
+
+        // StationCount here is 1 (StationGroupPaths/StationShipSimPaths/StationMapPositions all
+        // length 1, StationDestinationAirlockPaths empty — see StationCount's own Math.Min guard),
+        // so destination id 0 is the lone Station, 1/2 are Derelict 1/2.
+        AssertObject(console.GetDerelictBuildTarget(0)).IsNull();
+        AssertBool(ReferenceEquals(console.GetDerelictBuildTarget(1), derelictBuildTargets[0])).IsTrue();
+        AssertBool(ReferenceEquals(console.GetDerelictBuildTarget(2), derelictBuildTargets[1])).IsTrue();
+        AssertObject(console.GetDerelictBuildTarget(3)).IsNull();
     }
 }

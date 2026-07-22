@@ -59,11 +59,24 @@ public partial class PickupItem : RigidBody3D, IVerbTarget, IPhysicsPresenceAwar
     [Export]
     public float Charge { get; set; } = 1f;
 
+    /// <summary>Empty for every ordinary drop (refund/scrap-yield overflow, hand-placed scene
+    /// loot, procedural GenerateLoot) — set only by ShipBuildTarget.PlaceMissionItem, to the
+    /// owning ship's own SaveId, so SaveManager can find and recreate a still-outstanding
+    /// contract item on load without re-deriving it from Contract state (see
+    /// ShipBuildTarget.PlaceMissionItem's own doc comment).</summary>
+    [Export]
+    public string MissionOwnerSaveId { get; set; } = "";
+
     public override void _Ready()
     {
         var shapeKind = ItemCatalog.ShapeKind(ItemId);
         AddChild(ItemVisualBuilder.BuildVisual(ItemId, shapeKind));
         AddChild(new CollisionShape3D { Shape = ItemVisualBuilder.BuildCollisionShape(shapeKind) });
+
+        if (MissionOwnerSaveId != "")
+        {
+            AddToGroup("mission_item");
+        }
 
         LinearDamp = ZeroGSettleDamp;
         AngularDamp = ZeroGSettleDamp;

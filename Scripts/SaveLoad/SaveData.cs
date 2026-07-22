@@ -32,6 +32,34 @@ public sealed class SaveData
     /// tied to any ShipBuildTarget, so none of the lists above fit. Scanned/respawned by
     /// SaveManager via the "dropped_container" group (see ContainerPickupItem).</summary>
     public List<DroppedContainerSaveData> DroppedContainers { get; set; } = new();
+
+    /// <summary>A still-outstanding RetrieveItem contract's spawned target item — scanned/
+    /// respawned by SaveManager via the "mission_item" group (see PickupItem.MissionOwnerSaveId),
+    /// same shape as <see cref="DroppedContainers"/>. Deliberately decoupled from ActiveContracts:
+    /// the item's own presence here is the source of truth, not the owning Contract — once picked
+    /// up, PickupItem.ExecuteVerb already QueueFree()s it, so it simply stops appearing here
+    /// (zero double-spawn risk). Purely additive: empty for any save predating this feature.</summary>
+    public List<MissionItemSaveData> MissionItems { get; set; } = new();
+}
+
+/// <summary>A RetrieveItem contract's spawned target item's whole world state — position plus
+/// which ShipBuildTarget (by SaveId) it belongs to, so SaveManager.Load can re-parent it under the
+/// right derelict's ShipRoot (see ShipBuildTarget.PlaceMissionItem) instead of the world root.</summary>
+public sealed class MissionItemSaveData
+{
+    public float PosX { get; set; }
+
+    public float PosY { get; set; }
+
+    public float PosZ { get; set; }
+
+    public string ItemId { get; set; } = "";
+
+    public int Count { get; set; }
+
+    public float Charge { get; set; } = 1f;
+
+    public string OwnerBuildTargetSaveId { get; set; } = "";
 }
 
 /// <summary>A ContainerPickupItem's whole world state — position plus its own contents, since

@@ -422,6 +422,7 @@ StationMapPositions = Array[Vector2]([Vector2(220, 180), Vector2(140, 260)])
 DerelictGroupPaths = Array[NodePath]([NodePath("../../Derelict1"), NodePath("../../Derelict2"), NodePath("../../Derelict3"), NodePath("../../Derelict4"), NodePath("../../Derelict5")])
 DerelictShipSimPaths = Array[NodePath]([NodePath("../../Derelict1/ShipSim"), NodePath("../../Derelict2/ShipSim"), NodePath("../../Derelict3/ShipSim"), NodePath("../../Derelict4/ShipSim"), NodePath("../../Derelict5/ShipSim")])
 DerelictMapPositions = Array[Vector2]([Vector2(300, 60), Vector2(420, 150), Vector2(380, 300), Vector2(180, 320), Vector2(80, 150)])
+DerelictBuildTargetPaths = Array[NodePath]([NodePath("../../Derelict1/Floor"), NodePath("../../Derelict2/Floor"), NodePath("../../Derelict3/Floor"), NodePath("../../Derelict4/Floor"), NodePath("../../Derelict5/Floor")])
 SaveId = "travel_console"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/TravelConsole"]

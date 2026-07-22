@@ -758,6 +758,62 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
     }
 
+    /// <summary>Drops one contract-target item onto a random live, non-vented cell of this ship —
+    /// called by ContractGiverVerbTarget the instant a RetrieveItem offer is accepted, since
+    /// nothing else in the loot pipeline ever places a contract's specific item anywhere
+    /// (GenerateLoot/SpawnGeneratedLoot rolls from an entirely disjoint procedural table, and a
+    /// hand-authored ship like this one gets no automatic loot at all). Falls back to any cell
+    /// (ignoring vent state) if the whole ship happens to be vented, rather than silently placing
+    /// nothing.</summary>
+    public void SpawnMissionItem(string itemId, int count, System.Random rng)
+    {
+        if (ShipSimRef is null || ShipSimRef.Deck.Cells.Count == 0)
+        {
+            return;
+        }
+
+        var cells = ShipSimRef.Deck.Cells.ToList();
+        var liveCells = ShipSimRef.Atmosphere is { } atmosphere
+            ? cells.Where(cell => !atmosphere.IsConnectedToOutside(cell)).ToList()
+            : cells;
+
+        var candidates = liveCells.Count > 0 ? liveCells : cells;
+        var cell = candidates[rng.Next(candidates.Count)];
+        var worldPosition = TileWorldPosition(new Vector2I(cell.X, cell.Y), LootRestHeight);
+
+        PlaceMissionItem(itemId, count, charge: 1f, worldPosition);
+    }
+
+    /// <summary>The actual spawn, split out from <see cref="SpawnMissionItem"/> so save/load can
+    /// recreate a still-outstanding mission item at its exact saved position instead of re-rolling
+    /// a new random cell. Mirrors InventoryOverflow.DropAt's own parent-at-ship-root convention,
+    /// but additionally mirrors this ship's CURRENT presence state (Visible/collision/physics)
+    /// onto the new pickup — unlike a startup-time spawn (SpawnGeneratedLoot, always still ahead
+    /// of TravelConsoleVerbTarget's first ApplyCurrentLocation), this can run on an already-hidden
+    /// derelict at any point during play, and TravelConsoleVerbTarget.SetShipPresence's own
+    /// traversal only re-runs on an actual destination change — it won't retroactively catch a
+    /// child added after the fact.</summary>
+    public void PlaceMissionItem(string itemId, int count, float charge, Vector3 worldPosition)
+    {
+        var shipRoot = ShipRoot ?? GetParent<Node3D>();
+        var pickup = new PickupItem { ItemId = itemId, Count = count, Charge = charge, MissionOwnerSaveId = SaveId };
+        shipRoot.AddChild(pickup);
+        pickup.GlobalPosition = worldPosition;
+
+        var present = shipRoot.Visible;
+        pickup.Visible = present;
+
+        foreach (var node in pickup.FindChildren("*", nameof(CollisionShape3D), recursive: true, owned: false))
+        {
+            if (node is CollisionShape3D shape)
+            {
+                shape.Disabled = !present;
+            }
+        }
+
+        pickup.SetPhysicsPresence(present);
+    }
+
     private void GenerateFloorCeilingPanels()
     {
         // PanelMesh is only wired up on ships that opt into the floor/ceiling construction-part
