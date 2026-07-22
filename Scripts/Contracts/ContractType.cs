@@ -10,10 +10,13 @@ public enum ContractType
     /// VendorVerbTarget.TrySell).</summary>
     RetrieveItem,
 
-    /// <summary>Carry cargo "healthy" from one Station to the other — completes automatically on
-    /// arrival at the target Station (see TravelConsoleVerbTarget.ApplyCurrentLocation), not a
-    /// turn-in interaction. The "healthy" condition check is a deliberate placeholder that always
-    /// passes for now — no real in-transit risk exists yet.</summary>
+    /// <summary>Carry a real cargo item (spawned at the origin Station on acceptance) to the
+    /// destination Station — completes automatically on arrival (see
+    /// Player.OnArrivedAtDestination), not a turn-in interaction, but only if the item is still
+    /// actually being carried at that moment (Has -> TryRemove, same shape RetrieveItem's turn-in
+    /// uses). Losing the cargo along the way (dropped, or ejected by a hull breach) just means it
+    /// doesn't complete on that arrival — the contract keeps ticking toward its own deadline like
+    /// any other unmet contract.</summary>
     CargoDelivery,
 
     /// <summary>Deliver N units of a material, not one specific item — turned in at the

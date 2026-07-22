@@ -422,12 +422,82 @@ public class TravelConsoleVerbTargetTest
         });
         sceneTree.Root.AddChild(console);
 
-        // StationCount here is 1 (StationGroupPaths/StationShipSimPaths/StationMapPositions all
-        // length 1, StationDestinationAirlockPaths empty — see StationCount's own Math.Min guard),
-        // so destination id 0 is the lone Station, 1/2 are Derelict 1/2.
+        // StationCount here is 1 (StationGroupPaths/StationShipSimPaths/StationDestinationAirlockPaths/
+        // StationMapPositions all length 1 — see StationCount's own Math.Min guard), so
+        // destination id 0 is the lone Station, 1/2 are Derelict 1/2.
         AssertObject(console.GetDerelictBuildTarget(0)).IsNull();
         AssertBool(ReferenceEquals(console.GetDerelictBuildTarget(1), derelictBuildTargets[0])).IsTrue();
         AssertBool(ReferenceEquals(console.GetDerelictBuildTarget(2), derelictBuildTargets[1])).IsTrue();
         AssertObject(console.GetDerelictBuildTarget(3)).IsNull();
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void GetStationBuildTarget_ReturnsNull_WhenTheSceneHasNotWiredStationBuildTargetPaths()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (console, _, _) = CreateConsole(sceneTree, 2);
+
+        // CreateConsole (mirroring a scene predating this feature) never sets
+        // StationBuildTargetPaths — GetStationBuildTarget must stay a safe no-op rather than
+        // throwing, exactly as ContractGiverVerbTarget.TryTakeOffer relies on via its own `?.`.
+        AssertObject(console.GetStationBuildTarget(0)).IsNull(); // the lone Station
+        AssertObject(console.GetStationBuildTarget(1)).IsNull(); // a Derelict id — never a Station
+        AssertObject(console.GetStationBuildTarget(99)).IsNull(); // out of range entirely
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public void GetStationBuildTarget_ResolvesTheRightShipBuildTarget_PerDestinationId()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var homeShip = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(homeShip);
+
+        var stationGroupPaths = new Godot.Collections.Array<NodePath>();
+        var stationShipSimPaths = new Godot.Collections.Array<NodePath>();
+        var stationDestinationAirlockPaths = new Godot.Collections.Array<NodePath>();
+        var stationMapPositions = new Godot.Collections.Array<Vector2>();
+        var stationBuildTargetPaths = new Godot.Collections.Array<NodePath>();
+        var stationBuildTargets = new ShipBuildTarget[2];
+
+        for (var i = 0; i < 2; i++)
+        {
+            var group = AutoFree(new Node3D { Name = $"StationGroup{i}" });
+            sceneTree.Root.AddChild(group);
+
+            var stationShip = new ShipSim { Name = "ShipSim" };
+            group.AddChild(stationShip);
+
+            var buildTarget = new ShipBuildTarget { Name = "Floor", ShipSimRef = stationShip, ShipRoot = group };
+            group.AddChild(buildTarget);
+            stationBuildTargets[i] = buildTarget;
+
+            var destinationAirlock = AutoFree(new AirlockDoorVerbTarget { Name = $"StationDestinationAirlock{i}", ShipARef = stationShip, OwnsBridge = false });
+            sceneTree.Root.AddChild(destinationAirlock);
+
+            stationGroupPaths.Add(new NodePath($"../StationGroup{i}"));
+            stationShipSimPaths.Add(new NodePath($"../StationGroup{i}/ShipSim"));
+            stationDestinationAirlockPaths.Add(new NodePath($"../StationDestinationAirlock{i}"));
+            stationBuildTargetPaths.Add(new NodePath($"../StationGroup{i}/Floor"));
+            stationMapPositions.Add(new Vector2(i * 10, i * 10));
+        }
+
+        var console = AutoFree(new TravelConsoleVerbTarget
+        {
+            ShipSimRef = homeShip,
+            StationGroupPaths = stationGroupPaths,
+            StationShipSimPaths = stationShipSimPaths,
+            StationDestinationAirlockPaths = stationDestinationAirlockPaths,
+            StationMapPositions = stationMapPositions,
+            StationBuildTargetPaths = stationBuildTargetPaths,
+        });
+        sceneTree.Root.AddChild(console);
+
+        // No Derelicts wired at all here — StationCount is 2, destination ids 0/1 are the two
+        // Stations, and anything >= 2 is out of range.
+        AssertBool(ReferenceEquals(console.GetStationBuildTarget(0), stationBuildTargets[0])).IsTrue();
+        AssertBool(ReferenceEquals(console.GetStationBuildTarget(1), stationBuildTargets[1])).IsTrue();
+        AssertObject(console.GetStationBuildTarget(2)).IsNull();
     }
 }

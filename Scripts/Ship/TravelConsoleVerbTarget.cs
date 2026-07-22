@@ -120,6 +120,14 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     [Export]
     public Godot.Collections.Array<Vector2> StationMapPositions { get; set; } = new();
 
+    /// <summary>Each Station's own Floor (ShipBuildTarget) — resolves a destination id to a spawn
+    /// point for ContractGiverVerbTarget's CargoDelivery contracts (see GetStationBuildTarget),
+    /// mirroring DerelictBuildTargetPaths/GetDerelictBuildTarget below. Deliberately NOT folded
+    /// into StationCount's own Math.Min: a scene that hasn't wired this array yet keeps a fully
+    /// working travel map regardless, since GetStationBuildTarget just returns null.</summary>
+    [Export]
+    public Godot.Collections.Array<NodePath> StationBuildTargetPaths { get; set; } = new();
+
     /// <summary>Parallel arrays, index i describing Derelict i+1 across all three — the same
     /// per-instance-override mechanism ShipSim's own GridWidth/RoomSplitColumns already use,
     /// just three arrays instead of one field per ship. Not a data-driven (JSON/.tres) ship list
@@ -164,6 +172,7 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     private readonly List<Node3D> _stationGroups = new();
     private readonly List<ShipSim> _stationShipSims = new();
     private readonly List<AirlockDoorVerbTarget> _stationDestinationAirlocks = new();
+    private readonly List<ShipBuildTarget> _stationBuildTargets = new();
     private readonly List<Node3D> _derelictGroups = new();
     private readonly List<ShipSim> _derelictShipSims = new();
     private readonly List<ShipBuildTarget> _derelictBuildTargets = new();
@@ -243,6 +252,11 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         foreach (var path in StationDestinationAirlockPaths)
         {
             _stationDestinationAirlocks.Add(GetNode<AirlockDoorVerbTarget>(path));
+        }
+
+        foreach (var path in StationBuildTargetPaths)
+        {
+            _stationBuildTargets.Add(GetNode<ShipBuildTarget>(path));
         }
 
         foreach (var path in DerelictGroupPaths)
@@ -427,6 +441,12 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         var derelictIndex = destinationId - StationCount;
         return derelictIndex >= 0 && derelictIndex < _derelictBuildTargets.Count ? _derelictBuildTargets[derelictIndex] : null;
     }
+
+    /// <summary>Resolves a unified destination id to that Station's own ShipBuildTarget, for
+    /// ContractGiverVerbTarget to spawn a CargoDelivery contract's cargo item onto — mirrors
+    /// GetDerelictBuildTarget, indexed directly since Stations occupy 0..StationCount-1.</summary>
+    public ShipBuildTarget? GetStationBuildTarget(int destinationId) =>
+        destinationId >= 0 && destinationId < StationCount && destinationId < _stationBuildTargets.Count ? _stationBuildTargets[destinationId] : null;
 
     /// <summary>Every Station first, then every Derelict — for the travel map to render uniformly
     /// without special-casing individual destinations itself. Station 0 keeps the original

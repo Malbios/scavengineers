@@ -34,6 +34,7 @@ public class ContractSystemTest
         var stationShipSimPaths = new Godot.Collections.Array<NodePath>();
         var stationDestinationAirlockPaths = new Godot.Collections.Array<NodePath>();
         var stationMapPositions = new Godot.Collections.Array<Vector2>();
+        var stationBuildTargetPaths = new Godot.Collections.Array<NodePath>();
 
         AirlockDoorVerbTarget? stationAirlock = null;
 
@@ -44,6 +45,12 @@ public class ContractSystemTest
 
             var stationGroup = AutoFree(new Node3D { Name = $"StationGroup{i}" });
             sceneTree.Root.AddChild(stationGroup);
+
+            // The Station's own Floor (ShipBuildTarget) — needed so a CargoDelivery contract
+            // originating here has somewhere real to spawn its cargo item (see
+            // ContractGiverVerbTarget.TryTakeOffer/ShipBuildTarget.SpawnMissionItem).
+            var stationBuildTarget = AutoFree(new ShipBuildTarget { Name = "Floor", ShipSimRef = stationShip, ShipRoot = stationGroup, SaveId = $"station_build_target_test_{i}" });
+            stationGroup.AddChild(stationBuildTarget);
 
             var stationDestinationAirlock = AutoFree(new AirlockDoorVerbTarget { Name = $"StationDestinationAirlock{i}", ShipARef = stationShip, OwnsBridge = false });
             sceneTree.Root.AddChild(stationDestinationAirlock);
@@ -61,6 +68,7 @@ public class ContractSystemTest
             stationGroupPaths.Add(new NodePath($"../StationGroup{i}"));
             stationShipSimPaths.Add(new NodePath($"../StationShip{i}"));
             stationDestinationAirlockPaths.Add(new NodePath($"../StationDestinationAirlock{i}"));
+            stationBuildTargetPaths.Add(new NodePath($"../StationGroup{i}/Floor"));
             stationMapPositions.Add(new Vector2(i * 100, i * 100));
         }
 
@@ -88,6 +96,7 @@ public class ContractSystemTest
             StationShipSimPaths = stationShipSimPaths,
             StationDestinationAirlockPaths = stationDestinationAirlockPaths,
             StationMapPositions = stationMapPositions,
+            StationBuildTargetPaths = stationBuildTargetPaths,
             DerelictGroupPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1") },
             DerelictShipSimPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/ShipSim") },
             DerelictBuildTargetPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/Floor") },
@@ -219,18 +228,41 @@ public class ContractSystemTest
 
     [TestCase]
     [RequireGodotRuntime]
-    public async Task ArrivingAtTheCargoDestinationStation_CompletesCargoDeliveryAutomatically()
+    public async Task ArrivingAtTheCargoDestinationStation_CompletesCargoDelivery_WhenCarryingTheCargo()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var (player, console, giver) = MakeHarness(sceneTree);
         var startingCredits = player.Credits;
 
-        giver.AddOfferForTests(new Contract { InstanceId = "c1", TemplateId = "cargo_delivery", Type = ContractType.CargoDelivery, OriginStationId = 0, DestinationStationId = 1, Reward = 50, FailureFee = 20, RemainingSeconds = 200f });
+        giver.AddOfferForTests(new Contract { InstanceId = "c1", TemplateId = "cargo_delivery", Type = ContractType.CargoDelivery, ItemId = "cargo_crate", Count = 1, OriginStationId = 0, DestinationStationId = 1, Reward = 50, FailureFee = 20, RemainingSeconds = 200f });
         player.AcceptContract("c1");
+
+        var originStationGroup = sceneTree.Root.GetNode<Node3D>("StationGroup0");
+        var crate = originStationGroup.GetChildren().OfType<PickupItem>().Single();
+        AssertString(crate.ItemId).IsEqual("cargo_crate");
+        crate.ExecuteVerb(crate.AvailableVerbs[0], player.Inventory);
 
         await TravelAndDockAsync(sceneTree, console, 1);
 
         AssertInt(player.Credits).IsEqual(startingCredits + 50);
+        AssertBool(player.Inventory.Has("cargo_crate", 1)).IsFalse(); // consumed on delivery
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
+    public async Task ArrivingAtTheCargoDestinationStation_DoesNotComplete_WithoutTheCargo()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var (player, console, giver) = MakeHarness(sceneTree);
+        var startingCredits = player.Credits;
+
+        // Offer accepted (spawning the crate at the origin Station), but never picked up.
+        giver.AddOfferForTests(new Contract { InstanceId = "c1", TemplateId = "cargo_delivery", Type = ContractType.CargoDelivery, ItemId = "cargo_crate", Count = 1, OriginStationId = 0, DestinationStationId = 1, Reward = 50, FailureFee = 20, RemainingSeconds = 200f });
+        player.AcceptContract("c1");
+
+        await TravelAndDockAsync(sceneTree, console, 1);
+
+        AssertInt(player.Credits).IsEqual(startingCredits);
     }
 
     [TestCase]

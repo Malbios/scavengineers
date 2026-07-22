@@ -24,6 +24,7 @@
   { "id": "pda", "maxStackSize": 1, "color": "#33CCFF", "equipSlot": "pda", "shapeKind": "tablet" },
   { "id": "health_scan_cartridge", "maxStackSize": 1, "color": "#33CC99", "shapeKind": "cartridge" },
   { "id": "power_scan_cartridge", "maxStackSize": 1, "color": "#E6C619", "shapeKind": "cartridge" },
+  { "id": "cargo_crate", "maxStackSize": 1, "color": "#C2954D", "fitsInStorage": false, "shapeKind": "crate" },
   { "id": "small_bin", "maxStackSize": 5, "color": "#8FA6A3", "storageSlotCount": 2 },
   { "id": "shelf", "maxStackSize": 5, "color": "#6B8B87", "storageSlotCount": 6 },
   { "id": "large_shelf", "maxStackSize": 5, "color": "#2F8A7D", "storageSlotCount": 10 }

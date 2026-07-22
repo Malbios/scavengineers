@@ -85,9 +85,10 @@ public partial class ContractGiverVerbTarget : StaticBody3D, IVerbTarget
     /// accepted job leaves the board (can't be double-accepted) rather than just being copied.
     /// Null if the id doesn't match any current offer (e.g. taken by a stale UI click after
     /// RefreshOffers already replaced it). For a RetrieveItem offer, also spawns its target item
-    /// onto the target Derelict — nothing else in the loot pipeline ever places a contract's
-    /// specific item anywhere (see ShipBuildTarget.SpawnMissionItem's own doc comment), so without
-    /// this the job could never actually be found or completed.</summary>
+    /// onto the target Derelict; for a CargoDelivery offer, spawns the cargo item onto the origin
+    /// Station instead — nothing else in the loot pipeline ever places a contract's specific item
+    /// anywhere (see ShipBuildTarget.SpawnMissionItem's own doc comment), so without this the job
+    /// could never actually be found/carried or completed.</summary>
     public Contract? TryTakeOffer(string instanceId)
     {
         var offer = _availableOffers.FirstOrDefault(o => o.InstanceId == instanceId);
@@ -102,12 +103,16 @@ public partial class ContractGiverVerbTarget : StaticBody3D, IVerbTarget
 
     private void SpawnMissionItemIfNeeded(Contract offer)
     {
-        if (offer.Type != ContractType.RetrieveItem || offer.ItemId is not { } itemId || offer.TargetDestinationId is not { } destinationId)
+        if (offer.Type == ContractType.RetrieveItem && offer.ItemId is { } retrieveItemId && offer.TargetDestinationId is { } derelictDestinationId)
         {
+            ConsoleRef?.GetDerelictBuildTarget(derelictDestinationId)?.SpawnMissionItem(retrieveItemId, offer.Count, _rng);
             return;
         }
 
-        ConsoleRef?.GetDerelictBuildTarget(destinationId)?.SpawnMissionItem(itemId, offer.Count, _rng);
+        if (offer.Type == ContractType.CargoDelivery && offer.ItemId is { } cargoItemId && offer.OriginStationId is { } originStationId)
+        {
+            ConsoleRef?.GetStationBuildTarget(originStationId)?.SpawnMissionItem(cargoItemId, offer.Count, _rng);
+        }
     }
 
     /// <summary>Test-only seam: puts a specific, fully-resolved Contract directly onto the board,
@@ -184,7 +189,7 @@ public partial class ContractGiverVerbTarget : StaticBody3D, IVerbTarget
         var details = contract.Type switch
         {
             ContractType.RetrieveItem => $"{itemName} @ {DestinationName(contract.TargetDestinationId)}",
-            ContractType.CargoDelivery => $"{DestinationName(contract.OriginStationId)} -> {DestinationName(contract.DestinationStationId)}",
+            ContractType.CargoDelivery => $"{itemName}: {DestinationName(contract.OriginStationId)} -> {DestinationName(contract.DestinationStationId)}",
             ContractType.SalvageQuota => $"{contract.Count}x {itemName}",
             ContractType.Survey => $"{DestinationName(contract.TargetDestinationId)} ({itemName})",
             _ => "",

@@ -1435,7 +1435,8 @@ public partial class Player : CharacterBody3D
         {
             var completed = contract.Type switch
             {
-                ContractType.CargoDelivery => isStation && contract.DestinationStationId == destinationId,
+                ContractType.CargoDelivery => isStation && contract.DestinationStationId == destinationId
+                    && contract.ItemId is { } cargoItemId && _inventory.Has(cargoItemId, contract.Count) && _inventory.TryRemove(cargoItemId, contract.Count),
                 ContractType.Survey => contract.TargetDestinationId == destinationId && HasCartridgeEquipped(contract.ItemId),
                 _ => false,
             };

@@ -282,6 +282,18 @@ albedo_color = Color(0.5, 0.32, 0.12, 1)
 [sub_resource type="StandardMaterial3D" id="ContractFigureHeadMaterial"]
 albedo_color = Color(0.68, 0.58, 0.5, 1)
 
+[sub_resource type="StandardMaterial3D" id="Station2ShopSuitMaterial"]
+albedo_color = Color(0.3, 0.42, 0.55, 1)
+
+[sub_resource type="StandardMaterial3D" id="Station2ShopHeadMaterial"]
+albedo_color = Color(0.62, 0.48, 0.4, 1)
+
+[sub_resource type="StandardMaterial3D" id="Station2ContractSuitMaterial"]
+albedo_color = Color(0.35, 0.15, 0.4, 1)
+
+[sub_resource type="StandardMaterial3D" id="Station2ContractHeadMaterial"]
+albedo_color = Color(0.58, 0.45, 0.38, 1)
+
 [node name="World" type="Node3D" unique_id=474587780]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=285196794]
@@ -419,6 +431,7 @@ StationGroupPaths = Array[NodePath]([NodePath("../../Station"), NodePath("../../
 StationShipSimPaths = Array[NodePath]([NodePath("../../Station/ShipSim"), NodePath("../../Station2/ShipSim")])
 StationDestinationAirlockPaths = Array[NodePath]([NodePath("../../Station/DestinationAirlock"), NodePath("../../Station2/DestinationAirlock")])
 StationMapPositions = Array[Vector2]([Vector2(220, 180), Vector2(140, 260)])
+StationBuildTargetPaths = Array[NodePath]([NodePath("../../Station/Floor"), NodePath("../../Station2/Floor")])
 DerelictGroupPaths = Array[NodePath]([NodePath("../../Derelict1"), NodePath("../../Derelict2"), NodePath("../../Derelict3"), NodePath("../../Derelict4"), NodePath("../../Derelict5")])
 DerelictShipSimPaths = Array[NodePath]([NodePath("../../Derelict1/ShipSim"), NodePath("../../Derelict2/ShipSim"), NodePath("../../Derelict3/ShipSim"), NodePath("../../Derelict4/ShipSim"), NodePath("../../Derelict5/ShipSim")])
 DerelictMapPositions = Array[Vector2]([Vector2(300, 60), Vector2(420, 150), Vector2(380, 300), Vector2(180, 320), Vector2(80, 150)])
@@ -997,6 +1010,85 @@ shape = SubResource("DoorSlabShape")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
 mesh = SubResource("DoorSlabMesh")
 surface_material_override/0 = SubResource("AirlockDoorMaterial")
+
+[node name="ShopFigure2" type="StaticBody3D" parent="Station2"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -2.4, 0, -1)
+script = ExtResource("22")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Station2/ShopFigure2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("FigureBodyShape")
+
+[node name="Visual" type="Node3D" parent="Station2/ShopFigure2"]
+script = ExtResource("29")
+ArmSwayDegrees = 6.0
+HeadTurnRangeDegrees = 24.0
+BreathSpeed = 1.1
+
+[node name="Legs" type="MeshInstance3D" parent="Station2/ShopFigure2/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+mesh = SubResource("FigureLegsMesh")
+surface_material_override/0 = SubResource("Station2ShopSuitMaterial")
+
+[node name="Torso" type="MeshInstance3D" parent="Station2/ShopFigure2/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+mesh = SubResource("FigureTorsoMesh")
+surface_material_override/0 = SubResource("Station2ShopSuitMaterial")
+
+[node name="Head" type="MeshInstance3D" parent="Station2/ShopFigure2/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.65, 0)
+mesh = SubResource("FigureHeadMesh")
+surface_material_override/0 = SubResource("Station2ShopHeadMaterial")
+
+[node name="ArmLeft" type="MeshInstance3D" parent="Station2/ShopFigure2/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.36, 1.15, 0)
+mesh = SubResource("FigureArmMesh")
+surface_material_override/0 = SubResource("Station2ShopSuitMaterial")
+
+[node name="ArmRight" type="MeshInstance3D" parent="Station2/ShopFigure2/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.36, 1.15, 0)
+mesh = SubResource("FigureArmMesh")
+surface_material_override/0 = SubResource("Station2ShopSuitMaterial")
+
+[node name="ContractFigure2" type="StaticBody3D" parent="Station2" node_paths=PackedStringArray("ConsoleRef")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -2.4, 0, 1)
+script = ExtResource("30")
+ConsoleRef = NodePath("../../HomeShip/TravelConsole")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Station2/ContractFigure2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("FigureBodyShape")
+
+[node name="Visual" type="Node3D" parent="Station2/ContractFigure2"]
+script = ExtResource("29")
+ArmSwayDegrees = 2.5
+HeadTurnRangeDegrees = 12.0
+BreathSpeed = 0.6
+
+[node name="Legs" type="MeshInstance3D" parent="Station2/ContractFigure2/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+mesh = SubResource("FigureLegsMesh")
+surface_material_override/0 = SubResource("Station2ContractSuitMaterial")
+
+[node name="Torso" type="MeshInstance3D" parent="Station2/ContractFigure2/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+mesh = SubResource("FigureTorsoMesh")
+surface_material_override/0 = SubResource("Station2ContractSuitMaterial")
+
+[node name="Head" type="MeshInstance3D" parent="Station2/ContractFigure2/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.65, 0)
+mesh = SubResource("FigureHeadMesh")
+surface_material_override/0 = SubResource("Station2ContractHeadMaterial")
+
+[node name="ArmLeft" type="MeshInstance3D" parent="Station2/ContractFigure2/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.36, 1.15, 0)
+mesh = SubResource("FigureArmMesh")
+surface_material_override/0 = SubResource("Station2ContractSuitMaterial")
+
+[node name="ArmRight" type="MeshInstance3D" parent="Station2/ContractFigure2/Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.36, 1.15, 0)
+mesh = SubResource("FigureArmMesh")
+surface_material_override/0 = SubResource("Station2ContractSuitMaterial")
 
 [node name="Player" parent="." unique_id=191954104 instance=ExtResource("2") node_paths=PackedStringArray("SaveManagerRef")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)

@@ -83,6 +83,7 @@ public static class ItemVisualBuilder
         "cartridge" => new BoxShape3D { Size = new Vector3(0.08f, 0.015f, 0.12f) },
         "suit_torso" => new BoxShape3D { Size = new Vector3(0.4f, 0.3f, 0.14f) },
         "helmet" => new SphereShape3D { Radius = 0.15f },
+        "crate" => new BoxShape3D { Size = new Vector3(0.3f, 0.25f, 0.3f) },
         _ => new BoxShape3D { Size = FallbackBoxSize },
     };
 
@@ -185,6 +186,11 @@ public static class ItemVisualBuilder
             new Rect2(0.25f, 0.15f, 0.5f, 0.5f),
             new Rect2(0.32f, 0.55f, 0.36f, 0.18f),
         ],
+        "crate" =>
+        [
+            new Rect2(0.15f, 0.35f, 0.7f, 0.5f),
+            new Rect2(0.1f, 0.42f, 0.8f, 0.1f),
+        ],
         _ => [FallbackIconRect],
     };
 
@@ -273,6 +279,11 @@ public static class ItemVisualBuilder
         [
             Sphere(0.14f, Vector3.Zero),
             Box(new Vector3(0.16f, 0.06f, 0.05f), new Vector3(0, -0.02f, 0.12f)),
+        ],
+        "crate" =>
+        [
+            Box(new Vector3(0.3f, 0.25f, 0.3f), Vector3.Zero),
+            Box(new Vector3(0.32f, 0.04f, 0.32f), new Vector3(0, 0.08f, 0)),
         ],
         _ => [Box(FallbackBoxSize, Vector3.Zero)],
     };
