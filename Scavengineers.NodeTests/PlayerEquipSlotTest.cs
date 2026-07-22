@@ -334,6 +334,38 @@ public class PlayerEquipSlotTest
 
     [TestCase]
     [RequireGodotRuntime]
+    public void TryDropInWorld_AimedAtAVerticalWall_NudgesAlongTheWallsNormal_NotStraightUp()
+    {
+        // Regression test: RestingDropPosition used to always nudge straight up regardless of
+        // the raycast's own hit normal — fine for a floor hit (already ~Up there), but a wall hit
+        // has a horizontal normal, so the up-only nudge did nothing to clear the item away from
+        // the wall's own collision, leaving it embedded instead of ending up on the floor nearby
+        // the way gravity settles every other drop. Aiming dead-center at this wall's front face
+        // hits with a purely horizontal normal (~(0,0,1)) — the fix nudges along THAT normal, so
+        // the dropped item's Y should stay at the wall's own height (0), not boosted upward.
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var player = PlayerTestHarness.CreateAttached(sceneTree);
+        ResetTorsoAndHeadFromStipend(player.Inventory);
+        player.Inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2));
+
+        var wall = AutoFree(new StaticBody3D { Position = new Vector3(0, 0, -1.5f) });
+        wall.AddChild(new CollisionShape3D { Shape = new BoxShape3D() });
+        sceneTree.Root.AddChild(wall);
+
+        var source = AutoFree(new InventorySlotUI { EquippedSlotName = "torso" });
+        var viewportCenter = player.GetViewport().GetVisibleRect().GetCenter();
+
+        player.TryDropInWorld(source, viewportCenter);
+
+        var dropped = sceneTree.Root.GetChildren().OfType<ContainerPickupItem>().FirstOrDefault(c => c.ItemId == "eva_torso_suit");
+        AssertBool(dropped is not null).IsTrue();
+        AssertFloat(dropped!.Position.Y).IsEqual(0f);
+
+        AutoFree(dropped);
+    }
+
+    [TestCase]
+    [RequireGodotRuntime]
     public void TryDropInWorld_EquippedTorsoSlot_CarriesTheSuitsTanks_RestoredExactlyOnPickup()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();

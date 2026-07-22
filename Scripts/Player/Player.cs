@@ -1039,17 +1039,19 @@ public partial class Player : CharacterBody3D
     /// drop's screen direction.</summary>
     public void TryDropInWorld(InventorySlotUI source, Vector2 screenPosition)
     {
-        if (ResolveWorldDropPosition(screenPosition) is not { } position)
+        if (ResolveWorldDropPosition(screenPosition) is not { } dropTarget)
         {
             return;
         }
+
+        var (position, normal) = dropTarget;
 
         if (source.SpecializedSlotKey.Length > 0)
         {
             if (_inventory.EjectSpecializedSlotForWorld(source.SpecializedSlotKey) is { } charge
                 && PlayerInventory.SpecializedSlotAcceptedItemId(source.SpecializedSlotKey) is { } itemId)
             {
-                InventoryOverflow.DropAt(this, itemId, 1, RestingDropPosition(position, itemId), charge);
+                InventoryOverflow.DropAt(this, itemId, 1, RestingDropPosition(position, normal, itemId), charge);
             }
 
             return;
@@ -1057,13 +1059,13 @@ public partial class Player : CharacterBody3D
 
         if (source.IsBackSlot)
         {
-            DropBackpackInWorld(position);
+            DropBackpackInWorld(position, normal);
             return;
         }
 
         if (source.EquippedSlotName.Length > 0)
         {
-            DropEquippedItemInWorld(source.EquippedSlotName, position);
+            DropEquippedItemInWorld(source.EquippedSlotName, position, normal);
             return;
         }
 
@@ -1083,12 +1085,12 @@ public partial class Player : CharacterBody3D
             container.SetSlot(source.SlotIndex, null);
             _inventory.DiscardPersistentContents(slot.ItemId);
             var (o2, n2, filter, battery) = CaptureAndDetachSuitTanks(ItemCatalog.EquipSlot(slot.ItemId) == "torso");
-            SpawnDroppedContainer(slot.ItemId, persistentContents, RestingDropPosition(position, slot.ItemId), null, o2, n2, filter, battery);
+            SpawnDroppedContainer(slot.ItemId, persistentContents, RestingDropPosition(position, normal, slot.ItemId), null, o2, n2, filter, battery);
             return;
         }
 
         container.SetSlot(source.SlotIndex, null);
-        InventoryOverflow.DropAt(this, slot.ItemId, slot.Count, RestingDropPosition(position, slot.ItemId), slot.Charge);
+        InventoryOverflow.DropAt(this, slot.ItemId, slot.Count, RestingDropPosition(position, normal, slot.ItemId), slot.Charge);
     }
 
     /// <summary>Always drops the backpack (empty or not) at `position` — unlike
@@ -1096,7 +1098,7 @@ public partial class Player : CharacterBody3D
     /// back into a hand instead. Dragging it out into the world is a deliberate "put it down," so
     /// it always ends up loose. A genuine discard, so its persistent contents leave the player
     /// entirely (see PlayerInventory.DiscardPersistentContents) rather than just being unworn.</summary>
-    private void DropBackpackInWorld(Vector3 position)
+    private void DropBackpackInWorld(Vector3 position, Vector3 normal)
     {
         if (_inventory.Backpack is not { } backpack)
         {
@@ -1105,14 +1107,14 @@ public partial class Player : CharacterBody3D
 
         _inventory.ClearBackpack();
         _inventory.DiscardPersistentContents(backpack.ItemId);
-        SpawnDroppedContainer(backpack.ItemId, backpack.Contents, RestingDropPosition(position, backpack.ItemId), "back");
+        SpawnDroppedContainer(backpack.ItemId, backpack.Contents, RestingDropPosition(position, normal, backpack.ItemId), "back");
     }
 
     /// <summary>Same "always drops it, deliberate put-down, genuine discard" shape as
-    /// <see cref="DropBackpackInWorld"/>, generalized to any Torso/Head equip slot — used when
+    /// <see cref="DropBackpackInWorld"/>, generalized to any Torso/Head/Pda equip slot — used when
     /// dragging a worn item straight into open space (see WorldDropZone) rather than onto another
     /// slot.</summary>
-    private void DropEquippedItemInWorld(string slotName, Vector3 position)
+    private void DropEquippedItemInWorld(string slotName, Vector3 position, Vector3 normal)
     {
         if (_inventory.GetEquippedContainer(slotName) is not { } equipped)
         {
@@ -1123,14 +1125,16 @@ public partial class Player : CharacterBody3D
         _inventory.DiscardPersistentContents(equipped.ItemId);
         var (o2, n2, filter, battery) = CaptureAndDetachSuitTanks(slotName == "torso");
 
-        SpawnDroppedContainer(equipped.ItemId, equipped.Contents, RestingDropPosition(position, equipped.ItemId), slotName, o2, n2, filter, battery);
+        SpawnDroppedContainer(equipped.ItemId, equipped.Contents, RestingDropPosition(position, normal, equipped.ItemId), slotName, o2, n2, filter, battery);
     }
 
     /// <summary>Projects a ray from the camera through the drop's screen position — the first
     /// mouse-position-based raycast in this codebase (InteractRay is a fixed forward crosshair
     /// ray). Returns null (refuse the drop) if nothing solid is within MaxDropReachMeters, e.g.
-    /// aiming out an open breach or off a platform's edge.</summary>
-    private Vector3? ResolveWorldDropPosition(Vector2 screenPosition)
+    /// aiming out an open breach or off a platform's edge. Returns the hit surface's own normal
+    /// alongside the position — see RestingDropPosition for why that's needed on top of the
+    /// small fixed nudge already applied here.</summary>
+    private (Vector3 Position, Vector3 Normal)? ResolveWorldDropPosition(Vector2 screenPosition)
     {
         if (_camera is null)
         {
@@ -1148,25 +1152,25 @@ public partial class Player : CharacterBody3D
             return null;
         }
 
+        var normal = (Vector3)result["normal"];
+
         // Nudge off the surface along its normal so the item doesn't spawn half-embedded — a
         // small fixed amount, enough to dodge z-fighting on any surface. NOT enough clearance on
-        // its own for a tall item to avoid spawning past a thin floor panel's own collision shape
+        // its own for a bulkier item to avoid spawning past the surface's own collision shape
         // entirely (see RestingDropPosition, which every actual spawn call site adds on top of
         // this for the specific item being dropped).
-        return (Vector3)result["position"] + (Vector3)result["normal"] * 0.05f;
+        return ((Vector3)result["position"] + normal * 0.05f, normal);
     }
 
-    /// <summary>Adds this item's own collision half-height (see ItemVisualBuilder.RestingHalfHeight)
-    /// on top of ResolveWorldDropPosition's own small fixed surface nudge — without this, a tall
-    /// item (e.g. the EVA suit torso, ContainerPickupItem's "suit_torso" shapeKind) can spawn
-    /// already embedded past a thin floor panel's own collision shape entirely, so instead of
-    /// being pushed back out it just falls straight through the moment its one-tick startup
-    /// freeze lifts. Assumes "up" for this extra nudge (every drop in this ship-grid game is
-    /// effectively onto a floor) rather than the raycast's own surface normal — gravity settles
-    /// the item onto whatever it's actually resting near regardless; this only prevents spawning
-    /// catastrophically embedded.</summary>
-    private static Vector3 RestingDropPosition(Vector3 surfacePosition, string itemId) =>
-        surfacePosition + Vector3.Up * ItemVisualBuilder.RestingHalfHeight(ItemCatalog.ShapeKind(itemId));
+    /// <summary>Adds this item's own collision half-extent (see ItemVisualBuilder.RestingHalfHeight)
+    /// on top of ResolveWorldDropPosition's own small fixed surface nudge, along the surface's own
+    /// hit normal rather than always assuming "up" — a fixed up-nudge worked fine for a floor hit
+    /// (normal already ~Up there) but did nothing to clear a WALL hit (a near-horizontal normal),
+    /// so a dropped item aimed at a wall spawned still embedded in it instead of ending up on the
+    /// floor nearby the way gravity settles every other drop. Using the real normal generalizes
+    /// correctly to any surface (floor, wall, ceiling) with no special-casing.</summary>
+    private static Vector3 RestingDropPosition(Vector3 surfacePosition, Vector3 surfaceNormal, string itemId) =>
+        surfacePosition + surfaceNormal * ItemVisualBuilder.RestingHalfHeight(ItemCatalog.ShapeKind(itemId));
 
     /// <summary>Test harnesses that instantiate a real Player (see
     /// Scavengineers.NodeTests/PlayerTestHarness.cs) run inside a real, non-headless Godot
