@@ -80,6 +80,21 @@ public static class ShipLayoutCatalog
 
         [JsonPropertyName("damagedConduitCell")]
         public CellPosition? DamagedConduitCell { get; set; }
+
+        /// <summary>Null (the default, and every layout before this field existed) means a
+        /// single-deck ship — today's behavior, completely unchanged. Non-null describes a real
+        /// second deck stacked above this one, reusing this exact same shape (so it gets its own
+        /// independent hazard risk — breaches, fire — for free, by reuse, rather than a new
+        /// hazard-modeling concept). Depth is capped at 1: a SecondDeck's own SecondDeck is
+        /// ignored/unsupported — 3+ decks are future work, not this feature.</summary>
+        [JsonPropertyName("secondDeck")]
+        public ShipLayoutDefinition? SecondDeck { get; set; }
+
+        /// <summary>The tile (shared X/Z — only Y differs between decks) where a ladder connects
+        /// this deck to its SecondDeck. Required iff SecondDeck is set; must be a real cell in
+        /// both decks' grids (an authoring constraint, not validated at runtime yet).</summary>
+        [JsonPropertyName("ladderCell")]
+        public CellPosition? LadderCell { get; set; }
     }
 
     public sealed class BreachEdge

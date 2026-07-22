@@ -95,6 +95,35 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     [Export]
     public string LayoutId { get; set; } = "";
 
+    /// <summary>0 for a ship's primary (ground-floor) deck — every ship before multi-deck support
+    /// existed. Any nonzero value means "I'm not the primary deck of my site — resolve my own
+    /// shape from <see cref="PrimaryDeckRef"/>'s <see cref="SecondDeckLayout"/> instead of my own
+    /// <see cref="LayoutId"/>/<see cref="ProcedurallyGenerate"/>." Only 0/1 are meaningful today
+    /// (depth capped at one extra deck — see ShipLayoutCatalog.ShipLayoutDefinition.SecondDeck's
+    /// own doc comment); anything higher is unsupported future work.</summary>
+    [Export]
+    public int DeckIndex { get; set; }
+
+    /// <summary>Only meaningful when <see cref="DeckIndex"/> is nonzero — the same site's
+    /// ground-floor ShipSim, whose own resolved <see cref="SecondDeckLayout"/>/<see cref="LadderCell"/>
+    /// this deck reads instead of resolving anything itself. Same cross-reference shape
+    /// AirlockDoorVerbTarget.ShipARef/ShipBRef already use for "two ShipSims, one relationship."</summary>
+    [Export]
+    public ShipSim? PrimaryDeckRef { get; set; }
+
+    /// <summary>This ship's own second deck's layout, if any — set from
+    /// ShipLayoutCatalog.ShipLayoutDefinition.SecondDeck by <see cref="ApplyLayout"/>. Null means
+    /// single-deck (today's behavior for every ship). Read by a DeckIndex=1 ShipSim (via
+    /// <see cref="PrimaryDeckRef"/>) to resolve its own shape — see <see cref="_Ready"/>.</summary>
+    public ShipLayoutCatalog.ShipLayoutDefinition? SecondDeckLayout { get; private set; }
+
+    /// <summary>The shared X/Z tile (only Y differs between decks) where a ladder connects this
+    /// deck to its second deck — null for a single-deck ship. Set from the layout's own
+    /// LadderCell by <see cref="ApplyLayout"/> for a primary deck; a DeckIndex=1 deck instead
+    /// copies it straight from <see cref="PrimaryDeckRef"/> in <see cref="_Ready"/>, since the
+    /// nested SecondDeckLayout doesn't carry its own (it's the same coordinate either way).</summary>
+    public CellCoord? LadderCell { get; private set; }
+
     /// <summary>Rolls a random <see cref="ShipLayoutGenerator"/> layout instead of reading
     /// <see cref="LayoutId"/> from the catalog — wins over <see cref="LayoutId"/> if both are
     /// somehow set. The resolved <see cref="LayoutSeed"/> is read from (and persisted to) the
@@ -199,7 +228,18 @@ public partial class ShipSim : Node, IShipLayoutSaveable
 
     public override void _Ready()
     {
-        if (ProcedurallyGenerate)
+        if (DeckIndex > 0)
+        {
+            // Not the primary deck of my site — my own LayoutId/ProcedurallyGenerate (if any are
+            // even set in the scene) are ignored entirely; my shape comes from whatever the
+            // primary deck's own layout resolved as its SecondDeck. Null (single-deck primary, or
+            // an unwired PrimaryDeckRef) leaves GridWidth/etc. at this node's own scene-authored
+            // defaults, which the shared Derelict.tscn template sets to an empty (GridWidth=0)
+            // grid — inert and harmless, exactly the "not every derelict has a second deck" case.
+            ApplyLayout(PrimaryDeckRef?.SecondDeckLayout);
+            LadderCell = PrimaryDeckRef?.LadderCell;
+        }
+        else if (ProcedurallyGenerate)
         {
             if (!string.IsNullOrEmpty(LayoutId))
             {
@@ -362,6 +402,13 @@ public partial class ShipSim : Node, IShipLayoutSaveable
         {
             DamagedConduitCell = new CellCoord(damagedConduitCell.X, damagedConduitCell.Y);
         }
+
+        if (layout.LadderCell is { } ladderCell)
+        {
+            LadderCell = new CellCoord(ladderCell.X, ladderCell.Y);
+        }
+
+        SecondDeckLayout = layout.SecondDeck;
     }
 
     /// <summary>Applies a procedurally-generated layout (see <see cref="ShipLayoutGenerator"/>) —

@@ -231,6 +231,13 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private const float FloorPanelHeight = -0.025f;
     private const float CeilingPanelHeight = 2.025f;
 
+    /// <summary>Vertical spacing between a site's stacked decks — a second deck's own ShipRoot
+    /// sits this far above the first deck's, making deck 2's floor plane exactly meet deck 1's
+    /// ceiling plane (docs/project-plan.md Appendix A3: "deck N's ceiling plane is the same
+    /// boundary as deck N+1's floor"). Named here (not a magic number in the scene transform) so
+    /// the two heights it's derived from can never drift out of sync with it.</summary>
+    public const float DeckYOffset = CeilingPanelHeight - FloorPanelHeight;
+
     // Matches Derelict.tscn's own hand-placed pickups' resting height (e.g. WallPanel1/ScrapMetal
     // both sit at Y=0.15) — a bit more clearance than the purely-visual conduit mount since a
     // spawned RigidBody3D pickup needs room to settle physically without floor interpenetration.
@@ -837,27 +844,42 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     {
         var tile = new Vector2I(cell.X, cell.Y);
 
-        var floorPanel = new MeshInstance3D { Mesh = PanelMesh };
-        AddChild(floorPanel);
-        floorPanel.Position = ToLocal(TileWorldPosition(tile, FloorPanelHeight));
-        floorPanel.SetSurfaceOverrideMaterial(0, FloorPanelMaterial);
+        // A ladder shaft's own tile skips exactly one of its two panels — never both, and never
+        // via Deck.BreachHull (that's the one thing that would wire this cell to the Outside
+        // vacuum sentinel, incorrectly venting this deck since decks are independently simulated,
+        // not bridged). The primary deck (DeckIndex 0) opens its ceiling here; a second deck
+        // (DeckIndex > 0) opens its floor here instead — each still gets its OTHER panel normally.
+        var isLadderCell = ShipSimRef?.LadderCell == cell;
+        var skipFloor = isLadderCell && (ShipSimRef?.DeckIndex ?? 0) > 0;
+        var skipCeiling = isLadderCell && (ShipSimRef?.DeckIndex ?? 0) == 0;
 
-        var floorCollision = new CollisionShape3D { Shape = PanelCollisionShape };
-        AddChild(floorCollision);
-        floorCollision.Position = floorPanel.Position;
+        if (!skipFloor)
+        {
+            var floorPanel = new MeshInstance3D { Mesh = PanelMesh };
+            AddChild(floorPanel);
+            floorPanel.Position = ToLocal(TileWorldPosition(tile, FloorPanelHeight));
+            floorPanel.SetSurfaceOverrideMaterial(0, FloorPanelMaterial);
 
-        _floorPanels[cell] = (floorPanel, floorCollision);
+            var floorCollision = new CollisionShape3D { Shape = PanelCollisionShape };
+            AddChild(floorCollision);
+            floorCollision.Position = floorPanel.Position;
 
-        var ceilingPanel = new MeshInstance3D { Mesh = PanelMesh };
-        AddChild(ceilingPanel);
-        ceilingPanel.Position = ToLocal(TileWorldPosition(tile, CeilingHeightFor(cell)));
-        ceilingPanel.SetSurfaceOverrideMaterial(0, CeilingPanelMaterial);
+            _floorPanels[cell] = (floorPanel, floorCollision);
+        }
 
-        var ceilingCollision = new CollisionShape3D { Shape = PanelCollisionShape };
-        AddChild(ceilingCollision);
-        ceilingCollision.Position = ceilingPanel.Position;
+        if (!skipCeiling)
+        {
+            var ceilingPanel = new MeshInstance3D { Mesh = PanelMesh };
+            AddChild(ceilingPanel);
+            ceilingPanel.Position = ToLocal(TileWorldPosition(tile, CeilingHeightFor(cell)));
+            ceilingPanel.SetSurfaceOverrideMaterial(0, CeilingPanelMaterial);
 
-        _ceilingPanels[cell] = (ceilingPanel, ceilingCollision);
+            var ceilingCollision = new CollisionShape3D { Shape = PanelCollisionShape };
+            AddChild(ceilingCollision);
+            ceilingCollision.Position = ceilingPanel.Position;
+
+            _ceilingPanels[cell] = (ceilingPanel, ceilingCollision);
+        }
     }
 
     /// <summary>Spawns one <see cref="ShipAtmosphereZone"/> per room band (the span between

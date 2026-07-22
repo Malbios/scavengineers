@@ -11,7 +11,19 @@
       { "cellX": 3, "cellY": 0, "outsideX": 3, "outsideY": -1 }
     ],
     "fireGeneratorCell": { "x": 1, "y": 4 },
-    "damagedConduitCell": { "x": 1, "y": 3 }
+    "damagedConduitCell": { "x": 1, "y": 3 },
+    "ladderCell": { "x": 2, "y": 2 },
+    "secondDeck": {
+      "id": "derelict_1_deck2",
+      "gridWidth": 6,
+      "roomSplitColumns": [],
+      "eastCorridorLength": 0,
+      "hasHullBreaches": true,
+      "hasFireHazard": false,
+      "initialBreaches": [
+        { "cellX": 4, "cellY": 5, "outsideX": 4, "outsideY": 6 }
+      ]
+    }
   },
   {
     "id": "derelict_small",

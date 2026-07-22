@@ -503,3 +503,23 @@ already-logged (much-later) NPC/crew mechanics.
 **Why not now:** Flagged as "for later" when raised (2026-07-20).
 
 **Revisit when:** Not yet determined — bring it up explicitly rather than re-offering it.
+
+## Multi-deck derelicts — stage 2+ (procedural roll-in, more ships)
+
+**What:** Stage 1 (built 2026-07-22) added the real mechanism — a data-driven `SecondDeck`/
+`LadderCell` on `ShipLayoutCatalog.ShipLayoutDefinition`, a real independent-hazard second deck,
+and ladder-climbing player movement — proven on one hand-authored derelict (Derelict1). Deferred:
+(a) rolling a second-deck chance into `ShipLayoutGenerator`'s procedural derelicts (Derelict3-5),
+(b) extending `TravelConsoleVerbTarget.GetDerelictBuildTarget`/contract mission-item placement to
+consider a target's second deck, (c) opting more hand-authored derelicts into a second deck, (d)
+3+ decks (currently depth-capped at one extra deck), ladder wear/upkeep, and lifts as a traversal
+alternative to a ladder.
+
+**Why it's good:** Stage 1 already proves the mechanism works end-to-end; these are the "make it
+actually common" follow-ups rather than new design risk.
+
+**Why not now:** Explicitly scoped out of the first slice to keep that change reviewable and
+testable on its own (see the session's own plan file reasoning) — a deliberate sequencing choice,
+not a rejection.
+
+**Revisit when:** Bring it up explicitly — don't re-offer it unprompted.

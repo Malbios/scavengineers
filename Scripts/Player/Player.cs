@@ -92,8 +92,29 @@ public partial class Player : CharacterBody3D
     private const float DecompressionPullAcceleration = 4f;
 
     // Placeholder/tunable — comfortably more than any current room's floor-to-ceiling height
-    // (3m), so a normal room can never trip this; revisit once multi-deck verticality exists.
+    // (3m). A 2-deck ship's own worst-case gap (standing at the ladder tile on deck 2, looking
+    // straight down through both open panels to deck 1's intact floor) is exactly
+    // ShipBuildTarget.DeckYOffset (2.05m) — still comfortably inside this. A much taller aligned
+    // stack (~7+ decks with open gaps stacked directly on top of each other) would need this
+    // revisited; not a concern for today's 2-deck ships.
     private const float FreefallRaycastDistance = 15f;
+
+    // Placeholder/tunable — vertical speed while climbing a LadderVerbTarget.
+    private const float ClimbSpeed = 2.5f;
+
+    // Placeholder/tunable — how strongly horizontal position is pulled back toward the ladder's
+    // own rail each tick (a soft snap, not a teleport) — high enough that drifting off the rail
+    // corrects within a few frames, not a real physical spring constant.
+    private const float ClimbSnapStrength = 8f;
+
+    // Placeholder/tunable — how far past either anchor (world Y) climbing auto-releases, so
+    // release lands right at the destination deck's own floor rather than partway through it.
+    private const float ClimbReleaseMargin = 0.15f;
+
+    private bool _climbing;
+    private float _climbBottomY;
+    private float _climbTopY;
+    private Vector2 _climbAnchorXZ;
 
     /// <summary>Which ship (and which of its tiles) currently governs the player's ambient O2
     /// reading — set at runtime by whichever <see cref="Scavengineers.Scripts.Ship.ShipAtmosphereZone"/>
@@ -635,15 +656,15 @@ public partial class Player : CharacterBody3D
                 _head.Rotation = new Vector3(_pitch, 0, 0);
             }
         }
-        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Right, Pressed: true } && !IsBusy && !AnyPanelOpen)
+        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Right, Pressed: true } && !IsBusy && !AnyPanelOpen && !_climbing)
         {
             Interact();
         }
-        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.WheelUp, Pressed: true } && !IsBusy && !AnyPanelOpen)
+        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.WheelUp, Pressed: true } && !IsBusy && !AnyPanelOpen && !_climbing)
         {
             CycleSelectedVerb(1);
         }
-        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.WheelDown, Pressed: true } && !IsBusy && !AnyPanelOpen)
+        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.WheelDown, Pressed: true } && !IsBusy && !AnyPanelOpen && !_climbing)
         {
             CycleSelectedVerb(-1);
         }
@@ -721,7 +742,7 @@ public partial class Player : CharacterBody3D
             // Same "always allowed to turn off, only turns on if the gate passes" shape as V/CanScan.
             _powerInfoOn = !_powerInfoOn && CanShowPowerInfo;
         }
-        else if (@event is InputEventKey { Pressed: true } hotbarKey && !IsBusy)
+        else if (@event is InputEventKey { Pressed: true } hotbarKey && !IsBusy && !_climbing)
         {
             var index = hotbarKey.Keycode switch
             {
@@ -1570,7 +1591,10 @@ public partial class Player : CharacterBody3D
         var roomVolume = ShipSimRef?.VolumeAt(currentCell);
         var inZeroG = (roomVolume?.O2Fraction ?? 0.21) <= ShipAtmosphereZone.ZeroGO2Threshold
             || (!IsOnFloor() && NoFloorBelow());
-        MotionMode = inZeroG ? MotionModeEnum.Floating : MotionModeEnum.Grounded;
+        // Climbing overrides the normal grounded/zero-g fork below for this tick, regardless of
+        // what the room's own atmosphere/floor reading says — a mid-climb player between two
+        // decks needs Floating (no floor-snap fighting the rail) either way.
+        MotionMode = _climbing || inZeroG ? MotionModeEnum.Floating : MotionModeEnum.Grounded;
 
         // A ship with no life support (e.g. the Derelict) never regenerates air, so a room's
         // O2Fraction can stay at "reads as vacuum" forever even after its own breach is patched
@@ -1589,7 +1613,47 @@ public partial class Player : CharacterBody3D
 
         var velocity = Velocity;
 
-        if (inZeroG)
+        if (_climbing)
+        {
+            if (IsBusy || AnyPanelOpen)
+            {
+                // Same "freeze movement, don't force an exit" shape the zero-g thrust block below
+                // already uses while busy/a panel is open — grabbing on again resumes exactly
+                // where you left off instead of losing your place on the ladder.
+                velocity = Vector3.Zero;
+            }
+            else
+            {
+                var verticalInput = 0f;
+                if (Input.IsPhysicalKeyPressed(Key.W))
+                {
+                    verticalInput += 1f;
+                }
+
+                if (Input.IsPhysicalKeyPressed(Key.S))
+                {
+                    verticalInput -= 1f;
+                }
+
+                velocity.X = (_climbAnchorXZ.X - GlobalPosition.X) * ClimbSnapStrength;
+                velocity.Z = (_climbAnchorXZ.Y - GlobalPosition.Z) * ClimbSnapStrength;
+                velocity.Y = verticalInput * ClimbSpeed;
+
+                // Space lets go early; otherwise auto-release once past either anchor by
+                // ClimbReleaseMargin — deliberately NOT Escape too (unlike a held item's own
+                // release gesture), since Escape's existing _Input handler falls through to
+                // un-capturing the mouse when no panel is open, which would be a jarring side
+                // effect of just letting go of a ladder.
+                if (Input.IsPhysicalKeyPressed(Key.Space)
+                    || GlobalPosition.Y >= _climbTopY + ClimbReleaseMargin
+                    || GlobalPosition.Y <= _climbBottomY - ClimbReleaseMargin)
+                {
+                    _climbing = false;
+                    velocity = Vector3.Zero;
+                }
+            }
+        }
+        else if (inZeroG)
         {
             // Thrust-based, not direct-velocity — you drift and have to counter-thrust to stop,
             // a first real taste of the "precise maneuvering is earned" framing
@@ -1906,6 +1970,27 @@ public partial class Player : CharacterBody3D
 
         UpdateVerbHud();
     }
+
+    /// <summary>Called by LadderVerbTarget.ExecuteVerb — starts continuous climbing between the
+    /// two given world points (each deck's own floor height at the ladder tile). Refused while
+    /// busy with another verb or any HUD panel is open, same gating every other player-initiated
+    /// action already uses.</summary>
+    public void BeginClimbing(Vector3 bottomWorld, Vector3 topWorld)
+    {
+        if (IsBusy || AnyPanelOpen)
+        {
+            return;
+        }
+
+        _climbing = true;
+        _climbBottomY = bottomWorld.Y;
+        _climbTopY = topWorld.Y;
+        _climbAnchorXZ = new Vector2(bottomWorld.X, bottomWorld.Z);
+    }
+
+    /// <summary>Test/UI-observable mirror of the private _climbing flag — same "expose a bool for
+    /// external state checks" shape as IsBusy.</summary>
+    public bool IsClimbing => _climbing;
 
     /// <summary>No ship structure at all within a generous distance straight down — you've
     /// walked/fallen off the edge of a ship (a removed wall or floor) into open space, not just

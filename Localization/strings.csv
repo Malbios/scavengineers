@@ -21,6 +21,8 @@ VERB_OPEN_DOOR,Open Door,Tür öffnen
 VERB_CLOSE_DOOR,Close Door,Tür schließen
 VERB_PRY_DOOR,Pry Door,Tür forcieren
 OBJECT_DOOR,Door,Tür
+VERB_CLIMB_LADDER,Climb Ladder,Leiter erklimmen
+OBJECT_LADDER,Ladder,Leiter
 ITEM_CROWBAR,Crowbar,Brechstange
 ITEM_POWER_DRILL,Power Drill,Akkuschrauber
 ITEM_DEBUG_BACKPACK,Debug Backpack,Debug-Rucksack

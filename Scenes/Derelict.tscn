@@ -9,6 +9,7 @@
 [ext_resource type="Script" path="res://Scripts/Verbs/DamagedConduitVerbTarget.cs" id="17"]
 [ext_resource type="Script" path="res://Scripts/Verbs/ShipBuildTarget.cs" id="18"]
 [ext_resource type="Script" path="res://Scripts/Verbs/ShipBuildAimForwarder.cs" id="20"]
+[ext_resource type="Script" path="res://Scripts/Ship/LadderVerbTarget.cs" id="21"]
 
 [sub_resource type="BoxShape3D" id="DerelictFloorShape"]
 size = Vector3(18, 0.2, 6)
@@ -102,6 +103,18 @@ size = Vector3(0.2, 2, 1.6)
 
 [sub_resource type="StandardMaterial3D" id="AirlockDoorMaterial"]
 albedo_color = Color(0.85, 0.75, 0.15, 1)
+
+[sub_resource type="BoxMesh" id="LadderRailMesh"]
+size = Vector3(0.15, 2.3, 0.15)
+
+[sub_resource type="BoxShape3D" id="LadderRailShape"]
+size = Vector3(0.15, 2.3, 0.15)
+
+[sub_resource type="StandardMaterial3D" id="LadderRailMaterial"]
+albedo_color = Color(0.55, 0.55, 0.6, 1)
+
+[sub_resource type="BoxShape3D" id="Deck2FloorShape"]
+size = Vector3(6, 0.2, 6)
 
 [node name="Derelict" type="Node3D"]
 
@@ -262,3 +275,77 @@ shape = SubResource("DoorSlabShape")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
 mesh = SubResource("DoorSlabMesh")
 surface_material_override/0 = SubResource("AirlockDoorMaterial")
+
+[node name="Deck2" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.05, 0)
+
+[node name="ShipSim2" type="Node" parent="Deck2" node_paths=PackedStringArray("PrimaryDeckRef") groups=["saveable"]]
+script = ExtResource("3")
+DeckIndex = 1
+PrimaryDeckRef = NodePath("../../ShipSim")
+GridWidth = 0
+RoomSplitColumns = PackedInt32Array()
+SaveId = "derelict_ship_sim_1_deck2"
+
+[node name="Floor2" type="StaticBody3D" parent="Deck2" node_paths=PackedStringArray("ShipSimRef", "ShipRoot") groups=["saveable"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, -0.1, 0)
+script = ExtResource("18")
+ShipSimRef = NodePath("../ShipSim2")
+ShipRoot = NodePath("..")
+ConduitMesh = SubResource("ConduitSlotMesh")
+ConduitArmMesh = SubResource("ConduitArmMesh")
+ConduitDropMesh = SubResource("ConduitDropMesh")
+ConduitMaterial = SubResource("ConduitSlotWiredMaterial")
+WallConduitMesh = SubResource("WallConduitMesh")
+WallSegmentMesh = SubResource("WallSegmentMesh")
+WallSegmentShape = SubResource("WallSegmentShape")
+WallMaterial = ExtResource("10")
+PanelMesh = SubResource("PanelMesh")
+PanelCollisionShape = SubResource("PanelCollisionShape")
+FloorPanelMaterial = ExtResource("9")
+CeilingPanelMaterial = ExtResource("11")
+GhostMaterial = SubResource("ConduitGhostMaterial")
+SeedDefaultLayout = true
+GenerateAtmosphereZones = true
+SaveId = "derelict_build_target_1_deck2"
+
+[node name="FloorAimHelper2" type="StaticBody3D" parent="Deck2" node_paths=PackedStringArray("BuildTarget")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, -0.1, 0)
+collision_layer = 2
+collision_mask = 0
+script = ExtResource("20")
+BuildTarget = NodePath("../Floor2")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Deck2/FloorAimHelper2"]
+shape = SubResource("Deck2FloorShape")
+
+[node name="Ceiling2" type="StaticBody3D" parent="Deck2" node_paths=PackedStringArray("BuildTarget")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 2.1, 0)
+collision_layer = 2
+collision_mask = 0
+script = ExtResource("20")
+BuildTarget = NodePath("../Floor2")
+IsCeiling = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Deck2/Ceiling2"]
+shape = SubResource("Deck2FloorShape")
+
+[node name="Ladder" type="StaticBody3D" parent="." node_paths=PackedStringArray("BottomAnchor", "TopAnchor")]
+script = ExtResource("21")
+BottomAnchor = NodePath("BottomAnchor")
+TopAnchor = NodePath("TopAnchor")
+
+[node name="BottomAnchor" type="Marker3D" parent="Ladder"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -0.5)
+
+[node name="TopAnchor" type="Marker3D" parent="Ladder"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 2.05, -0.5)
+
+[node name="RailMesh" type="MeshInstance3D" parent="Ladder"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.85, 1.05, -0.5)
+mesh = SubResource("LadderRailMesh")
+surface_material_override/0 = SubResource("LadderRailMaterial")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ladder"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.85, 1.05, -0.5)
+shape = SubResource("LadderRailShape")
