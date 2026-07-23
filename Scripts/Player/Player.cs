@@ -200,58 +200,15 @@ public partial class Player : CharacterBody3D
     /// <summary>Test-only observability, same narrow convention as <see cref="ScanModeOn"/>.</summary>
     public PanelController? Panels => _panels;
 
-    private DraggableWindow? _drillWindow;
-    private DraggableWindow? _flashlightWindow;
-    private DraggableWindow? _backpackWindow;
-    private Control? _backpackGrid;
-    private InventorySlotUI? _backpackSlotTemplate;
-    private readonly List<InventorySlotUI> _backpackSlotUIs = new();
+    /// <summary>The right-click-on-an-item sub-windows (drill/flashlight/backpack/suit/PDA) plus
+    /// the thruster and storage slot grids — see <see cref="InventoryWindowView"/>. Distinct from
+    /// <see cref="_panels"/>: these don't suppress gameplay input and aren't in
+    /// <see cref="AnyPanelOpen"/>; they're a rendering of PlayerInventory's persistent-contents
+    /// model.</summary>
+    private InventoryWindowView? _windows;
 
-    /// <summary>Slot count the backpack grid was last built for — <see cref="UpdateInventoryHud"/>
-    /// only rebuilds the grid's <see cref="InventorySlotUI"/> children when this changes (equip/
-    /// unequip/load), not every frame.</summary>
-    private int _backpackSlotUICount = -1;
-
-    /// <summary>Which item's persistent contents (see PlayerInventory.GetPersistentContents) the
-    /// open backpack/suit window is currently showing — set by <see cref="ToggleItemWindow"/>,
-    /// read by <see cref="UpdateInventoryHud"/> to re-point the window's slots every frame. Not
-    /// the same thing as "currently worn": the window can stay open and keep showing an item's
-    /// contents while it's merely held in a hand, per the persistent-contents model — null
-    /// whenever that window is closed.</summary>
-    private string? _openBackpackItemId;
-
-    private string? _openSuitItemId;
-
-    private string? _openPdaItemId;
-
-    /// <summary>The EVA suit torso's own window — unlike the backpack's grid, its 2 pocket slots
-    /// are static scene nodes (the torso's inner slot count never varies), so no
-    /// rebuild-on-equip mechanism is needed, just a per-frame Container re-point.</summary>
-    private DraggableWindow? _suitWindow;
-    private readonly InventorySlotUI?[] _suitPocketSlots = new InventorySlotUI?[2];
-
-    /// <summary>The PDA's own window — two cartridge pockets, both static scene nodes (like
-    /// the suit's pockets above): the original health-scan slot and (see <see
-    /// cref="_pdaCartridgeSlot2"/>) the power-info one.</summary>
-    private DraggableWindow? _pdaWindow;
-    private InventorySlotUI? _pdaCartridgeSlot;
-    private InventorySlotUI? _pdaCartridgeSlot2;
-
-    /// <summary>A thruster's own N2 tank slot window — one static slot, same shape as the PDA's
-    /// single cartridge pocket above, just pointed at whichever ThrusterVerbTarget's own Contents
-    /// is currently open (see PanelController.OpenThruster) instead of a PlayerInventory-owned
-    /// container. The window itself belongs to PanelController (it's a modal panel); only its
-    /// inner slot is inventory-view state, so only that is held here.</summary>
-    private InventorySlotUI? _thrusterTankSlot;
-
-    /// <summary>An installed shelf/bin's own storage grid — unlike the thruster's single fixed
-    /// slot, a storage unit's slot count is genuinely variable per instance, so this follows the
-    /// Backpack's rebuild-on-count-change shape (see _backpackSlotTemplate/_backpackSlotUIs/
-    /// _backpackSlotUICount) rather than the Thruster's single static slot.</summary>
-    private Control? _storageGrid;
-    private InventorySlotUI? _storageSlotTemplate;
-    private readonly List<InventorySlotUI> _storageSlotUIs = new();
-    private int _storageSlotUICount = -1;
+    /// <summary>Test-only observability, same narrow convention as <see cref="ScanModeOn"/>.</summary>
+    public InventoryWindowView? Windows => _windows;
 
     /// <summary>Toggled by the scan-mode key (see _Input) — only ever true while
     /// <see cref="CanScan"/> also holds; forced back off the moment it stops holding (checked
@@ -415,12 +372,14 @@ public partial class Player : CharacterBody3D
         _panels.Bind(GetNode("HUD"), this, CaptureMouse);
         _panels.InventoryClosed += CloseItemWindows;
 
-        _flashlightSpot = GetNode<SpotLight3D>("Head/Camera3D/FlashlightSpot");
-        _drillWindow = GetNode<DraggableWindow>("HUD/DrillWindow");
-        _flashlightWindow = GetNode<DraggableWindow>("HUD/FlashlightWindow");
-        _backpackWindow = GetNode<DraggableWindow>("HUD/BackpackWindow");
-        _backpackGrid = GetNode<Control>("HUD/BackpackWindow/Layout/BackpackGrid");
+        _windows = new InventoryWindowView { Name = "InventoryWindows" };
+        AddChild(_windows);
+        _windows.Bind(GetNode("HUD"), this);
 
+        _flashlightSpot = GetNode<SpotLight3D>("Head/Camera3D/FlashlightSpot");
+
+        // The main panel's own equip slots all share the Hands container — the one set of slots
+        // that isn't a sub-window, so it stays here rather than in InventoryWindowView.
         foreach (var child in GetNode("HUD/InventoryPanel/Layout/EquipSlots").GetChildren())
         {
             if (child is InventorySlotUI slot)
@@ -430,57 +389,9 @@ public partial class Player : CharacterBody3D
             }
         }
 
-        GetNode<InventorySlotUI>("HUD/DrillWindow/Layout/DrillBatterySlot").PlayerRef = this;
-        GetNode<InventorySlotUI>("HUD/FlashlightWindow/Layout/FlashlightBatterySlot").PlayerRef = this;
-
-        _backpackSlotTemplate = GetNode<InventorySlotUI>("HUD/BackpackWindow/Layout/BackpackGrid/SlotTemplate");
-
-        _suitWindow = GetNode<DraggableWindow>("HUD/SuitWindow");
-        GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/O2Tank").PlayerRef = this;
-        GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/N2Tank").PlayerRef = this;
-        GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/Filter").PlayerRef = this;
-        GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/Battery").PlayerRef = this;
-        _suitPocketSlots[0] = GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/Pocket1");
-        _suitPocketSlots[1] = GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/Pocket2");
-        foreach (var pocketSlot in _suitPocketSlots)
-        {
-            pocketSlot!.PlayerRef = this;
-        }
-
-        _pdaWindow = GetNode<DraggableWindow>("HUD/PdaWindow");
-        _pdaCartridgeSlot = GetNode<InventorySlotUI>("HUD/PdaWindow/Layout/PdaGrid/Cartridge1");
-        _pdaCartridgeSlot.PlayerRef = this;
-        _pdaCartridgeSlot2 = GetNode<InventorySlotUI>("HUD/PdaWindow/Layout/PdaGrid/Cartridge2");
-        _pdaCartridgeSlot2.PlayerRef = this;
-
-        _thrusterTankSlot = GetNode<InventorySlotUI>("HUD/ThrusterWindow/Layout/ThrusterGrid/Tank1");
-        _thrusterTankSlot.PlayerRef = this;
-
-        _storageGrid = GetNode<Control>("HUD/StorageWindow/Layout/StorageGrid");
-        _storageSlotTemplate = GetNode<InventorySlotUI>("HUD/StorageWindow/Layout/StorageGrid/SlotTemplate");
-
-        // X button / right-click-on-background — each window closes exactly the way its own
-        // existing toggle-off path already does (see ToggleItemWindow's closing branches/
-        // CloseInventory), just reachable without needing to re-press the same hotkey/re-click
-        // the same slot.
+        // X button / right-click-on-background. The item sub-windows wire their own (see
+        // InventoryWindowView.Bind); these three are the modal panels' equivalents.
         _panels.InventoryWindow!.CloseRequested += CloseInventory;
-        _drillWindow.CloseRequested += () => _drillWindow!.Visible = false;
-        _flashlightWindow.CloseRequested += () => _flashlightWindow!.Visible = false;
-        _backpackWindow.CloseRequested += () =>
-        {
-            _backpackWindow!.Visible = false;
-            _openBackpackItemId = null;
-        };
-        _suitWindow.CloseRequested += () =>
-        {
-            _suitWindow!.Visible = false;
-            _openSuitItemId = null;
-        };
-        _pdaWindow.CloseRequested += () =>
-        {
-            _pdaWindow!.Visible = false;
-            _openPdaItemId = null;
-        };
         _panels.ThrusterWindow!.CloseRequested += CloseThrusterInventory;
         _panels.StorageWindow!.CloseRequested += CloseStorageInventory;
 
@@ -1093,17 +1004,7 @@ public partial class Player : CharacterBody3D
     /// main inventory panel open to drag items to and from. Subscribed to
     /// PanelController.InventoryClosed rather than called from CloseInventory directly, so it also
     /// fires when the panel is closed via its own X button or the Escape chain.</summary>
-    private void CloseItemWindows()
-    {
-        _drillWindow!.Visible = false;
-        _flashlightWindow!.Visible = false;
-        _backpackWindow!.Visible = false;
-        _openBackpackItemId = null;
-        _suitWindow!.Visible = false;
-        _openSuitItemId = null;
-        _pdaWindow!.Visible = false;
-        _openPdaItemId = null;
-    }
+    private void CloseItemWindows() => _windows!.CloseAll();
 
     /// <summary>Called by TravelConsoleVerbTarget.ExecuteVerb — opens the map instead of that
     /// verb starting travel directly, same shape as OpenInventory but triggered from a world
@@ -1329,30 +1230,7 @@ public partial class Player : CharacterBody3D
     /// <see cref="_openSuitItemId"/>) so UpdateInventoryHud re-points the window's slots at that
     /// specific item's contents every frame, not just whichever one (if any) happens to be
     /// worn.</summary>
-    public void ToggleItemWindow(string itemId)
-    {
-        switch (itemId)
-        {
-            case "power_drill":
-                _drillWindow!.Visible = !_drillWindow.Visible;
-                break;
-            case "flashlight":
-                _flashlightWindow!.Visible = !_flashlightWindow.Visible;
-                break;
-            case "backpack" or "debug_backpack" when _inventory.GetPersistentContents(itemId) is not null:
-                _backpackWindow!.Visible = !_backpackWindow.Visible;
-                _openBackpackItemId = _backpackWindow.Visible ? itemId : null;
-                break;
-            case "eva_torso_suit" when _inventory.GetPersistentContents(itemId) is not null:
-                _suitWindow!.Visible = !_suitWindow.Visible;
-                _openSuitItemId = _suitWindow.Visible ? itemId : null;
-                break;
-            case "pda" when _inventory.GetPersistentContents(itemId) is not null:
-                _pdaWindow!.Visible = !_pdaWindow.Visible;
-                _openPdaItemId = _pdaWindow.Visible ? itemId : null;
-                break;
-        }
-    }
+    public void ToggleItemWindow(string itemId) => _windows!.ToggleItemWindow(_inventory, itemId);
 
     public override void _PhysicsProcess(double delta)
     {
@@ -2074,9 +1952,9 @@ public partial class Player : CharacterBody3D
             FlashlightHasBattery = _inventory.Flashlight?.HasItem ?? false,
             FlashlightCharge = _inventory.Flashlight?.Charge ?? 0f,
             InventoryWindow = new WindowPosition(_panels!.InventoryWindow!.Position.X, _panels.InventoryWindow.Position.Y),
-            DrillWindow = new WindowPosition(_drillWindow!.Position.X, _drillWindow.Position.Y),
-            FlashlightWindow = new WindowPosition(_flashlightWindow!.Position.X, _flashlightWindow.Position.Y),
-            BackpackWindow = new WindowPosition(_backpackWindow!.Position.X, _backpackWindow.Position.Y),
+            DrillWindow = new WindowPosition(_windows!.DrillWindow!.Position.X, _windows.DrillWindow.Position.Y),
+            FlashlightWindow = new WindowPosition(_windows.FlashlightWindow!.Position.X, _windows.FlashlightWindow.Position.Y),
+            BackpackWindow = new WindowPosition(_windows.BackpackWindow!.Position.X, _windows.BackpackWindow.Position.Y),
             HeadItemId = _inventory.Head?.ItemId,
             TorsoItemId = _inventory.Torso?.ItemId,
             HasEvaSuit = ownedTorsoContents is not null,
@@ -2093,14 +1971,14 @@ public partial class Player : CharacterBody3D
             HasSuitBattery = _inventory.SuitBattery?.HasItem ?? false,
             SuitBatteryCharge = _inventory.SuitBattery?.Charge ?? 0f,
             CO2Percent = _suitResources.CO2Percent,
-            SuitWindow = new WindowPosition(_suitWindow!.Position.X, _suitWindow.Position.Y),
+            SuitWindow = new WindowPosition(_windows.SuitWindow!.Position.X, _windows.SuitWindow.Position.Y),
             PdaItemId = _inventory.GetEquippedContainer("pda")?.ItemId,
             HasPda = ownedPdaContents is not null,
             PdaSlots = ownedPdaContents is not null
                 ? SlotSaveDataConverter.Capture(ownedPdaContents)
                 : new List<SlotSaveData?>(),
             PdaSlotCount = ownedPdaContents?.Slots.Count ?? PlayerInventory.PdaSlotCount,
-            PdaWindow = new WindowPosition(_pdaWindow!.Position.X, _pdaWindow.Position.Y),
+            PdaWindow = new WindowPosition(_windows.PdaWindow!.Position.X, _windows.PdaWindow.Position.Y),
             ThrusterWindow = new WindowPosition(_panels.ThrusterWindow!.Position.X, _panels.ThrusterWindow.Position.Y),
             ActiveContracts = _activeContracts.Select(c => new ContractSaveData
             {
@@ -2247,22 +2125,22 @@ public partial class Player : CharacterBody3D
 
         if (data.DrillWindow is { } drillWindowPos)
         {
-            _drillWindow!.Position = new Vector2(drillWindowPos.X, drillWindowPos.Y);
+            _windows!.DrillWindow!.Position = new Vector2(drillWindowPos.X, drillWindowPos.Y);
         }
 
         if (data.FlashlightWindow is { } flashlightWindowPos)
         {
-            _flashlightWindow!.Position = new Vector2(flashlightWindowPos.X, flashlightWindowPos.Y);
+            _windows!.FlashlightWindow!.Position = new Vector2(flashlightWindowPos.X, flashlightWindowPos.Y);
         }
 
         if (data.BackpackWindow is { } backpackWindowPos)
         {
-            _backpackWindow!.Position = new Vector2(backpackWindowPos.X, backpackWindowPos.Y);
+            _windows!.BackpackWindow!.Position = new Vector2(backpackWindowPos.X, backpackWindowPos.Y);
         }
 
         if (data.PdaWindow is { } pdaWindowPos)
         {
-            _pdaWindow!.Position = new Vector2(pdaWindowPos.X, pdaWindowPos.Y);
+            _windows!.PdaWindow!.Position = new Vector2(pdaWindowPos.X, pdaWindowPos.Y);
         }
 
         if (data.ThrusterWindow is { } thrusterWindowPos)
@@ -2272,7 +2150,7 @@ public partial class Player : CharacterBody3D
 
         if (data.SuitWindow is { } suitWindowPos)
         {
-            _suitWindow!.Position = new Vector2(suitWindowPos.X, suitWindowPos.Y);
+            _windows!.SuitWindow!.Position = new Vector2(suitWindowPos.X, suitWindowPos.Y);
         }
 
         _credits = data.Credits;
@@ -2344,88 +2222,24 @@ public partial class Player : CharacterBody3D
 
     private void UpdateInventoryHud()
     {
-        // Re-pointed every frame rather than only on equip/unequip: equipping/unequipping
-        // creates a new SlotContainer instance, and this is the cheapest way to keep the window
-        // always addressing whichever item's contents it's currently open for (see
-        // _openBackpackItemId) — worn, merely held, or (for the backpack) tucked into another
-        // backpack's slot, per PlayerInventory's persistent-contents model.
-        var backpackContents = _openBackpackItemId is { } backpackItemId ? _inventory.GetPersistentContents(backpackItemId) : null;
-        _backpackGrid!.Visible = backpackContents is not null;
-        if (backpackContents is null)
-        {
-            // The open item was genuinely discarded (or the window was never opened) — nothing
-            // left to show, so close it instead of leaving an empty window floating.
-            _backpackWindow!.Visible = false;
-            _openBackpackItemId = null;
-        }
-
-        var backpackSlotCount = backpackContents?.Slots.Count ?? 0;
-        if (backpackSlotCount != _backpackSlotUICount)
-        {
-            RebuildBackpackSlotUIs(backpackSlotCount);
-        }
-
-        foreach (var slot in _backpackSlotUIs)
-        {
-            slot.Container = backpackContents;
-        }
-
-        // Same "re-point every frame, close on discard" shape as the backpack above — the torso's
-        // own pocket slot *count* never varies (always 2), so no rebuild step is needed.
-        var suitContents = _openSuitItemId is { } suitItemId ? _inventory.GetPersistentContents(suitItemId) : null;
-        if (suitContents is null)
-        {
-            _suitWindow!.Visible = false;
-            _openSuitItemId = null;
-        }
-
-        foreach (var pocketSlot in _suitPocketSlots)
-        {
-            pocketSlot!.Container = suitContents;
-        }
-
-        // Same shape again — the PDA's single cartridge pocket, like the suit's, is a static
-        // scene node.
-        var pdaContents = _openPdaItemId is { } pdaItemId ? _inventory.GetPersistentContents(pdaItemId) : null;
-        if (pdaContents is null)
-        {
-            _pdaWindow!.Visible = false;
-            _openPdaItemId = null;
-        }
-
-        _pdaCartridgeSlot!.Container = pdaContents;
-        _pdaCartridgeSlot2!.Container = pdaContents;
-
-        // Unlike the backpack/suit/pda contents above (reached by itemId, always safe to
-        // dereference), PanelController.OpenThruster is a live Node reference that Uninstall/Scrap
-        // can QueueFree() out from under this window while it's open — check validity before
-        // touching it at all, not just before reading its Contents.
+        // Unlike the backpack/suit/pda contents (reached by itemId, always safe to dereference),
+        // PanelController.OpenThruster/OpenStorage are live Node references that Uninstall/Scrap
+        // can QueueFree() out from under their window while it's open — checked here, where the
+        // panel state lives, rather than inside the view.
         if (_panels!.IsOpen(PanelId.Thruster) && !GodotObject.IsInstanceValid(_panels.OpenThruster))
         {
             CloseThrusterInventory();
         }
 
-        _thrusterTankSlot!.Container = _panels.OpenThruster?.Contents;
-
-        // Same IsInstanceValid guard as the thruster above — a storage unit's own slot count is
-        // genuinely variable, so this also follows the backpack's rebuild-on-count-change shape.
         if (_panels.IsOpen(PanelId.Storage) && !GodotObject.IsInstanceValid(_panels.OpenStorage))
         {
             CloseStorageInventory();
         }
 
-        var storageContents = GodotObject.IsInstanceValid(_panels.OpenStorage) ? _panels.OpenStorage!.Contents : null;
-        _storageGrid!.Visible = storageContents is not null;
-        var storageSlotCount = storageContents?.Slots.Count ?? 0;
-        if (storageSlotCount != _storageSlotUICount)
-        {
-            RebuildStorageSlotUIs(storageSlotCount);
-        }
-
-        foreach (var slot in _storageSlotUIs)
-        {
-            slot.Container = storageContents;
-        }
+        _windows!.Refresh(
+            _inventory,
+            _panels.OpenThruster?.Contents,
+            GodotObject.IsInstanceValid(_panels.OpenStorage) ? _panels.OpenStorage!.Contents : null);
 
         // Force scan mode off the moment its gate stops holding (PDA/cartridge/helmet removed
         // mid-scan) — see _scanModeOn's own doc comment.
@@ -2448,54 +2262,4 @@ public partial class Player : CharacterBody3D
         _hud.RenderCarried(_credits, LeftHandItemId, RightHandItemId);
     }
 
-    /// <summary>Rebuilds BackpackGrid's InventorySlotUI children to match the worn backpack's
-    /// actual slot count (8 for the normal backpack, 24 for the debug backpack, 0 while
-    /// unequipped) by duplicating <see cref="_backpackSlotTemplate"/> — the scene itself only
-    /// ever carries that one hidden template node, not a fixed slot count.</summary>
-    private void RebuildBackpackSlotUIs(int slotCount)
-    {
-        foreach (var slot in _backpackSlotUIs)
-        {
-            slot.QueueFree();
-        }
-
-        _backpackSlotUIs.Clear();
-
-        for (var i = 0; i < slotCount; i++)
-        {
-            var slot = (InventorySlotUI)_backpackSlotTemplate!.Duplicate();
-            slot.Visible = true;
-            slot.SlotIndex = i;
-            slot.PlayerRef = this;
-            _backpackGrid!.AddChild(slot);
-            _backpackSlotUIs.Add(slot);
-        }
-
-        _backpackSlotUICount = slotCount;
-    }
-
-    /// <summary>Same shape as <see cref="RebuildBackpackSlotUIs"/> — a storage unit's own slot
-    /// count varies per catalog item (small_bin/shelf/large_shelf), so StorageGrid only ever
-    /// carries one hidden template node too, not a fixed slot count.</summary>
-    private void RebuildStorageSlotUIs(int slotCount)
-    {
-        foreach (var slot in _storageSlotUIs)
-        {
-            slot.QueueFree();
-        }
-
-        _storageSlotUIs.Clear();
-
-        for (var i = 0; i < slotCount; i++)
-        {
-            var slot = (InventorySlotUI)_storageSlotTemplate!.Duplicate();
-            slot.Visible = true;
-            slot.SlotIndex = i;
-            slot.PlayerRef = this;
-            _storageGrid!.AddChild(slot);
-            _storageSlotUIs.Add(slot);
-        }
-
-        _storageSlotUICount = slotCount;
-    }
 }
