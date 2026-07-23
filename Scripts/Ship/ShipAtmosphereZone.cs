@@ -136,17 +136,14 @@ public partial class ShipAtmosphereZone : Area3D
             (halfSize.Z - Mathf.Abs(local.Z)) / halfSize.Z);
     }
 
-    /// <summary>Converts a world position into this zone's ship's own grid tile coordinate — the
-    /// same local-space "+3, floor" convention ShipBuildTarget's own aim-point conversion uses.
-    /// This zone's own parent is always that ship's spatial root (HomeShip/Derelict/Station),
+    /// <summary>Converts a world position into this zone's ship's own grid tile coordinate, via the
+    /// shared <see cref="ShipGeometry"/> mapping ShipBuildTarget's own aim-point conversion is the
+    /// forward direction of. This zone's own parent is always that ship's spatial root (HomeShip/Derelict/Station),
     /// matching ShipBuildTarget's own "ShipRoot ?? GetParent&lt;Node3D&gt;()" fallback. Lets the
     /// player read its own actual current cell instead of this zone's fixed representative
     /// <see cref="Tile"/>, now that per-cell diffusion means different cells in the same room can
     /// genuinely disagree for a while near a fresh breach.</summary>
-    public Vector2I TileAt(Vector3 worldPosition)
-    {
-        var local = GetParent<Node3D>().ToLocal(worldPosition);
-        return new Vector2I(Mathf.FloorToInt(local.X + 3), Mathf.FloorToInt(local.Z + 3));
-    }
+    public Vector2I TileAt(Vector3 worldPosition) =>
+        ShipGeometry.TileAtShipLocal(GetParent<Node3D>().ToLocal(worldPosition));
 
 }

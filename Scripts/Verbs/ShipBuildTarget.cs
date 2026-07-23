@@ -215,37 +215,21 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     // that edge instead of the tile itself — half of this margin on each side of every boundary.
     private const float EdgeMargin = 0.25f;
 
-    private const float WallCenterHeight = 1.0f;
+    // The ship's shared coordinate system and the heights that depend on it live in ShipGeometry —
+    // ShipAtmosphereZone needs the same mapping (it converts the other way, world position back to
+    // tile), and it used to reimplement it from an unnamed literal. Aliased here so the many uses
+    // below stay readable.
+    private const float WallCenterHeight = ShipGeometry.WallCenterHeight;
+    private const float FloorConduitHeight = ShipGeometry.FloorConduitHeight;
+    private const float WallHeight = ShipGeometry.WallHeight;
+    private const float FloorPanelHeight = ShipGeometry.FloorPanelHeight;
+    private const float CeilingPanelHeight = ShipGeometry.CeilingPanelHeight;
+    private static readonly int WallSlotCount = ShipGeometry.WallSlotCount;
+    private static readonly float WallSlotHeight = ShipGeometry.WallSlotHeight;
 
-    // Half the conduit mesh's own 0.05 thickness above the floor's actual top surface (Y=0,
-    // matching FloorPanelHeight's own surface-alignment note below) — resting flush on the
-    // floor instead of the old 0.2 (visibly floating ~17.5cm above it).
-    private const float FloorConduitHeight = 0.025f;
-
-    // A wall face gets one conduit slot per tile-height's worth of its own height, stacked
-    // vertically — a taller/shorter wall (if WallHeight ever changes) gets more/fewer slots
-    // automatically rather than a hand-picked fixed count. WallHeight matches
-    // WallSegmentShape/WallSegmentMesh's authored Y size (see World.tscn), the same
-    // hand-kept-in-sync convention WallCenterHeight already uses for that same mesh.
-    private const float WallHeight = 2f;
-    private const float TileSize = 1f;
-    private static readonly int WallSlotCount = Mathf.RoundToInt(WallHeight / TileSize);
-    private static readonly float WallSlotHeight = WallHeight / WallSlotCount;
-
-    // Match the existing (unsplit, collision-only) FloorShape/CeilingShape colliders' actual
-    // top/bottom surfaces exactly, so the panel mesh sits flush with where the player's feet and
-    // the ceiling's underside really are, instead of at the conduit's own mount height
-    // (FloorConduitHeight) — sharing that height with conduits is what caused the panels to
-    // z-fight with them.
-    private const float FloorPanelHeight = -0.025f;
-    private const float CeilingPanelHeight = 2.025f;
-
-    /// <summary>Vertical spacing between a site's stacked decks — a second deck's own ShipRoot
-    /// sits this far above the first deck's, making deck 2's floor plane exactly meet deck 1's
-    /// ceiling plane (docs/project-plan.md Appendix A3: "deck N's ceiling plane is the same
-    /// boundary as deck N+1's floor"). Named here (not a magic number in the scene transform) so
-    /// the two heights it's derived from can never drift out of sync with it.</summary>
-    public const float DeckYOffset = CeilingPanelHeight - FloorPanelHeight;
+    /// <summary>Kept as a public alias because World.tscn's authored deck transform and
+    /// docs/architecture/ship-model.md both reference it by this name.</summary>
+    public const float DeckYOffset = ShipGeometry.DeckYOffset;
 
     // Matches Derelict.tscn's own hand-placed pickups' resting height (e.g. WallPanel1/ScrapMetal
     // both sit at Y=0.15) — a bit more clearance than the purely-visual conduit mount since a
@@ -2372,7 +2356,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// top — slot count is derived from <see cref="WallHeight"/>, not fixed, so both the count
     /// and each slot's actual height stay correct automatically if <see cref="WallHeight"/> ever
     /// changes again (today: <see cref="WallSlotCount"/> is 2, matching a 2m wall).</summary>
-    private static float SlotHeight(int slot) => (slot + 0.5f) * WallSlotHeight;
+    private static float SlotHeight(int slot) => ShipGeometry.SlotHeight(slot);
 
     /// <summary>Same edge position/rotation a wall segment would use, nudged toward whichever tile
     /// the mount belongs to (reads as mounted on that tile's wall face instead of embedded in the
@@ -2834,35 +2818,26 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// <summary>Local (to this Floor body) position + rotation for a 1-tile wall segment on the
     /// given edge — works uniformly for interior edges and boundary edges (where the "far" cell
     /// is off-grid), since the midpoint math is the same either way.</summary>
-    private static Vector3 EdgeShipLocalPosition(CellCoord a, CellCoord b)
-    {
-        var midX = (a.X + b.X) / 2f;
-        var midY = (a.Y + b.Y) / 2f;
-        return new Vector3(midX - 3 + 0.5f, WallCenterHeight, midY - 3 + 0.5f);
-    }
+    private static Vector3 EdgeShipLocalPosition(CellCoord a, CellCoord b) =>
+        ShipGeometry.EdgeShipLocal(a, b, WallCenterHeight);
 
-    private (Vector3 Position, Vector3 RotationDegrees) EdgeTransform(CellCoord a, CellCoord b)
-    {
-        var world = (ShipRoot ?? GetParent<Node3D>()).ToGlobal(EdgeShipLocalPosition(a, b));
-
-        // WallSegmentMesh is authored running along X (separates cells differing in Y) — rotate
-        // 90 degrees when the edge instead separates cells differing in X.
-        var rotationDegrees = a.X != b.X ? new Vector3(0, 90, 0) : Vector3.Zero;
-
-        return (ToLocal(world), rotationDegrees);
-    }
+    private (Vector3 Position, Vector3 RotationDegrees) EdgeTransform(CellCoord a, CellCoord b) =>
+        (ToLocal(EdgeWorldPosition(a, b)), ShipGeometry.EdgeRotationDegrees(a, b));
 
     /// <summary>World position of an edge's midpoint — the wall-breach counterpart to
-    /// <see cref="TileWorldPosition"/>, reusing <see cref="EdgeTransform"/>'s own position math so
-    /// a breach pull target always lines up with the actual wall segment.</summary>
+    /// <see cref="TileWorldPosition"/>, sharing <see cref="ShipGeometry"/>'s position math so a
+    /// breach pull target always lines up with the actual wall segment.</summary>
     private Vector3 EdgeWorldPosition(CellCoord a, CellCoord b) =>
-        (ShipRoot ?? GetParent<Node3D>()).ToGlobal(EdgeShipLocalPosition(a, b));
+        ShipSpace.ToGlobal(EdgeShipLocalPosition(a, b));
 
-    private Vector3 TileWorldPosition(Vector2I tile, float height)
-    {
-        var shipLocal = new Vector3(tile.X - 3 + 0.5f, height, tile.Y - 3 + 0.5f);
-        return (ShipRoot ?? GetParent<Node3D>()).ToGlobal(shipLocal);
-    }
+    private Vector3 TileWorldPosition(Vector2I tile, float height) =>
+        ShipSpace.ToGlobal(ShipGeometry.TileShipLocal(tile, height));
+
+    /// <summary>This ship's spatial root — every grid-to-world conversion goes through it, so a
+    /// ship instanced anywhere (including, later, under a runtime-instantiated destination) places
+    /// its geometry relative to itself rather than to the world origin. Falls back to this node's
+    /// own parent for a scene that hasn't wired ShipRoot explicitly.</summary>
+    private Node3D ShipSpace => ShipRoot ?? GetParent<Node3D>();
 
     /// <summary>World positions of every currently-open floor/ceiling/wall breach on this ship —
     /// the decompression-pull hazard's own read of Deck.HullBreaches/WallEdgeBreaches, reusing the
