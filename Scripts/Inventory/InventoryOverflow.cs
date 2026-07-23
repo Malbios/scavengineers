@@ -2,29 +2,20 @@ using Godot;
 
 namespace Scavengineers.Scripts.Inventory;
 
-/// <summary>
-/// Spawns a generic dropped-item pickup at another node's own position — the "nothing vanishes"
-/// half of the inventory arc's Stage 1 capacity work (see PlayerInventory.Add's partial-add
-/// return). Used wherever a verb creates an item as a side effect (a refund, a scrap yield) with
-/// no existing world object to fall back to, unlike picking up something that's already sitting in
-/// the world (see PickupItem's own partial-pickup handling).
-/// </summary>
+/// <summary>Spawns a generic dropped-item pickup at another node's own position — for a verb that
+/// creates an item as a side effect (a refund, a scrap yield) with no existing world object to
+/// fall back to.</summary>
 public static class InventoryOverflow
 {
     public static void DropAt(Node3D near, string itemId, int count, Vector3? position = null, float charge = 1f)
     {
         var pickup = new PickupItem { ItemId = itemId, Count = count, Charge = charge };
 
-        // Parented at the world/ship root (mirrors Player.SpawnDroppedContainer), not under
-        // `near` itself — `near` is the producing verb target (a ShipBuildTarget, a damaged
-        // conduit), and a RigidBody3D meant to drift/settle independently must not be parented
-        // under something whose own transform could change or that could later be freed.
-        // PickupItem's own _Ready() (fired synchronously by this AddChild, since the tree is
-        // already running) builds its own visual/collision from ItemId via ItemVisualBuilder —
-        // nothing else needed here.
+        // Parented at the world/ship root, not under `near` — `near` is the producing verb target
+        // (a ShipBuildTarget, a damaged conduit), and a RigidBody3D meant to drift/settle
+        // independently must not be parented under something whose transform could change or that
+        // could later be freed.
         near.GetParent()?.AddChild(pickup);
-        // `position` lets a caller with an already-resolved world position (e.g. a raycast hit
-        // point) use it instead of dropping at `near`'s own position.
         pickup.GlobalPosition = position ?? near.GlobalPosition;
     }
 }

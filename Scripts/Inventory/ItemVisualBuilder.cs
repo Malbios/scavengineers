@@ -4,32 +4,15 @@ using Godot;
 
 namespace Scavengineers.Scripts.Inventory;
 
-/// <summary>
-/// Builds a small multi-primitive visual (and a roughly-matching collision shape) for a pickup's
-/// own ItemId — replaces the old approach of every item sharing one plain box
-/// (PickupItemMesh/PickupItemShape in World.tscn/Derelict.tscn), tinted only by color. Used by
-/// both PickupItem and ContainerPickupItem's own _Ready(), so the same item always looks the same
-/// whether it was hand-placed in a scene or spawned by code (loot, refund overflow, a dropped
-/// slot) — nothing about appearance is scattered per-scene anymore (see CLAUDE.md's data-driven
-/// non-negotiable). Every mesh here is one of Godot's own primitive Mesh resources
-/// (BoxMesh/CylinderMesh/SphereMesh) configured directly in code — no new asset files, matching
-/// the project's existing procedural-primitive convention (e.g. every hand-authored ship wall/
-/// panel/conduit mesh already works this way).
-/// </summary>
+/// <summary>Builds a small multi-primitive visual (and a roughly-matching collision shape) for a
+/// pickup's own ItemId, tinted by <see cref="ItemCatalog.Color"/>. Every mesh is one of Godot's
+/// own primitives (BoxMesh/CylinderMesh/SphereMesh) — no new asset files.</summary>
 public static class ItemVisualBuilder
 {
-    // Matches the old shared PickupItemMesh/PickupItemShape exactly — the safe fallback for an
-    // item with no ShapeKind (unknown id, or a catalog entry that hasn't been given one yet).
     private static readonly Vector3 FallbackBoxSize = new(0.3f, 0.3f, 0.3f);
 
-    /// <summary>A small Node3D whose children are this item's own primitive MeshInstance3D
-    /// parts, all tinted with the same ItemCatalog.Color this item's inventory icon already
-    /// uses — the caller (PickupItem/ContainerPickupItem) just adds this as a child. Takes
-    /// shapeKind explicitly (resolved by the caller via ItemCatalog.ShapeKind(itemId)) rather than
-    /// doing that lookup internally, so this stays a pure function of its inputs — directly
-    /// testable without a reachable Data/items.json (Scavengineers.NodeTests is its own separate,
-    /// scene-less Godot project that can't load it — see ItemCatalog's own test-seam doc
-    /// comments).</summary>
+    /// <summary>Takes `shapeKind` explicitly rather than looking it up internally, so this stays a
+    /// pure function of its inputs — testable without a reachable Data/items.json.</summary>
     public static Node3D BuildVisual(string itemId, string? shapeKind)
     {
         var root = new Node3D();
@@ -44,11 +27,9 @@ public static class ItemVisualBuilder
         return root;
     }
 
-    /// <summary>Half this item's own vertical collision extent — used to nudge a raycast-resolved
-    /// world-drop position far enough above a resting surface that the item doesn't spawn already
-    /// embedded (and, for a shape tall enough, past a thin floor panel's own collision entirely —
-    /// see Player.RestingDropPosition). Reuses BuildCollisionShape's own dimensions rather than a
-    /// second hand-maintained table, so the two can never drift apart.</summary>
+    /// <summary>Half this item's vertical collision extent — used to nudge a raycast-resolved
+    /// world-drop position above a resting surface so the item doesn't spawn already embedded.
+    /// Reuses <see cref="BuildCollisionShape"/>'s own dimensions rather than a second table.</summary>
     public static float RestingHalfHeight(string? shapeKind) => BuildCollisionShape(shapeKind) switch
     {
         BoxShape3D box => box.Size.Y / 2f,
@@ -57,9 +38,8 @@ public static class ItemVisualBuilder
         _ => FallbackBoxSize.Y / 2f,
     };
 
-    /// <summary>A single Shape3D roughly matching this item's own visual silhouette — an
-    /// approximation (one shape, not a compound matching every primitive), not a physically exact
-    /// collider.</summary>
+    /// <summary>A single Shape3D roughly matching this item's silhouette — one shape, not a
+    /// physically exact compound collider.</summary>
     public static Shape3D BuildCollisionShape(string? shapeKind) => shapeKind switch
     {
         "tank" => new CylinderShape3D { Radius = 0.08f, Height = 0.43f },
@@ -87,19 +67,11 @@ public static class ItemVisualBuilder
         _ => new BoxShape3D { Size = FallbackBoxSize },
     };
 
-    // Every item without a recognized shapeKind (unknown id, or a catalog entry that hasn't been
-    // given one yet) gets this — the exact same "one flat square" look every icon already has
-    // today, so nothing regresses for an item this table hasn't caught up with.
     private static readonly Rect2 FallbackIconRect = new(0f, 0f, 1f, 1f);
 
-    /// <summary>Normalized (0-1) rects for this item's own flat 2D inventory icon — a simplified,
-    /// flattened echo of the same per-shapeKind composition PartsFor uses for the real 3D visual
-    /// (same proportions/groupings, just 2D rects instead of 3D primitives), so an icon reads as
-    /// "the same item, flattened" rather than a second, independently-designed representation.
-    /// Normalized so the caller (InventorySlotUI) can anchor each rect directly regardless of the
-    /// icon Control's actual pixel size. Y grows downward in UI space (unlike the 3D parts' own Y-
-    /// up convention) — anything positioned "on top of" another part here uses a SMALLER y than
-    /// the part it sits above.</summary>
+    /// <summary>Normalized (0-1) rects for this item's flat 2D inventory icon — a flattened echo
+    /// of <see cref="PartsFor"/>'s 3D composition. Y grows downward in UI space (unlike the 3D
+    /// parts' Y-up convention) — "on top of" another part means a SMALLER y here.</summary>
     public static IReadOnlyList<Rect2> IconPartsFor(string? shapeKind) => shapeKind switch
     {
         "tank" =>

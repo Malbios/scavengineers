@@ -4,18 +4,13 @@ using System.Linq;
 
 namespace Scavengineers.Scripts.Inventory;
 
-/// <summary>
-/// A fixed-size slot inventory (docs/project-plan.md §4) — extracted from PlayerInventory
-/// (inventory arc Stage 3) so a backpack's own contents can reuse the exact same mechanics
-/// instead of a parallel implementation. PlayerInventory now composes one of these for the
-/// body (pockets + hands) and, optionally, another for an equipped backpack.
-/// </summary>
+/// <summary>A fixed-size slot inventory — shared by the player's body slots and an equipped
+/// backpack's own contents, so both reuse the same fill/merge/stack mechanics.</summary>
 public sealed class SlotContainer
 {
-    // Charge is 1f (full) and meaningless for every item except "battery" — the same "meaningless
-    // unless a condition holds" shape PlayerInventory.SpecializedSlot.Charge already uses, just
-    // carried on the slot itself so a loose/dropped battery has somewhere to keep its
-    // real remaining charge instead of it being discarded the moment it leaves a device.
+    // Charge is 1f (full) and meaningless for every item except "battery" — carried on the slot
+    // so a loose/dropped battery keeps its real remaining charge instead of it being discarded
+    // the moment it leaves a device.
     private readonly (string ItemId, int Count, float Charge)?[] _slots;
 
     public SlotContainer(int slotCount)
@@ -23,14 +18,12 @@ public sealed class SlotContainer
         _slots = new (string, int, float)?[slotCount];
     }
 
-    /// <summary>The raw per-slot view the inventory panel UI reads (see InventorySlotUI) — index
-    /// identity matters here (which physical slot holds what), unlike <see cref="Counts"/>'s
-    /// aggregated view for the plain-text HUD summary.</summary>
+    /// <summary>Index identity matters here (which physical slot holds what), unlike
+    /// <see cref="Counts"/>'s aggregated view.</summary>
     public IReadOnlyList<(string ItemId, int Count, float Charge)?> Slots => _slots;
 
     /// <summary>Direct slot assignment, bypassing the fill/merge logic in <see cref="Add"/> and
-    /// <see cref="MoveSlot"/> — used by PlayerInventory's hand-unequip flow, which needs to clear
-    /// a specific slot outright before topping up the body range from its old contents.</summary>
+    /// <see cref="MoveSlot"/>.</summary>
     public void SetSlot(int index, (string ItemId, int Count, float Charge)? value) => _slots[index] = value;
 
     public IReadOnlyDictionary<string, int> Counts =>
@@ -43,9 +36,7 @@ public sealed class SlotContainer
     public bool Has(string itemId, int count) => CountOf(itemId) >= count;
 
     /// <summary>How much of `itemId` would still fit right now, without actually adding
-    /// anything — for a caller that needs to know before committing to a cost (see
-    /// VendorVerbTarget's Buy verb), or that needs to combine room across more than one
-    /// container (see PlayerInventory.HasRoomFor).</summary>
+    /// anything.</summary>
     public int RoomFor(string itemId)
     {
         var maxStack = ItemCatalog.MaxStackSize(itemId);
@@ -61,23 +52,19 @@ public sealed class SlotContainer
 
     public bool HasRoomFor(string itemId, int count) => RoomFor(itemId) >= count;
 
-    /// <summary>Adds up to `count`, respecting both this item's own stack limit
-    /// (<see cref="ItemCatalog.MaxStackSize"/>) and the number of free slots — returns how much
-    /// actually fit (0..count). A caller whose item has nowhere else to fall back to (a refund,
-    /// a purchase) must handle a partial result itself; see InventoryOverflow. `charge` only
-    /// matters for a freshly-created "battery" slot — every other item ignores it.</summary>
+    /// <summary>Respects both the item's stack limit and the number of free slots. Returns how
+    /// much actually fit (0..count) — a caller with nowhere else to fall back to (a refund, a
+    /// purchase) must handle a partial result itself.</summary>
     public int Add(string itemId, int count = 1, float charge = 1f) => AddWithinRange(itemId, count, 0, _slots.Length, charge);
 
-    /// <summary>Adds within a sub-range of slots only — used by PlayerInventory to target just
-    /// the body range (e.g. unequipping a hand without spilling into the *other* hand).</summary>
+    /// <summary>Adds within a sub-range of slots only — e.g. unequipping a hand without spilling
+    /// into the *other* hand.</summary>
     public int AddWithinRange(string itemId, int count, int startInclusive, int endExclusive, float charge = 1f)
     {
         var remaining = count;
         var maxStack = ItemCatalog.MaxStackSize(itemId);
 
-        // Top up existing stacks of the same item first — keeps that slot's own Charge (moot for
-        // battery specifically, since its maxStackSize of 1 means this branch never actually
-        // applies to it).
+        // Top up existing stacks first.
         for (var i = startInclusive; i < endExclusive && remaining > 0; i++)
         {
             if (_slots[i] is not { } slot || slot.ItemId != itemId)
@@ -112,11 +99,9 @@ public sealed class SlotContainer
         return count - remaining;
     }
 
-    /// <summary>Moves slot `from` onto slot `to` — the inventory panel UI's drag-and-drop
-    /// mutation (see InventorySlotUI). Different items swap; the same item tops `to` up from
-    /// `from` up to that item's stack limit, leaving any remainder in `from` (same "partial fit"
-    /// spirit as <see cref="Add"/>). A no-op for an out-of-range index, `from == to`, an empty
-    /// `from`, or a same-item `to` that's already full.</summary>
+    /// <summary>Different items swap; the same item tops `to` up from `from` up to its stack
+    /// limit, leaving any remainder in `from`. A no-op for an out-of-range index, `from == to`,
+    /// an empty `from`, or a same-item `to` that's already full.</summary>
     public void MoveSlot(int from, int to)
     {
         if (from == to || from < 0 || from >= _slots.Length || to < 0 || to >= _slots.Length)
@@ -154,9 +139,8 @@ public sealed class SlotContainer
         _slots[from] = remaining > 0 ? (source.ItemId, remaining, source.Charge) : null;
     }
 
-    /// <summary>Same drag-and-drop mutation as <see cref="MoveSlot"/>, but for two different
-    /// containers (e.g. a body slot and a worn backpack's own contents — see InventorySlotUI) —
-    /// delegates to <see cref="MoveSlot"/> when `from` and `to` are actually the same container.</summary>
+    /// <summary>Same mutation as <see cref="MoveSlot"/>, but for two different containers —
+    /// delegates to it when `from` and `to` are actually the same container.</summary>
     public static void MoveBetween(SlotContainer from, int fromIndex, SlotContainer to, int toIndex)
     {
         if (ReferenceEquals(from, to))

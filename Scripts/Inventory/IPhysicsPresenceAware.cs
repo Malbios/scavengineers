@@ -1,10 +1,8 @@
 namespace Scavengineers.Scripts.Inventory;
 
-/// <summary>Implemented by loose RigidBody3D pickups (PickupItem/ContainerPickupItem) so
-/// TravelConsoleVerbTarget.SetShipPresence can freeze/unfreeze them in lockstep with its own
-/// CollisionShape3D.Disabled toggle — a live RigidBody3D has nothing to rest on or collide with
-/// once its ship's collision is disabled, and would otherwise fall through the now-decollided
-/// floor forever (see TravelConsoleVerbTarget's own doc comment on SetShipPresence).</summary>
+/// <summary>Lets TravelConsoleVerbTarget.SetShipPresence freeze/unfreeze loose RigidBody3D
+/// pickups in lockstep with a ship's collision toggle — otherwise a live body falls through the
+/// now-decollided floor forever.</summary>
 public interface IPhysicsPresenceAware
 {
     void SetPhysicsPresence(bool present);

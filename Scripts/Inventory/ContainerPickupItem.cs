@@ -8,13 +8,9 @@ using PlayerScript = Scavengineers.Scripts.Player.Player;
 
 namespace Scavengineers.Scripts.Inventory;
 
-/// <summary>
-/// A full backpack sitting in the world (inventory arc Stage 3) — dropped by
-/// Player.TryUnequipBackpack when a non-empty backpack is taken off, since its contents have no
-/// fungible slot representation to fall back into. Structurally parallel to PickupItem, but
-/// carries a live <see cref="SlotContainer"/> instead of a flat count — the same instance that
-/// was equipped, contents intact.
-/// </summary>
+/// <summary>A full backpack sitting in the world — dropped when a non-empty backpack is taken
+/// off, since its contents have no fungible slot representation to fall back into. Structurally
+/// parallel to PickupItem, but carries a live <see cref="SlotContainer"/> instead of a flat count.</summary>
 public partial class ContainerPickupItem : RigidBody3D, IVerbTarget, IPhysicsPresenceAware
 {
     private static readonly Verb PickUpVerb = new("pick_up", "VERB_PICK_UP", DurationSeconds: 0f);
@@ -36,21 +32,15 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget, IPhysicsPre
     public string ItemId { get; set; } = "";
 
     /// <summary>Which equip slot this container re-equips into on pickup — "back" for a dropped
-    /// backpack, "torso" for a dropped EVA suit torso piece, etc. Defaults to "back" since the
-    /// backpack was this class's only use case until other worn containers existed.</summary>
+    /// backpack, "torso" for a dropped EVA suit torso piece.</summary>
     [Export]
     public string EquipSlotName { get; set; } = "back";
 
     public SlotContainer? Contents { get; set; }
 
     /// <summary>The EVA suit torso's tank/filter/battery sub-slot state at the moment it was
-    /// genuinely discarded (see Player's CaptureAndDetachSuitTanks) — null for anything that
-    /// isn't the suit (a plain backpack drop), non-null-but-HasItem-false for an attached-but-
-    /// empty sub-slot (still meaningful: this suit has that slot at all, just nothing loaded).
-    /// Restored via AttachSpecializedSlot on pickup (see ExecuteVerb) so a genuinely-discarded
-    /// suit's tanks travel with it into the world and back, instead of the "eject tanks back
-    /// into general inventory" behavior a mere unequip now uses (see PlayerInventory's
-    /// persistent-contents model).</summary>
+    /// discarded — null for anything that isn't the suit. Restored via AttachSpecializedSlot on
+    /// pickup so a discarded suit's tanks travel with it into the world and back.</summary>
     public (bool HasItem, float Charge)? SuitO2 { get; set; }
 
     public (bool HasItem, float Charge)? SuitN2 { get; set; }
@@ -179,8 +169,8 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget, IPhysicsPre
 
     public string? DisplayNameKey => "ITEM_" + ItemId.ToUpperInvariant();
 
-    /// <summary>Pick Up only offered while the target equip slot is free — a full container has
-    /// no fungible slot to fall back into, so there's nowhere else for it to go.</summary>
+    /// <summary>Only offered while the target equip slot is free — a full container has nowhere
+    /// else to go.</summary>
     public IReadOnlyList<Verb> AvailableVerbs =>
         GetPlayer() is { } player && player.Inventory.IsContainerSlotFree(EquipSlotName) ? [PickUpVerb] : [];
 
@@ -207,7 +197,7 @@ public partial class ContainerPickupItem : RigidBody3D, IVerbTarget, IPhysicsPre
         // Instant, already complete by the time anyone could cancel it — nothing to do.
     }
 
-    // Resolved fresh on every access rather than cached in _Ready — see VendorVerbTarget's
-    // own GetPlayer for why (scene-tree "player" group membership order isn't guaranteed yet).
+    // Resolved fresh on every access rather than cached in _Ready — scene-tree "player" group
+    // membership order isn't guaranteed yet at that point.
     private PlayerScript? GetPlayer() => GetTree().GetFirstNodeInGroup("player") as PlayerScript;
 }
