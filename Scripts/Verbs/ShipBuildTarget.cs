@@ -132,56 +132,65 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         Requirements = [WrenchRequirement, SparePartsRequirement],
     };
 
-    // Same two-tier upkeep for Switch/RechargeStation machine fixtures — Battery deliberately
-    // has no Maintain/Repair pair, since its own Condition already means charge, not wear (see
-    // WearSystem and BatteryFixture's own doc comment).
-    private static readonly Verb MaintainSwitchVerb = new("maintain_switch", "VERB_MAINTAIN_SWITCH", DurationSeconds: 0.6f)
+    /// <summary>
+    /// Everything that varies between the single-instance machines (Battery/Switch/Recharge
+    /// Station) except the bits that are genuinely per-machine code: the mesh/material/collider it
+    /// spawns and which VerbTarget script it attaches (see <see cref="InstallBattery"/> and its two
+    /// siblings). This used to be nine parallel <c>switch (MachineType)</c> expressions plus a
+    /// hand-written static Verb field per machine per action — adding one machine meant touching
+    /// all of them, which is precisely the per-object-type special-casing
+    /// docs/architecture/verbs-and-interaction.md exists to forbid.
+    ///
+    /// <para>The five verbs are generated rather than listed, because the ids and localization keys
+    /// were already perfectly systematic: <c>install_&lt;item&gt;</c> / <c>VERB_INSTALL_&lt;ITEM&gt;</c>
+    /// and so on for uninstall/scrap/maintain/repair. Install requires holding the machine's own
+    /// item (bought from a vendor, or refunded by a prior Uninstall); Uninstall gives that item
+    /// back, Scrap yields partial scrap_metal instead — a real tradeoff, same shape as
+    /// DamagedConduitVerbTarget's Repair-vs-Scrap.</para>
+    /// </summary>
+    /// <param name="FixtureId">The Deck fixture backing this machine's wear/Condition, or null for
+    /// a machine with no upkeep concept at all. Null is exactly Battery: its Condition already
+    /// means charge, not wear (see WearSystem and BatteryFixture's own doc comment), so it gets no
+    /// Maintain/Repair pair — hence those two verbs being nullable below.</param>
+    private sealed record MachineDefinition(MachineType Type, string ItemId, string? FixtureId, int ScrapYield)
     {
-        Requirements = [WrenchRequirement],
+        public Verb Install { get; } = new($"install_{ItemId}", $"VERB_INSTALL_{ItemId.ToUpperInvariant()}", DurationSeconds: 0.6f)
+        {
+            Requirements = [new ItemRequirement(ItemId, 1)],
+        };
+
+        public Verb Uninstall { get; } =
+            new($"uninstall_{ItemId}", $"VERB_UNINSTALL_{ItemId.ToUpperInvariant()}", DurationSeconds: 0.6f) { IsDestructive = true };
+
+        public Verb Scrap { get; } =
+            new($"scrap_{ItemId}", $"VERB_SCRAP_{ItemId.ToUpperInvariant()}", DurationSeconds: 0.6f) { IsDestructive = true };
+
+        /// <summary>Null iff <see cref="FixtureId"/> is — the same two-tier upkeep model every other
+        /// wearing thing uses (wrench alone above 50% health, wrench + spare parts at or below).</summary>
+        public Verb? Maintain { get; } = FixtureId is null
+            ? null
+            : new Verb($"maintain_{ItemId}", $"VERB_MAINTAIN_{ItemId.ToUpperInvariant()}", DurationSeconds: 0.6f)
+            {
+                Requirements = [WrenchRequirement],
+            };
+
+        public Verb? Repair { get; } = FixtureId is null
+            ? null
+            : new Verb($"repair_{ItemId}", $"VERB_REPAIR_{ItemId.ToUpperInvariant()}", DurationSeconds: 0.6f)
+            {
+                Requirements = [WrenchRequirement, SparePartsRequirement],
+            };
+    }
+
+    // ScrapYield is placeholder/tunable — roughly tracks each machine's own buy price in items.json.
+    private static readonly Dictionary<MachineType, MachineDefinition> Machines = new()
+    {
+        [MachineType.Battery] = new(MachineType.Battery, "battery", FixtureId: null, ScrapYield: 4),
+        [MachineType.Switch] = new(MachineType.Switch, "switch", ShipSim.SwitchFixtureId, ScrapYield: 1),
+        [MachineType.RechargeStation] = new(MachineType.RechargeStation, "recharge_station", ShipSim.RechargeFixtureId, ScrapYield: 3),
     };
 
-    private static readonly Verb RepairSwitchVerb = new("repair_switch", "VERB_REPAIR_SWITCH", DurationSeconds: 0.6f)
-    {
-        Requirements = [WrenchRequirement, SparePartsRequirement],
-    };
-
-    private static readonly Verb MaintainRechargeStationVerb = new("maintain_recharge_station", "VERB_MAINTAIN_RECHARGE_STATION", DurationSeconds: 0.6f)
-    {
-        Requirements = [WrenchRequirement],
-    };
-
-    private static readonly Verb RepairRechargeStationVerb = new("repair_recharge_station", "VERB_REPAIR_RECHARGE_STATION", DurationSeconds: 0.6f)
-    {
-        Requirements = [WrenchRequirement, SparePartsRequirement],
-    };
-
-    // Battery/Switch/RechargeStation verbs — Install requires holding the machine's own item
-    // (bought from a trade console, or refunded by a prior Uninstall); Uninstall gives that same
-    // item back, Scrap gives partial scrap_metal instead (a real tradeoff, same shape as
-    // DamagedConduitVerbTarget's Repair-vs-Scrap).
-    private static readonly Verb InstallBatteryVerb = new("install_battery", "VERB_INSTALL_BATTERY", DurationSeconds: 0.6f)
-    {
-        Requirements = [new ItemRequirement("battery", 1)],
-    };
-
-    private static readonly Verb UninstallBatteryVerb = new("uninstall_battery", "VERB_UNINSTALL_BATTERY", DurationSeconds: 0.6f) { IsDestructive = true };
-    private static readonly Verb ScrapBatteryVerb = new("scrap_battery", "VERB_SCRAP_BATTERY", DurationSeconds: 0.6f) { IsDestructive = true };
-
-    private static readonly Verb InstallSwitchVerb = new("install_switch", "VERB_INSTALL_SWITCH", DurationSeconds: 0.6f)
-    {
-        Requirements = [new ItemRequirement("switch", 1)],
-    };
-
-    private static readonly Verb UninstallSwitchVerb = new("uninstall_switch", "VERB_UNINSTALL_SWITCH", DurationSeconds: 0.6f) { IsDestructive = true };
-    private static readonly Verb ScrapSwitchVerb = new("scrap_switch", "VERB_SCRAP_SWITCH", DurationSeconds: 0.6f) { IsDestructive = true };
-
-    private static readonly Verb InstallRechargeStationVerb = new("install_recharge_station", "VERB_INSTALL_RECHARGE_STATION", DurationSeconds: 0.6f)
-    {
-        Requirements = [new ItemRequirement("recharge_station", 1)],
-    };
-
-    private static readonly Verb UninstallRechargeStationVerb = new("uninstall_recharge_station", "VERB_UNINSTALL_RECHARGE_STATION", DurationSeconds: 0.6f) { IsDestructive = true };
-    private static readonly Verb ScrapRechargeStationVerb = new("scrap_recharge_station", "VERB_SCRAP_RECHARGE_STATION", DurationSeconds: 0.6f) { IsDestructive = true };
+    private static MachineDefinition Definition(MachineType type) => Machines[type];
 
     // Thruster — same Install/Uninstall/Scrap shape as Battery/Switch/RechargeStation above, but
     // NOT MachineType-based (see _placedThrusters): many can be installed at once, one per edge.
@@ -1394,7 +1403,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         return wallPresent ? InstallConduitVerb : null;
     }
 
-    private static readonly MachineType[] AllMachineTypes = [MachineType.Battery, MachineType.Switch, MachineType.RechargeStation];
+    private static IEnumerable<MachineType> AllMachineTypes => Machines.Keys;
 
     /// <summary>Same multi-verb-on-one-edge idea as <see cref="EdgeConduitVerb"/> — a machine
     /// already at this exact edge offers Uninstall/Scrap; an empty, wall-present edge offers
@@ -1469,68 +1478,42 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
     }
 
-    private static Verb InstallVerbFor(MachineType type) => type switch
-    {
-        MachineType.Battery => InstallBatteryVerb,
-        MachineType.Switch => InstallSwitchVerb,
-        MachineType.RechargeStation => InstallRechargeStationVerb,
-        _ => throw new System.ArgumentOutOfRangeException(nameof(type)),
-    };
+    private static Verb InstallVerbFor(MachineType type) => Definition(type).Install;
 
-    private static Verb UninstallVerbFor(MachineType type) => type switch
-    {
-        MachineType.Battery => UninstallBatteryVerb,
-        MachineType.Switch => UninstallSwitchVerb,
-        MachineType.RechargeStation => UninstallRechargeStationVerb,
-        _ => throw new System.ArgumentOutOfRangeException(nameof(type)),
-    };
+    private static Verb UninstallVerbFor(MachineType type) => Definition(type).Uninstall;
 
-    private static Verb ScrapVerbFor(MachineType type) => type switch
-    {
-        MachineType.Battery => ScrapBatteryVerb,
-        MachineType.Switch => ScrapSwitchVerb,
-        MachineType.RechargeStation => ScrapRechargeStationVerb,
-        _ => throw new System.ArgumentOutOfRangeException(nameof(type)),
-    };
+    private static Verb ScrapVerbFor(MachineType type) => Definition(type).Scrap;
 
     /// <summary>The Deck fixture id backing a machine type's wear/Condition — null for Battery,
     /// which deliberately has no upkeep verbs (see WearSystem/BatteryFixture).</summary>
-    private static string? MachineFixtureIdFor(MachineType type) => type switch
-    {
-        MachineType.Switch => ShipSim.SwitchFixtureId,
-        MachineType.RechargeStation => ShipSim.RechargeFixtureId,
-        _ => null,
-    };
-
-    private static Verb MaintainVerbFor(MachineType type) => type switch
-    {
-        MachineType.Switch => MaintainSwitchVerb,
-        MachineType.RechargeStation => MaintainRechargeStationVerb,
-        _ => throw new System.ArgumentOutOfRangeException(nameof(type)),
-    };
-
-    private static Verb RepairVerbFor(MachineType type) => type switch
-    {
-        MachineType.Switch => RepairSwitchVerb,
-        MachineType.RechargeStation => RepairRechargeStationVerb,
-        _ => throw new System.ArgumentOutOfRangeException(nameof(type)),
-    };
+    private static string? MachineFixtureIdFor(MachineType type) => Definition(type).FixtureId;
 
     /// <summary>Which machine type/pending action a machine verb id maps to — Action is null for
-    /// any non-machine verb id, the signal ExecuteVerb/IsMachineVerb use to fall through.</summary>
-    private static (MachineType Type, PendingAction? Action) ResolveMachineVerb(Verb verb) => verb.Id switch
+    /// any non-machine verb id, the signal ExecuteVerb/IsMachineVerb use to fall through. Searches
+    /// the table rather than listing all three actions for all three machines, so a new machine
+    /// becomes reachable here purely by existing in <see cref="Machines"/>.</summary>
+    private static (MachineType Type, PendingAction? Action) ResolveMachineVerb(Verb verb)
     {
-        _ when verb.Id == InstallBatteryVerb.Id => (MachineType.Battery, PendingAction.InstallMachine),
-        _ when verb.Id == UninstallBatteryVerb.Id => (MachineType.Battery, PendingAction.UninstallMachine),
-        _ when verb.Id == ScrapBatteryVerb.Id => (MachineType.Battery, PendingAction.ScrapMachine),
-        _ when verb.Id == InstallSwitchVerb.Id => (MachineType.Switch, PendingAction.InstallMachine),
-        _ when verb.Id == UninstallSwitchVerb.Id => (MachineType.Switch, PendingAction.UninstallMachine),
-        _ when verb.Id == ScrapSwitchVerb.Id => (MachineType.Switch, PendingAction.ScrapMachine),
-        _ when verb.Id == InstallRechargeStationVerb.Id => (MachineType.RechargeStation, PendingAction.InstallMachine),
-        _ when verb.Id == UninstallRechargeStationVerb.Id => (MachineType.RechargeStation, PendingAction.UninstallMachine),
-        _ when verb.Id == ScrapRechargeStationVerb.Id => (MachineType.RechargeStation, PendingAction.ScrapMachine),
-        _ => (default, null),
-    };
+        foreach (var definition in Machines.Values)
+        {
+            if (verb.Id == definition.Install.Id)
+            {
+                return (definition.Type, PendingAction.InstallMachine);
+            }
+
+            if (verb.Id == definition.Uninstall.Id)
+            {
+                return (definition.Type, PendingAction.UninstallMachine);
+            }
+
+            if (verb.Id == definition.Scrap.Id)
+            {
+                return (definition.Type, PendingAction.ScrapMachine);
+            }
+        }
+
+        return (default, null);
+    }
 
     private static bool IsMachineVerb(Verb verb) => ResolveMachineVerb(verb).Action is not null;
 
@@ -1572,7 +1555,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// cref="MachineFixtureIdFor"/>) or a machine not currently installed.</summary>
     internal IReadOnlyList<Verb> MachineMaintainRepairVerbs(MachineType type)
     {
-        if (MachineFixtureIdFor(type) is not { } fixtureId)
+        var definition = Definition(type);
+
+        // FixtureId and Maintain/Repair are null together by construction (see MachineDefinition),
+        // so this one check covers all three.
+        if (definition.FixtureId is not { } fixtureId)
         {
             return [];
         }
@@ -1582,7 +1569,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             return [];
         }
 
-        return MaintenanceTier.PickVerb(fixture.Condition, MaintainVerbFor(type), RepairVerbFor(type)) is { } verb ? [verb] : [];
+        return MaintenanceTier.PickVerb(fixture.Condition, definition.Maintain!, definition.Repair!) is { } verb ? [verb] : [];
     }
 
     /// <summary>Counterpart to <see cref="MachineRemovalVerbs"/> — a machine's own ExecuteVerb
@@ -1694,17 +1681,18 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// <see cref="ExecuteMachineRemoval"/>.</summary>
     internal void ExecuteMachineMaintainRepair(MachineType type, Verb verb, PlayerInventory inventory)
     {
-        if (_cycling || !_placedMachines.ContainsKey(type) || MachineFixtureIdFor(type) is null)
+        var definition = Definition(type);
+        if (_cycling || !_placedMachines.ContainsKey(type) || definition.FixtureId is null)
         {
             return;
         }
 
         PendingAction action;
-        if (verb.Id == MaintainVerbFor(type).Id)
+        if (verb.Id == definition.Maintain!.Id)
         {
             action = PendingAction.MaintainMachine;
         }
-        else if (verb.Id == RepairVerbFor(type).Id)
+        else if (verb.Id == definition.Repair!.Id)
         {
             action = PendingAction.RepairMachine;
         }
@@ -2687,23 +2675,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         _ => null,
     };
 
-    private static string ItemIdFor(MachineType type) => type switch
-    {
-        MachineType.Battery => "battery",
-        MachineType.Switch => "switch",
-        MachineType.RechargeStation => "recharge_station",
-        _ => throw new System.ArgumentOutOfRangeException(nameof(type)),
-    };
+    private static string ItemIdFor(MachineType type) => Definition(type).ItemId;
 
-    // Placeholder/tunable — roughly matches each machine's relative buy price (see
-    // VendorVerbTarget.Prices).
-    private static int ScrapYieldFor(MachineType type) => type switch
-    {
-        MachineType.Battery => 4,
-        MachineType.Switch => 1,
-        MachineType.RechargeStation => 3,
-        _ => 1,
-    };
+    private static int ScrapYieldFor(MachineType type) => Definition(type).ScrapYield;
 
     /// <summary>Ghost shape/position depends on both where you're aiming AND which install verb
     /// is currently highlighted — e.g. "install a conduit" and "build a floor panel" are
@@ -3016,13 +2990,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         return data;
     }
 
-    private static MachineType? MachineTypeFromItemId(string itemId) => itemId switch
-    {
-        "battery" => MachineType.Battery,
-        "switch" => MachineType.Switch,
-        "recharge_station" => MachineType.RechargeStation,
-        _ => null,
-    };
+    /// <summary>Reverse of <see cref="ItemIdFor"/> — null for anything that isn't one of the
+    /// single-instance machines. Derived from the same table, so the two can't drift apart.</summary>
+    private static MachineType? MachineTypeFromItemId(string itemId) =>
+        Machines.Values.FirstOrDefault(d => d.ItemId == itemId)?.Type;
 
     /// <summary>Replays a save's tiles/edges through the same helpers Install/BuildWall use —
     /// already inventory-free at this level (the verb/cost logic lives in ExecuteVerb, never
