@@ -11,14 +11,10 @@ using PlayerScript = Scavengineers.Scripts.Player.Player;
 
 namespace Scavengineers.Scripts.Ship;
 
-/// <summary>
-/// The Station's contract-giver — a second static figure alongside VendorVerbTarget's own
-/// ShopFigure (see World.tscn), same "person, not a machine, single always-available verb opens a
-/// panel" shape. Rolls a small pool of contract offers from ContractCatalog's data-driven
-/// templates, resolving each offer's real Derelict/Station targets from <see cref="ConsoleRef"/>'s
-/// own BuildMapEntries — ContractCatalog itself has no notion of the live travel-console state,
-/// only item pools/counts/rewards/deadlines (see its own class doc comment).
-/// </summary>
+/// <summary>The Station's contract-giver. Rolls a small pool of offers from ContractCatalog's
+/// data-driven templates, resolving each offer's real Derelict/Station targets from
+/// <see cref="ConsoleRef"/>'s BuildMapEntries — ContractCatalog itself has no notion of the live
+/// travel-console state, only item pools/counts/rewards/deadlines.</summary>
 public partial class ContractGiverVerbTarget : StaticBody3D, IVerbTarget
 {
     // Placeholder/tunable — how many offers sit on the board at once.
@@ -40,8 +36,6 @@ public partial class ContractGiverVerbTarget : StaticBody3D, IVerbTarget
 
     public IReadOnlyList<Contract> AvailableOffers => _availableOffers;
 
-    /// <summary>Opens the contract board instead of executing anything directly — same "no bespoke
-    /// per-object input path" shape VendorVerbTarget/TravelConsoleVerbTarget already use.</summary>
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
         if (verb.Id != OpenContractBoardVerb.Id)
@@ -61,12 +55,10 @@ public partial class ContractGiverVerbTarget : StaticBody3D, IVerbTarget
     {
     }
 
-    /// <summary>Tops the board back up to MaxOffers — called every time the board is opened, so a
-    /// taken/expired slot gets refilled next visit rather than needing a separate timer of its
-    /// own. Stops early (rather than looping forever) if a template can't currently be resolved
-    /// into a real offer — e.g. CargoDelivery needs at least 2 Stations that aren't the current
-    /// destination; if that's momentarily not satisfiable, the board just stays under MaxOffers
-    /// until the next visit.</summary>
+    /// <summary>Tops the board back up to MaxOffers, called every time the board is opened. Stops
+    /// early if a template can't currently be resolved into a real offer — e.g. CargoDelivery
+    /// needs at least 2 Stations that aren't the current destination — leaving the board under
+    /// MaxOffers until the next visit rather than looping forever.</summary>
     public void RefreshOffers()
     {
         while (_availableOffers.Count < MaxOffers)
@@ -81,14 +73,11 @@ public partial class ContractGiverVerbTarget : StaticBody3D, IVerbTarget
         }
     }
 
-    /// <summary>Removes and returns the named offer — called by Player.AcceptContract so an
-    /// accepted job leaves the board (can't be double-accepted) rather than just being copied.
-    /// Null if the id doesn't match any current offer (e.g. taken by a stale UI click after
-    /// RefreshOffers already replaced it). For a RetrieveItem offer, also spawns its target item
-    /// onto the target Derelict; for a CargoDelivery offer, spawns the cargo item onto the origin
-    /// Station instead — nothing else in the loot pipeline ever places a contract's specific item
-    /// anywhere (see ShipBuildTarget.SpawnMissionItem's own doc comment), so without this the job
-    /// could never actually be found/carried or completed.</summary>
+    /// <summary>Removes and returns the named offer so an accepted job can't be double-accepted.
+    /// Null if the id doesn't match any current offer (e.g. a stale UI click after RefreshOffers
+    /// already replaced it). For RetrieveItem, also spawns the target item onto the target
+    /// Derelict; for CargoDelivery, onto the origin Station — nothing else in the loot pipeline
+    /// ever places a contract's item anywhere, so without this the job could never be completed.</summary>
     public Contract? TryTakeOffer(string instanceId)
     {
         var offer = _availableOffers.FirstOrDefault(o => o.InstanceId == instanceId);
@@ -115,10 +104,9 @@ public partial class ContractGiverVerbTarget : StaticBody3D, IVerbTarget
         }
     }
 
-    /// <summary>Test-only seam: puts a specific, fully-resolved Contract directly onto the board,
-    /// bypassing RollOneOffer's real randomness — lets NodeTests exercise deterministic accept/
-    /// turn-in/expiry/arrival flows without fighting RNG. Matches this codebase's existing
-    /// test-accessor convention (see Player.SetScanModeOnForTests).</summary>
+    /// <summary>Test-only seam: puts a resolved Contract directly onto the board, bypassing
+    /// RollOneOffer's randomness, so NodeTests can exercise deterministic accept/turn-in/expiry
+    /// flows.</summary>
     public void AddOfferForTests(Contract contract) => _availableOffers.Add(contract);
 
     private Contract? RollOneOffer()
@@ -171,16 +159,14 @@ public partial class ContractGiverVerbTarget : StaticBody3D, IVerbTarget
         return rolled with { OriginStationId = ConsoleRef.CurrentDestinationId, DestinationStationId = destination.DestinationId };
     }
 
-    /// <summary>Every current offer, always acceptable (no gating) — the Active list's own
-    /// entries are built by Player instead (see Player.RefreshContractBoard), since only it knows
-    /// whether the player's inventory currently satisfies a RetrieveItem/SalvageQuota turn-in.</summary>
+    /// <summary>Every current offer, always acceptable — the Active list's entries are built by
+    /// Player instead, since only it knows whether the inventory currently satisfies a
+    /// RetrieveItem/SalvageQuota turn-in.</summary>
     public IReadOnlyList<ContractBoardEntry> BuildAvailableEntries() =>
         _availableOffers.Select(c => new ContractBoardEntry(c.InstanceId, Describe(c), ActionAvailable: true)).ToList();
 
-    /// <summary>Builds the simple, modular "{type}: {details} ({reward}cr, {time}s)" display text
-    /// this codebase's own localization bar already sets (see ShopPanel's own "{name} ({price}cr)"
-    /// — concatenated parts via Tr() per atomic piece, not an attempt at grammatically correct
-    /// full-sentence translation).</summary>
+    /// <summary>"{type}: {details} ({reward}cr, {time}s)" — concatenated parts via Tr() per atomic
+    /// piece, not an attempt at grammatically correct full-sentence translation.</summary>
     public string Describe(Contract contract)
     {
         var typeLabel = Tr($"CONTRACT_TYPE_{contract.Type.ToString().ToUpperInvariant()}");

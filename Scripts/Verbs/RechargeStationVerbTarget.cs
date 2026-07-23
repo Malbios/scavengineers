@@ -9,19 +9,16 @@ using PlayerScript = Scavengineers.Scripts.Player.Player;
 
 namespace Scavengineers.Scripts.Verbs;
 
-/// <summary>
-/// Refills the player's suit O2/power, but only while its ship's recharge-station fixture
-/// is powered — cutting the breaker (<see cref="ToggleLightVerbTarget"/>) really does cut
-/// this off, giving the power grid an upkeep stake beyond a cosmetic light.
-/// </summary>
+/// <summary>Refills the player's suit O2/power, but only while its ship's recharge-station
+/// fixture is powered — cutting the breaker (<see cref="ToggleLightVerbTarget"/>) really does
+/// cut this off, giving the power grid an upkeep stake beyond a cosmetic light.</summary>
 public partial class RechargeStationVerbTarget : StaticBody3D, IVerbTarget
 {
     private static readonly Verb RechargeVerb = new("recharge", "VERB_RECHARGE", DurationSeconds: 0.6f);
 
-    // Placeholder/tunable — Recharge is a near-instant 0.2s action with no other "in progress"
-    // signal to hook a sustained draw off (ExecuteVerb only fires once Player's own generic
-    // verb-duration wait has already elapsed), so this is a brief, honest power spike after the
-    // fact rather than pretending Recharge is a multi-second continuous action it isn't.
+    // Placeholder/tunable — Recharge is a near-instant action with no "in progress" signal to
+    // hook a sustained draw off, so this is a brief, honest power spike after the fact rather
+    // than pretending Recharge is a multi-second continuous action it isn't.
     private const float ActiveDrawWindowSeconds = 1.5f;
 
     [Export]

@@ -8,14 +8,11 @@ using Scavengineers.Scripts.Ship;
 
 namespace Scavengineers.Scripts.Verbs;
 
-/// <summary>
-/// The room's breaker. Flipping the physical switch is always possible — a mechanical toggle
-/// needs no power of its own to move — but the bulb only actually lights while the switch
-/// fixture itself reads as powered (wired all the way back to the battery, which has charge).
-/// <see cref="_switchOn"/> is the switch's own position; <see cref="TargetLight"/>'s visibility
-/// is a derived value recomputed every tick, not the source of truth, so it correctly goes dark
-/// the moment the battery dies even though nobody touched the switch.
-/// </summary>
+/// <summary>The room's breaker. Flipping the physical switch is always possible — a mechanical
+/// toggle needs no power to move — but the bulb only lights while the switch fixture itself
+/// reads as powered. <see cref="_switchOn"/> is the switch's own position;
+/// <see cref="TargetLight"/>'s visibility is a derived value recomputed every tick, so it
+/// correctly goes dark the moment the battery dies even though nobody touched the switch.</summary>
 public partial class ToggleLightVerbTarget : StaticBody3D, IVerbTarget, ISaveable
 {
     private static readonly Verb ToggleVerb = new("toggle", "VERB_TOGGLE", DurationSeconds: 0f);
@@ -26,9 +23,8 @@ public partial class ToggleLightVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     [Export]
     public ShipSim? ShipSimRef { get; set; }
 
-    /// <summary>Set by ShipBuildTarget when it spawns this instance — see BatteryVerbTarget's own
-    /// BuildTarget for why this is needed (Uninstall/Scrap reachable while aiming at the switch's
-    /// own box, not just bare wall space next to it).</summary>
+    /// <summary>Set by ShipBuildTarget when it spawns this instance — makes Uninstall/Scrap
+    /// reachable while aiming at the switch's own box.</summary>
     [Export]
     public ShipBuildTarget? BuildTarget { get; set; }
 
@@ -36,8 +32,7 @@ public partial class ToggleLightVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     public string SaveId { get; set; } = "";
 
     // Starts on, matching the scene's default-visible RoomLight and the switch fixture's own
-    // IsOpen=false default (closed = power flows) — the same "starts working" state as before
-    // this change, for a switch that's still adjacent enough to the battery not to need a wire.
+    // IsOpen=false default (closed = power flows).
     private bool _switchOn = true;
 
     public IReadOnlyList<Verb> AvailableVerbs =>

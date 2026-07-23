@@ -10,16 +10,12 @@ using Scavengineers.Scripts.Ship;
 
 namespace Scavengineers.Scripts.Verbs;
 
-/// <summary>
-/// Turns a ship's whole Floor into a free-form build target — any tile, ceiling point, or edge
-/// the player is aiming at (fed in via <see cref="SetAimPoint"/>/<see cref="SetCeilingAimPoint"/>,
-/// computed from the interact ray's hit point) can have a conduit (tile or wall), a floor panel
-/// (tile), a ceiling panel, or a wall segment (edge) installed/removed. Reuses PowerSystem's
-/// existing adjacency rule for conduits, Deck.SealEdge/UnsealEdge for interior walls, and
-/// Deck.BreachHull/RepairHull (now reason-tagged, see StructuralSurface) for both boundary walls
-/// and floor/ceiling — so no new Scavengineers.Sim concepts are needed, just deciding which
-/// surface the player means and which existing primitive represents it.
-/// </summary>
+/// <summary>Turns a ship's whole Floor into a free-form build target — any tile, ceiling point,
+/// or edge the player is aiming at (fed in via <see cref="SetAimPoint"/>/
+/// <see cref="SetCeilingAimPoint"/>) can have a conduit (tile or wall), a floor panel (tile), a
+/// ceiling panel, or a wall segment (edge) installed/removed. Reuses PowerSystem's adjacency rule
+/// for conduits, Deck.SealEdge/UnsealEdge for interior walls, and Deck.BreachHull/RepairHull for
+/// both boundary walls and floor/ceiling — no new Scavengineers.Sim concepts needed.</summary>
 public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSaveable
 {
     // Public so Player can compare its filtered/affordable verb against these exact instances to
@@ -29,9 +25,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         Requirements = [new ItemRequirement("scrap_metal", 1)],
     };
 
-    // Wall/floor/ceiling work (not conduits) needs a power drill in hand alongside the
-    // consumed material — a real tool, not spent, gated on its own charge (see
-    // Player.IsAffordable/Interact's drill-specific clauses).
+    // Wall/floor/ceiling work (not conduits) needs a power drill in hand alongside the consumed
+    // material — a real tool, not spent, gated on its own charge.
     private static readonly ItemRequirement PowerDrillRequirement = new("power_drill", 1) { Consumed = false };
 
     public static readonly Verb InstallWallVerb = new("build_wall", "VERB_BUILD_WALL", DurationSeconds: 0.6f)
@@ -47,9 +42,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         Requirements = [PowerDrillRequirement],
     };
 
-    // Floor and ceiling panels reuse the same wall_panel construction-part item as walls —
-    // one item covers all three rather than inventing two more catalog entries for the same
-    // purpose.
+    // Floor and ceiling panels reuse the same wall_panel construction-part item as walls.
     private static readonly Verb InstallFloorVerb = new("install_floor", "VERB_INSTALL_FLOOR", DurationSeconds: 0.6f)
     {
         Requirements = [new ItemRequirement("wall_panel", 1), PowerDrillRequirement],
@@ -72,21 +65,18 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         Requirements = [PowerDrillRequirement],
     };
 
-    // Same cost shape as InstallFloorVerb — it's the same construction work, just claiming a
-    // brand-new cell instead of repairing an existing one's panel. Only offered alongside
-    // InstallWallVerb on a boundary edge that's currently open (see ResolveAvailableVerbs) — you
-    // extend through a gap you've made, not through an intact wall.
+    // Same cost as InstallFloorVerb, but claims a brand-new cell instead of repairing an existing
+    // one's panel. Only offered alongside InstallWallVerb on a boundary edge that's currently
+    // open — you extend through a gap you've made, not through an intact wall.
     private static readonly Verb ExtendFloorVerb = new("extend_floor", "VERB_EXTEND_FLOOR", DurationSeconds: 0.6f)
     {
         Requirements = [new ItemRequirement("wall_panel", 1), PowerDrillRequirement],
     };
 
-    // The two-tier upkeep model (see WearSystem's passive decay): above 50% health, a wrench
-    // alone tops a surface back to full — no resource cost, matching "the right tool, no
-    // materials." At or below 50% it's Damaged and needs the wrench *and* spare_parts instead.
-    // Offered instead of each other (see ResolveAvailableVerbs), alongside — not instead of —
-    // the existing Install/Remove verb above; reaching exactly 0% health is a full breach, which
-    // stays on that existing, more expensive verb since there's no panel left to merely top up.
+    // The two-tier upkeep model: above 50% health, a wrench alone tops a surface back to full —
+    // no resource cost. At or below 50% it's Damaged and needs the wrench *and* spare_parts.
+    // Offered alongside, not instead of, the existing Install/Remove verb above; reaching exactly
+    // 0% health is a full breach, which stays on that verb since there's no panel left to top up.
     private static readonly ItemRequirement WrenchRequirement = new("wrench", 1) { Consumed = false };
     private static readonly ItemRequirement SparePartsRequirement = new("spare_parts", 1);
 
@@ -120,8 +110,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         Requirements = [WrenchRequirement, SparePartsRequirement],
     };
 
-    // Same two-tier upkeep for a placed conduit fixture (ConduitFixture.Condition) — offered
-    // alongside its Remove verb, never instead of it.
+    // Same two-tier upkeep for a placed conduit fixture — offered alongside its Remove verb.
     private static readonly Verb MaintainConduitVerb = new("maintain_conduit", "VERB_MAINTAIN_CONDUIT", DurationSeconds: 0.6f)
     {
         Requirements = [WrenchRequirement],
@@ -132,26 +121,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         Requirements = [WrenchRequirement, SparePartsRequirement],
     };
 
-    /// <summary>
-    /// Everything that varies between the single-instance machines (Battery/Switch/Recharge
-    /// Station) except the bits that are genuinely per-machine code: the mesh/material/collider it
-    /// spawns and which VerbTarget script it attaches (see <see cref="InstallBattery"/> and its two
-    /// siblings). This used to be nine parallel <c>switch (MachineType)</c> expressions plus a
-    /// hand-written static Verb field per machine per action — adding one machine meant touching
-    /// all of them, which is precisely the per-object-type special-casing
-    /// docs/architecture/verbs-and-interaction.md exists to forbid.
-    ///
-    /// <para>The five verbs are generated rather than listed, because the ids and localization keys
-    /// were already perfectly systematic: <c>install_&lt;item&gt;</c> / <c>VERB_INSTALL_&lt;ITEM&gt;</c>
-    /// and so on for uninstall/scrap/maintain/repair. Install requires holding the machine's own
-    /// item (bought from a vendor, or refunded by a prior Uninstall); Uninstall gives that item
-    /// back, Scrap yields partial scrap_metal instead — a real tradeoff, same shape as
-    /// DamagedConduitVerbTarget's Repair-vs-Scrap.</para>
-    /// </summary>
+    /// <summary>Everything that varies between the single-instance machines (Battery/Switch/
+    /// Recharge Station) except the bits that are genuinely per-machine code: the mesh/material/
+    /// collider it spawns and which VerbTarget script it attaches (see <see cref="InstallBattery"/>
+    /// and its two siblings). The five verbs are generated rather than listed, since the ids and
+    /// localization keys are perfectly systematic (<c>install_&lt;item&gt;</c> /
+    /// <c>VERB_INSTALL_&lt;ITEM&gt;</c>, and so on for uninstall/scrap/maintain/repair). Install
+    /// requires holding the machine's item; Uninstall gives it back; Scrap yields partial
+    /// scrap_metal instead — a real tradeoff.</summary>
     /// <param name="FixtureId">The Deck fixture backing this machine's wear/Condition, or null for
-    /// a machine with no upkeep concept at all. Null is exactly Battery: its Condition already
-    /// means charge, not wear (see WearSystem and BatteryFixture's own doc comment), so it gets no
-    /// Maintain/Repair pair — hence those two verbs being nullable below.</param>
+    /// no upkeep concept at all — null is exactly Battery, whose Condition already means charge,
+    /// not wear, so it gets no Maintain/Repair pair.</param>
     private sealed record MachineDefinition(MachineType Type, string ItemId, string? FixtureId, int ScrapYield)
     {
         public Verb Install { get; } = new($"install_{ItemId}", $"VERB_INSTALL_{ItemId.ToUpperInvariant()}", DurationSeconds: 0.6f)
@@ -165,8 +145,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         public Verb Scrap { get; } =
             new($"scrap_{ItemId}", $"VERB_SCRAP_{ItemId.ToUpperInvariant()}", DurationSeconds: 0.6f) { IsDestructive = true };
 
-        /// <summary>Null iff <see cref="FixtureId"/> is — the same two-tier upkeep model every other
-        /// wearing thing uses (wrench alone above 50% health, wrench + spare parts at or below).</summary>
+        /// <summary>Null iff <see cref="FixtureId"/> is.</summary>
         public Verb? Maintain { get; } = FixtureId is null
             ? null
             : new Verb($"maintain_{ItemId}", $"VERB_MAINTAIN_{ItemId.ToUpperInvariant()}", DurationSeconds: 0.6f)
@@ -192,10 +171,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     private static MachineDefinition Definition(MachineType type) => Machines[type];
 
-    // Thruster — same Install/Uninstall/Scrap shape as Battery/Switch/RechargeStation above, but
-    // NOT MachineType-based (see _placedThrusters): many can be installed at once, one per edge.
-    // Its own Refuel verb lives on ThrusterVerbTarget instead, mirroring how Battery's Recharge
-    // verb lives on BatteryVerbTarget rather than here.
+    // Thruster — same Install/Uninstall/Scrap shape as Battery/Switch/RechargeStation, but NOT
+    // MachineType-based: many can be installed at once, one per edge. Its own Refuel verb lives
+    // on ThrusterVerbTarget instead, mirroring Battery's Recharge verb on BatteryVerbTarget.
     private static readonly Verb InstallThrusterVerb = new("install_thruster", "VERB_INSTALL_THRUSTER", DurationSeconds: 0.6f)
     {
         Requirements = [new ItemRequirement("thruster", 1)],
@@ -236,39 +214,26 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     // spawned RigidBody3D pickup needs room to settle physically without floor interpenetration.
     private const float LootRestHeight = 0.15f;
 
-    // Atmosphere-zone generation (see GenerateAtmosphereZonesFromRoomLayout): generic overlap
-    // margin so adjacent zones' box shapes touch/slightly overlap rather than leaving a gap at
-    // their shared boundary — ShipAtmosphereZone.FindZoneAt's containment-margin tie-break
-    // already resolves any such overlap correctly. Values match the real hand-authored zones'
-    // own Y/Z padding (still spawned by hand on the Home Ship) exactly; X reproduces the
-    // corridor zone's own symmetric pad rather than the room zones' own slightly asymmetric one
-    // (an authoring artifact with no functional significance — both give the same ~0.2 total
-    // overlap at a shared room/room boundary).
+    // Atmosphere-zone generation: generic overlap margin so adjacent zones' box shapes touch/
+    // slightly overlap rather than leaving a gap at their shared boundary —
+    // ShipAtmosphereZone.FindZoneAt's containment-margin tie-break resolves any such overlap.
     private const float ZoneWidthOverlapMargin = 0.1f;
     private const float ZoneDepthOverlapMargin = 0.2f;
     private const float ZoneHeightOverlapMargin = 0.1f;
 
     /// <summary>Extra X-axis margin (replacing, not adding to, <see cref="ZoneWidthOverlapMargin"/>)
-    /// on the specific edge of the band adjacent to a nonzero west/east airlock corridor length —
-    /// reproduces the real, deliberately oversized Room1 zone from this session's own earlier
-    /// zone-tie-break bug fixes (guards the docking seam where a Derelict's corridor meets the
-    /// Home Ship's own). Not a "clean" theoretical value — measured directly against
-    /// Derelict.tscn's real, already-working ShipZoneRoom1 box (center -2, width 10 vs a clean
-    /// center 0, width 6).</summary>
+    /// on the edge of the band adjacent to a nonzero west/east airlock corridor length — guards
+    /// the docking seam where a Derelict's corridor meets the Home Ship's own.</summary>
     private const float CorridorSeamOverlapMargin = 4.0f;
 
-    // ConduitDropMesh's own authored length (see World.tscn) — BuildWallConduitVisual scales a
-    // fresh instance of it to whatever the *actual* measured gap to the floor conduit turns out
-    // to be, rather than assuming a fixed distance (an earlier version did that and got it
-    // wrong — computing the real delta between the two anchor points is the only version that
-    // can't silently drift out of sync with the actual geometry).
+    // ConduitDropMesh's authored length — BuildWallConduitVisual scales a fresh instance to the
+    // *actual* measured gap rather than assuming a fixed distance, so it can't silently drift out
+    // of sync with the real geometry.
     private const float WallToFloorDropHeight = WallCenterHeight - FloorConduitHeight;
     private const float WallMountRoomOffset = 0.15f; // matches WallConduitTransform's own push
 
-    // Each machine's own mount height/room-offset — matched exactly to the old hand-placed
-    // World.tscn transforms (derived against each edge's own wall-boundary position) so the
-    // retrofit doesn't shift anything. Recharge Station sits further into the room since it's a
-    // station you approach, not a flush wall fitting like the other two.
+    // Each machine's own mount height/room-offset. Recharge Station sits further into the room
+    // since it's a station you approach, not a flush wall fitting like the other two.
     private const float BatteryHeight = 1f;
     private const float BatteryRoomOffset = 0.1f;
     private const float SwitchHeight = 1f;
@@ -292,32 +257,25 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     ];
 
     // The doorway rows every ship's boundary/interior walls leave open for airlocks and interior
-    // doors — matches ShipSim's own DoorwayRows exactly (kept in sync by hand; both are the same
-    // "fixed-shape stand-in" the project plan already accepts pre-data-driven ship layouts, see
-    // ShipSim.cs's own hardcoded grid).
+    // doors — matches ShipSim's own DoorwayRows exactly (kept in sync by hand).
     private static readonly int[] DoorwayRows = [2, 3];
 
-    // The Home Ship's default Battery/Switch/RechargeStation edges — matches the old hand-placed
-    // World.tscn positions exactly (see BatteryHeight/etc above). Battery and Switch sit on
-    // Manhattan-adjacent tiles (mounted right next to each other on the same wall) — PowerSystem
-    // already treats directly-adjacent fixtures as touching, no conduit segment needed between
-    // them, same rule the Derelict's fire hazard relies on for its own adjacent pair.
+    // The Home Ship's default Battery/Switch/RechargeStation edges. Battery and Switch sit on
+    // Manhattan-adjacent tiles — PowerSystem already treats directly-adjacent fixtures as
+    // touching, no conduit segment needed between them.
     private static readonly (CellCoord A, CellCoord B) BatteryEdge = (new CellCoord(4, 0), new CellCoord(4, -1));
     private static readonly (CellCoord A, CellCoord B) SwitchEdge = (new CellCoord(5, 0), new CellCoord(5, -1));
     private static readonly (CellCoord A, CellCoord B) RechargeStationEdge = (new CellCoord(9, 0), new CellCoord(9, -1));
 
     // Two default thrusters, one per room (RoomSplitColumns = [6] splits room 1 at columns 0-5
-    // from room 2 at 6-11) — free row-0 boundary columns, verified against every other seeded
-    // fixture's own cell (TravelConsole/StationAirlock/InteriorDoor/DerelictAirlock/Bunk).
+    // from room 2 at 6-11) — free row-0 boundary columns.
     private static readonly (CellCoord A, CellCoord B) ThrusterEdge1 = (new CellCoord(3, 0), new CellCoord(3, -1));
     private static readonly (CellCoord A, CellCoord B) ThrusterEdge2 = (new CellCoord(8, 0), new CellCoord(8, -1));
 
-    // Default wiring for the Home Ship's seeded layout (see SeedDefaultShipLayout) — a straight
-    // utility spine along the row-2 doorway line (already unsealed at the room-split boundary,
-    // and already passing next to every airlock/interior-door fixture on that row) plus one
-    // vertical spur per row-0 device. Skips (0,2)/(5,2)/(11,2) themselves since StationAirlock/
-    // InteriorDoor/DerelictAirlock already occupy those tiles and bridge the spine via plain
-    // tile-adjacency (see PowerSystem.AreConnected) — no conduit needed on top of them.
+    // Default wiring for the Home Ship's seeded layout — a straight utility spine along the
+    // row-2 doorway line plus one vertical spur per row-0 device. Skips (0,2)/(5,2)/(11,2)
+    // themselves since StationAirlock/InteriorDoor/DerelictAirlock already occupy those tiles and
+    // bridge the spine via plain tile-adjacency — no conduit needed on top of them.
     private static readonly Vector2I[] DefaultConduitRoute =
     [
         new(1, 2), new(2, 2), new(3, 2), new(4, 2), new(6, 2), new(7, 2), new(8, 2), new(9, 2), new(10, 2),
@@ -372,12 +330,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     /// <summary>One tile can carry several conduits at once — one floor-mounted (WallNeighbor
     /// null) plus up to <see cref="WallSlotCount"/> per bordering wall (WallNeighbor = the cell
-    /// across that specific edge, WallSlot = which height band on that wall face). They're
-    /// deliberately small boxes rather than one big one, so a busy junction tile can hold multiple
-    /// distinct wire runs (e.g. a corner turn, or several stacked by height) without them blocking
-    /// each other — Scavengineers.Sim doesn't care: same tile, or a neighbor exactly one tile away,
-    /// both already connect via PowerSystem's adjacency rule regardless of mount surface or height.
-    /// WallSlot is meaningless (always the default) for a floor-mounted slot.</summary>
+    /// across that edge, WallSlot = which height band on that wall face). WallSlot is meaningless
+    /// for a floor-mounted slot.</summary>
     private readonly record struct ConduitSlot(Vector2I Tile, CellCoord? WallNeighbor, int WallSlot = 0)
     {
         public bool OnWall => WallNeighbor is not null;
@@ -397,25 +351,20 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     public Mesh? ConduitMesh { get; set; }
 
     /// <summary>One arm segment, reused once per connection to build a conduit's straight/corner/
-    /// T/cross shape (floor conduits, see <see cref="BuildFloorConduitVisual"/>) or its along-
-    /// wall/into-the-room stubs (wall conduits, see <see cref="BuildWallConduitVisual"/>) — thin
-    /// and short enough that several fit on one tile without visually merging into a blob.
-    /// Authored long-axis Z (north/south); rotated 90 degrees for east/west arms.</summary>
+    /// T/cross shape (floor) or its along-wall/into-the-room stubs (wall) — thin and short enough
+    /// that several fit on one tile without visually merging. Authored long-axis Z (north/south);
+    /// rotated 90 degrees for east/west arms.</summary>
     [Export]
     public Mesh? ConduitArmMesh { get; set; }
 
-    /// <summary>The vertical leg of a wall-to-floor connector (see
-    /// <see cref="BuildWallConduitVisual"/>) — a fixed length matching
-    /// <see cref="WallToFloorDropHeight"/>, since every tile's wall-mount-to-floor-height gap is
-    /// identical.</summary>
+    /// <summary>The vertical leg of a wall-to-floor connector — a fixed length matching
+    /// <see cref="WallToFloorDropHeight"/>.</summary>
     [Export]
     public Mesh? ConduitDropMesh { get; set; }
 
     /// <summary>Distinct shape from <see cref="ConduitMesh"/> — thin front-to-back rather than
-    /// thin top-to-bottom, so it reads as mounted flush against a wall face instead of lying on
-    /// the floor. Same <see cref="ConduitMaterial"/> either way. Shown only for a wall conduit
-    /// with no connections at all (see <see cref="BuildWallConduitVisual"/>) — connected ones use
-    /// <see cref="ConduitArmMesh"/> instead, same as floor conduits.</summary>
+    /// top-to-bottom, so it reads as mounted flush against a wall face. Shown only for a wall
+    /// conduit with no connections; connected ones use <see cref="ConduitArmMesh"/> instead.</summary>
     [Export]
     public Mesh? WallConduitMesh { get; set; }
 
@@ -439,12 +388,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public Mesh? PanelMesh { get; set; }
 
-    /// <summary>Shared full-tile (1x1, not PanelMesh's cosmetic 0.98 inset) collision box for
-    /// each panel's own dedicated CollisionShape3D — this is what actually blocks/allows
-    /// movement per tile now (see RefreshFloorPanelState/RefreshCeilingPanelState). The Home
-    /// Ship's Floor/Ceiling no longer have a single unsplit collider at all; a raycast-only
-    /// "aim helper" body (see World.tscn's Ceiling/FloorAimHelper, on the build_aim_only physics
-    /// layer) is what lets the player still target a fully-enclosed hole to repair it.</summary>
+    /// <summary>Shared full-tile (1x1, not PanelMesh's cosmetic 0.98 inset) collision box for each
+    /// panel's own CollisionShape3D — this is what actually blocks/allows movement per tile now.
+    /// A raycast-only "aim helper" body (see World.tscn's Ceiling/FloorAimHelper, on the
+    /// build_aim_only physics layer) is what lets the player still target a fully-enclosed hole
+    /// to repair it.</summary>
     [Export]
     public Shape3D? PanelCollisionShape { get; set; }
 
@@ -454,18 +402,16 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public Material? CeilingPanelMaterial { get; set; }
 
-    /// <summary>The grid column of the room-split boundary (i.e. the edge between
-    /// column-1 and column) — excluded from wall targeting entirely, since
-    /// InteriorDoorVerbTarget already owns the two doorway edges there and would desync if this
-    /// generic tool could silently reseal/unseal them too. -1 disables the exclusion.</summary>
+    /// <summary>The grid column of the room-split boundary — excluded from wall targeting
+    /// entirely, since InteriorDoorVerbTarget already owns the two doorway edges there and would
+    /// desync if this generic tool could silently reseal/unseal them too. -1 disables the
+    /// exclusion.</summary>
     [Export]
     public int ExcludedEdgeColumn { get; set; } = -1;
 
     /// <summary>Ceiling height for every cell NOT in a west/east corridor strip (see
     /// <see cref="IsCorridorCell"/>) — corridor cells always use the plain
-    /// <see cref="CeilingPanelHeight"/>. -1 (default) means "no override," matching
-    /// CeilingPanelHeight everywhere, same as every ship before Station needed a taller room than
-    /// its own corridor.</summary>
+    /// <see cref="CeilingPanelHeight"/>. -1 (default) means no override.</summary>
     [Export]
     public float TallCeilingHeight { get; set; } = -1f;
 
@@ -509,8 +455,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     // Battery/Switch/RechargeStation meshes/shapes/materials — only wired on ships that opted
     // into the machine-construction-part system (currently just the Home Ship), same "null means
-    // skip this feature entirely" pattern PanelMesh already uses for floor/ceiling. Gated behind
-    // BatteryMesh specifically wherever only one flag is needed.
+    // skip this feature entirely" pattern PanelMesh uses for floor/ceiling.
     [Export]
     public Mesh? BatteryMesh { get; set; }
 
@@ -547,9 +492,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     [Export]
     public Material? ThrusterMaterial { get; set; }
 
-    // Shared across every storage tier (small_bin/shelf/large_shelf) rather than one set per
-    // tier — Phase 1 is explicitly "entirely in cubes and capsules," visual differentiation per
-    // tier is a Phase 3 art-pass concern, not this feature's.
+    // Shared across every storage tier (small_bin/shelf/large_shelf) rather than one set per tier
+    // — visual differentiation per tier is a later art-pass concern, not this feature's.
     [Export]
     public Mesh? StorageMesh { get; set; }
 
@@ -560,8 +504,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     public Material? StorageMaterial { get; set; }
 
     /// <summary>The Home Ship's single room light — wired directly to a dynamically spawned
-    /// Switch's own TargetLight, since it's no longer a fixed sibling node the switch's own
-    /// scene declaration can NodePath to.</summary>
+    /// Switch's own TargetLight, since it's no longer a fixed sibling node the switch's scene
+    /// declaration can NodePath to.</summary>
     [Export]
     public Light3D? RoomLight { get; set; }
 
@@ -573,25 +517,21 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private readonly Dictionary<CellCoord, (MeshInstance3D Mesh, CollisionShape3D Collision)> _floorPanels = new();
     private readonly Dictionary<CellCoord, (MeshInstance3D Mesh, CollisionShape3D Collision)> _ceilingPanels = new();
 
-    /// <summary>Cells added beyond the ship's default footprint via <see cref="ExtendFloor"/> —
-    /// as opposed to every cell ShipSim's own GridWidth/corridor exports generate at startup.
+    /// <summary>Cells added beyond the ship's default footprint via <see cref="ExtendFloor"/>.
     /// Tracked separately so CaptureBuildState/ApplyBuildState/ClearAllBuildState know exactly
-    /// which cells to persist and which to actually remove on a load that doesn't include them.</summary>
+    /// which cells to persist and which to remove on a load that doesn't include them.</summary>
     private readonly HashSet<CellCoord> _extendedCells = new();
 
     /// <summary>At most one of each <see cref="MachineType"/> at a time, matching ShipSim's own
-    /// singular _battery field and fixed Switch/RechargeFixtureId — installing a second one
-    /// elsewhere isn't offered while one already exists (see ResolveAvailableVerbs).</summary>
+    /// singular _battery field and fixed Switch/RechargeFixtureId.</summary>
     private readonly Dictionary<MachineType, (CellCoord EdgeA, CellCoord EdgeB, Node3D Node)> _placedMachines = new();
 
     /// <summary>Unlike <see cref="_placedMachines"/>, many thrusters can exist at once — keyed by
-    /// <see cref="Deck.Normalize"/> of the mounting edge (not the raw aim-resolved _edgeA/_edgeB
-    /// pair) so aiming at the same interior wall from either side resolves to the same entry
-    /// instead of allowing a duplicate install on the far side.</summary>
+    /// <see cref="Deck.Normalize"/> of the mounting edge so aiming at the same interior wall from
+    /// either side resolves to the same entry instead of allowing a duplicate install on the far
+    /// side.</summary>
     private readonly Dictionary<(CellCoord, CellCoord), ThrusterVerbTarget> _placedThrusters = new();
 
-    /// <summary>Same edge-keyed, uncapped shape as <see cref="_placedThrusters"/> — many shelves/
-    /// bins can exist at once, one per wall edge.</summary>
     private readonly Dictionary<(CellCoord, CellCoord), StorageVerbTarget> _placedStorage = new();
 
     private Timer? _cycleTimer;
@@ -600,13 +540,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private Verb? _previewVerb;
 
     /// <summary>A second, dedicated mesh purely for the PDA scan-mode highlight (see
-    /// HighlightVisual) — kept separate from _ghost, whose own visibility/shape is tied to the
-    /// currently-selected install-preview verb specifically, not to "is anything sensible aimed
-    /// at right now" in general (Maintain/Repair, or a fully-healthy tile with no verb selected
-    /// at all, would otherwise never show a ghost). Starts on no render layer at all (Layers = 0,
-    /// overriding MeshInstance3D's own default of 1) — invisible in the main view always; Player
-    /// is the only thing that ever sets its highlight-layer bit, only while this instance is the
-    /// current scan-mode target.</summary>
+    /// HighlightVisual) — kept separate from _ghost, whose visibility/shape is tied to the
+    /// currently-selected install-preview verb, not to "is anything sensible aimed at right now"
+    /// in general. Starts on no render layer (Layers = 0) — invisible in the main view always;
+    /// Player is the only thing that ever sets its highlight-layer bit.</summary>
     private MeshInstance3D? _highlightGhost;
 
     private AimKind _aimKind;
@@ -633,12 +570,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         _cycling ? 1f - (float)(_cycleTimer!.TimeLeft / _cycleTimer.WaitTime) : null;
 
     /// <summary>The currently-aimed surface's health, for the PDA scan-mode crosshair readout —
-    /// null while breached (nothing left to measure until it's rebuilt) or while aiming at
-    /// something with no structural-surface concept at all. A conduit fixture at the aimed slot
-    /// wins over the underlying floor/wall (scanning the wire is more specific than scanning what
-    /// it's mounted on) — never checked for AimKind.Ceiling, since a conduit slot is always
-    /// floor/wall-mounted and AimedConduitFixture's own Tile-vs-Edge resolution has no ceiling
-    /// case to fall into.</summary>
+    /// null while breached or while aiming at something with no structural-surface concept. A
+    /// conduit fixture at the aimed slot wins over the underlying floor/wall (scanning the wire is
+    /// more specific than scanning what it's mounted on) — never checked for AimKind.Ceiling,
+    /// since a conduit slot is always floor/wall-mounted.</summary>
     public float? Condition
     {
         get
@@ -680,9 +615,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     }
 
     /// <summary>Overrides IVerbTarget's default (which looks for a fixed child mesh) — floor/
-    /// wall/ceiling has no single mesh to point at, so this dynamically-repositioned dedicated
-    /// mesh (see UpdateHighlightGhostTransform, kept in sync with the aim point) stands in for
-    /// whichever surface is currently aimed at.</summary>
+    /// wall/ceiling has no single mesh to point at, so this dynamically-repositioned mesh (see
+    /// UpdateHighlightGhostTransform) stands in for whichever surface is currently aimed at.</summary>
     public IReadOnlyList<VisualInstance3D> HighlightVisual => _aimKind == AimKind.None ? [] : [_highlightGhost!];
 
     public override void _Ready()
@@ -691,9 +625,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         AddChild(_cycleTimer);
         _cycleTimer.Timeout += OnCycleComplete;
 
-        // ConduitMesh is optional (see GenerateFloorCeilingPanels's own PanelMesh-only gate) —
-        // a ship with no conduit system (e.g. Station) has nothing to preview, and a null Mesh
-        // has zero surfaces, so overriding surface 0 would throw.
+        // ConduitMesh is optional — a ship with no conduit system (e.g. Station) has nothing to
+        // preview, and a null Mesh has zero surfaces, so overriding surface 0 would throw.
         _ghost = new MeshInstance3D { Mesh = ConduitMesh, Visible = false };
         if (ConduitMesh is not null)
         {
@@ -705,26 +638,20 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         _highlightGhost = new MeshInstance3D { Visible = true, Layers = 0 };
         AddChild(_highlightGhost);
 
-        // Deferred: ShipSimRef's own Deck is built in its _Ready(), which may not have run yet
-        // at this exact point depending on scene-tree sibling order (the established fix for
-        // this same class of ordering issue elsewhere in the project, e.g. ShipSim's own
-        // deferred vacuum seeding).
+        // Deferred: ShipSimRef's Deck is built in its own _Ready(), which may not have run yet at
+        // this exact point depending on scene-tree sibling order.
         //
         // One deferred entry point rather than four separate CallDeferred queue entries: the four
         // steps have a required order among themselves (panels exist before zones are sized off
         // them, the default layout is seeded before loot lands on it), and four independent queue
-        // entries only preserved that by luck — nothing stopped another node's deferred work from
-        // interleaving between them. It also gives the whole batch a single completion signal (see
-        // InitialGenerationComplete).
+        // entries only preserved that by luck. It also gives the whole batch a single completion
+        // signal (see InitialGenerationComplete).
         CallDeferred(nameof(RunInitialGeneration));
     }
 
     /// <summary>True once <see cref="RunInitialGeneration"/> has finished. Exists for tests: this
-    /// node's whole visible state (floor/ceiling panels, seeded layout, atmosphere zones, loot)
-    /// appears during a deferred call, so a test that just awaits one ProcessFrame and asserts is
-    /// racing the deferred flush — which is exactly what made ShipBuildTargetLadderGapTest,
-    /// ShipBuildTargetLootTest and ShipBuildTargetSaveStateTest fail intermittently under load.
-    /// Same narrow test-observability convention as Player.ScanModeOn.</summary>
+    /// node's whole visible state appears during a deferred call, so a test that just awaits one
+    /// ProcessFrame and asserts is racing the deferred flush.</summary>
     public bool InitialGenerationComplete { get; private set; }
 
     private void RunInitialGeneration()
@@ -782,12 +709,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     }
 
     /// <summary>Drops one contract-target item onto a random live, non-vented cell of this ship —
-    /// called by ContractGiverVerbTarget the instant a RetrieveItem offer is accepted, since
-    /// nothing else in the loot pipeline ever places a contract's specific item anywhere
-    /// (GenerateLoot/SpawnGeneratedLoot rolls from an entirely disjoint procedural table, and a
-    /// hand-authored ship like this one gets no automatic loot at all). Falls back to any cell
-    /// (ignoring vent state) if the whole ship happens to be vented, rather than silently placing
-    /// nothing.</summary>
+    /// called by ContractGiverVerbTarget the instant a RetrieveItem offer is accepted. Falls back
+    /// to any cell (ignoring vent state) if the whole ship happens to be vented, rather than
+    /// silently placing nothing.</summary>
     public void SpawnMissionItem(string itemId, int count, System.Random rng)
     {
         if (ShipSimRef is null || ShipSimRef.Deck.Cells.Count == 0)
@@ -809,13 +733,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     /// <summary>The actual spawn, split out from <see cref="SpawnMissionItem"/> so save/load can
     /// recreate a still-outstanding mission item at its exact saved position instead of re-rolling
-    /// a new random cell. Mirrors InventoryOverflow.DropAt's own parent-at-ship-root convention,
-    /// but additionally mirrors this ship's CURRENT presence state (Visible/collision/physics)
-    /// onto the new pickup — unlike a startup-time spawn (SpawnGeneratedLoot, always still ahead
-    /// of TravelConsoleVerbTarget's first ApplyCurrentLocation), this can run on an already-hidden
-    /// derelict at any point during play, and TravelConsoleVerbTarget.SetShipPresence's own
-    /// traversal only re-runs on an actual destination change — it won't retroactively catch a
-    /// child added after the fact.</summary>
+    /// a new random cell. Additionally mirrors this ship's CURRENT presence state (Visible/
+    /// collision/physics) onto the new pickup — unlike a startup-time spawn, this can run on an
+    /// already-hidden derelict at any point during play, and
+    /// TravelConsoleVerbTarget.SetShipPresence's traversal only re-runs on a destination change —
+    /// it won't retroactively catch a child added after the fact.</summary>
     public void PlaceMissionItem(string itemId, int count, float charge, Vector3 worldPosition)
     {
         var shipRoot = ShipRoot ?? GetParent<Node3D>();
@@ -840,8 +762,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private void GenerateFloorCeilingPanels()
     {
         // PanelMesh is only wired up on ships that opt into the floor/ceiling construction-part
-        // system (currently just the Home Ship) — everything else skips this entirely rather
-        // than generating unusable null-mesh instances.
+        // system — everything else skips this entirely rather than generating unusable
+        // null-mesh instances.
         if (ShipSimRef is null || PanelMesh is null)
         {
             return;
@@ -854,17 +776,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     }
 
     /// <summary>One cell's floor+ceiling panel pair — extracted so a dynamically extended cell
-    /// (see <see cref="ExtendFloor"/>) can get the exact same real, removable structure as every
-    /// other cell already generated at startup, not a separate one-off representation.</summary>
+    /// (see <see cref="ExtendFloor"/>) gets the same real, removable structure as every other
+    /// cell generated at startup.</summary>
     private void GeneratePanelsForCell(CellCoord cell)
     {
         var tile = new Vector2I(cell.X, cell.Y);
 
-        // A ladder shaft's own tile skips exactly one of its two panels — never both, and never
-        // via Deck.BreachHull (that's the one thing that would wire this cell to the Outside
-        // vacuum sentinel, incorrectly venting this deck since decks are independently simulated,
-        // not bridged). The primary deck (DeckIndex 0) opens its ceiling here; a second deck
-        // (DeckIndex > 0) opens its floor here instead — each still gets its OTHER panel normally.
+        // A ladder shaft's tile skips exactly one of its two panels — never both, and never via
+        // Deck.BreachHull (that would wire this cell to the Outside vacuum sentinel, incorrectly
+        // venting this deck since decks are independently simulated, not bridged). The primary
+        // deck (DeckIndex 0) opens its ceiling here; a second deck opens its floor instead — each
+        // still gets its OTHER panel normally.
         var isLadderCell = ShipSimRef?.LadderCell == cell;
         var skipFloor = isLadderCell && (ShipSimRef?.DeckIndex ?? 0) > 0;
         var skipCeiling = isLadderCell && (ShipSimRef?.DeckIndex ?? 0) == 0;
@@ -899,12 +821,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     }
 
     /// <summary>Spawns one <see cref="ShipAtmosphereZone"/> per room band (the span between
-    /// consecutive <see cref="ShipSim.RoomSplitColumns"/> entries, or the ship's full
-    /// west/east boundary when there are none) plus one for each nonzero airlock corridor —
-    /// replacing what today is hand-placed per scene (see the Home Ship's own zones, left as-is).
-    /// Each zone is added as a sibling of this Floor node (a child of the ship's own spatial
-    /// root), matching <see cref="ShipAtmosphereZone.TileAt"/>'s own assumption that its parent
-    /// is always that root, not this Floor node's own (differently transformed) local space.</summary>
+    /// consecutive <see cref="ShipSim.RoomSplitColumns"/> entries) plus one for each nonzero
+    /// airlock corridor. Each zone is added as a sibling of this Floor node (a child of the
+    /// ship's spatial root), matching <see cref="ShipAtmosphereZone.TileAt"/>'s assumption that
+    /// its parent is always that root, not this Floor node's own local space.</summary>
     private void GenerateAtmosphereZonesFromRoomLayout()
     {
         if (ShipSimRef is null)
@@ -1004,14 +924,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private float CeilingHeightFor(CellCoord cell) =>
         TallCeilingHeight > 0 && !IsCorridorCell(cell) ? TallCeilingHeight : CeilingPanelHeight;
 
-    /// <summary>Claims a brand-new real Deck cell beyond the ship's existing footprint —
-    /// genuine dynamic ship expansion, not just repairing an existing breached panel. The edge
-    /// back to <paramref name="origin"/> becomes a normal open interior connection (unsealed by
-    /// default, same as any other doorway); <see cref="NormalizeBoundaryEdgesForCell"/> handles
-    /// clearing that edge's now-stale wall-breach flag and marking the new cell's other, still-
-    /// open sides. Only the floor is claimed — the ceiling starts breached (open), same as any
-    /// other missing ceiling, so it needs its own separate Install Ceiling verb rather than
-    /// coming for free.</summary>
+    /// <summary>Claims a brand-new real Deck cell beyond the ship's existing footprint — genuine
+    /// dynamic ship expansion, not just repairing an existing breached panel. The edge back to
+    /// <paramref name="origin"/> becomes a normal open interior connection;
+    /// <see cref="NormalizeBoundaryEdgesForCell"/> clears that edge's stale wall-breach flag and
+    /// marks the new cell's other, still-open sides. Only the floor is claimed — the ceiling
+    /// starts breached, so it needs its own Install Ceiling verb rather than coming for free.</summary>
     private void ExtendFloor(CellCoord origin, CellCoord newCell)
     {
         ShipSimRef!.Deck.AddCell(newCell);
@@ -1024,11 +942,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     }
 
     /// <summary>For each of a cell's 4 neighbors: if it's a real cell, the edge is interior now —
-    /// clear any wall-breach flag left over from before it was extended into (a no-op if there
-    /// never was one). If it's still not a real cell, mark that edge open — no wall has been
-    /// built there yet. Checking generically like this (rather than tracking which direction was
-    /// "the origin") means the exact same call works for save-replay too, where cells may have
-    /// been extended in an arbitrary chain.</summary>
+    /// clear any wall-breach flag left over from before. If it's still not a real cell, mark that
+    /// edge open. Checking generically (rather than tracking which direction was "the origin")
+    /// means this works for save-replay too, where cells may have been extended in an arbitrary
+    /// chain.</summary>
     private void NormalizeBoundaryEdgesForCell(CellCoord cell)
     {
         CellCoord[] neighbors =
@@ -1090,11 +1007,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
 
         // Airlock corridors — a narrow (DoorwayRows-only) strip of real cells attached to the
-        // west/east boundary (see ShipSim.WestCorridorLength/EastCorridorLength). Only the long
-        // sides need walling: the inner junction already falls out of the boundary-wall loop
-        // above (rows 2/3 there were always left open for the doorway, and now lead into real
-        // corridor cells instead of nothing), and the outer tip needs no wall at all since the
-        // AirlockDoorVerbTarget's own frame already caps it, same as it did at the old boundary.
+        // west/east boundary. Only the long sides need walling: the inner junction falls out of
+        // the boundary-wall loop above, and the outer tip needs no wall since
+        // AirlockDoorVerbTarget's own frame already caps it.
         for (var i = -1; i >= -ShipSimRef.WestCorridorLength; i--)
         {
             MaybeSpawnWall(new CellCoord(i, 2), new CellCoord(i, 1));
@@ -1115,15 +1030,14 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             InstallSwitch(SwitchEdge.A, SwitchEdge.B, savedState: null);
             InstallRechargeStation(RechargeStationEdge.A, RechargeStationEdge.B, savedState: null);
             // Full engine charge AND a full docked N2 tank ("1|n2_tank|1" — see
-            // ThrusterVerbTarget.ApplySaveState's own pipe-delimited format) — unlike a fresh
-            // player-bought install (which now starts empty, see ShipSim.InstallThruster), the
-            // Home Ship's own two engines start genuinely fueled, not just numerically charged.
+            // ThrusterVerbTarget.ApplySaveState's pipe-delimited format) — unlike a fresh
+            // player-bought install (which starts empty), the Home Ship's two engines start
+            // genuinely fueled.
             InstallThruster(ThrusterEdge1.A, ThrusterEdge1.B, savedState: "1|n2_tank|1");
             InstallThruster(ThrusterEdge2.A, ThrusterEdge2.B, savedState: "1|n2_tank|1");
 
-            // Wire the whole default layout together (see DefaultConduitRoute) — real,
-            // player-removable conduits through the same InstallConduit a player's own wiring
-            // verb and a save replay use, not a special-cased shortcut.
+            // Wire the whole default layout together — real, player-removable conduits through
+            // the same InstallConduit a player's own wiring verb and a save replay use.
             foreach (var tile in DefaultConduitRoute)
             {
                 InstallConduit(new ConduitSlot(tile, null));
@@ -1186,11 +1100,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 far = new CellCoord(i, neighborJ);
             }
 
-            // The raw hit point's own cell is normally the "inside" one, but a wall's collider
-            // has real thickness — once an adjacent wall is gone, the player can end up standing
-            // in that gap and aim at the next wall over from its outward face instead, which
-            // flips which side the hit point falls on. Swap so _edgeA always ends up as whichever
-            // side is real ship structure, regardless of which face actually got hit.
+            // The raw hit point's cell is normally the "inside" one, but a wall's collider has
+            // real thickness — once an adjacent wall is gone, the player can end up standing in
+            // that gap and aim at the next wall over from its outward face, flipping which side
+            // the hit point falls on. Swap so _edgeA always ends up as real ship structure.
             if (!ShipSimRef.Deck.Cells.Contains(near) && ShipSimRef.Deck.Cells.Contains(far))
             {
                 (near, far) = (far, near);
@@ -1245,11 +1158,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         UpdateGhostTransform();
     }
 
-    // Only the two doorway edges (matching DoorwayRows) are InteriorDoorVerbTarget's to own —
-    // the rest of this column is a real, solid wall (MidWallA/B) that this generic tool must
-    // still manage, same as any other interior wall. Checking a.Y (== b.Y for this edge shape, a
-    // column boundary between same-row cells) previously wasn't done at all, which excluded the
-    // *entire* column from wall/conduit targeting, not just its two doorway rows.
+    // Only the two doorway edges (matching DoorwayRows) are InteriorDoorVerbTarget's to own — the
+    // rest of this column is a real, solid wall this generic tool must still manage.
     private bool IsExcludedColumn(CellCoord a, CellCoord b) =>
         ExcludedEdgeColumn >= 0 &&
         DoorwayRows.Contains(a.Y) &&
@@ -1265,11 +1175,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             : null;
 
     /// <summary>The conduit fixture (if any) at whatever this target is currently aimed at — Tile
-    /// aim means the floor-mounted slot, Edge aim means the wall-mounted one on the near side,
-    /// same slot resolution <see cref="ExecuteConduitVerb"/> already uses. Used by <see
-    /// cref="Condition"/> to prefer a conduit's own health over the underlying structural
-    /// surface's, since scanning a conduit is more specific than scanning the floor/wall it's
-    /// mounted on.</summary>
+    /// aim means the floor-mounted slot, Edge aim means the wall-mounted one on the near side.
+    /// Used by <see cref="Condition"/> to prefer a conduit's health over the underlying
+    /// structural surface's.</summary>
     private Fixture? AimedConduitFixture()
     {
         var slot = _aimKind == AimKind.Edge
@@ -1331,12 +1239,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
             case AimKind.Edge when !ShipSimRef.Deck.Cells.Contains(_edgeB):
             {
-                // Boundary edge — Install repairs an existing breach, Remove deliberately
-                // creates one (a real, consequential choice, same as scrapping the floor or
-                // ceiling). A wall-mounted conduit needs an actual hull wall to mount on, so
-                // it's only offered while that hull is intact. Tracked per edge, not per cell
-                // (see Deck.BreachWallEdge) — a cell can have several independently open wall
-                // directions at once, most visibly a freshly extended floor tile.
+                // Boundary edge — Install repairs an existing breach, Remove deliberately creates
+                // one, a real consequential choice. A wall-mounted conduit needs an actual hull
+                // wall to mount on, so it's only offered while that hull is intact.
                 var breached = ShipSimRef.Deck.IsWallEdgeBreached(_edgeA, _edgeB);
                 var verbs = new List<Verb> { breached ? InstallWallVerb : RemoveWallVerb };
                 if (breached)
@@ -1393,12 +1298,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
     }
 
-    // Cycled alongside the wall verb via the same multi-verb scroll selection every other
-    // multi-verb target already uses — aiming at an edge can mean "the wall itself" or "a
-    // conduit mounted on it," two different objects sharing one aim point. Null when nothing
-    // is already placed AND there's no wall to mount a new one on — removal of an already-
-    // placed conduit is always offered regardless (e.g. if the wall behind it got breached
-    // afterwards), only fresh installation requires a real wall to exist first.
+    // Aiming at an edge can mean "the wall itself" or "a conduit mounted on it," two different
+    // objects sharing one aim point. Null when nothing is already placed AND there's no wall to
+    // mount a new one on — removal of an already-placed conduit is always offered regardless,
+    // only fresh installation requires a real wall to exist first.
     private Verb? EdgeConduitVerb(bool wallPresent)
     {
         var slot = new ConduitSlot(new Vector2I(_edgeA.X, _edgeA.Y), _edgeB, _aimedWallSlot);
@@ -1416,10 +1319,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// already at this exact edge offers Uninstall/Scrap; an empty, wall-present edge offers
     /// Install for every machine type not already placed *anywhere* on the ship (at most one of
     /// each — see <see cref="_placedMachines"/>). Every Install verb is returned regardless of
-    /// what's currently held; IsAffordable (Player.cs) is what actually narrows the visible cycle
-    /// down to whichever one item the player has in hand, same reliance
-    /// VendorVerbTarget's always-present Buy verbs already use. Gated behind BatteryMesh
-    /// so ships that never opted into this system (Derelict/Station) never offer it at all.</summary>
+    /// what's currently held; IsAffordable (Player.cs) narrows the visible cycle down to whichever
+    /// item the player has in hand. Gated behind BatteryMesh so ships that never opted into this
+    /// system never offer it.</summary>
     private IEnumerable<Verb> MachineVerbsFor(bool wallPresent)
     {
         if (BatteryMesh is null || !wallPresent)
@@ -1427,10 +1329,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             yield break;
         }
 
-        // Thrusters aren't MachineType-based (see _placedThrusters) and are keyed by the
-        // normalized edge, unlike _edgeA/_edgeB's raw aim-resolved pair — check this edge for one
-        // first, same "occupied here means only Uninstall/Scrap, no stacking" rule Battery/Switch/
-        // RechargeStation already apply to each other below.
+        // Thrusters aren't MachineType-based and are keyed by the normalized edge — check this
+        // edge for one first, same "occupied here means only Uninstall/Scrap, no stacking" rule
+        // Battery/Switch/RechargeStation apply to each other below.
         if (_placedThrusters.ContainsKey(Deck.Normalize(_edgeA, _edgeB)))
         {
             yield return UninstallThrusterVerb;
@@ -1438,9 +1339,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             yield break;
         }
 
-        // Same "occupied here means only Uninstall/Scrap, no stacking" rule as Thruster above —
-        // a storage unit claims its edge exclusively too, which is what makes it genuinely "take
-        // up space" rather than stacking infinitely.
+        // Same rule as Thruster above — a storage unit claims its edge exclusively too, which is
+        // what makes it genuinely "take up space" rather than stacking infinitely.
         if (_placedStorage.TryGetValue(Deck.Normalize(_edgeA, _edgeB), out var storageHere))
         {
             var suffix = Tr($"ITEM_{storageHere.ItemId.ToUpperInvariant()}");
@@ -1471,10 +1371,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         // thrusters over the single-instance MachineType system.
         yield return InstallThrusterVerb;
 
-        // One generated Install verb per storage catalog item — genuinely data-driven (see
-        // ItemCatalog.StorageItemIds), so a new storage tier needs only an items.json entry, no
-        // new C# Verb. Shared label + a DisplaySuffix naming the specific item, same "label
-        // (suffix)" shape BatteryVerbTarget's own Recharge verb already uses for its charge %.
+        // One generated Install verb per storage catalog item — a new storage tier needs only an
+        // items.json entry, no new C# Verb.
         foreach (var itemId in ItemCatalog.StorageItemIds)
         {
             yield return new Verb($"install_storage:{itemId}", "VERB_INSTALL_STORAGE", DurationSeconds: 0.6f)
@@ -1496,9 +1394,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private static string? MachineFixtureIdFor(MachineType type) => Definition(type).FixtureId;
 
     /// <summary>Which machine type/pending action a machine verb id maps to — Action is null for
-    /// any non-machine verb id, the signal ExecuteVerb/IsMachineVerb use to fall through. Searches
-    /// the table rather than listing all three actions for all three machines, so a new machine
-    /// becomes reachable here purely by existing in <see cref="Machines"/>.</summary>
+    /// any non-machine verb id, the signal ExecuteVerb/IsMachineVerb use to fall through.</summary>
     private static (MachineType Type, PendingAction? Action) ResolveMachineVerb(Verb verb)
     {
         foreach (var definition in Machines.Values)
@@ -1544,28 +1440,22 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// <summary>Uninstall/Scrap for an already-installed machine, exposed so its own VerbTarget
     /// script (BatteryVerbTarget etc.) can merge them into its own AvailableVerbs — aiming
     /// directly at the machine's own box hits *its* collider, not this edge, so without this it
-    /// has no way to offer removal at all alongside its native verb (Recharge/Toggle/...).
-    /// Empty if that type isn't currently installed (shouldn't happen — a machine only ever asks
-    /// about its own type while it exists — but a defensive empty list beats a throw).</summary>
+    /// has no way to offer removal alongside its native verb (Recharge/Toggle/...).</summary>
     internal IReadOnlyList<Verb> MachineRemovalVerbs(MachineType type) =>
         _placedMachines.ContainsKey(type) ? [UninstallVerbFor(type), ScrapVerbFor(type)] : [];
 
     /// <summary>Same idea as <see cref="MachineRemovalVerbs"/> for thrusters — a thruster's own
-    /// ThrusterVerbTarget exists only while installed, so this is unconditional (unlike
-    /// MachineRemovalVerbs' placement check, which guards against a MachineType that might not be
-    /// placed at all).</summary>
+    /// ThrusterVerbTarget exists only while installed, so this is unconditional.</summary>
     internal IReadOnlyList<Verb> ThrusterRemovalVerbs => [UninstallThrusterVerb, ScrapThrusterVerb];
 
-    /// <summary>Same idea as <see cref="MachineRemovalVerbs"/>, for the Maintain/Repair pair — a
-    /// machine's own VerbTarget script (ToggleLightVerbTarget, RechargeStationVerbTarget) merges
-    /// this into its own AvailableVerbs too. Empty for Battery (see <see
-    /// cref="MachineFixtureIdFor"/>) or a machine not currently installed.</summary>
+    /// <summary>Same idea as <see cref="MachineRemovalVerbs"/>, for the Maintain/Repair pair.
+    /// Empty for Battery or a machine not currently installed.</summary>
     internal IReadOnlyList<Verb> MachineMaintainRepairVerbs(MachineType type)
     {
         var definition = Definition(type);
 
-        // FixtureId and Maintain/Repair are null together by construction (see MachineDefinition),
-        // so this one check covers all three.
+        // FixtureId and Maintain/Repair are null together by construction, so this one check
+        // covers all three.
         if (definition.FixtureId is not { } fixtureId)
         {
             return [];
@@ -1581,9 +1471,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     /// <summary>Counterpart to <see cref="MachineRemovalVerbs"/> — a machine's own ExecuteVerb
     /// delegates here for any verb id it doesn't recognize as its own. Looks the edge up from
-    /// _placedMachines directly rather than this body's own _edgeA/_edgeB (which reflect whatever
-    /// *this* target was last aimed at, not necessarily this machine — the player is aiming at
-    /// the machine's own collider when this runs, not this one's).</summary>
+    /// _placedMachines directly rather than this body's own _edgeA/_edgeB, which reflect whatever
+    /// *this* target was last aimed at, not necessarily this machine.</summary>
     internal void ExecuteMachineRemoval(MachineType type, Verb verb, PlayerInventory inventory)
     {
         if (_cycling || !_placedMachines.TryGetValue(type, out var placed))
@@ -1614,11 +1503,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         _cycleTimer!.Start();
     }
 
-    /// <summary>Counterpart to <see cref="ExecuteMachineRemoval"/> for thrusters — exposed so
-    /// ThrusterVerbTarget's own Uninstall/Scrap verbs (aimed at the thruster's own collider, not
-    /// this edge) can dispatch through the same cycle-timer mechanism. Takes the edge explicitly,
-    /// since thrusters aren't MachineType-keyed and ThrusterVerbTarget already knows its own
-    /// mounting edge.</summary>
+    /// <summary>Counterpart to <see cref="ExecuteMachineRemoval"/> for thrusters — takes the edge
+    /// explicitly, since thrusters aren't MachineType-keyed.</summary>
     internal void ExecuteThrusterRemoval(CellCoord edgeA, CellCoord edgeB, Verb verb, PlayerInventory inventory)
     {
         if (_cycling || !_placedThrusters.ContainsKey(Deck.Normalize(edgeA, edgeB)))
@@ -1843,8 +1729,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     }
 
     /// <summary>Shared by the floor/ceiling Maintain and Repair verbs — both just record the
-    /// aimed tile and the chosen action, differing only in PendingAction (which drives the
-    /// requirements check upstream in Player and the repair call in OnCycleComplete).</summary>
+    /// aimed tile and the chosen action, differing only in PendingAction.</summary>
     private void ExecuteStructuralUpkeepTileVerb(PendingAction action, PlayerInventory inventory)
     {
         _pendingAction = action;
@@ -2069,9 +1954,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     }
 
     /// <summary>Adds a refund/scrap-yield item to the player's inventory, dropping whatever
-    /// doesn't fit as a world pickup right where this action happened instead of losing it —
-    /// unlike picking something up that's already a world object (see PickupItem's own partial-
-    /// pickup handling), a refund has nothing else to fall back to but a freshly spawned one.</summary>
+    /// doesn't fit as a world pickup right where this action happened instead of losing it.</summary>
     private void AddOrDrop(PlayerInventory? inventory, string itemId, int count)
     {
         if (inventory is null)
@@ -2144,12 +2027,11 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     }
 
     /// <summary>Builds a floor conduit's shape from whichever of its 4 cardinal neighbor tiles
-    /// currently carry any fixture at all (another conduit, a machine, the battery, ...) — same
-    /// adjacency PowerSystem itself uses to decide connectivity, so the shape never lies about
-    /// what's actually wired. Zero neighbors falls back to the plain lone-conduit box; each
-    /// connected direction gets its own short arm meeting the others at the tile center, so 2
-    /// opposite directions read as a straight run, 2 adjacent as a corner, 3 as a T, 4 as a
-    /// cross — all built from the same one arm mesh, no per-shape art needed.</summary>
+    /// currently carry any fixture — same adjacency PowerSystem uses to decide connectivity, so
+    /// the shape never lies about what's actually wired. Zero neighbors falls back to the plain
+    /// lone-conduit box; each connected direction gets its own short arm meeting at the tile
+    /// center, so 2 opposite directions read as a straight run, 2 adjacent as a corner, 3 as a T,
+    /// 4 as a cross — all built from the same one arm mesh.</summary>
     private Node3D BuildFloorConduitVisual(Vector2I tile)
     {
         var container = new Node3D();
@@ -2207,15 +2089,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
     }
 
-    /// <summary>Same idea as <see cref="BuildFloorConduitVisual"/>, adapted to a wall mount's
-    /// relationships: another conduit further along the *same* wall (an along-wall arm, reused
-    /// ConduitArmMesh again), a floor conduit on the same tile (a real 2-segment connector — a
-    /// horizontal reach out from the wall then a vertical drop to floor height, both fixed
-    /// lengths since every tile is the same size), or a *different* wall's conduit on the same
-    /// tile (a short inward stub only — actually reaching it would mean wrapping the room's
-    /// corner, real extra geometry this pass still skips). Floor takes priority if both a floor
-    /// and another wall share the tile. Nothing connected at all falls back to the plain lone
-    /// wall-conduit box.</summary>
+    /// <summary>Same idea as <see cref="BuildFloorConduitVisual"/>, adapted to a wall mount:
+    /// another conduit further along the *same* wall (an along-wall arm), a floor conduit on the
+    /// same tile (a real 2-segment connector — horizontal reach then vertical drop), or a
+    /// *different* wall's conduit on the same tile (a short inward stub only — reaching it would
+    /// mean wrapping the room's corner, extra geometry this pass skips). Floor takes priority if
+    /// both share the tile. Nothing connected falls back to the plain lone wall-conduit box.</summary>
     private Node3D BuildWallConduitVisual(ConduitSlot slot)
     {
         var tile = slot.Tile;
@@ -2258,12 +2137,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
         if (hasFloorCompanion)
         {
-            // A real connector reaching the floor conduit's own tile-center hub — measured
-            // directly against that hub's actual position rather than an assumed fixed offset.
-            // Routed down the wall/corner FIRST (staying at the wall's own horizontal position,
-            // no reach yet) and only jogging out to the floor conduit's hub once it's already at
-            // floor height — a real wire runs down a corner then along the floor, it doesn't
-            // jut straight out into open air at wall height and drop through nothing.
+            // A real connector reaching the floor conduit's tile-center hub, measured against its
+            // actual position. Routed down the wall/corner FIRST and only jogging out to the
+            // floor conduit's hub once at floor height — a real wire runs down a corner then
+            // along the floor, it doesn't jut into open air and drop through nothing.
             hasArm = true;
 
             var floorHubLocal = ToLocal(TileWorldPosition(tile, FloorConduitHeight));
@@ -2343,27 +2220,19 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         }
 
         // Any other wall conduit sharing this tile may have just gained or lost the same-tile
-        // companion that drives its inward "connects into the room" stub — this change (whether
-        // it's the wall conduit itself, another wall on the same tile, or a floor conduit here)
-        // is exactly that companion.
+        // companion that drives its inward "connects into the room" stub.
         foreach (var other in _placedConduits.Keys.Where(s => s.OnWall && s.Tile == slot.Tile && s != slot).ToList())
         {
             RefreshWallConduitVisual(other);
         }
     }
 
-    /// <summary>The world/local height of a wall conduit's given height slot, 0-indexed bottom to
-    /// top — slot count is derived from <see cref="WallHeight"/>, not fixed, so both the count
-    /// and each slot's actual height stay correct automatically if <see cref="WallHeight"/> ever
-    /// changes again (today: <see cref="WallSlotCount"/> is 2, matching a 2m wall).</summary>
     private static float SlotHeight(int slot) => ShipGeometry.SlotHeight(slot);
 
     /// <summary>Same edge position/rotation a wall segment would use, nudged toward whichever tile
     /// the mount belongs to (reads as mounted on that tile's wall face instead of embedded in the
-    /// wall itself) and raised/lowered to the given height instead of the wall's fixed center.
-    /// Shared by conduits (height/offset from the slot system) and machines (their own fixed
-    /// per-type height/offset, see BatteryHeight etc.) — the only difference between mounting a
-    /// wire and mounting a battery on the same wall is how far up and how far out it sits.</summary>
+    /// wall) and raised/lowered to the given height. Shared by conduits and machines — the only
+    /// difference between mounting a wire and mounting a battery is how far up and out it sits.</summary>
     private (Vector3 Position, Vector3 RotationDegrees) WallMountTransform(CellCoord edgeA, CellCoord edgeB, Vector2I nearTile, float height, float roomOffset)
     {
         var (position, rotationDegrees) = EdgeTransform(edgeA, edgeB);
@@ -2410,12 +2279,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     }
 
     /// <summary>Builds the Battery's own interactable node (BatteryVerbTarget, mesh, collision,
-    /// plus its charge IndicatorLight — the same child <see cref="PoweredDeviceIndicator"/> setup
-    /// World.tscn used to hand-author), mounts it at the given edge, and registers its fixture
-    /// with ShipSim. <paramref name="savedState"/> (BatteryVerbTarget's own charge-fraction save
-    /// string), if given, is applied directly to the freshly-built instance — no group-scan save
-    /// mechanism is involved, since a dynamically spawned machine is never in the "saveable"
-    /// group (see docs/plan — ShipBuildTarget's own save record owns this instead).</summary>
+    /// plus its charge IndicatorLight), mounts it at the given edge, and registers its fixture
+    /// with ShipSim. <paramref name="savedState"/>, if given, is applied directly to the
+    /// freshly-built instance — no group-scan save mechanism is involved, since a dynamically
+    /// spawned machine is never in the "saveable" group.</summary>
     private void InstallBattery(CellCoord edgeA, CellCoord edgeB, string? savedState)
     {
         var nearTile = new Vector2I(edgeA.X, edgeA.Y);
@@ -2460,7 +2327,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     /// <summary>Same shape as <see cref="InstallBattery"/> — RoomLight is wired directly (no
     /// NodePath, since a dynamically spawned node has no fixed sibling to path to) and
-    /// <paramref name="savedState"/> is the switch's own on/off bool, stringified.</summary>
+    /// <paramref name="savedState"/> is the switch's on/off bool, stringified.</summary>
     private void InstallSwitch(CellCoord edgeA, CellCoord edgeB, string? savedState)
     {
         var nearTile = new Vector2I(edgeA.X, edgeA.Y);
@@ -2488,8 +2355,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     }
 
     /// <summary>Same shape as <see cref="InstallBattery"/>/<see cref="InstallSwitch"/> — the
-    /// Recharge Station has no extra state of its own, so <paramref name="savedState"/> is unused
-    /// (kept for a uniform three-way call signature, see ApplyBuildState/SeedDefaultShipLayout).</summary>
+    /// Recharge Station has no extra state, so <paramref name="savedState"/> is unused (kept for
+    /// a uniform three-way call signature).</summary>
     private void InstallRechargeStation(CellCoord edgeA, CellCoord edgeB, string? savedState)
     {
         var nearTile = new Vector2I(edgeA.X, edgeA.Y);
@@ -2515,8 +2382,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private const int ThrusterScrapYield = 2;
 
     /// <summary>Unlike Battery/Switch/RechargeStation's single fixed constant id, each installed
-    /// thruster needs its own — derived from its normalized mounting edge so it's stable and
-    /// reproducible from either side of the wall (see _placedThrusters).</summary>
+    /// thruster needs its own — derived from its normalized mounting edge so it's stable
+    /// regardless of which side of the wall it's read from.</summary>
     private static string ThrusterFixtureId(CellCoord edgeA, CellCoord edgeB)
     {
         var (a, b) = Deck.Normalize(edgeA, edgeB);
@@ -2567,8 +2434,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             return;
         }
 
-        // Any N2 tank still docked inside goes back to the player/world, same as every other
-        // uninstall/scrap refund below — it's real player property, not scenery.
+        // Any N2 tank still docked inside goes back to the player/world — it's real player
+        // property, not scenery.
         if (node.Contents.Slots[0] is { } tank)
         {
             AddOrDrop(inventory, tank.ItemId, tank.Count);
@@ -2590,9 +2457,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     /// when present — sizes <see cref="StorageVerbTarget.Contents"/> from its own segment count
     /// instead of consulting <see cref="ItemCatalog.StorageSlotCount"/>: a reload restores
     /// exactly the slots that existed at save time, even if items.json later changes that tier's
-    /// capacity, and it never needs a real ItemCatalog lookup to reconstruct (NodeTests has no
-    /// items.json of its own — see the plan's own note on this). A fresh, verb-triggered install
-    /// (savedState null) does consult ItemCatalog, since there's no saved shape to preserve yet.</summary>
+    /// capacity. A fresh, verb-triggered install (savedState null) does consult ItemCatalog, since
+    /// there's no saved shape to preserve yet.</summary>
     private void InstallStorage(string itemId, CellCoord edgeA, CellCoord edgeB, string? savedState = null)
     {
         var nearTile = new Vector2I(edgeA.X, edgeA.Y);
@@ -2636,8 +2502,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             return;
         }
 
-        // Every slot still holding something goes back to the player/world, same refund
-        // philosophy as Thruster's own docked-tank refund above.
+        // Every slot still holding something goes back to the player/world.
         foreach (var slot in node.Contents.Slots)
         {
             if (slot is { } item)
@@ -2686,12 +2551,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     private static int ScrapYieldFor(MachineType type) => Definition(type).ScrapYield;
 
-    /// <summary>Ghost shape/position depends on both where you're aiming AND which install verb
-    /// is currently highlighted — e.g. "install a conduit" and "build a floor panel" are
-    /// different objects sharing the same tile aim point, so previewing the wrong one's shape
-    /// would be actively misleading, not just imprecise. Always shows the plain lone/panel-box
-    /// shape rather than a live connection-aware preview — a rough "here's where" indicator, not
-    /// a promise of the final shape.</summary>
+    /// <summary>Ghost shape/position depends on both where you're aiming AND which install verb is
+    /// currently highlighted — e.g. "install a conduit" and "build a floor panel" are different
+    /// objects sharing the same tile aim point. Always shows the plain lone/panel-box shape
+    /// rather than a live connection-aware preview — a rough "here's where" indicator.</summary>
     private void UpdateGhostTransform()
     {
         var isInstall = _previewVerb == InstallConduitVerb || _previewVerb == InstallWallVerb ||
@@ -2727,9 +2590,8 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 break;
 
             case AimKind.Edge when _previewVerb == ExtendFloorVerb:
-                // Previews the new cell itself (across the edge, at _edgeB) rather than the
-                // edge — that's where the floor panel will actually land, same shape as the
-                // Tile/InstallFloorVerb preview above.
+                // Previews the new cell itself (across the edge, at _edgeB) — that's where the
+                // floor panel will actually land.
                 _ghost!.Visible = true;
                 _ghost.Mesh = PanelMesh;
                 _ghost.RotationDegrees = Vector3.Zero;
@@ -2764,10 +2626,7 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
     /// <summary>Keeps the dedicated highlight mesh (see HighlightVisual) tracking the current aim
     /// point — unconditional on _previewVerb/install-preview state, unlike UpdateGhostTransform,
-    /// since scan mode needs a silhouette regardless of which (if any) verb happens to be
-    /// selected. A ship with no PanelMesh/ConduitMesh/WallSegmentMesh configured (hasn't opted
-    /// into that system) just ends up with a null Mesh here — no crash, simply nothing to
-    /// outline.</summary>
+    /// since scan mode needs a silhouette regardless of which verb is selected.</summary>
     private void UpdateHighlightGhostTransform()
     {
         switch (_aimKind)
@@ -2786,12 +2645,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
             case AimKind.Edge:
             {
-                // EdgeMargin's own band is deliberately wide (lets you target a wall from well
-                // inside the neighboring tile) but that means "aim resolved to Edge" does NOT
-                // imply a wall actually exists there yet — outlining a phantom wall where there's
-                // only open floor reads as wrong. Same wallPresent test Condition's own Edge
-                // branches use: falls back to highlighting the floor tile itself when there's
-                // nothing built on this edge to outline instead.
+                // EdgeMargin's band is deliberately wide, but that means "aim resolved to Edge"
+                // does NOT imply a wall actually exists there yet — outlining a phantom wall over
+                // open floor reads as wrong, so this falls back to highlighting the floor tile.
                 var wallPresent = ShipSimRef!.Deck.Cells.Contains(_edgeB)
                     ? ShipSimRef.Deck.IsEdgeSealed(_edgeA, _edgeB)
                     : !ShipSimRef.Deck.IsWallEdgeBreached(_edgeA, _edgeB);
@@ -2824,9 +2680,6 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
     private (Vector3 Position, Vector3 RotationDegrees) EdgeTransform(CellCoord a, CellCoord b) =>
         (ToLocal(EdgeWorldPosition(a, b)), ShipGeometry.EdgeRotationDegrees(a, b));
 
-    /// <summary>World position of an edge's midpoint — the wall-breach counterpart to
-    /// <see cref="TileWorldPosition"/>, sharing <see cref="ShipGeometry"/>'s position math so a
-    /// breach pull target always lines up with the actual wall segment.</summary>
     private Vector3 EdgeWorldPosition(CellCoord a, CellCoord b) =>
         ShipSpace.ToGlobal(EdgeShipLocalPosition(a, b));
 
@@ -2834,16 +2687,12 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         ShipSpace.ToGlobal(ShipGeometry.TileShipLocal(tile, height));
 
     /// <summary>This ship's spatial root — every grid-to-world conversion goes through it, so a
-    /// ship instanced anywhere (including, later, under a runtime-instantiated destination) places
-    /// its geometry relative to itself rather than to the world origin. Falls back to this node's
-    /// own parent for a scene that hasn't wired ShipRoot explicitly.</summary>
+    /// ship instanced anywhere places its geometry relative to itself rather than to the world
+    /// origin. Falls back to this node's own parent for a scene that hasn't wired ShipRoot.</summary>
     private Node3D ShipSpace => ShipRoot ?? GetParent<Node3D>();
 
     /// <summary>World positions of every currently-open floor/ceiling/wall breach on this ship —
-    /// the decompression-pull hazard's own read of Deck.HullBreaches/WallEdgeBreaches, reusing the
-    /// exact same TileWorldPosition/EdgeWorldPosition math GenerateFloorCeilingPanels/SpawnWallSegment
-    /// already use so a pull target always lines up with the actual hole, not a re-derived
-    /// approximation.</summary>
+    /// the decompression-pull hazard's read of Deck.HullBreaches/WallEdgeBreaches.</summary>
     public IEnumerable<Vector3> ActiveBreachPositions()
     {
         if (ShipSimRef is null)
@@ -2865,21 +2714,17 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
                 yield return TileWorldPosition(tile, CeilingPanelHeight);
             }
 
-            // Wall, per-CELL rather than per-edge (see Deck.BreachHull's own doc comment) — a
-            // direct "this whole cell is exposed to vacuum" event, e.g. AirlockDoorVerbTarget
-            // venting its adjacent cell to space while undocked. Distinct from the per-edge wall
-            // breaches below (a player-removed wall segment) — this one has no specific edge to
-            // point at, just the cell itself, so it uses the tile's own center at wall height.
+            // Wall, per-CELL rather than per-edge — a direct "this whole cell is exposed to
+            // vacuum" event, e.g. AirlockDoorVerbTarget venting its adjacent cell while undocked.
+            // Distinct from the per-edge wall breaches below (a player-removed wall segment).
             if (ShipSimRef.Deck.IsHullBreached(cell, StructuralSurface.Wall))
             {
                 yield return TileWorldPosition(tile, WallCenterHeight);
             }
         }
 
-        // Floor/ceiling/per-cell-wall breaches are tracked per-cell (handled above); a breached/
-        // removed wall SEGMENT is tracked per-edge instead (Deck.WallEdgeBreaches, not the
-        // per-cell _breaches set), so it needs its own pass rather than fitting into
-        // IsHullBreached(cell, surface) above.
+        // A breached/removed wall SEGMENT is tracked per-edge (Deck.WallEdgeBreaches), not the
+        // per-cell breach set above, so it needs its own pass.
         foreach (var (a, b) in ShipSimRef.Deck.WallEdgeBreaches)
         {
             yield return EdgeWorldPosition(a, b);
@@ -2961,20 +2806,16 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
 
         // Thrusters share the same flat Machines list (Type "thruster") rather than a dedicated
         // field — MachineCoord already supports arbitrary rows and multiple entries of the same
-        // Type, so no BuildTargetSaveData schema change is needed for "many instead of one."
-        // Condition is left at its default (1f): ThrusterFixture is excluded from wear, same as
-        // Battery, so there's nothing but charge (State) to round-trip.
+        // Type. Condition is left at its default (1f): ThrusterFixture is excluded from wear,
+        // same as Battery, so there's nothing but charge (State) to round-trip.
         foreach (var (edge, node) in _placedThrusters)
         {
             data.Machines.Add(new MachineCoord("thruster", edge.Item1.X, edge.Item1.Y, edge.Item2.X, edge.Item2.Y, node.GetSaveState()));
         }
 
-        // Type is "storage:" + the storage item's own id ("storage:small_bin", etc.) rather than
-        // a fixed string — the prefix lets ApplyBuildState recognize a storage row on sight
-        // (StartsWith, below) without ever consulting ItemCatalog, which stays reliable even in
-        // Scavengineers.NodeTests' own isolated environment (no items.json there — see this
-        // feature's own plan notes). Condition is left at its default (1f) — storage has no
-        // charge/wear concept.
+        // Type is "storage:" + the storage item's own id ("storage:small_bin", etc.) — the
+        // prefix lets ApplyBuildState recognize a storage row on sight without ever consulting
+        // ItemCatalog. Condition is left at its default (1f) — storage has no charge/wear concept.
         foreach (var (edge, node) in _placedStorage)
         {
             data.Machines.Add(new MachineCoord($"storage:{node.ItemId}", edge.Item1.X, edge.Item1.Y, edge.Item2.X, edge.Item2.Y, node.GetSaveState()));
@@ -2994,11 +2835,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         Machines.Values.FirstOrDefault(d => d.ItemId == itemId)?.Type;
 
     /// <summary>Replays a save's tiles/edges through the same helpers Install/BuildWall use —
-    /// already inventory-free at this level (the verb/cost logic lives in ExecuteVerb, never
-    /// called here), so restoring a save never re-charges scrap_metal/wall_panel. Clears all
-    /// current conduit/wall/floor/ceiling state first: the ship's own default layout (see
-    /// <see cref="SeedDefaultShipLayout"/>) is itself now removable, so a loaded save must be
-    /// authoritative rather than layered on top of whatever startup already built.</summary>
+    /// already inventory-free at this level, so restoring a save never re-charges scrap_metal/
+    /// wall_panel. Clears all current conduit/wall/floor/ceiling state first: the ship's own
+    /// default layout is itself now removable, so a loaded save must be authoritative rather
+    /// than layered on top of whatever startup already built.</summary>
     public void ApplyBuildState(BuildTargetSaveData state)
     {
         ClearAllBuildState();
@@ -3070,13 +2910,10 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             ShipSimRef!.Deck.SetWallHealth(new CellCoord(entry.AX, entry.AY), new CellCoord(entry.BX, entry.BY), entry.Health);
         }
 
-        // ClearAllBuildState just breached every floor/ceiling tile as its own "removed"
-        // baseline (mirroring how it unseals every wall) — repair them all back to intact
-        // before selectively re-breaching only the ones the save actually recorded as open.
-        // Previously this step was missing (breach was purely cosmetic, so nothing ever
-        // surfaced it); now that breach means "no collision," skipping it would drop the
-        // player through the entire floor and ceiling on every load except the handful of
-        // tiles that happened to be breached when the save was made.
+        // ClearAllBuildState just breached every floor/ceiling tile as its "removed" baseline —
+        // repair them all back to intact before selectively re-breaching only the ones the save
+        // actually recorded as open. Skipping this would drop the player through the entire
+        // floor and ceiling on every load except the tiles breached when the save was made.
         foreach (var cell in _floorPanels.Keys)
         {
             ShipSimRef!.Deck.RepairHull(cell, StructuralSurface.Floor);
@@ -3193,9 +3030,9 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
             RemoveStorage(a, b, inventory: null);
         }
 
-        // A load that doesn't include a previously-extended cell must actually remove it —
-        // Load() (SaveManager.cs) applies state onto the live scene, not a fresh reload, so a
-        // stale extension from earlier in the same session would otherwise just linger.
+        // A load that doesn't include a previously-extended cell must actually remove it — Load()
+        // applies state onto the live scene, not a fresh reload, so a stale extension from
+        // earlier in the same session would otherwise just linger.
         foreach (var cell in _extendedCells)
         {
             if (_floorPanels.Remove(cell, out var floorPanel))

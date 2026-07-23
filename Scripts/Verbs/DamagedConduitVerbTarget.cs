@@ -9,13 +9,10 @@ using Scavengineers.Scripts.Ship;
 
 namespace Scavengineers.Scripts.Verbs;
 
-/// <summary>
-/// The conduit fire hazard's repair point (docs/project-plan.md Appendix A7 — powered +
-/// damaged + O2 present sparks and burns; ShipSim's FireSystem already handles ignition/
-/// burning/self-extinguishing). Repair restores the fixture's Condition, which stops
-/// FireSystem from ever igniting it again. Scrap rips it out of the power circuit entirely
-/// instead — a real tradeoff between the two, not just one verb.
-/// </summary>
+/// <summary>The conduit fire hazard's repair point — powered + damaged + O2 present sparks and
+/// burns (ShipSim's FireSystem handles ignition/burning/self-extinguishing). Repair restores the
+/// fixture's Condition, stopping FireSystem from ever igniting it again. Scrap rips it out of the
+/// power circuit entirely instead — a real tradeoff between the two.</summary>
 public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, IStateSaveable
 {
     private enum ConduitState { Damaged, Repaired, Scrapped }
@@ -43,15 +40,13 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, IStat
     [Export]
     public Material? RepairedMaterial { get; set; }
 
-    /// <summary>Shown whenever ShipSim's FireSystem has this conduit's tile actively burning —
-    /// combined with SmokeParticles below, now that fire is a real hazard worth calling
-    /// attention to rather than just a material swap.</summary>
+    /// <summary>Shown whenever ShipSim's FireSystem has this conduit's tile actively burning.</summary>
     [Export]
     public Material? BurningMaterial { get; set; }
 
     /// <summary>A grey particle puff toggled on/off alongside BurningMaterial — the visible cue
-    /// that a burning cell now actually drains the player's O2 faster and impairs their vision
-    /// (see Player.cs's inSmoke handling), not just a cosmetic material change.</summary>
+    /// that a burning cell drains the player's O2 faster and impairs their vision (see Player.cs's
+    /// inSmoke handling).</summary>
     [Export]
     public GpuParticles3D? SmokeParticles { get; set; }
 
@@ -83,21 +78,17 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, IStat
 
         _idleMaterial = Mesh?.GetSurfaceOverrideMaterial(0);
 
-        // Deferred: ShipSimRef's own DamagedConduitCell/HasFireHazard are only final once its
-        // _Ready() has run (may not have happened yet at this exact point depending on scene-tree
-        // sibling order — the same established fix used elsewhere in this project, e.g. ShipSim's
-        // own deferred vacuum seeding).
+        // Deferred: ShipSimRef's DamagedConduitCell/HasFireHazard are only final once its own
+        // _Ready() has run, which may not have happened yet depending on scene-tree sibling order.
         CallDeferred(nameof(ApplyGeneratedPlacement));
     }
 
-    /// <summary>This node's own hand-authored world Transform is fixed regardless of which cell
-    /// ShipSim.DamagedConduitCell actually resolves to — harmless while every ship's conduit sat
-    /// at the same hardcoded cell, but wrong for any layout (catalog-loaded or procedurally
-    /// generated) that moves it. A direct child of the ship root, so its own Position is already
-    /// in ship-root-local space (same "-3+0.5" convention ShipBuildTarget.TileWorldPosition uses)
-    /// — no ToLocal/ToGlobal needed. Only X/Z move; the hand-authored Y (mount height/room
-    /// offset) is left untouched. Hidden and made non-interactive entirely for a layout with no
-    /// fire hazard at all, rather than dangling inertly in whatever room cell (0,0) happens to be.</summary>
+    /// <summary>This node's hand-authored world Transform is fixed regardless of which cell
+    /// ShipSim.DamagedConduitCell resolves to — wrong for any layout (catalog-loaded or
+    /// procedurally generated) that moves it. A direct child of the ship root, so its Position is
+    /// already in ship-root-local space — no ToLocal/ToGlobal needed. Only X/Z move; the
+    /// hand-authored Y is left untouched. Hidden and non-interactive for a layout with no fire
+    /// hazard, rather than dangling inertly in whatever room cell (0,0) happens to be.</summary>
     private void ApplyGeneratedPlacement()
     {
         if (ShipSimRef is null)
@@ -227,8 +218,8 @@ public partial class DamagedConduitVerbTarget : StaticBody3D, IVerbTarget, IStat
                 break;
 
             case ConduitState.Scrapped:
-                // Extinguish before removing the fixture — ExtinguishIfBurning looks the
-                // fixture up by id to find its tile, which no longer resolves once gone.
+                // Extinguish before removing the fixture — ExtinguishIfBurning looks it up by id
+                // to find its tile, which no longer resolves once gone.
                 ExtinguishIfBurning();
                 ShipSimRef?.Deck.RemoveFixture(ShipSim.DamagedConduitFixtureId);
                 if (SmokeParticles is not null)

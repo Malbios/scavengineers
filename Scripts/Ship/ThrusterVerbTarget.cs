@@ -11,16 +11,11 @@ using PlayerScript = Scavengineers.Scripts.Player.Player;
 
 namespace Scavengineers.Scripts.Ship;
 
-/// <summary>
-/// A player-installable ship engine block with its own internal N2 tank — more of these,
-/// fueled, means faster travel (see TravelConsoleVerbTarget). Unlike Battery there can be many of
-/// these at once (see ShipBuildTarget's own _placedThrusters), so each instance carries its own
-/// fixture id and mounting edge rather than relying on a single fixed ShipSim constant/MachineType
-/// slot. Fueling is a physical dock, not an instant top-off: a real n2_tank item sits in <see
-/// cref="Contents"/> and continuously feeds the fixture's own charge (see _PhysicsProcess) until
-/// the tank itself runs dry — the same "swap the empty one for a full one" loop the EVA suit's own
-/// N2 tank slot already uses, just world-object-owned instead of player-owned.
-/// </summary>
+/// <summary>A player-installable ship engine block with its own internal N2 tank — more of these,
+/// fueled, means faster travel (see TravelConsoleVerbTarget). Unlike Battery there can be many at
+/// once, so each instance carries its own fixture id and mounting edge. Fueling is a physical
+/// dock, not an instant top-off: a real n2_tank item sits in <see cref="Contents"/> and
+/// continuously feeds the fixture's charge until the tank runs dry.</summary>
 public partial class ThrusterVerbTarget : StaticBody3D, IVerbTarget, IStateSaveable
 {
     private static readonly Verb OpenThrusterVerb = new("open_thruster", "VERB_OPEN_THRUSTER", DurationSeconds: 0f);
@@ -32,31 +27,25 @@ public partial class ThrusterVerbTarget : StaticBody3D, IVerbTarget, IStateSavea
     [Export]
     public ShipSim? ShipSimRef { get; set; }
 
-    /// <summary>Set by ShipBuildTarget when it spawns this instance — see BatteryVerbTarget's own
-    /// BuildTarget for why this is needed (Uninstall/Scrap reachable while aiming at the
-    /// thruster's own box, not just bare wall space next to it).</summary>
+    /// <summary>Set by ShipBuildTarget when it spawns this instance — makes Uninstall/Scrap
+    /// reachable while aiming at the thruster's own box, not just bare wall space next to it.</summary>
     [Export]
     public ShipBuildTarget? BuildTarget { get; set; }
 
-    /// <summary>This specific thruster's own Deck fixture id — derived by ShipBuildTarget from
-    /// its normalized mounting edge (see ShipBuildTarget.ThrusterFixtureId), since (unlike
-    /// Battery/Switch/RechargeStation) there's no single fixed constant to share across
+    /// <summary>Derived by ShipBuildTarget from this thruster's normalized mounting edge, since
+    /// (unlike Battery/Switch/RechargeStation) there's no single fixed constant to share across
     /// instances.</summary>
     public string FixtureId { get; set; } = "";
 
-    /// <summary>This thruster's own mounting edge, set once at spawn — needed so ExecuteVerb can
-    /// hand it back to <see cref="ShipBuildTarget.ExecuteThrusterRemoval"/>, which looks placement
-    /// up by edge rather than by fixture id.</summary>
+    /// <summary>Set once at spawn so ExecuteVerb can hand it back to
+    /// <see cref="ShipBuildTarget.ExecuteThrusterRemoval"/>, which looks placement up by edge
+    /// rather than by fixture id.</summary>
     public CellCoord EdgeA { get; set; }
 
     public CellCoord EdgeB { get; set; }
 
-    /// <summary>The docked N2 tank, if any — a single-slot SlotContainer rather than a new
-    /// primitive, so the existing generic drag-and-drop (InventorySlotUI.Container/
-    /// SlotContainer.MoveBetween) works with zero new mechanism. Any item can technically be
-    /// dropped in here (nothing enforces "n2_tank only," matching how ordinary backpack slots
-    /// don't restrict item type either); _PhysicsProcess below simply ignores anything that isn't
-    /// a charged n2_tank.</summary>
+    /// <summary>The docked N2 tank, if any. Nothing enforces "n2_tank only" — _PhysicsProcess
+    /// below simply ignores anything that isn't a charged n2_tank.</summary>
     public SlotContainer Contents { get; } = new(1);
 
     [Export]
@@ -64,8 +53,7 @@ public partial class ThrusterVerbTarget : StaticBody3D, IVerbTarget, IStateSavea
 
     public string? DisplayNameKey => "OBJECT_THRUSTER";
 
-    /// <summary>The thruster's own N2 charge fraction — excluded from WearSystem's passive decay
-    /// (see ThrusterFixture), same as Battery's charge.</summary>
+    /// <summary>Excluded from WearSystem's passive decay, same as Battery's charge.</summary>
     public float? Condition => ShipSimRef?.ThrusterChargeFraction(FixtureId);
 
     public float? CurrentVerbProgress => null; // instant, never "in progress"
@@ -112,9 +100,8 @@ public partial class ThrusterVerbTarget : StaticBody3D, IVerbTarget, IStateSavea
         // Instant, already complete by the time anyone could cancel it — nothing to do.
     }
 
-    /// <summary>Condition alone, or condition plus the docked tank's own remaining charge
-    /// (pipe-delimited) — still a single string in MachineCoord.State, no BuildTargetSaveData
-    /// schema change needed just because a thruster now has its own sub-item.</summary>
+    /// <summary>Condition alone, or condition plus the docked tank's remaining charge
+    /// (pipe-delimited) — still a single string in MachineCoord.State.</summary>
     public string GetSaveState()
     {
         var condition = (ShipSimRef?.ThrusterChargeFraction(FixtureId) ?? 1f).ToString(CultureInfo.InvariantCulture);

@@ -2,10 +2,8 @@ using Godot;
 
 namespace Scavengineers.Scripts.Ship;
 
-/// <summary>
-/// The visible payoff for wiring a device up via ShipBuildTarget — no verb of its own,
-/// just a passive light that follows ShipSim.IsPowered(FixtureId) every tick.
-/// </summary>
+/// <summary>A passive light that follows ShipSim.IsPowered(FixtureId) every tick — no verb of its
+/// own.</summary>
 public partial class PoweredDeviceIndicator : Node
 {
     [Export]

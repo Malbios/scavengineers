@@ -3,28 +3,15 @@ using Scavengineers.Sim.Grid;
 
 namespace Scavengineers.Scripts.Ship;
 
-/// <summary>
-/// The shared mapping between a ship's tile grid (<see cref="CellCoord"/> / Vector2I, the
-/// coordinate system Scavengineers.Sim works in) and ship-local world space, plus the handful of
-/// heights that mapping depends on.
-///
-/// <para>This exists because the conversion was duplicated: <c>ShipBuildTarget</c> wrote
-/// <c>tile.X - 3 + 0.5f</c> in two places and <c>ShipAtmosphereZone.TileAt</c> wrote the inverse
-/// <c>local.X + 3</c>, floored — the same constant, unnamed, in three places, with nothing
-/// connecting them. Getting one of them wrong would put the player's O2 reading on a different tile
-/// than the one they're standing on, which is exactly the sort of bug that presents as "the
-/// atmosphere sim is broken".</para>
-///
-/// <para>Pure static functions over plain values: no node references, no scene assumptions. Callers
-/// that need *global* space convert the ship-local result through their own ShipRoot, since only
-/// they know which ship they mean.</para>
-/// </summary>
+/// <summary>The shared mapping between a ship's tile grid (<see cref="CellCoord"/> / Vector2I)
+/// and ship-local world space, plus the heights that mapping depends on. Pure static functions
+/// over plain values — no node references, no scene assumptions. Callers needing *global* space
+/// convert the ship-local result through their own ShipRoot.</summary>
 public static class ShipGeometry
 {
     /// <summary>Tile (0,0) sits this many tiles negative of the ship root on both axes, so a
-    /// default 6-deep grid straddles the origin rather than extending only positively. Baked into
-    /// every ship scene's authored geometry, so it isn't freely tunable — it's recorded here
-    /// because the value was previously an unnamed literal 3 in three separate expressions.</summary>
+    /// default grid straddles the origin rather than extending only positively. Baked into every
+    /// ship scene's authored geometry, so it isn't freely tunable.</summary>
     public const int GridOriginOffset = 3;
 
     /// <summary>Half a tile — every conversion below addresses a tile's *center*, not its
@@ -33,31 +20,24 @@ public static class ShipGeometry
 
     public const float TileSize = 1f;
 
-    /// <summary>Matches WallSegmentShape/WallSegmentMesh's authored Y size (see World.tscn) — the
-    /// same hand-kept-in-sync convention <see cref="WallCenterHeight"/> already uses for that
-    /// mesh.</summary>
+    /// <summary>Matches WallSegmentShape/WallSegmentMesh's authored Y size (see World.tscn).</summary>
     public const float WallHeight = 2f;
 
     public const float WallCenterHeight = 1.0f;
 
-    /// <summary>Half the conduit mesh's own 0.05 thickness above the floor's actual top surface
-    /// (Y=0, matching <see cref="FloorPanelHeight"/>'s surface alignment) — resting flush on the
-    /// floor rather than visibly floating above it.</summary>
+    /// <summary>Half the conduit mesh's own 0.05 thickness above the floor's top surface (Y=0) —
+    /// resting flush on the floor rather than visibly floating above it.</summary>
     public const float FloorConduitHeight = 0.025f;
 
-    /// <summary>Match the (collision-only) floor/ceiling colliders' actual top/bottom surfaces
-    /// exactly, so a panel mesh sits flush with where the player's feet and the ceiling's underside
-    /// really are, instead of at the conduit's mount height — sharing that height with conduits is
-    /// what used to make panels z-fight with them.</summary>
+    /// <summary>Matches the floor/ceiling colliders' actual top/bottom surfaces, so a panel mesh
+    /// sits flush rather than at the conduit's mount height (which used to z-fight with it).</summary>
     public const float FloorPanelHeight = -0.025f;
 
     public const float CeilingPanelHeight = 2.025f;
 
-    /// <summary>Vertical spacing between a site's stacked decks — a second deck's root sits this
-    /// far above the first's, making deck 2's floor plane exactly meet deck 1's ceiling plane
-    /// (docs/project-plan.md Appendix A3: "deck N's ceiling plane is the same boundary as deck
-    /// N+1's floor"). Derived rather than a magic number in a scene transform, so the two heights
-    /// it depends on can never drift out of sync with it.</summary>
+    /// <summary>Vertical spacing between a site's stacked decks, so deck 2's floor plane exactly
+    /// meets deck 1's ceiling plane. Derived, not a magic number in a scene transform, so the two
+    /// heights it depends on can never drift out of sync with it.</summary>
     public const float DeckYOffset = CeilingPanelHeight - FloorPanelHeight;
 
     /// <summary>A wall face gets one conduit mount slot per tile-height's worth of its own height,

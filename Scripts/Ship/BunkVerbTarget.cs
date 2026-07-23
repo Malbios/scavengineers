@@ -9,20 +9,15 @@ using PlayerScript = Scavengineers.Scripts.Player.Player;
 
 namespace Scavengineers.Scripts.Ship;
 
-/// <summary>
-/// Fixed Home Ship furniture (no build-target removal, like TravelConsoleVerbTarget) that
-/// restores the player's Energy need (PlayerNeeds, docs/project-plan.md's time-acceleration
-/// note) — a plain timed verb, not a power-gated station like RechargeStationVerbTarget, since
-/// a bunk doesn't need power.
-/// </summary>
+/// <summary>Fixed Home Ship furniture that restores the player's Energy need — a plain timed
+/// verb, not a power-gated station like RechargeStationVerbTarget, since a bunk doesn't need
+/// power.</summary>
 public partial class BunkVerbTarget : StaticBody3D, IVerbTarget
 {
-    // Placeholder/tunable — near-instant for dev testing, same spirit as every other timed verb.
+    // Placeholder/tunable — near-instant for dev testing.
     private static readonly Verb SleepVerb = new("sleep", "VERB_SLEEP", DurationSeconds: 3f);
 
-    // Same two-tier upkeep as everything else with a Deck-tracked Condition (see
-    // MaintenanceTier) — this bunk's own fixture (ShipSim.BunkFixtureId) decays passively like
-    // any other, even though it doesn't participate in the power graph.
+    // Same two-tier upkeep as everything else with a Deck-tracked Condition (see MaintenanceTier).
     private static readonly ItemRequirement WrenchRequirement = new("wrench", 1) { Consumed = false };
     private static readonly ItemRequirement SparePartsRequirement = new("spare_parts", 1);
 
@@ -42,8 +37,7 @@ public partial class BunkVerbTarget : StaticBody3D, IVerbTarget
     private Timer? _sleepTimer;
     private bool _sleeping;
 
-    // A second, independent timer/bool pair — sleeping and upkeep are two unrelated timed
-    // actions on the same object, not worth folding into one dispatch at this scale.
+    // A second, independent timer/bool pair — sleeping and upkeep are unrelated timed actions.
     private Timer? _maintenanceTimer;
     private bool _maintaining;
 

@@ -8,9 +8,8 @@ namespace Scavengineers.Scripts.Ship;
 /// turns this into a real world PickupItem via the existing InventoryOverflow.DropAt helper.</summary>
 public readonly record struct LootSpawn(string ItemId, int Count, int TileX, int TileY);
 
-/// <summary>The generator's own output shape — kept separate from ShipLayoutCatalog.ShipLayoutDefinition
-/// (the JSON-loaded schema) so the catalog's on-disk format doesn't have to carry generator-only
-/// loot data.</summary>
+/// <summary>Kept separate from ShipLayoutCatalog.ShipLayoutDefinition (the JSON-loaded schema) so
+/// the catalog's on-disk format doesn't have to carry generator-only loot data.</summary>
 public sealed class GeneratedShipLayout
 {
     public required ShipLayoutCatalog.ShipLayoutDefinition Layout { get; init; }
@@ -18,45 +17,33 @@ public sealed class GeneratedShipLayout
     public required IReadOnlyList<LootSpawn> Loot { get; init; }
 }
 
-/// <summary>
-/// Produces a random, always-valid derelict layout from a single integer seed — deterministic
-/// (same seed -> byte-identical output), so a persisted seed (see ShipSim.ProcedurallyGenerate)
-/// fully reproduces a derelict's shape across a save/reload without needing to persist the shape
-/// itself. Deliberately uses plain System.Random rather than Godot's RandomNumberGenerator: this
-/// project already hit a real crash (GD.PushWarning failing outside a running engine, this same
-/// session) from a Godot-native call executed without the engine initialized —
-/// RandomNumberGenerator is a full RefCounted-derived Godot class with the same category of risk,
-/// not a plain struct. System.Random is pure BCL, has zero engine dependency, and is exactly as
-/// deterministic for pure data generation — this sidesteps that risk rather than gambling on it,
-/// and keeps this class (and its tests) fully engine-free.
+/// <summary>Produces a random, always-valid derelict layout from a single integer seed —
+/// deterministic (same seed -> byte-identical output), so a persisted seed fully reproduces a
+/// derelict's shape across a save/reload without needing to persist the shape itself. Uses plain
+/// System.Random rather than Godot's RandomNumberGenerator (a RefCounted-derived Godot class) to
+/// keep this class, and its tests, fully engine-free.
 ///
-/// Every generated layout respects the hard constraints this codebase's own scene geometry
-/// imposes (see ShipSim.cs/ShipBuildTarget.cs/InteriorDoorVerbTarget.cs for the originals):
+/// Every generated layout respects hard constraints this codebase's scene geometry imposes:
 /// - RoomSplitColumns[0] is always 6 — the only split with a real door object
-///   (InteriorDoorVerbTarget's edges and ShipBuildTarget.ExcludedEdgeColumn are both hand-baked
-///   to column 6 and never read a layout's own split columns).
-/// - WestCorridorLength/EastCorridorLength are never part of this output at all — the shared
-///   DerelictAirlock's own fixed docking tile assumes exactly today's scene-authored corridor
-///   length; this generator only ever varies the room-side of the ship.
-/// - Every hull breach lands on a genuine boundary edge (never a RoomSplitColumns edge, whose
-///   "outside" is always a real adjacent room — breaching one would silently vent two rooms into
-///   one connected vacuum with no visible hole, see Deck.IsHullBreached).
-/// - A fresh ship has exactly two connected components at world-start: Room 1 (InteriorDoorVerbTarget
-///   starts closed) and everything else (every other split has no door object, its doorway rows
-///   stay permanently open) — the fire hazard, if generated, never shares a component with a
-///   breach, or it could never ignite (FireSystem only ignites once O2Fraction >= 0.1, and a
-///   breached room vents to vacuum immediately).
+///   (InteriorDoorVerbTarget's edges and ShipBuildTarget.ExcludedEdgeColumn are hand-baked to
+///   column 6 and never read a layout's own split columns).
+/// - WestCorridorLength/EastCorridorLength are never part of this output — the shared
+///   DerelictAirlock's fixed docking tile assumes today's scene-authored corridor length; this
+///   generator only varies the room-side of the ship.
+/// - Every hull breach lands on a genuine boundary edge, never a RoomSplitColumns edge (breaching
+///   one would silently vent two rooms into one connected vacuum with no visible hole).
+/// - A fresh ship has exactly two connected components at world-start: Room 1 (starts closed) and
+///   everything else — the fire hazard, if generated, never shares a component with a breach, or
+///   it could never ignite (FireSystem needs O2Fraction >= 0.1; a breached room vents instantly).
 /// </summary>
 public static class ShipLayoutGenerator
 {
-    // Must mirror ShipSim.GridDepth/DoorwayRows exactly — this generator targets the exact same
-    // fixed grid depth/doorway convention every ship in this game already shares.
+    // Must mirror ShipSim.GridDepth/DoorwayRows exactly.
     private const int GridDepth = 6;
     private static readonly int[] DoorwayRows = [2, 3];
 
-    // Placeholder/tunable — every range below is a first-pass balance guess, not a load-bearing
-    // design constraint. 1-3 additional rooms (2-4 total, matching the two hand-authored
-    // precedents: derelict_small has 2, derelict_1 has 3).
+    // Placeholder/tunable — every range below is a first-pass balance guess. 1-3 additional
+    // rooms (2-4 total, matching derelict_small's 2 and derelict_1's 3).
     private const int MinAdditionalRooms = 1;
     private const int MaxAdditionalRoomsExclusive = 4;
     private const int MinRoomWidth = 4;
@@ -104,10 +91,10 @@ public static class ShipLayoutGenerator
         return new GeneratedShipLayout { Layout = layout, Loot = loot };
     }
 
-    /// <summary>Room 1 is always columns [0,6) — non-negotiable (see class doc comment). Each
-    /// additional room's start column is recorded as a split before its own width is rolled and
-    /// added to the running grid width, so the final room never gets its own trailing split
-    /// (matching derelict_1's real [6,12] for GridWidth=18: 3 rooms, 2 splits).</summary>
+    /// <summary>Room 1 is always columns [0,6). Each additional room's start column is recorded
+    /// as a split before its own width is rolled and added to the running grid width, so the
+    /// final room never gets its own trailing split (matching derelict_1's real [6,12] for
+    /// GridWidth=18: 3 rooms, 2 splits).</summary>
     private static (int GridWidth, int[] RoomSplitColumns) GenerateRooms(Random rng)
     {
         var additionalRooms = rng.Next(MinAdditionalRooms, MaxAdditionalRoomsExclusive);
@@ -151,11 +138,10 @@ public static class ShipLayoutGenerator
         return (true, fireGeneratorCell, damagedConduitCell, hostInRoom1);
     }
 
-    /// <summary>Candidate pool exactly mirrors the boundary edges ShipBuildTarget.SeedDefaultShipLayout
-    /// itself walks (north/south full width, west/east at non-doorway rows) — deliberately
-    /// excludes every RoomSplitColumns edge (see class doc comment on why). When a fire hazard
-    /// exists, candidates whose cell shares its component are dropped entirely, so a breach can
-    /// never vent the same room the fire hazard depends on having real air.</summary>
+    /// <summary>Candidate pool mirrors the boundary edges ShipBuildTarget.SeedDefaultShipLayout
+    /// walks (north/south full width, west/east at non-doorway rows), excluding every
+    /// RoomSplitColumns edge. When a fire hazard exists, candidates sharing its component are
+    /// dropped, so a breach can never vent the room the fire hazard depends on having air.</summary>
     private static List<ShipLayoutCatalog.BreachEdge> GenerateBreaches(Random rng, int gridWidth, bool hasFireHazard, bool fireHazardIsInRoom1)
     {
         var candidates = new List<ShipLayoutCatalog.BreachEdge>();

@@ -34,13 +34,9 @@ public interface IVerbTarget
     float? Condition => null;
 
     /// <summary>The visual node(s) to isolate onto the PDA scan-mode highlight render layer while
-    /// this target is currently aimed at — every real implementer is a Node, so the default finds
-    /// ALL of its own direct VisualInstance3D children (covers the overwhelming majority: meshes
-    /// added as direct children, whether hand-authored in a .tscn — e.g. a door's separate frame
-    /// and slab meshes, both real parts of the same target — or spawned by ShipBuildTarget's own
-    /// Install* methods). Empty means nothing to highlight. Override only when that default is
-    /// wrong — ShipBuildTarget's floor/wall/ceiling aim has no fixed child mesh to find this way
-    /// (see its own override).</summary>
+    /// this target is aimed at — the default finds all of its own direct VisualInstance3D
+    /// children. Override only when that default is wrong (see ShipBuildTarget's floor/wall/
+    /// ceiling aim, which has no fixed child mesh to find this way).</summary>
     IReadOnlyList<VisualInstance3D> HighlightVisual =>
         this is Node node ? node.GetChildren().OfType<VisualInstance3D>().ToList() : [];
 }

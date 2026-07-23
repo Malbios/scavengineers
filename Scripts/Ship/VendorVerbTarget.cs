@@ -9,20 +9,12 @@ using PlayerScript = Scavengineers.Scripts.Player.Player;
 
 namespace Scavengineers.Scripts.Ship;
 
-/// <summary>
-/// The Station's vendor — a person, not a machine (see World.tscn's ShopFigure, previously just
-/// idle-animated set dressing with no interaction of its own). A single always-available verb
-/// opens the shop panel (see Player.OpenShop) instead of cycling one Buy/Sell verb per item at a
-/// time — the panel's Buy tab lists every item in <see cref="ItemCatalog.TradeableItemIds"/>,
-/// greyed out while unaffordable or with no room to carry it; the Sell tab lists the same catalog,
-/// greyed out for anything you don't currently hold. Buy is always pricier than Sell so there's no
-/// trivial buy-then-sell arbitrage loop (enforced by ItemsJsonTradePriceTests).
-///
-/// Prices and the tradeable-item set both come from Data/items.json via ItemCatalog, not from a
-/// table here. They used to be a hardcoded price dict indexed by a *separate* hardcoded list
-/// (Player.HotbarItems) — two hand-maintained lists in two files, where adding a hotbar item
-/// without a matching price threw KeyNotFoundException the moment the shop panel opened.
-/// </summary>
+/// <summary>The Station's vendor. A single always-available verb opens the shop panel instead of
+/// cycling one Buy/Sell verb per item — the Buy tab lists every item in
+/// <see cref="ItemCatalog.TradeableItemIds"/>, greyed out while unaffordable or with no room; the
+/// Sell tab lists the same catalog, greyed out for anything not held. Buy is always pricier than
+/// Sell (enforced by ItemsJsonTradePriceTests). Prices and the tradeable-item set both come from
+/// Data/items.json via ItemCatalog, not a separate table here.</summary>
 public partial class VendorVerbTarget : StaticBody3D, IVerbTarget
 {
     private static readonly Verb ShopVerb = new("open_shop", "VERB_TRADE", DurationSeconds: 0f);
@@ -33,9 +25,6 @@ public partial class VendorVerbTarget : StaticBody3D, IVerbTarget
 
     public IReadOnlyList<Verb> AvailableVerbs => [ShopVerb];
 
-    /// <summary>Opens the shop panel instead of executing a buy/sell directly — same "no bespoke
-    /// per-object input path" shape TravelConsoleVerbTarget's ExecuteVerb already uses for its own
-    /// map. Player still just calls ExecuteVerb generically.</summary>
     public void ExecuteVerb(Verb verb, PlayerInventory inventory)
     {
         if (verb.Id != ShopVerb.Id)
@@ -53,10 +42,8 @@ public partial class VendorVerbTarget : StaticBody3D, IVerbTarget
     {
     }
 
-    /// <summary>Every purchasable item, Disabled when unaffordable or with no room to carry it —
-    /// shown rather than hidden, so the full catalog is always visible. Driven by
-    /// ItemCatalog.TradeableItemIds (i.e. by items.json), not by a separate hardcoded list: the
-    /// item set and its prices are now one source, so an item can't be listed without a price.</summary>
+    /// <summary>Every purchasable item, Disabled (not hidden) when unaffordable or with no room to
+    /// carry it, so the full catalog is always visible.</summary>
     public IReadOnlyList<ShopEntry> BuildBuyEntries()
     {
         var player = GetPlayer();
@@ -70,8 +57,6 @@ public partial class VendorVerbTarget : StaticBody3D, IVerbTarget
             .ToList();
     }
 
-    /// <summary>Every sellable item, Disabled when you own none — same "always visible, greyed
-    /// when not possible right now" symmetry Buy already has.</summary>
     public IReadOnlyList<ShopEntry> BuildSellEntries()
     {
         var player = GetPlayer();
@@ -81,10 +66,8 @@ public partial class VendorVerbTarget : StaticBody3D, IVerbTarget
             .ToList();
     }
 
-    /// <summary>Called back from the shop panel's Buy button. Checked again here, not just via
-    /// the entry's Disabled flag above — refuses the purchase cleanly (credits untouched) rather
-    /// than spending credits for an item that then has nowhere to go. An untradeable item id
-    /// (BuyPrice 0) is refused outright rather than sold for free.</summary>
+    /// <summary>Re-checked here, not just via the entry's Disabled flag — refuses the purchase
+    /// cleanly (credits untouched) rather than spending credits for an item with nowhere to go.</summary>
     public bool TryBuy(string itemId)
     {
         var price = ItemCatalog.BuyPrice(itemId);
@@ -103,9 +86,8 @@ public partial class VendorVerbTarget : StaticBody3D, IVerbTarget
         return true;
     }
 
-    /// <summary>Called back from the shop panel's Sell button — grants credits for 1 unit at a
-    /// time rather than dumping the whole inventory at once. An untradeable item is refused
-    /// (and, importantly, not consumed) rather than accepted for 0 credits.</summary>
+    /// <summary>Grants credits for 1 unit at a time. An untradeable item is refused and not
+    /// consumed, rather than accepted for 0 credits.</summary>
     public bool TrySell(string itemId)
     {
         var price = ItemCatalog.SellPrice(itemId);

@@ -10,17 +10,11 @@ using Scavengineers.Scripts.Verbs;
 
 namespace Scavengineers.Scripts.Ship;
 
-/// <summary>
-/// A real door between a ship's own two rooms — unlike AirlockDoorVerbTarget (which links
-/// two independent ships' atmosphere via a bridge), this seals/unseals two edges within the
-/// SAME ship's Deck directly (Deck.SealEdge/UnsealEdge — the exact mechanic
-/// AtmosphereSystemTests.TwoSealedRoomsJoinedByOpenDoor_... already covers).
-///
-/// This node itself is a persistent, always-visible/collidable frame at the doorway threshold
-/// — reachable from either room without a mirrored copy. <see cref="Slab"/> is the part that
-/// actually toggles: covers most of the opening and disappears when open, while the frame
-/// stays put as both the "door not fully open" visual and the thing you click to close it.
-/// </summary>
+/// <summary>A real door between a ship's own two rooms — unlike AirlockDoorVerbTarget (which
+/// links two independent ships' atmosphere via a bridge), this seals/unseals two edges within
+/// the SAME ship's Deck directly. This node is a persistent frame at the doorway threshold,
+/// reachable from either room; <see cref="SlabMesh"/> is the part that toggles visible/collidable
+/// on open/close, while the frame stays put.</summary>
 public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveable
 {
     private static readonly Verb OpenVerb = new("open_door", "VERB_OPEN_DOOR", DurationSeconds: 0.6f);
@@ -40,10 +34,7 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
     private static readonly (CellCoord A, CellCoord B) Edge1 = (new CellCoord(5, 2), new CellCoord(6, 2));
     private static readonly (CellCoord A, CellCoord B) Edge2 = (new CellCoord(5, 3), new CellCoord(6, 3));
 
-    // Same two-tier upkeep as everything else with a Deck-tracked Condition (see
-    // MaintenanceTier) — this door's own fixture (ShipSim.InteriorDoorFixtureId) has been
-    // passively decaying since it started existing unconditionally, with no way to repair it
-    // until now.
+    // Same two-tier upkeep as everything else with a Deck-tracked Condition (see MaintenanceTier).
     private static readonly ItemRequirement WrenchRequirement = new("wrench", 1) { Consumed = false };
     private static readonly ItemRequirement SparePartsRequirement = new("spare_parts", 1);
 
@@ -60,8 +51,6 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
     [Export]
     public ShipSim? ShipSimRef { get; set; }
 
-    /// <summary>The togglable body of the door — covers most of the opening, toggles
-    /// visible/collidable on open/close. The frame (this node) never toggles.</summary>
     [Export]
     public Node3D? SlabMesh { get; set; }
 
@@ -85,13 +74,10 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
 
     public bool IsOpen => _isOpen;
 
-    /// <summary>Powered: the normal instant Open/Close, same as ever. Unpowered: no ship motor to
-    /// drive the mechanism either way, so <see cref="PryVerb"/> (a crowbar, by hand) is the only
-    /// option regardless of current state — it prys the door open if closed, or forces it shut
-    /// again if already open (see <see cref="ExecuteVerb"/>, which decides the direction from the
-    /// current <see cref="IsOpen"/> state rather than from which verb was picked). Maintain/Repair
-    /// is offered regardless of powered state — a door you can't currently open should still be
-    /// repairable.</summary>
+    /// <summary>Unpowered: no motor to drive the mechanism, so <see cref="PryVerb"/> (a crowbar,
+    /// by hand) is the only option, prying open if closed or forcing shut if already open (see
+    /// <see cref="ExecuteVerb"/>, which decides direction from <see cref="IsOpen"/> rather than
+    /// which verb was picked). Maintain/Repair is offered regardless of powered state.</summary>
     public IReadOnlyList<Verb> AvailableVerbs
     {
         get
@@ -118,11 +104,6 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
 
     public float? Condition => DoorFixture?.Condition;
 
-    // No HighlightVisual override needed: IVerbTarget's default (all direct VisualInstance3D
-    // children) already covers both FrameMesh (the static frame, present open or closed) and
-    // SlabMesh (the part that actually toggles) — FrameCollision/SlabCollision aren't
-    // VisualInstance3D, so they're excluded automatically.
-
     public float? CurrentVerbProgress =>
         _cycling ? 1f - (float)(_cycleTimer!.TimeLeft / _cycleTimer.WaitTime)
         : _maintaining ? 1f - (float)(_maintenanceTimer!.TimeLeft / _maintenanceTimer.WaitTime)
@@ -138,19 +119,15 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
         AddChild(_maintenanceTimer);
         _maintenanceTimer.Timeout += OnMaintenanceComplete;
 
-        // Deferred for two reasons: ShipSimRef's own Deck/power may not be built yet at this
-        // exact point in _Ready() order (needed to decide the starting _isOpen below), and a
-        // CollisionShape3D's very first Disabled toggle in the same frame it enters the tree can
-        // race the physics server's own "shape added" registration for that frame (Jolt in
-        // particular) — the write is silently lost and the shape stays solid until some later
-        // toggle forces a real update. One frame lands after both.
+        // Deferred: ShipSimRef's Deck/power may not be built yet at this point in _Ready() order,
+        // and a CollisionShape3D's first Disabled toggle in the same frame it enters the tree can
+        // race the physics server's own "shape added" registration (Jolt in particular), silently
+        // losing the write. One frame lands after both.
         CallDeferred(nameof(ApplyInitialState));
     }
 
-    /// <summary>A fresh, unpowered ship starts with its interior doors closed (no motor to hold
-    /// them open) rather than the old hardcoded "always starts open" — matching PryVerb's own
-    /// "closed is the state you need a crowbar for" framing. A loaded save overrides this via
-    /// ApplySaveState regardless, same as before.</summary>
+    /// <summary>A fresh, unpowered ship starts with its interior doors closed — no motor to hold
+    /// them open. A loaded save overrides this via ApplySaveState.</summary>
     private void ApplyInitialState()
     {
         _isOpen = ShipSimRef?.IsPowered(ShipSim.InteriorDoorFixtureId) ?? false;
@@ -228,8 +205,7 @@ public partial class InteriorDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveab
 
     public bool GetSaveState() => _isOpen;
 
-    /// <summary>Jumps straight to the saved open/closed state without replaying the timer —
-    /// same "already-settled" pattern the old HullBreachVerbTarget used.</summary>
+    /// <summary>Jumps straight to the saved open/closed state without replaying the timer.</summary>
     public void ApplySaveState(bool state)
     {
         _isOpen = state;

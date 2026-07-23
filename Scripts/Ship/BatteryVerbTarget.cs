@@ -9,13 +9,10 @@ using Scavengineers.Scripts.Verbs;
 
 namespace Scavengineers.Scripts.Ship;
 
-/// <summary>
-/// The Home Ship's sole power source (docs/project-plan.md §4 step 6 — "recharge cells" made
-/// real). Holds a finite charge (see <see cref="ShipSim.BatteryChargeFraction"/>) that every
-/// wired-up consumer's <see cref="ShipSim.IsPowered"/> check depends on. Recharging costs a
-/// purchasable power_cell item, mirroring how DamagedConduitVerbTarget's Repair consumes
-/// spare_parts.
-/// </summary>
+/// <summary>The Home Ship's sole power source. Holds a finite charge (see
+/// <see cref="ShipSim.BatteryChargeFraction"/>) that every wired-up consumer's
+/// <see cref="ShipSim.IsPowered"/> check depends on. Recharging costs a purchasable power_cell
+/// item.</summary>
 public partial class BatteryVerbTarget : StaticBody3D, IVerbTarget, IStateSaveable
 {
     private static readonly Verb RechargeVerb = new("recharge_battery", "VERB_RECHARGE_BATTERY", DurationSeconds: 0.6f)
@@ -27,9 +24,7 @@ public partial class BatteryVerbTarget : StaticBody3D, IVerbTarget, IStateSaveab
     public ShipSim? ShipSimRef { get; set; }
 
     /// <summary>Set by ShipBuildTarget when it spawns this instance — this is how Uninstall/Scrap
-    /// (owned by ShipBuildTarget, since installing/removing a machine is really a wall-mount
-    /// action) reach the player while aiming directly at the battery's own box, not just at bare
-    /// wall space next to it.</summary>
+    /// reach the player while aiming directly at the battery's own box.</summary>
     [Export]
     public ShipBuildTarget? BuildTarget { get; set; }
 
@@ -38,17 +33,13 @@ public partial class BatteryVerbTarget : StaticBody3D, IVerbTarget, IStateSaveab
 
     public string? DisplayNameKey => "OBJECT_BATTERY";
 
-    /// <summary>The battery's own Condition already means charge, not wear (it's excluded from
-    /// WearSystem's passive decay) — this just surfaces that existing value for the PDA's scan
-    /// mode, same as everything else with a Condition. No Maintain/Repair verbs here: charge
-    /// already has its own Recharge verb + drain mechanic.</summary>
+    /// <summary>Charge, not wear — excluded from WearSystem's passive decay. No Maintain/Repair
+    /// verbs here: charge already has its own Recharge verb + drain mechanic.</summary>
     public float? Condition => ShipSimRef?.BatteryChargeFraction;
 
     public float? CurrentVerbProgress => null; // instant, never "in progress"
 
-    // Hidden once already full — mirrors SellVerbs only showing while there's something to
-    // sell, rather than always offering a no-op top-off. Uninstall/Scrap always tag along
-    // regardless of charge — you can remove a full battery just as easily as an empty one.
+    // Hidden once already full. Uninstall/Scrap always tag along regardless of charge.
     public IReadOnlyList<Verb> AvailableVerbs =>
         (ShipSimRef is not null && ShipSimRef.BatteryChargeFraction < 1f
             ? new List<Verb> { RechargeVerb with { DisplaySuffix = $"{ShipSimRef.BatteryChargeFraction * 100:F0}%" } }

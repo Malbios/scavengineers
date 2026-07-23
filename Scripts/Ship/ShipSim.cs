@@ -12,15 +12,11 @@ using Scavengineers.Sim.ShipModel;
 
 namespace Scavengineers.Scripts.Ship;
 
-/// <summary>
-/// Owns and ticks a real Scavengineers.Sim <see cref="ShipModel.Deck"/> for a greybox ship: a
-/// full 1m-tile grid matching the room floor plan already built in the scene (rooms are
-/// <see cref="GridWidth"/> tiles wide, split into columns by <see cref="RoomSplitColumns"/>,
-/// both <see cref="GridDepth"/> deep), optionally hosting a hull breach (atmosphere) and/or a
-/// battery/switch/recharge-station power grid, toggled per scene via the exported flags. Real,
-/// data-driven ship layouts (arbitrary footprints) are still separate, larger future work —
-/// this is a fixed-shape stand-in, just no longer a single abstract cell.
-/// </summary>
+/// <summary>Owns and ticks a real Scavengineers.Sim <see cref="ShipModel.Deck"/> for a greybox
+/// ship: a full 1m-tile grid matching the room floor plan built in the scene (rooms are
+/// <see cref="GridWidth"/> tiles wide, split into columns by <see cref="RoomSplitColumns"/>, both
+/// <see cref="GridDepth"/> deep), optionally hosting a hull breach (atmosphere) and/or a
+/// battery/switch/recharge-station power grid, toggled per scene via the exported flags.</summary>
 public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
 {
     // Public so ShipBuildTarget.SeedDefaultShipLayout can size its own corridor-wall seeding off
@@ -38,9 +34,8 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
     public int[] RoomSplitColumns { get; set; } = [6];
 
     /// <summary>Extra 2-tile-wide (DoorwayRows-only) strip of cells attached to the west/east
-    /// boundary — real Deck.Cells, not a separate grid, so the same floor/wall/ceiling panel and
-    /// wall-removal systems apply to them automatically. 0 by default (opt-in); only the Home
-    /// Ship's airlock corridors use these today.</summary>
+    /// boundary — real Deck.Cells, not a separate grid, so the floor/wall/ceiling panel systems
+    /// apply automatically. 0 by default; only the Home Ship's airlock corridors use these today.</summary>
     [Export]
     public int WestCorridorLength { get; set; }
 
@@ -51,11 +46,8 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
     // can reuse this instead of re-hardcoding [2, 3].
     public static readonly int[] DoorwayRows = [2, 3];
 
-    // Every device below (the 4 further down) is added unwired — the player must run their own
-    // conduits via ShipBuildTarget's free-form placement to connect any of them to the battery.
-    // Battery/Switch/RechargeStation cells used to live here too, but they're now player-
-    // install/uninstall-able construction parts (see ShipBuildTarget's MachineType) — their
-    // cells moved there, since only it needs them now (for the default-seed replay). These stay
+    // Every device below is added unwired — the player must run their own conduits via
+    // ShipBuildTarget's free-form placement to connect any of them to the battery. These stay
     // static/shared, not per-layout data: they only ever fire under HasPowerGrid, which today
     // only the Home Ship sets.
     private static readonly CellCoord TravelConsoleCell = new(0, 0);
@@ -64,76 +56,63 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
     private static readonly CellCoord DerelictAirlockCell = new(11, 2);
 
     // Nominal placeholder cell for the Station's own destination-side airlock door's wear/power
-    // fixture — shared by every Station instance (Station, Station2, ...), same "one shared id,
-    // no real position read" convention as InteriorDoorCell.
+    // fixture — shared by every Station instance, same convention as InteriorDoorCell.
     private static readonly CellCoord StationDestinationAirlockCell = new(5, 3);
     private static readonly CellCoord BunkCell = new(0, 1);
 
     /// <summary>The Derelict's starting hull breaches — a real gap cut into the wall mesh at
-    /// these edges, repaired via ShipBuildTarget's generic wall-building (docs/project-plan.md
-    /// Appendix A7/A8) rather than a dedicated repair object. Paired with each edge's "outside"
-    /// neighbor since a wall breach is per-edge (Deck.BreachWallEdge), not per-cell. Instance
-    /// property (not the static default this used to be) so <see cref="ApplyLayout"/> can give
-    /// different derelicts different breach positions — the field default below is today's
-    /// exact original value, so a ship with no <see cref="LayoutId"/> behaves identically to
-    /// before this became data-driven.</summary>
+    /// these edges, paired with each edge's "outside" neighbor since a wall breach is per-edge
+    /// (Deck.BreachWallEdge), not per-cell. Instance property so <see cref="ApplyLayout"/> can
+    /// give different derelicts different breach positions; the default is today's original
+    /// value, so a ship with no <see cref="LayoutId"/> is unaffected.</summary>
     public (CellCoord Cell, CellCoord Outside)[] InitialBreaches { get; set; } =
         [(new(6, 5), new(6, 6)), (new(3, 0), new(3, -1))];
 
-    /// <summary>A minimal, switch-less power source just to energize one already-damaged
-    /// conduit (docs/project-plan.md Appendix A7's fire loop), kept deliberately separate from
-    /// HasPowerGrid's home-ship-shaped generator/switch/recharge chain. Instance property (see
-    /// <see cref="InitialBreaches"/>'s own doc comment for why); default matches the original
-    /// Room 1 placement.</summary>
+    /// <summary>A minimal, switch-less power source just to energize one already-damaged conduit
+    /// (the fire hazard), kept separate from HasPowerGrid's home-ship-shaped generator/switch/
+    /// recharge chain.</summary>
     public CellCoord FireGeneratorCell { get; set; } = new(1, 4);
 
     public CellCoord DamagedConduitCell { get; set; } = new(1, 3);
 
-    /// <summary>Opt-in id into <see cref="ShipLayoutCatalog"/> — empty (the default) means this
-    /// ship keeps whatever its own exported fields/defaults already say, exactly as before this
-    /// existed. Only Derelict-style ships are expected to ever set this.</summary>
+    /// <summary>Opt-in id into <see cref="ShipLayoutCatalog"/> — empty (default) means this ship
+    /// keeps its own exported fields/defaults. Only Derelict-style ships set this.</summary>
     [Export]
     public string LayoutId { get; set; } = "";
 
     /// <summary>0 for a ship's primary (ground-floor) deck — every ship before multi-deck support
-    /// existed. Any nonzero value means "I'm not the primary deck of my site — resolve my own
-    /// shape from <see cref="PrimaryDeckRef"/>'s <see cref="SecondDeckLayout"/> instead of my own
-    /// <see cref="LayoutId"/>/<see cref="ProcedurallyGenerate"/>." Only 0/1 are meaningful today
-    /// (depth capped at one extra deck — see ShipLayoutCatalog.ShipLayoutDefinition.SecondDeck's
-    /// own doc comment); anything higher is unsupported future work.</summary>
+    /// existed. Nonzero means "resolve my shape from <see cref="PrimaryDeckRef"/>'s
+    /// <see cref="SecondDeckLayout"/> instead of my own LayoutId/ProcedurallyGenerate." Only 0/1
+    /// are meaningful today (depth capped at one extra deck).</summary>
     [Export]
     public int DeckIndex { get; set; }
 
     /// <summary>Only meaningful when <see cref="DeckIndex"/> is nonzero — the same site's
-    /// ground-floor ShipSim, whose own resolved <see cref="SecondDeckLayout"/>/<see cref="LadderCell"/>
-    /// this deck reads instead of resolving anything itself. Same cross-reference shape
-    /// AirlockDoorVerbTarget.ShipARef/ShipBRef already use for "two ShipSims, one relationship."</summary>
+    /// ground-floor ShipSim, whose resolved <see cref="SecondDeckLayout"/>/<see cref="LadderCell"/>
+    /// this deck reads instead of resolving anything itself.</summary>
     [Export]
     public ShipSim? PrimaryDeckRef { get; set; }
 
     /// <summary>This ship's own second deck's layout, if any — set from
     /// ShipLayoutCatalog.ShipLayoutDefinition.SecondDeck by <see cref="ApplyLayout"/>. Null means
-    /// single-deck (today's behavior for every ship). Read by a DeckIndex=1 ShipSim (via
-    /// <see cref="PrimaryDeckRef"/>) to resolve its own shape — see <see cref="_Ready"/>.</summary>
+    /// single-deck. Read by a DeckIndex=1 ShipSim (via <see cref="PrimaryDeckRef"/>) to resolve
+    /// its own shape — see <see cref="_Ready"/>.</summary>
     public ShipLayoutCatalog.ShipLayoutDefinition? SecondDeckLayout { get; private set; }
 
     /// <summary>The shared X/Z tile (only Y differs between decks) where a ladder connects this
-    /// deck to its second deck — null for a single-deck ship. Set from the layout's own
-    /// LadderCell by <see cref="ApplyLayout"/> for a primary deck; a DeckIndex=1 deck instead
-    /// copies it straight from <see cref="PrimaryDeckRef"/> in <see cref="_Ready"/>, since the
-    /// nested SecondDeckLayout doesn't carry its own (it's the same coordinate either way).</summary>
+    /// deck to its second deck — null for a single-deck ship. Set from the layout's LadderCell by
+    /// <see cref="ApplyLayout"/> for a primary deck; a DeckIndex=1 deck instead copies it from
+    /// <see cref="PrimaryDeckRef"/> in <see cref="_Ready"/>.</summary>
     public CellCoord? LadderCell { get; private set; }
 
     /// <summary>Rolls a random <see cref="ShipLayoutGenerator"/> layout instead of reading
-    /// <see cref="LayoutId"/> from the catalog — wins over <see cref="LayoutId"/> if both are
-    /// somehow set. The resolved <see cref="LayoutSeed"/> is read from (and persisted to) the
-    /// save file directly — see IShipLayoutSaveable's own doc comment for why that can't go
-    /// through the normal ApplySaveState callback.</summary>
+    /// <see cref="LayoutId"/> from the catalog — wins if both are somehow set. The resolved
+    /// <see cref="LayoutSeed"/> is read from (and persisted to) the save file directly, since it
+    /// can't go through the normal ApplySaveState callback.</summary>
     [Export]
     public bool ProcedurallyGenerate { get; set; }
 
-    /// <summary>Only meaningful alongside <see cref="ProcedurallyGenerate"/> — every ship that
-    /// sets it needs its own stable id, same rule as every other SaveId in this project.</summary>
+    /// <summary>Only meaningful alongside <see cref="ProcedurallyGenerate"/>.</summary>
     [Export]
     public string SaveId { get; set; } = "";
 
@@ -143,14 +122,13 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
     [Export]
     public string? SavePathOverride { get; set; }
 
-    /// <summary>This ship's resolved procedural-generation seed — null for a ship that isn't
-    /// <see cref="ProcedurallyGenerate"/> at all. See IShipLayoutSaveable.</summary>
+    /// <summary>This ship's resolved procedural-generation seed — null unless
+    /// <see cref="ProcedurallyGenerate"/>. See IShipLayoutSaveable.</summary>
     public int? LayoutSeed { get; private set; }
 
     /// <summary>This ship's own procedurally-generated loot list, if any — empty unless
-    /// <see cref="ApplyGeneratedLayout"/> was called. Read by ShipBuildTarget.SpawnGeneratedLoot;
-    /// spawning itself lives there since it already owns the tile-to-world conversion and the
-    /// generic dropped-item mesh/shape/material every ship scene already wires.</summary>
+    /// <see cref="ApplyGeneratedLayout"/> was called. Spawned by ShipBuildTarget.SpawnGeneratedLoot,
+    /// which already owns the tile-to-world conversion and the generic dropped-item mesh/shape.</summary>
     public IReadOnlyList<LootSpawn> LootSpawns { get; private set; } = [];
 
     public const string BatteryFixtureId = "battery";
@@ -163,8 +141,8 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
     public const string StationAirlockFixtureId = "station_airlock_power";
     public const string DerelictAirlockFixtureId = "derelict_airlock_power";
 
-    // Shared by every Station's own destination-side airlock door (Station, Station2, ...) —
-    // same "one shared id across every instance" convention as InteriorDoorFixtureId.
+    // Shared by every Station's own destination-side airlock door, same convention as
+    // InteriorDoorFixtureId.
     public const string StationDestinationAirlockFixtureId = "station_destination_airlock_power";
     public const string BunkFixtureId = "bunk";
 
@@ -182,10 +160,8 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
     public const float TravelConsoleActiveDraw = 8f;
 
     // Per-thruster, not shared — N installed thrusters draw N times this while traveling. Low
-    // enough that a normal loadout (up to ~4 thrusters, already past the point of useful travel-
-    // time reduction against BaseTravelSeconds/MinTravelSeconds's floor) never trips IsOverloaded
-    // by itself; stacking thrusters well beyond that (or recharging mid-flight, on top of
-    // TravelConsoleActiveDraw) still can, keeping the ship-wide brownout a real but avoidable
+    // enough that a normal loadout never trips IsOverloaded by itself; stacking well beyond that
+    // (or recharging mid-flight) still can, keeping the ship-wide brownout an avoidable
     // consequence of over-equipping rather than a guaranteed side effect of every trip.
     public const float ThrusterActiveDraw = 2f;
 
@@ -198,8 +174,8 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
     public bool HasHullBreaches { get; set; }
 
     /// <summary>Adds a minimal always-on power source feeding one pre-damaged conduit — the
-    /// conduit fire hazard (docs/project-plan.md Appendix A7). Independent of
-    /// <see cref="HasPowerGrid"/> so a ship can have one, the other, both, or neither.</summary>
+    /// conduit fire hazard. Independent of <see cref="HasPowerGrid"/> so a ship can have one, the
+    /// other, both, or neither.</summary>
     [Export]
     public bool HasFireHazard { get; set; }
 
@@ -220,17 +196,16 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
 
     public AtmosphereSystem? Atmosphere => _systems?.Atmosphere;
 
-    /// <summary>This ship's whole simulation, owned as a plain object rather than as fields on this
-    /// node — see <see cref="ShipSystems"/>. The node is the thing that knows about scenes, frames
-    /// and exports; the systems below it don't, which is what lets a ship keep simulating while
+    /// <summary>This ship's whole simulation, owned as a plain object rather than as fields on
+    /// this node — see <see cref="ShipSystems"/>. The node knows about scenes, frames and
+    /// exports; the systems below it don't, which is what lets a ship keep simulating while
     /// nobody's aboard.</summary>
     private ShipSystems _systems = null!;
 
     /// <summary>False while the player is somewhere else and this ship isn't physically present
-    /// (see TravelConsoleVerbTarget.SetShipPresence). It keeps simulating either way — an absent
-    /// derelict still wears down, still vents through its own breaches — just in coarse lumps
-    /// rather than every frame. Defaults true so a ship nobody ever tells otherwise (the Home Ship,
-    /// and every ship in a test) behaves exactly as before.</summary>
+    /// (see TravelConsoleVerbTarget.SetShipPresence). It keeps simulating either way, just in
+    /// coarse lumps rather than every frame. Defaults true so a ship nobody ever tells otherwise
+    /// behaves exactly as before.</summary>
     public bool IsPresent { get; set; } = true;
 
     private PowerSystem? _power;
@@ -240,12 +215,11 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
     {
         if (DeckIndex > 0)
         {
-            // Not the primary deck of my site — my own LayoutId/ProcedurallyGenerate (if any are
-            // even set in the scene) are ignored entirely; my shape comes from whatever the
-            // primary deck's own layout resolved as its SecondDeck. Null (single-deck primary, or
-            // an unwired PrimaryDeckRef) leaves GridWidth/etc. at this node's own scene-authored
-            // defaults, which the shared Derelict.tscn template sets to an empty (GridWidth=0)
-            // grid — inert and harmless, exactly the "not every derelict has a second deck" case.
+            // Not the primary deck of my site — my own LayoutId/ProcedurallyGenerate are ignored;
+            // my shape comes from whatever the primary deck's layout resolved as its SecondDeck.
+            // Null (single-deck primary, or an unwired PrimaryDeckRef) leaves GridWidth/etc. at
+            // this node's scene-authored defaults, which Derelict.tscn sets to an empty grid —
+            // inert and harmless, exactly the "not every derelict has a second deck" case.
             ApplyLayout(PrimaryDeckRef?.SecondDeckLayout);
             LadderCell = PrimaryDeckRef?.LadderCell;
         }
@@ -305,10 +279,9 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
             }
         }
 
-        // Atmosphere and wear exist on every ship, regardless of its other hazard flags. Even a
-        // never-breached ship (e.g. the Home Ship) needs a real AtmosphereSystem to bridge against
-        // once an AirlockDoorVerbTarget links two ships' atmospheres; its deck just sits at
-        // Breathable and never changes.
+        // Atmosphere and wear exist on every ship, regardless of its other hazard flags — even a
+        // never-breached ship (e.g. the Home Ship) needs a real AtmosphereSystem to bridge
+        // against once an AirlockDoorVerbTarget links two ships' atmospheres.
         _systems = new ShipSystems(deck, hasLifeSupport: HasLifeSupport);
 
         if (HasHullBreaches)
@@ -323,34 +296,28 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
 
         // Deferring to the next frame guarantees every breach for this ship is already
         // registered before seeding vacuum. Only the room(s) actually connected to a breach
-        // start at vacuum (not the whole ship uniformly): a room a closed door has kept sealed
-        // off from any breach starts breathable, while a long-drifted derelict with real
-        // breaches in both rooms starts airless in both, for the right reason (each room really
-        // is holed) rather than a blanket assumption.
+        // start at vacuum: a room a closed door has kept sealed off from any breach starts
+        // breathable, while a long-drifted derelict with breaches in both rooms starts airless
+        // in both.
         CallDeferred(nameof(SeedVacuumFromInitialBreaches));
 
         // Unconditional (unlike the power-grid fixtures below): a physical door wears down
-        // whether or not the ship it's on has any electricity at all, so its own wear-tracked
-        // fixture exists on every ship — a Derelict never has HasPowerGrid, so without this its
-        // own interior door would have no Condition/upkeep concept whatsoever. InteriorDoorCell's
-        // fixed (5,2) is a nominal placeholder shared across every ship type (the Derelict's own
-        // door actually sits at a different column) — harmless today since nothing reads this
-        // fixture's cell for position, only WearSystem's blanket per-tick decay and lookup-by-Id.
+        // regardless of whether its ship has any electricity — a Derelict never has HasPowerGrid,
+        // so without this its interior door would have no Condition/upkeep concept at all.
         Deck.AddFixture(new MachineFixture(InteriorDoorFixtureId, InteriorDoorCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
 
-        // Also unconditional (see InteriorDoorFixtureId's own comment above) — a Station's own
-        // destination-side airlock door needs a wear-tracked fixture on ITS OWN ship regardless
-        // of whether that ship has a power grid at all (Stations don't today).
+        // Also unconditional — a Station's destination-side airlock door needs a wear-tracked
+        // fixture on ITS OWN ship regardless of whether that ship has a power grid (Stations
+        // don't today).
         Deck.AddFixture(new MachineFixture(StationDestinationAirlockFixtureId, StationDestinationAirlockCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
 
         if (HasPowerGrid)
         {
-            // None of the below are pre-connected — the player must run their own conduits
-            // from the battery to every one of them via ShipBuildTarget's free-form placement.
-            // Battery/Switch/RechargeStation aren't seeded here at all anymore — they're
-            // player-install/uninstall-able construction parts (see ShipBuildTarget's
-            // MachineType), seeded (for the Home Ship) through the exact same
-            // Install*/Remove* calls below that a player action or a save replay uses.
+            // None of the below are pre-connected — the player must run their own conduits from
+            // the battery to each via ShipBuildTarget's free-form placement. Battery/Switch/
+            // RechargeStation are player-install/uninstall-able construction parts instead (see
+            // ShipBuildTarget's MachineType), seeded for the Home Ship through the same
+            // Install*/Remove* calls a player action or save replay uses.
             Deck.AddFixture(new MachineFixture(TravelConsoleFixtureId, TravelConsoleCell, FixtureSurface.WallInner) { PowerDraw = IdleDraw });
             Deck.AddFixture(new MachineFixture(StationAirlockFixtureId, StationAirlockCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
             Deck.AddFixture(new MachineFixture(DerelictAirlockFixtureId, DerelictAirlockCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
@@ -379,10 +346,9 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
     }
 
     /// <summary>Overwrites this ship's grid shape and hazard placement from a loaded
-    /// <see cref="ShipLayoutCatalog"/> entry — public (not private) so NodeTests can call it
-    /// directly with a hand-built <see cref="ShipLayoutCatalog.ShipLayoutDefinition"/>, without
-    /// needing to seed or file-load the static catalog at all. A null layout (unset/unknown
-    /// LayoutId) is a no-op. Must run before the Deck-building loop in <see cref="_Ready"/>.</summary>
+    /// <see cref="ShipLayoutCatalog"/> entry — public so NodeTests can call it directly with a
+    /// hand-built definition, without needing to seed or file-load the static catalog. A null
+    /// layout is a no-op. Must run before the Deck-building loop in <see cref="_Ready"/>.</summary>
     public void ApplyLayout(ShipLayoutCatalog.ShipLayoutDefinition? layout)
     {
         if (layout is null)
@@ -417,19 +383,16 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
         SecondDeckLayout = layout.SecondDeck;
     }
 
-    /// <summary>Applies a procedurally-generated layout (see <see cref="ShipLayoutGenerator"/>) —
-    /// reuses <see cref="ApplyLayout"/> for the grid-shape/hazard half, and additionally records
-    /// this ship's own loot list. Must run at the same point <see cref="ApplyLayout"/> does, for
-    /// the same reason.</summary>
+    /// <summary>Reuses <see cref="ApplyLayout"/> for the grid-shape/hazard half, and additionally
+    /// records this ship's own loot list.</summary>
     public void ApplyGeneratedLayout(GeneratedShipLayout generated)
     {
         ApplyLayout(generated.Layout);
         LootSpawns = generated.Loot;
     }
 
-    // Reuses AtmosphereSystem's own CellsConnectedToOutside (one ConnectivitySolver.FindComponents
-    // pass over the same graph Tick() already partitions every frame) instead of hand-rolling a
-    // second flood-fill here — see CLAUDE.md's "one solver" rule.
+    // Reuses AtmosphereSystem's own CellsConnectedToOutside instead of hand-rolling a second
+    // flood-fill here — see CLAUDE.md's "one solver" rule.
     private void SeedVacuumFromInitialBreaches()
     {
         if (_systems is null)
@@ -450,18 +413,13 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
     private const float MinStartingStructuralHealth = 0.3f;
     private const float MaxStartingStructuralHealth = 0.9f;
 
-    /// <summary>Gives every floor/ceiling/wall a random starting health in
-    /// [MinStartingStructuralHealth, MaxStartingStructuralHealth] instead of the default pristine
-    /// 1.0 — only called for a ship worth marking HasHullBreaches (currently only the Derelict
-    /// template), which should read as genuinely found-this-way rather than freshly built. Uses
-    /// SetFloorHealth/SetCeilingHealth/SetWallHealth (the no-clamp, no-breach-side-effect
-    /// absolute setters Deck already reserves for exactly this "establish a starting value"
-    /// purpose — see their own doc comments) rather than DamageFloor/etc., which would risk an
-    /// unwanted breach if a low roll landed near 0. Seeding every cell's own edges from all 4
-    /// directions is simpler than tracking which edges will actually get a real wall spawned
-    /// later (a Scripts-layer concern this Sim-layer setup doesn't need to know about) — an edge
-    /// that ends up unsealed/breached just never has its seeded value read at all (see
-    /// ShipBuildTarget's own Condition getter).</summary>
+    /// <summary>Gives every floor/ceiling/wall a random starting health instead of the default
+    /// pristine 1.0 — only called for a ship worth marking HasHullBreaches, which should read as
+    /// genuinely found-this-way. Uses the no-clamp, no-breach-side-effect absolute setters rather
+    /// than DamageFloor/etc., which would risk an unwanted breach if a low roll landed near 0.
+    /// Seeding every cell's edges from all 4 directions is simpler than tracking which edges will
+    /// actually get a real wall spawned later — an edge that ends up unsealed/breached just never
+    /// has its seeded value read.</summary>
     private void SeedStructuralWear()
     {
         var rng = new RandomNumberGenerator();
@@ -484,10 +442,9 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
     }
 
     /// <summary>Full fidelity while the player is here; a coarse level-of-detail tick otherwise
-    /// (see <see cref="ShipSystems.TickCoarse"/> and docs/architecture/multi-ship-fleet.md's sim-LOD
-    /// seam). An absent ship still pays every cost in full — it banks elapsed time and spends it in
-    /// one-second lumps rather than sixty per second — which matters because a derelict you left
-    /// venting should still be vented when you get back.</summary>
+    /// (see <see cref="ShipSystems.TickCoarse"/>). An absent ship still pays every cost in full —
+    /// it banks elapsed time and spends it in one-second lumps rather than sixty per second — so
+    /// a derelict left venting is still vented on return.</summary>
     public override void _PhysicsProcess(double delta)
     {
         if (IsPresent)
@@ -502,17 +459,13 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
 
     /// <summary>Breathable if this ship's atmosphere isn't wired up at all (e.g. queried before
     /// _Ready), otherwise the modeled cell's real volume — or, if <paramref name="cell"/> isn't
-    /// one of this ship's own modeled Deck cells at all, whichever orthogonal neighbor IS modeled
-    /// (falling back to Vacuum only if none are). That unmodeled case is reachable in practice: a
-    /// world-position-derived tile (see ShipAtmosphereZone.TileAt, used for the player's own
-    /// current-cell O2 read) can land in the unmodeled seam between two docked ships' airlock
-    /// corridors, just past this ship's own WestCorridorLength/EastCorridorLength — including
-    /// right at a *closed* door's own boundary edge, where TileAt's floor-based conversion can
-    /// round one tile too far even though the player never left this ship. Reading the nearest
-    /// modeled neighbor instead of blanket Vacuum gets that case right (this ship's own real air)
-    /// while still avoiding AtmosphereSystem.VolumeAt's own hard KeyNotFoundException on a truly
-    /// unrecognized cell, and still reads Vacuum when the neighbor is genuinely vented too (the
-    /// original crash-prevention scenario this fallback exists for).</summary>
+    /// one of this ship's own modeled Deck cells, whichever orthogonal neighbor IS modeled
+    /// (falling back to Vacuum only if none are). That unmodeled case is reachable: a world-
+    /// position-derived tile can land in the unmodeled seam between two docked ships' airlock
+    /// corridors, including right at a *closed* door's boundary edge, where a floor-based
+    /// conversion can round one tile too far even though the player never left this ship. Reading
+    /// the nearest modeled neighbor gets that case right while still avoiding
+    /// AtmosphereSystem.VolumeAt's hard KeyNotFoundException on a truly unrecognized cell.</summary>
     public AtmosphereVolume VolumeAt(CellCoord cell)
     {
         if (_systems is null)
@@ -536,12 +489,11 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
         return AtmosphereVolume.Vacuum;
     }
 
-    /// <summary>Topologically connected to a source, (if this ship has a battery at all) that
-    /// battery actually has charge — a ship with no battery (e.g. the Derelict, whose only
-    /// source is the always-on fire hazard generator) is never gated by this second check — AND
-    /// the circuit isn't currently overloaded (see IsOverloaded): a ship-wide brownout, not a
-    /// per-device cutoff, so every fixture's own IsPowered flips false at once the moment total
-    /// demand exceeds BatteryCapacity, and recovers the instant it drops back under again.</summary>
+    /// <summary>Topologically connected to a source, (if this ship has a battery) that battery
+    /// actually has charge, AND the circuit isn't currently overloaded (see IsOverloaded): a
+    /// ship-wide brownout, not a per-device cutoff, so every fixture's IsPowered flips false at
+    /// once when total demand exceeds BatteryCapacity, and recovers the instant it drops back
+    /// under.</summary>
     public bool IsPowered(string fixtureId) =>
         _power is not null &&
         _power.IsPowered(new PowerNodeId(fixtureId)) &&
@@ -549,13 +501,12 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
         !IsOverloaded;
 
     /// <summary>Sum of PowerDraw over every fixture topologically reachable from a source —
-    /// deliberately reads _power's own raw powered set rather than the full IsPowered above, to
-    /// avoid the circularity of "demand decides overload decides IsPowered decides demand".
-    /// What the circuit is currently asking for, regardless of whether supply can actually cover
-    /// it — this is the number a power readout should show as "required."
+    /// deliberately reads _power's raw powered set rather than the full IsPowered above, to avoid
+    /// the circularity of "demand decides overload decides IsPowered decides demand." What the
+    /// circuit is currently asking for, regardless of whether supply can cover it.
     ///
-    /// Resolves the powered set once and tests membership, rather than asking _power.IsPowered per
-    /// fixture: that made this O(F) solver passes for F fixtures, and IsOverloaded calls it, so
+    /// Resolves the powered set once and tests membership, rather than asking _power.IsPowered
+    /// per fixture — that made this one O(F) pass instead of F, and IsOverloaded calls it, so
     /// every per-frame IsPowered call paid for it too.</summary>
     public float DemandedPower()
     {
@@ -613,10 +564,10 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
         }
     }
 
-    // Battery/Switch/RechargeStation are player-install/uninstall-able construction parts
-    // (see ShipBuildTarget's MachineType) rather than seeded in _Ready() — these are the
-    // single place their fixtures get added to/removed from the Deck, called equally by a
-    // fresh player action, the Home Ship's own default-layout seed, and a save replay.
+    // Battery/Switch/RechargeStation are player-install/uninstall-able construction parts (see
+    // ShipBuildTarget's MachineType) rather than seeded in _Ready() — these are the single place
+    // their fixtures get added to/removed from the Deck, called equally by a player action, the
+    // Home Ship's default-layout seed, and a save replay.
 
     public void InstallBattery(CellCoord cell, FixtureSurface surface)
     {
@@ -641,20 +592,18 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
 
     public void RemoveRechargeStation() => Deck.RemoveFixture(RechargeFixtureId);
 
-    // Thrusters take a caller-supplied id rather than a single fixed constant (unlike
-    // Battery/Switch/RechargeStation above) — there can be many installed at once, one per
-    // edge ShipBuildTarget tracks in its own _placedThrusters (see that class for the id shape).
-    // Starts at Condition = 0f (empty), not full — a freshly installed thruster has no fuel until
-    // a real N2 tank is docked in its own ThrusterVerbTarget.Contents; ShipBuildTarget's own
-    // ApplySaveState/SeedDefaultShipLayout callers override this via an explicit savedState when
-    // a real charge (and tank) should carry over.
+    // Thrusters take a caller-supplied id rather than a single fixed constant — there can be many
+    // installed at once, one per edge ShipBuildTarget tracks. Starts at Condition = 0f (empty),
+    // not full — a freshly installed thruster has no fuel until a real N2 tank is docked;
+    // ShipBuildTarget's own save/load callers override this via an explicit savedState when a
+    // real charge should carry over.
     public void InstallThruster(string id, CellCoord cell, FixtureSurface surface) =>
         Deck.AddFixture(new ThrusterFixture(id, cell, surface) { Condition = 0f, PowerDraw = IdleDraw });
 
     public void RemoveThruster(string id) => Deck.RemoveFixture(id);
 
-    /// <summary>PowerDraw stays at the base default (0) — a shelf/bin draws no power at all,
-    /// unlike every other installable fixture here.</summary>
+    /// <summary>PowerDraw stays at the base default (0) — a shelf/bin draws no power, unlike
+    /// every other installable fixture here.</summary>
     public void InstallStorage(string id, CellCoord cell, FixtureSurface surface) =>
         Deck.AddFixture(new StorageFixture(id, cell, surface));
 
@@ -678,8 +627,7 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
 
     /// <summary>This ship's live sim state for the save file — see <see cref="IShipStateSaveable"/>.
     /// Captures what the air and fire are currently doing, which no other save contract covers:
-    /// ShipBuildTarget records what has been built, not what the atmosphere has since done to
-    /// it.</summary>
+    /// ShipBuildTarget records what has been built, not what the atmosphere has since done to it.</summary>
     public ShipStateSaveData CaptureShipState()
     {
         var state = new ShipStateSaveData();
@@ -707,8 +655,8 @@ public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
 
     /// <summary>0-1 charge fraction for a specific thruster's own N2 tank — 0 if the given id
     /// isn't (or is no longer) an installed thruster. Draining during travel reads/writes
-    /// ThrusterFixture.Condition directly off Deck.Fixtures instead of going through here (see
-    /// TravelConsoleVerbTarget) since that loop already holds a live fixture reference.</summary>
+    /// ThrusterFixture.Condition directly off Deck.Fixtures instead, since that loop already
+    /// holds a live fixture reference.</summary>
     public float ThrusterChargeFraction(string id) =>
         Deck.Fixtures.FirstOrDefault(f => f.Id == id) is ThrusterFixture thruster ? thruster.Condition : 0f;
 }
