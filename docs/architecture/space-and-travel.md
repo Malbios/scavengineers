@@ -84,33 +84,46 @@ the second capture silently overwrites the first and every instance loads the sa
 found this already live in `Derelict.tscn`: `Deck2/Floor2` shipped one hardcoded id that no derelict
 overrode, so all five wrecks' second-deck build state was one shared slot.
 
-### What remains, and the dependency the plan understates
+### The tactical layer is built from data now
 
-Destinations are still *hand-placed* instances rather than instantiated from data. Two separable
-steps, and the plan (§ Phase 5) runs them together as one — worth pulling apart, because the second
-is much larger than it looks:
+`DestinationManager` instantiates every `DestinationCatalog` entry under `World.tscn`'s `BubbleRoot`
+at startup and registers it with the travel console. That removed eight hand-placed sibling groups
+from `World.tscn` (1108 → 385 lines) and all seven parallel `NodePath` arrays from
+`TravelConsoleVerbTarget`. **Adding a destination is one row of `destinations.json`.**
 
-**1. Instantiate from data at startup.** `DestinationCatalog` gains a `scene` field plus the
-per-instance property overrides currently authored in `World.tscn` (save ids, `LayoutId`,
-`ProcedurallyGenerate`, `GenerateLoot`); a `BubbleRoot` replaces the fixed sibling groups; the
-travel console's seven parallel `NodePath` arrays become lookups against the manager. This is where
-the actual payoff is: **a sixth destination becomes one row of `destinations.json`** instead of a
-scene edit plus three array entries. Every node stays in the tree, so the save system is untouched.
+A destination row carries `scene`, a position, and `overrides` — a node path → property → value map,
+the data equivalent of a `.tscn` instance override block, which is exactly what it replaced. All
+five Derelicts share `Derelict.tscn` and differ only by overrides. When a difference *isn't* a
+scalar — Station 2's own figure placement, materials and idle timings — it goes in a variant scene
+instead (`Station2.tscn` inherits `Station.tscn`), and the row just names it.
 
-**2. Free the absent destination.** This is the expensive half, and it *conflicts with work already
-done*. `ShipSim` is a `Node` that owns its `ShipSystems`, so freeing an absent destination destroys
-the very sim the coarse LOD tick exists to keep running — an absent ship wouldn't tick slowly, it
-would cease to exist. Freeing also drops four things `SaveManager` reads straight off the live tree:
+Overrides are applied before the instance enters the tree, because `ShipSim` reads `LayoutId` and
+`ShipBuildTarget` reads `GenerateLoot` in their own `_Ready`. Two failure modes are silent by
+nature and both are guarded: `Node.Set` on a misspelled property does nothing (the manager warns,
+and `WorldSceneRegressionTests` fails on an override naming a node the scene doesn't have), and a
+node left on its scene-default `SaveId` collides with another destination's (the same test resolves
+every destination's *effective* ids and asserts uniqueness).
+
+The console's twice-deferred `ApplyCurrentLocation` is still load-bearing and now for a slightly
+different reason — see its comment: the console readies before the manager has instantiated
+anything, so the second defer is what lands it behind every destination's own deferred
+`SeedDefaultShipLayout`.
+
+### What remains: freeing the destination you left
+
+Every destination is instantiated once and kept; presence is still toggled by `SetShipPresence`. The
+only cost is resident greybox geometry, which at eight destinations is not a real cost.
+
+Freeing them is a much larger step than it looks, and it *conflicts with work already done*.
+`ShipSim` is a `Node` that owns its `ShipSystems`, so freeing an absent destination destroys the very
+sim the coarse LOD tick exists to keep running — an absent ship wouldn't tick slowly, it would cease
+to exist. Freeing also drops four things `SaveManager` reads straight off the live tree:
 `ShipBuildTarget`'s build state, the procgen `LayoutSeed`, `IStateSaveable`/`ISaveable` door and
 console state, and any contract `mission_item` sitting in that wreck.
 
-So step 2's real prerequisite is the **`FleetRegistry`** of the plan's Phase 4 — sim ownership moved
-off the node so a destination's state outlives its scene — plus a capture-on-unload cache for the
-node-owned save state. Not the scene work. Do step 1 first; it is a strict prerequisite either way,
-and it delivers the content-scalability win on its own.
-
-Until step 2 lands, the only cost of step 1's absent destinations is resident greybox geometry,
-which at eight destinations is not a real cost.
+So its real prerequisite is the **`FleetRegistry`** of the plan's Phase 4 — sim ownership moved off
+the node so a destination's state outlives its scene — plus a capture-on-unload cache for the
+node-owned save state. Not scene work at all.
 
 ## Before editing this subsystem
 

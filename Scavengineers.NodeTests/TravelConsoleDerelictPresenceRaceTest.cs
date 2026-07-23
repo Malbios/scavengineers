@@ -74,12 +74,7 @@ public class TravelConsoleDerelictPresenceRaceTest
         {
             ShipSimRef = homeShip,
             DerelictAirlock = derelictAirlock,
-            StationGroupPaths = new Godot.Collections.Array<NodePath> { new("../StationGroup") },
             StationAirlock = stationAirlock,
-            StationShipSimPaths = new Godot.Collections.Array<NodePath> { new("../StationShip") },
-            StationDestinationAirlockPaths = new Godot.Collections.Array<NodePath> { new("../StationDestinationAirlock") },
-            DerelictGroupPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1") },
-            DerelictShipSimPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/ShipSim") },
         };
 
         // Ordering matters: console (HomeShip's branch) is added as a sibling BEFORE the derelict
@@ -94,6 +89,12 @@ public class TravelConsoleDerelictPresenceRaceTest
         worldRoot.AddChild(derelictGroup);
 
         sceneTree.Root.AddChild(worldRoot);
+
+        // After the whole subtree is live (so every _Ready has fired and queued its deferred work)
+        // but before the flush — the same window DestinationManager registers in, and the window
+        // this test's twice-deferred ApplyCurrentLocation depends on.
+        console.RegisterStation(stationGroup, stationShip, stationDestinationAirlock, buildTarget: null);
+        console.RegisterDerelict(derelictGroup, derelictShip, derelictBuildTarget);
 
         // Let the deferred-call flush (ApplyCurrentLocation, twice-deferred) and every Derelict's
         // own deferred SeedDefaultShipLayout both run — a couple of real frames' margin past the

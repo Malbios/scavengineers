@@ -23,10 +23,9 @@
 [ext_resource type="Material" path="res://Assets/Materials/station_floor_material.tres" id="25"]
 [ext_resource type="Material" path="res://Assets/Materials/station_wall_material.tres" id="26"]
 [ext_resource type="Material" path="res://Assets/Materials/station_ceiling_material.tres" id="27"]
-[ext_resource type="PackedScene" path="res://Scenes/Derelict.tscn" id="28"]
 [ext_resource type="Script" path="res://Scripts/Environment/BreathingIdle.cs" id="29"]
 [ext_resource type="Script" path="res://Scripts/Ship/ContractGiverVerbTarget.cs" id="30"]
-[ext_resource type="PackedScene" path="res://Scenes/Station.tscn" id="31"]
+[ext_resource type="Script" path="res://Scripts/Travel/DestinationManager.cs" id="33"]
 
 [sub_resource type="ShaderMaterial" id="StarfieldSkyMaterial"]
 shader = ExtResource("24")
@@ -223,18 +222,6 @@ size = Vector3(1.8, 0.5, 0.6)
 [sub_resource type="StandardMaterial3D" id="BunkMaterial"]
 albedo_color = Color(0.35, 0.4, 0.5, 1)
 
-[sub_resource type="StandardMaterial3D" id="Station2ShopSuitMaterial"]
-albedo_color = Color(0.3, 0.42, 0.55, 1)
-
-[sub_resource type="StandardMaterial3D" id="Station2ShopHeadMaterial"]
-albedo_color = Color(0.62, 0.48, 0.4, 1)
-
-[sub_resource type="StandardMaterial3D" id="Station2ContractSuitMaterial"]
-albedo_color = Color(0.35, 0.15, 0.4, 1)
-
-[sub_resource type="StandardMaterial3D" id="Station2ContractHeadMaterial"]
-albedo_color = Color(0.58, 0.45, 0.38, 1)
-
 [node name="World" type="Node3D" unique_id=474587780]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=285196794]
@@ -369,13 +356,6 @@ script = ExtResource("21")
 ShipSimRef = NodePath("../ShipSim")
 DerelictAirlock = NodePath("../../DerelictAirlock")
 StationAirlock = NodePath("../../StationAirlock")
-StationGroupPaths = Array[NodePath]([NodePath("../../Station"), NodePath("../../Station2")])
-StationShipSimPaths = Array[NodePath]([NodePath("../../Station/ShipSim"), NodePath("../../Station2/ShipSim")])
-StationDestinationAirlockPaths = Array[NodePath]([NodePath("../../Station/DestinationAirlock"), NodePath("../../Station2/DestinationAirlock")])
-StationBuildTargetPaths = Array[NodePath]([NodePath("../../Station/Floor"), NodePath("../../Station2/Floor")])
-DerelictGroupPaths = Array[NodePath]([NodePath("../../Derelict1"), NodePath("../../Derelict2"), NodePath("../../Derelict3"), NodePath("../../Derelict4"), NodePath("../../Derelict5")])
-DerelictShipSimPaths = Array[NodePath]([NodePath("../../Derelict1/ShipSim"), NodePath("../../Derelict2/ShipSim"), NodePath("../../Derelict3/ShipSim"), NodePath("../../Derelict4/ShipSim"), NodePath("../../Derelict5/ShipSim")])
-DerelictBuildTargetPaths = Array[NodePath]([NodePath("../../Derelict1/Floor"), NodePath("../../Derelict2/Floor"), NodePath("../../Derelict3/Floor"), NodePath("../../Derelict4/Floor"), NodePath("../../Derelict5/Floor")])
 SaveId = "travel_console"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="HomeShip/TravelConsole"]
@@ -426,94 +406,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
 mesh = SubResource("DoorSlabMesh")
 surface_material_override/0 = SubResource("AirlockDoorMaterial")
 
-[node name="Derelict1" parent="." instance=ExtResource("28")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 0)
-[node name="ShipSim" parent="Derelict1" index="0"]
-LayoutId = "derelict_1"
-SaveId = "derelict_ship_sim_1"
-[node name="Floor" parent="Derelict1" index="5"]
-SaveId = "derelict_build_target_1"
-[node name="ShipSim2" parent="Derelict1/Deck2" index="0"]
-SaveId = "derelict_ship_sim_1_deck2"
-[node name="Floor2" parent="Derelict1/Deck2" index="1"]
-SaveId = "derelict_build_target_1_deck2"
-[node name="DamagedConduit" parent="Derelict1" index="19"]
-SaveId = "damaged_conduit_1"
-[node name="InteriorDoor" parent="Derelict1" index="20"]
-SaveId = "derelict_interior_door_1"
-
-[node name="Derelict2" parent="." instance=ExtResource("28")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 0)
-[node name="ShipSim" parent="Derelict2" index="0"]
-LayoutId = "derelict_small"
-SaveId = "derelict_ship_sim_2"
-[node name="Floor" parent="Derelict2" index="5"]
-SaveId = "derelict_build_target_2"
-[node name="ShipSim2" parent="Derelict2/Deck2" index="0"]
-SaveId = "derelict_ship_sim_2_deck2"
-[node name="Floor2" parent="Derelict2/Deck2" index="1"]
-SaveId = "derelict_build_target_2_deck2"
-[node name="DamagedConduit" parent="Derelict2" index="19"]
-SaveId = "damaged_conduit_2"
-[node name="InteriorDoor" parent="Derelict2" index="20"]
-SaveId = "derelict_interior_door_2"
-
-[node name="Derelict3" parent="." instance=ExtResource("28")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 0)
-[node name="ShipSim" parent="Derelict3" index="0"]
-ProcedurallyGenerate = true
-SaveId = "derelict_ship_sim_3"
-[node name="Floor" parent="Derelict3" index="5"]
-GenerateLoot = true
-SaveId = "derelict_build_target_3"
-[node name="ShipSim2" parent="Derelict3/Deck2" index="0"]
-SaveId = "derelict_ship_sim_3_deck2"
-[node name="Floor2" parent="Derelict3/Deck2" index="1"]
-SaveId = "derelict_build_target_3_deck2"
-[node name="DamagedConduit" parent="Derelict3" index="19"]
-SaveId = "damaged_conduit_3"
-[node name="InteriorDoor" parent="Derelict3" index="20"]
-SaveId = "derelict_interior_door_3"
-
-[node name="Derelict4" parent="." instance=ExtResource("28")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 0)
-[node name="ShipSim" parent="Derelict4" index="0"]
-ProcedurallyGenerate = true
-SaveId = "derelict_ship_sim_4"
-[node name="Floor" parent="Derelict4" index="5"]
-GenerateLoot = true
-SaveId = "derelict_build_target_4"
-[node name="ShipSim2" parent="Derelict4/Deck2" index="0"]
-SaveId = "derelict_ship_sim_4_deck2"
-[node name="Floor2" parent="Derelict4/Deck2" index="1"]
-SaveId = "derelict_build_target_4_deck2"
-[node name="DamagedConduit" parent="Derelict4" index="19"]
-SaveId = "damaged_conduit_4"
-[node name="InteriorDoor" parent="Derelict4" index="20"]
-SaveId = "derelict_interior_door_4"
-
-[node name="Derelict5" parent="." instance=ExtResource("28")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 0)
-[node name="ShipSim" parent="Derelict5" index="0"]
-ProcedurallyGenerate = true
-SaveId = "derelict_ship_sim_5"
-[node name="Floor" parent="Derelict5" index="5"]
-GenerateLoot = true
-SaveId = "derelict_build_target_5"
-[node name="ShipSim2" parent="Derelict5/Deck2" index="0"]
-SaveId = "derelict_ship_sim_5_deck2"
-[node name="Floor2" parent="Derelict5/Deck2" index="1"]
-SaveId = "derelict_build_target_5_deck2"
-[node name="DamagedConduit" parent="Derelict5" index="19"]
-SaveId = "damaged_conduit_5"
-[node name="InteriorDoor" parent="Derelict5" index="20"]
-SaveId = "derelict_interior_door_5"
-
-[node name="DerelictAirlock" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipARef", "ShipBRef", "SlabMesh", "SlabCollision") groups=["saveable"]]
+[node name="DerelictAirlock" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipARef", "SlabMesh", "SlabCollision") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 1.0, -0.8)
 script = ExtResource("15")
 ShipARef = NodePath("../HomeShip/ShipSim")
-ShipBRef = NodePath("../Derelict1/ShipSim")
 PowerFixtureId = "derelict_airlock_power"
 TileA = Vector2i(13, 2)
 TileB = Vector2i(-2, 2)
@@ -537,26 +433,16 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
 mesh = SubResource("DoorSlabMesh")
 surface_material_override/0 = SubResource("AirlockDoorMaterial")
 
-[node name="Station" parent="." instance=ExtResource("31")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, 0)
-
-[node name="ContractFigure" parent="Station" index="15" node_paths=PackedStringArray("ConsoleRef")]
-ConsoleRef = NodePath("../../HomeShip/TravelConsole")
-
-[node name="DestinationAirlock" parent="Station" index="16" node_paths=PackedStringArray("PartnerDoorRef")]
-PartnerDoorRef = NodePath("../../StationAirlock")
-[node name="StationAirlock" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipARef", "ShipBRef", "SlabMesh", "SlabCollision", "PartnerDoorRef") groups=["saveable"]]
+[node name="StationAirlock" type="StaticBody3D" parent="." node_paths=PackedStringArray("ShipARef", "SlabMesh", "SlabCollision") groups=["saveable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.9, 1.0, -0.8)
 script = ExtResource("15")
 ShipARef = NodePath("../HomeShip/ShipSim")
-ShipBRef = NodePath("../Station/ShipSim")
 PowerFixtureId = "station_airlock_power"
 TileA = Vector2i(-2, 2)
 TileB = Vector2i(7, 2)
 SealsLocalEdge = true
 LocalEdgeColumnNear = -1
 LocalEdgeColumnFar = 0
-PartnerDoorRef = NodePath("../Station/DestinationAirlock")
 SlabMesh = NodePath("SlabMesh")
 SlabCollision = NodePath("SlabCollision")
 SaveId = "station_airlock"
@@ -577,64 +463,12 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1)
 mesh = SubResource("DoorSlabMesh")
 surface_material_override/0 = SubResource("AirlockDoorMaterial")
 
-[node name="Station2" parent="." instance=ExtResource("31")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, 0)
+[node name="BubbleRoot" type="Node3D" parent="."]
 
-[node name="ShipSim" parent="Station2" index="0"]
-SaveId = "station2_ship_sim"
-
-[node name="Floor" parent="Station2" index="3"]
-SaveId = "station2_build_target"
-
-[node name="ShopFigure" parent="Station2" index="14"]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -2.4, 0, -1)
-
-[node name="Visual" parent="Station2/ShopFigure" index="1"]
-ArmSwayDegrees = 6.0
-HeadTurnRangeDegrees = 24.0
-BreathSpeed = 1.1
-
-[node name="Legs" parent="Station2/ShopFigure/Visual" index="0"]
-surface_material_override/0 = SubResource("Station2ShopSuitMaterial")
-
-[node name="Torso" parent="Station2/ShopFigure/Visual" index="1"]
-surface_material_override/0 = SubResource("Station2ShopSuitMaterial")
-
-[node name="Head" parent="Station2/ShopFigure/Visual" index="2"]
-surface_material_override/0 = SubResource("Station2ShopHeadMaterial")
-
-[node name="ArmLeft" parent="Station2/ShopFigure/Visual" index="3"]
-surface_material_override/0 = SubResource("Station2ShopSuitMaterial")
-
-[node name="ArmRight" parent="Station2/ShopFigure/Visual" index="4"]
-surface_material_override/0 = SubResource("Station2ShopSuitMaterial")
-
-[node name="ContractFigure" parent="Station2" index="15" node_paths=PackedStringArray("ConsoleRef")]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -2.4, 0, 1)
-ConsoleRef = NodePath("../../HomeShip/TravelConsole")
-
-[node name="Visual" parent="Station2/ContractFigure" index="1"]
-ArmSwayDegrees = 2.5
-HeadTurnRangeDegrees = 12.0
-BreathSpeed = 0.6
-
-[node name="Legs" parent="Station2/ContractFigure/Visual" index="0"]
-surface_material_override/0 = SubResource("Station2ContractSuitMaterial")
-
-[node name="Torso" parent="Station2/ContractFigure/Visual" index="1"]
-surface_material_override/0 = SubResource("Station2ContractSuitMaterial")
-
-[node name="Head" parent="Station2/ContractFigure/Visual" index="2"]
-surface_material_override/0 = SubResource("Station2ContractHeadMaterial")
-
-[node name="ArmLeft" parent="Station2/ContractFigure/Visual" index="3"]
-surface_material_override/0 = SubResource("Station2ContractSuitMaterial")
-
-[node name="ArmRight" parent="Station2/ContractFigure/Visual" index="4"]
-surface_material_override/0 = SubResource("Station2ContractSuitMaterial")
-
-[node name="DestinationAirlock" parent="Station2" index="16"]
-SaveId = "station2_destination_airlock"
+[node name="DestinationManager" type="Node" parent="." node_paths=PackedStringArray("BubbleRoot", "ConsoleRef")]
+script = ExtResource("33")
+BubbleRoot = NodePath("../BubbleRoot")
+ConsoleRef = NodePath("../HomeShip/TravelConsole")
 [node name="Player" parent="." unique_id=191954104 instance=ExtResource("2") node_paths=PackedStringArray("SaveManagerRef")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 SaveManagerRef = NodePath("../SaveManager")

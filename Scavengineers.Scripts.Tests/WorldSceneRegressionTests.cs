@@ -1,3 +1,7 @@
+using System.Text.Json;
+
+using Scavengineers.Scripts.Travel;
+
 namespace Scavengineers.Scripts.Tests;
 
 /// <summary>Guards against a bug this project already hit once (commit bdcd15a): a .tscn
@@ -37,18 +41,21 @@ public class WorldSceneRegressionTests
         Assert.Contains(propertyLines, l => l.Trim() == "collision_layer = 2");
     }
 
-    /// <summary>Every destination in World.tscn instances a shared scene — 5 Derelicts off
-    /// Derelict.tscn, 2 Stations off Station.tscn — so a SaveId authored in the shared scene is
-    /// inherited by every instance that doesn't override it. SaveManager keys purely by id, so two
-    /// live nodes sharing one means the second capture silently overwrites the first and every
-    /// instance loads the same state back. Nothing errors; the wrong ship just has your walls.
+    /// <summary>Every destination is instantiated at runtime from Data/destinations.json, and the
+    /// scenes they name are shared — all five Derelicts are one Derelict.tscn. So a SaveId authored
+    /// in a shared scene is inherited by every destination that doesn't override it in JSON.
+    /// SaveManager keys purely by id, so two live nodes sharing one means the second capture
+    /// silently overwrites the first and both load the same state back. Nothing errors; the wrong
+    /// wreck just has your walls.
+    ///
+    /// A JSON typo is the live hazard now: DestinationManager warns on an unknown property, but the
+    /// node still keeps its scene default, which for a SaveId is exactly this collision.
     ///
     /// This caught Derelict.tscn's Deck2/Floor2 shipping SaveId "derelict_build_target_1_deck2"
     /// with no per-derelict override, so all five wrecks' second-deck build state collided.</summary>
     [Fact]
-    public void NoTwoNodesInTheWorld_ShareASaveId_AcrossInstancedDestinationScenes()
+    public void NoTwoDestinations_ShareASaveId_OnceTheirJsonOverridesAreApplied()
     {
-        var world = Path.Combine(RepoRoot(), "Scenes", "World.tscn");
         var owners = new Dictionary<string, string>();
 
         void Claim(string saveId, string owner)
@@ -59,89 +66,76 @@ public class WorldSceneRegressionTests
             owners[saveId] = owner;
         }
 
-        var instances = InstancedScenes(world).ToList();
-        var instanceNames = instances.Select(i => i.Instance).ToHashSet();
-
-        // Nodes authored inline in World.tscn itself (HomeShip, the two shared airlocks, ...).
-        // An instance's override blocks live in this same file and are counted below instead.
-        foreach (var (node, saveId) in SaveIdsByNode(world, instance: null))
+        // The Home Ship and the two shared airlocks are still authored inline.
+        foreach (var (node, saveId) in SaveIdsByNode(Path.Combine(RepoRoot(), "Scenes", "World.tscn")))
         {
-            if (!instanceNames.Contains(node.Split('/')[0]))
-            {
-                Claim(saveId, node);
-            }
+            Claim(saveId, node);
         }
 
-        foreach (var (instanceName, scenePath) in instances)
-        {
-            var overrides = SaveIdsByNode(world, instance: instanceName);
-            var inherited = SaveIdsByNode(Path.Combine(RepoRoot(), scenePath), instance: null);
-            Assert.NotEmpty(inherited);
+        var destinationsJson = Path.Combine(RepoRoot(), "Data", "destinations.json");
+        var destinations = JsonSerializer.Deserialize<List<DestinationCatalog.DestinationDefinition>>(File.ReadAllText(destinationsJson));
+        Assert.NotNull(destinations);
+        Assert.NotEmpty(destinations);
 
-            foreach (var (node, inheritedId) in inherited)
+        foreach (var destination in destinations)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(destination.Scene), $"'{destination.Id}' names no scene, so nothing would be instantiated for it");
+
+            var scene = ReadScene(ScenePath(destination.Scene));
+            var effective = scene.SaveIds;
+
+            foreach (var (nodePath, properties) in destination.Overrides)
             {
-                Claim(overrides.TryGetValue(node, out var overridden) ? overridden : inheritedId, $"{instanceName}/{node}");
+                // A node path that doesn't exist is the typo that matters: DestinationManager warns
+                // and moves on, leaving every node it meant to configure on its scene default.
+                Assert.Contains(nodePath, scene.Paths);
+
+                if (properties.TryGetValue("SaveId", out var overridden))
+                {
+                    effective[nodePath] = overridden.GetString() ?? "";
+                }
             }
-        }
-    }
 
-    /// <summary>Maps each root-level instance in World.tscn to the scene file it instances, by
-    /// resolving its ExtResource id against the header.</summary>
-    private static IEnumerable<(string Instance, string ScenePath)> InstancedScenes(string worldPath)
-    {
-        var lines = File.ReadAllLines(worldPath);
-        var scenesByResourceId = lines
-            .Where(l => l.StartsWith("[ext_resource type=\"PackedScene\""))
-            .ToDictionary(l => Between(l, "id=\"", "\""), l => Between(l, "path=\"res://", "\""));
+            Assert.NotEmpty(effective);
 
-        foreach (var line in lines.Where(l => l.StartsWith("[node ") && l.Contains("parent=\".\"") && l.Contains("instance=ExtResource(")))
-        {
-            var resourceId = Between(line, "instance=ExtResource(\"", "\"");
-            if (scenesByResourceId.TryGetValue(resourceId, out var scenePath))
+            foreach (var (node, saveId) in effective)
             {
-                yield return (Between(line, "name=\"", "\""), scenePath);
+                Claim(saveId, $"{destination.Id}/{node}");
             }
         }
     }
 
-    /// <summary>Maps a node's path (relative to the scene root, or to the named instance) to its
-    /// authored SaveId. `instance` null means the scene's own nodes rather than an instance's
-    /// override blocks.</summary>
-    private static Dictionary<string, string> SaveIdsByNode(string scenePath, string? instance)
+    private static string ScenePath(string resPath) =>
+        Path.Combine(RepoRoot(), resPath.Replace("res://", "").Replace('/', Path.DirectorySeparatorChar));
+
+    /// <summary>Every node path in a scene, plus those that author a SaveId. Follows scene
+    /// inheritance: Station2.tscn's root instances Station.tscn, so it inherits every node and
+    /// SaveId authored there and overrides three of them.</summary>
+    private sealed record SceneNodes(HashSet<string> Paths, Dictionary<string, string> SaveIds);
+
+    private static SceneNodes ReadScene(string scenePath)
     {
-        var result = new Dictionary<string, string>();
+        var lines = File.ReadAllLines(scenePath);
+
+        // An inherited scene's root node carries `instance=ExtResource(...)` and no parent.
+        var root = lines.FirstOrDefault(l => l.StartsWith("[node ") && !l.Contains("parent=\""));
+        var result = root is not null && root.Contains("instance=ExtResource(")
+            ? ReadScene(ScenePath(BaseSceneOf(lines, Between(root, "instance=ExtResource(\"", "\""))))
+            : new SceneNodes([], new Dictionary<string, string>());
+
         var currentNode = (string?)null;
 
-        foreach (var line in File.ReadAllLines(scenePath))
+        foreach (var line in lines)
         {
             if (line.StartsWith("[node "))
             {
                 currentNode = null;
-
-                // An instance's own header carries no SaveId, and root-level nodes of World.tscn
-                // that *are* instances are handled by the caller, not here.
-                if (!line.Contains("parent=\"") || line.Contains("instance=ExtResource("))
+                if (line.Contains("parent=\""))
                 {
-                    continue;
-                }
-
-                var parent = Between(line, "parent=\"", "\"");
-                var name = Between(line, "name=\"", "\"");
-
-                // "." is the scene root; otherwise parent is a path below it. For an instance's
-                // overrides the parent is prefixed with the instance name, which is stripped so
-                // both sides key on the same scene-relative path.
-                if (instance is null)
-                {
+                    var parent = Between(line, "parent=\"", "\"");
+                    var name = Between(line, "name=\"", "\"");
                     currentNode = parent == "." ? name : $"{parent}/{name}";
-                }
-                else if (parent == instance)
-                {
-                    currentNode = name;
-                }
-                else if (parent.StartsWith($"{instance}/", StringComparison.Ordinal))
-                {
-                    currentNode = $"{parent[(instance.Length + 1)..]}/{name}";
+                    result.Paths.Add(currentNode);
                 }
 
                 continue;
@@ -149,11 +143,19 @@ public class WorldSceneRegressionTests
 
             if (currentNode is not null && line.StartsWith("SaveId = "))
             {
-                result[currentNode] = line["SaveId = ".Length..].Trim('"');
+                result.SaveIds[currentNode] = line["SaveId = ".Length..].Trim('"');
             }
         }
 
         return result;
+    }
+
+    private static Dictionary<string, string> SaveIdsByNode(string scenePath) => ReadScene(scenePath).SaveIds;
+
+    private static string BaseSceneOf(string[] lines, string resourceId)
+    {
+        var declaration = lines.First(l => l.StartsWith("[ext_resource type=\"PackedScene\"") && l.Contains($"id=\"{resourceId}\""));
+        return Between(declaration, "path=\"", "\"");
     }
 
     private static string Between(string source, string start, string end)

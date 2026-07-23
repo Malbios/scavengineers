@@ -99,55 +99,6 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     [Export]
     public AirlockDoorVerbTarget? StationAirlock { get; set; }
 
-    /// <summary>Parallel arrays, index i describing Station i across all four — same mechanism as
-    /// the Derelict arrays below. Each group is hidden and decollided while the Home Ship isn't
-    /// docked there, so it and whichever other destination is current aren't both spatially
-    /// present at once; flying outside in zero-g would otherwise reveal every ship floating right
-    /// next to each other regardless of which one's actually docked.</summary>
-    [Export]
-    public Godot.Collections.Array<NodePath> StationGroupPaths { get; set; } = new();
-
-    [Export]
-    public Godot.Collections.Array<NodePath> StationShipSimPaths { get; set; } = new();
-
-    /// <summary>Each Station's own destination-side door — StationAirlock's RebindFarSide
-    /// partner, only ever physically reachable while that Station is the current destination
-    /// (see SetShipPresence). Distinct per Station, unlike StationAirlock itself.</summary>
-    [Export]
-    public Godot.Collections.Array<NodePath> StationDestinationAirlockPaths { get; set; } = new();
-
-    /// <summary>Each Station's own Floor (ShipBuildTarget) — resolves a destination id to a spawn
-    /// point for ContractGiverVerbTarget's CargoDelivery contracts (see GetStationBuildTarget),
-    /// mirroring DerelictBuildTargetPaths/GetDerelictBuildTarget below. Deliberately NOT folded
-    /// into StationCount's own Math.Min: a scene that hasn't wired this array yet keeps a fully
-    /// working travel map regardless, since GetStationBuildTarget just returns null.</summary>
-    [Export]
-    public Godot.Collections.Array<NodePath> StationBuildTargetPaths { get; set; } = new();
-
-    /// <summary>Parallel arrays, index i describing Derelict i+1 across all three — the same
-    /// per-instance-override mechanism ShipSim's own GridWidth/RoomSplitColumns already use,
-    /// just three arrays instead of one field per ship. Not a data-driven (JSON/.tres) ship list
-    /// — that's aspirational per CLAUDE.md and unimplemented everywhere else in this codebase
-    /// too; these stay scene-authored exported references, matching Station/Derelict/HomeShip.
-    /// NodePath arrays rather than Node3D/ShipSim arrays — a raw Node reference can't itself be
-    /// serialized as a plain Variant in a .tscn (unlike a single [Export] Node3D field, which
-    /// Godot resolves through its own node_paths mechanism, there's no equivalent auto-resolved
-    /// array-of-Node export), so each path is resolved once via GetNode in _Ready instead.</summary>
-    [Export]
-    public Godot.Collections.Array<NodePath> DerelictGroupPaths { get; set; } = new();
-
-    [Export]
-    public Godot.Collections.Array<NodePath> DerelictShipSimPaths { get; set; } = new();
-
-    /// <summary>Each Derelict's own Floor (ShipBuildTarget) — resolves a destination id to a
-    /// spawn point for ContractGiverVerbTarget's RetrieveItem contracts (see
-    /// GetDerelictBuildTarget). Deliberately NOT folded into DerelictCount's own Math.Min: a scene
-    /// that hasn't wired this array yet keeps a fully working travel map regardless, since
-    /// GetDerelictBuildTarget just returns null (contract still gets accepted, nothing to
-    /// physically spawn).</summary>
-    [Export]
-    public Godot.Collections.Array<NodePath> DerelictBuildTargetPaths { get; set; } = new();
-
     [Export]
     public string SaveId { get; set; } = "";
 
@@ -161,28 +112,50 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 
     private int _currentDestination; // 0..StationCount-1 = Station N, StationCount.. = Derelict N
     private int _pendingDestination;
+    // Populated by DestinationManager.Register* at startup, in catalog order (every Station, then
+    // every Derelict), rather than resolved from seven parallel inspector NodePath arrays. Same
+    // index-alignment contract as before — the lists are only ever appended to as a set, so index i
+    // describes destination i throughout — but a destination can no longer be half-wired.
     private readonly List<Node3D> _stationGroups = new();
     private readonly List<ShipSim> _stationShipSims = new();
     private readonly List<AirlockDoorVerbTarget> _stationDestinationAirlocks = new();
-    private readonly List<ShipBuildTarget> _stationBuildTargets = new();
+    private readonly List<ShipBuildTarget?> _stationBuildTargets = new();
     private readonly List<Node3D> _derelictGroups = new();
     private readonly List<ShipSim> _derelictShipSims = new();
-    private readonly List<ShipBuildTarget> _derelictBuildTargets = new();
+    private readonly List<ShipBuildTarget?> _derelictBuildTargets = new();
+
+    /// <summary>Called once per Station by DestinationManager, before this node's own deferred
+    /// ApplyCurrentLocation runs. A null buildTarget is tolerated for the same reason the old
+    /// StationBuildTargetPaths array was allowed to be short — it only costs CargoDelivery
+    /// contracts a physical spawn point, not the ability to travel there.</summary>
+    public void RegisterStation(Node3D group, ShipSim shipSim, AirlockDoorVerbTarget destinationAirlock, ShipBuildTarget? buildTarget)
+    {
+        _stationGroups.Add(group);
+        _stationShipSims.Add(shipSim);
+        _stationDestinationAirlocks.Add(destinationAirlock);
+        _stationBuildTargets.Add(buildTarget);
+    }
+
+    /// <summary>Called once per Derelict by DestinationManager. Derelicts have no destination-side
+    /// door of their own — the one shared DerelictAirlock is repointed at whichever is current.</summary>
+    public void RegisterDerelict(Node3D group, ShipSim shipSim, ShipBuildTarget? buildTarget)
+    {
+        _derelictGroups.Add(group);
+        _derelictShipSims.Add(shipSim);
+        _derelictBuildTargets.Add(buildTarget);
+    }
 
     // A second, independent timer/bool pair — travel and upkeep are two unrelated timed actions
     // on the same object, not worth folding into one PendingAction-style dispatch at this scale.
     private Timer? _maintenanceTimer;
     private bool _maintaining;
 
-    /// <summary>Bounds every loop/lookup below defensively against the parallel Station arrays
-    /// being resized inconsistently by hand in the inspector. Map positions dropped out of this
-    /// bound when they moved to DestinationCatalog — one fewer array to keep in step.</summary>
-    private int StationCount => Math.Min(
-        Math.Min(_stationGroups.Count, _stationShipSims.Count),
-        _stationDestinationAirlocks.Count);
+    /// <summary>How many Stations were registered. The defensive Math.Min this used to be — over
+    /// four independently hand-resized inspector arrays — is gone with the arrays themselves:
+    /// RegisterStation appends to all of them at once, so they cannot disagree.</summary>
+    private int StationCount => _stationGroups.Count;
 
-    /// <summary>Same, for the Derelict arrays.</summary>
-    private int DerelictCount => Math.Min(_derelictGroups.Count, _derelictShipSims.Count);
+    private int DerelictCount => _derelictGroups.Count;
 
     public IReadOnlyList<Verb> AvailableVerbs =>
         [
@@ -219,63 +192,6 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 
     public override void _Ready()
     {
-        if (StationGroupPaths.Count != StationShipSimPaths.Count
-            || StationGroupPaths.Count != StationDestinationAirlockPaths.Count)
-        {
-            GD.PushWarning("[TravelConsoleVerbTarget] Mismatched station array lengths — extra entries ignored.");
-        }
-
-        if (DerelictGroupPaths.Count != DerelictShipSimPaths.Count)
-        {
-            GD.PushWarning("[TravelConsoleVerbTarget] Mismatched derelict array lengths — extra entries ignored.");
-        }
-
-        // The data list and the scene wiring are separate halves of the same thing, so a mismatch
-        // means either an unreachable destination (described but not wired) or an unnamed one
-        // (wired but absent from the catalog, which BuildMapEntries then can't label).
-        if (DestinationCatalog.All.Count > 0
-            && (DestinationCatalog.StationCount != StationGroupPaths.Count || DestinationCatalog.DerelictCount != DerelictGroupPaths.Count))
-        {
-            GD.PushWarning(
-                $"[TravelConsoleVerbTarget] destinations.json describes {DestinationCatalog.StationCount} station(s)/{DestinationCatalog.DerelictCount} derelict(s) " +
-                $"but the scene wires {StationGroupPaths.Count}/{DerelictGroupPaths.Count} — only wired destinations are offered.");
-        }
-
-        foreach (var path in StationGroupPaths)
-        {
-            _stationGroups.Add(GetNode<Node3D>(path));
-        }
-
-        foreach (var path in StationShipSimPaths)
-        {
-            _stationShipSims.Add(GetNode<ShipSim>(path));
-        }
-
-        foreach (var path in StationDestinationAirlockPaths)
-        {
-            _stationDestinationAirlocks.Add(GetNode<AirlockDoorVerbTarget>(path));
-        }
-
-        foreach (var path in StationBuildTargetPaths)
-        {
-            _stationBuildTargets.Add(GetNode<ShipBuildTarget>(path));
-        }
-
-        foreach (var path in DerelictGroupPaths)
-        {
-            _derelictGroups.Add(GetNode<Node3D>(path));
-        }
-
-        foreach (var path in DerelictShipSimPaths)
-        {
-            _derelictShipSims.Add(GetNode<ShipSim>(path));
-        }
-
-        foreach (var path in DerelictBuildTargetPaths)
-        {
-            _derelictBuildTargets.Add(GetNode<ShipBuildTarget>(path));
-        }
-
         _travelTimer = new Timer { OneShot = true, WaitTime = TravelVerb.DurationSeconds };
         AddChild(_travelTimer);
         _travelTimer.Timeout += OnTravelComplete;
@@ -284,15 +200,15 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         AddChild(_maintenanceTimer);
         _maintenanceTimer.Timeout += OnMaintenanceComplete;
 
-        // Deferred TWICE, not once: every Derelict's own Floor.SeedDefaultShipLayout (which
-        // spawns the actual wall/conduit/machine CollisionShape3D children) is ALSO deferred,
-        // from that Floor's own _Ready() — and since HomeShip (this node's ancestor) readies
-        // before Derelict1..5 as an earlier scene-tree sibling (see World.tscn), a single
-        // CallDeferred here would run BEFORE those walls exist, leaving them permanently
-        // un-decollided for whichever derelict isn't the starting location (SetShipPresence can
-        // only disable colliders that already exist at the moment it runs). Deferring a second
-        // time lands this call at the back of the same deferred-call flush, after every already-
-        // queued SeedDefaultShipLayout call, guaranteeing the walls exist first.
+        // Deferred TWICE, not once: every destination's own Floor.SeedDefaultShipLayout (which
+        // spawns the actual wall/conduit/machine CollisionShape3D children) is ALSO deferred, from
+        // that Floor's own _Ready(). This node readies before DestinationManager has instantiated
+        // anything (HomeShip is an earlier sibling in World.tscn), so a single CallDeferred here
+        // would run BEFORE those walls exist, leaving them permanently un-decollided for every
+        // destination that isn't the starting location — SetShipPresence can only disable colliders
+        // that already exist at the moment it runs. Deferring a second time lands this call at the
+        // back of the same flush, after every SeedDefaultShipLayout the manager's AddChild calls
+        // queued in between, guaranteeing the walls exist first.
         CallDeferred(nameof(DeferApplyCurrentLocationOnceMore));
     }
 

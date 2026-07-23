@@ -61,16 +61,17 @@ public class TravelConsoleDockingTest
         {
             ShipSimRef = homeShip,
             DerelictAirlock = derelictAirlock,
-            StationGroupPaths = new Godot.Collections.Array<NodePath> { new("../StationGroup") },
             StationAirlock = stationAirlock,
-            StationShipSimPaths = new Godot.Collections.Array<NodePath> { new("../StationShip") },
-            StationDestinationAirlockPaths = new Godot.Collections.Array<NodePath> { new("../StationDestinationAirlock") },
-            DerelictGroupPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1") },
-            DerelictShipSimPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/ShipSim") },
             BaseTravelSeconds = 0.3f,
             MinTravelSeconds = 0.1f,
         });
         sceneTree.Root.AddChild(console);
+
+        // Registration replaced the console's parallel NodePath arrays; it has to happen
+        // before the twice-deferred ApplyCurrentLocation runs, exactly as DestinationManager
+        // does it during its own _Ready.
+        console.RegisterStation(stationGroup, stationShip, stationDestinationAirlock, buildTarget: null);
+        console.RegisterDerelict(derelictGroup, derelictShip, buildTarget: null);
 
         homeShip.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
         homeShip.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);

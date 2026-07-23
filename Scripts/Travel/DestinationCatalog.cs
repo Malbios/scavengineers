@@ -24,9 +24,10 @@ namespace Scavengineers.Scripts.Travel;
 /// silently repoints an in-flight CargoDelivery at the wrong place. Same stable-id discipline as
 /// docs/architecture/save-schema.md's content-ID rule, applied to positions in a list.</para>
 ///
-/// <para>The *node* side — which scene subtree each destination is, and its airlock/build-target
-/// references — is still scene-authored on the travel console (see its own doc comment). Moving
-/// that here is what runtime instancing would need.</para>
+/// <para>The *node* side lives here too now: <see cref="DestinationDefinition.Scene"/> plus
+/// <see cref="DestinationDefinition.Overrides"/> are what <c>DestinationManager</c> instantiates at
+/// startup, replacing seven parallel <c>NodePath</c> arrays on the travel console and eight
+/// hand-placed sibling groups in World.tscn. Adding a destination is one entry in this file.</para>
 /// </summary>
 public static class DestinationCatalog
 {
@@ -104,5 +105,35 @@ public static class DestinationCatalog
         public float MapY { get; set; }
 
         public Vector2 MapPosition => new(MapX, MapY);
+
+        /// <summary>The scene DestinationManager instantiates for this destination. Two
+        /// destinations can share one scene and differ only by <see cref="Overrides"/> (all five
+        /// Derelicts do) — a variant scene is for differences that aren't scalars, like Station 2's
+        /// own figure placement and materials (Scenes/Station2.tscn inherits Station.tscn).</summary>
+        [JsonPropertyName("scene")]
+        public string Scene { get; set; } = "";
+
+        [JsonPropertyName("posX")]
+        public float PosX { get; set; }
+
+        [JsonPropertyName("posY")]
+        public float PosY { get; set; }
+
+        [JsonPropertyName("posZ")]
+        public float PosZ { get; set; }
+
+        /// <summary>Where the instance sits in the tactical bubble. Every destination shares one
+        /// world origin today (only the current one is present), so this is a fixed offset that
+        /// keeps the player's ship and the destination from occupying the same space — not a
+        /// strategic-layer position, which is <see cref="MapPosition"/>.</summary>
+        public Vector3 Position => new(PosX, PosY, PosZ);
+
+        /// <summary>Per-instance property overrides, keyed by node path below the destination root
+        /// then by property name — the data equivalent of a .tscn instance override block, which is
+        /// exactly what these replaced. Values are applied before the instance enters the tree, so
+        /// a node's own _Ready already sees them (ShipSim reads LayoutId there, ShipBuildTarget
+        /// reads GenerateLoot).</summary>
+        [JsonPropertyName("overrides")]
+        public Dictionary<string, Dictionary<string, JsonElement>> Overrides { get; set; } = new();
     }
 }

@@ -1,0 +1,72 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/Station.tscn" id="1"]
+
+[sub_resource type="StandardMaterial3D" id="Station2ShopSuitMaterial"]
+albedo_color = Color(0.3, 0.42, 0.55, 1)
+
+[sub_resource type="StandardMaterial3D" id="Station2ShopHeadMaterial"]
+albedo_color = Color(0.62, 0.48, 0.4, 1)
+
+[sub_resource type="StandardMaterial3D" id="Station2ContractSuitMaterial"]
+albedo_color = Color(0.35, 0.15, 0.4, 1)
+
+[sub_resource type="StandardMaterial3D" id="Station2ContractHeadMaterial"]
+albedo_color = Color(0.58, 0.45, 0.38, 1)
+
+[node name="Station" instance=ExtResource("1")]
+
+[node name="ShipSim" parent="." index="0"]
+SaveId = "station2_ship_sim"
+
+[node name="Floor" parent="." index="3"]
+SaveId = "station2_build_target"
+
+[node name="ShopFigure" parent="." index="14"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -2.4, 0, -1)
+
+[node name="Visual" parent="ShopFigure" index="1"]
+ArmSwayDegrees = 6.0
+HeadTurnRangeDegrees = 24.0
+BreathSpeed = 1.1
+
+[node name="Legs" parent="ShopFigure/Visual" index="0"]
+surface_material_override/0 = SubResource("Station2ShopSuitMaterial")
+
+[node name="Torso" parent="ShopFigure/Visual" index="1"]
+surface_material_override/0 = SubResource("Station2ShopSuitMaterial")
+
+[node name="Head" parent="ShopFigure/Visual" index="2"]
+surface_material_override/0 = SubResource("Station2ShopHeadMaterial")
+
+[node name="ArmLeft" parent="ShopFigure/Visual" index="3"]
+surface_material_override/0 = SubResource("Station2ShopSuitMaterial")
+
+[node name="ArmRight" parent="ShopFigure/Visual" index="4"]
+surface_material_override/0 = SubResource("Station2ShopSuitMaterial")
+
+[node name="ContractFigure" parent="." index="15"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -2.4, 0, 1)
+
+[node name="Visual" parent="ContractFigure" index="1"]
+ArmSwayDegrees = 2.5
+HeadTurnRangeDegrees = 12.0
+BreathSpeed = 0.6
+
+[node name="Legs" parent="ContractFigure/Visual" index="0"]
+surface_material_override/0 = SubResource("Station2ContractSuitMaterial")
+
+[node name="Torso" parent="ContractFigure/Visual" index="1"]
+surface_material_override/0 = SubResource("Station2ContractSuitMaterial")
+
+[node name="Head" parent="ContractFigure/Visual" index="2"]
+surface_material_override/0 = SubResource("Station2ContractHeadMaterial")
+
+[node name="ArmLeft" parent="ContractFigure/Visual" index="3"]
+surface_material_override/0 = SubResource("Station2ContractSuitMaterial")
+
+[node name="ArmRight" parent="ContractFigure/Visual" index="4"]
+surface_material_override/0 = SubResource("Station2ContractSuitMaterial")
+
+[node name="DestinationAirlock" parent="." index="16"]
+SaveId = "station2_destination_airlock"

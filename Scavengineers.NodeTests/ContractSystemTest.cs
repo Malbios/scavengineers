@@ -30,10 +30,10 @@ public class ContractSystemTest
         var homeShip = AutoFree(new ShipSim { HasPowerGrid = true });
         sceneTree.Root.AddChild(homeShip);
 
-        var stationGroupPaths = new Godot.Collections.Array<NodePath>();
-        var stationShipSimPaths = new Godot.Collections.Array<NodePath>();
-        var stationDestinationAirlockPaths = new Godot.Collections.Array<NodePath>();
-        var stationBuildTargetPaths = new Godot.Collections.Array<NodePath>();
+        var stationGroups = new Node3D[2];
+        var stationShipSims = new ShipSim[2];
+        var stationDestinationAirlocks = new AirlockDoorVerbTarget[2];
+        var stationBuildTargets = new ShipBuildTarget[2];
 
         AirlockDoorVerbTarget? stationAirlock = null;
 
@@ -64,10 +64,10 @@ public class ContractSystemTest
                 stationDestinationAirlock.PartnerDoorRef = stationAirlock; // bidirectional — see AirlockDoorVerbTarget.RefreshBridgeEngagement
             }
 
-            stationGroupPaths.Add(new NodePath($"../StationGroup{i}"));
-            stationShipSimPaths.Add(new NodePath($"../StationShip{i}"));
-            stationDestinationAirlockPaths.Add(new NodePath($"../StationDestinationAirlock{i}"));
-            stationBuildTargetPaths.Add(new NodePath($"../StationGroup{i}/Floor"));
+            stationGroups[i] = stationGroup;
+            stationShipSims[i] = stationShip;
+            stationDestinationAirlocks[i] = stationDestinationAirlock;
+            stationBuildTargets[i] = stationBuildTarget;
         }
 
         var derelictGroup = AutoFree(new Node3D { Name = "DerelictGroup1" });
@@ -89,18 +89,18 @@ public class ContractSystemTest
         {
             ShipSimRef = homeShip,
             DerelictAirlock = derelictAirlock,
-            StationGroupPaths = stationGroupPaths,
             StationAirlock = stationAirlock,
-            StationShipSimPaths = stationShipSimPaths,
-            StationDestinationAirlockPaths = stationDestinationAirlockPaths,
-            StationBuildTargetPaths = stationBuildTargetPaths,
-            DerelictGroupPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1") },
-            DerelictShipSimPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/ShipSim") },
-            DerelictBuildTargetPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/Floor") },
             BaseTravelSeconds = 0.3f,
             MinTravelSeconds = 0.1f,
         });
         sceneTree.Root.AddChild(console);
+
+        for (var i = 0; i < 2; i++)
+        {
+            console.RegisterStation(stationGroups[i], stationShipSims[i], stationDestinationAirlocks[i], stationBuildTargets[i]);
+        }
+
+        console.RegisterDerelict(derelictGroup, derelictShip, derelictBuildTarget);
 
         homeShip.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
         homeShip.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);

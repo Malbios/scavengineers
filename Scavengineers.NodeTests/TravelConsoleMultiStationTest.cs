@@ -45,9 +45,8 @@ public class TravelConsoleMultiStationTest
         var homeShip = AutoFree(new ShipSim { HasPowerGrid = true });
         sceneTree.Root.AddChild(homeShip);
 
-        var stationGroupPaths = new Godot.Collections.Array<NodePath>();
-        var stationShipSimPaths = new Godot.Collections.Array<NodePath>();
-        var stationDestinationAirlockPaths = new Godot.Collections.Array<NodePath>();
+        var stationGroups = new Node3D[2];
+        var stationShipSims = new ShipSim[2];
         var stationDestinationAirlocks = new AirlockDoorVerbTarget[2];
 
         AirlockDoorVerbTarget? stationAirlock = null;
@@ -56,9 +55,11 @@ public class TravelConsoleMultiStationTest
         {
             var stationShip = AutoFree(new ShipSim { Name = $"StationShip{i}" });
             sceneTree.Root.AddChild(stationShip);
+            stationShipSims[i] = stationShip;
 
             var stationGroup = AutoFree(new Node3D { Name = $"StationGroup{i}" });
             sceneTree.Root.AddChild(stationGroup);
+            stationGroups[i] = stationGroup;
 
             var stationDestinationAirlock = AutoFree(new AirlockDoorVerbTarget { Name = $"StationDestinationAirlock{i}", ShipARef = stationShip, OwnsBridge = false });
             sceneTree.Root.AddChild(stationDestinationAirlock);
@@ -73,10 +74,6 @@ public class TravelConsoleMultiStationTest
                 sceneTree.Root.AddChild(stationAirlock);
                 stationDestinationAirlock.PartnerDoorRef = stationAirlock; // bidirectional — see AirlockDoorVerbTarget.RefreshBridgeEngagement
             }
-
-            stationGroupPaths.Add(new NodePath($"../StationGroup{i}"));
-            stationShipSimPaths.Add(new NodePath($"../StationShip{i}"));
-            stationDestinationAirlockPaths.Add(new NodePath($"../StationDestinationAirlock{i}"));
         }
 
         var derelictGroup = AutoFree(new Node3D { Name = "DerelictGroup1" });
@@ -92,16 +89,20 @@ public class TravelConsoleMultiStationTest
         {
             ShipSimRef = homeShip,
             DerelictAirlock = derelictAirlock,
-            StationGroupPaths = stationGroupPaths,
             StationAirlock = stationAirlock,
-            StationShipSimPaths = stationShipSimPaths,
-            StationDestinationAirlockPaths = stationDestinationAirlockPaths,
-            DerelictGroupPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1") },
-            DerelictShipSimPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/ShipSim") },
             BaseTravelSeconds = 0.3f,
             MinTravelSeconds = 0.1f,
         });
         sceneTree.Root.AddChild(console);
+
+        // Stations first, then derelicts — the registration order IS the destination id order, and
+        // DestinationManager registers straight down the catalog for the same reason.
+        for (var i = 0; i < 2; i++)
+        {
+            console.RegisterStation(stationGroups[i], stationShipSims[i], stationDestinationAirlocks[i], buildTarget: null);
+        }
+
+        console.RegisterDerelict(derelictGroup, derelictShip, buildTarget: null);
 
         homeShip.InstallBattery(new CellCoord(0, 0), FixtureSurface.WallInner);
         homeShip.InstallThruster("t1", new CellCoord(1, 0), FixtureSurface.WallInner);

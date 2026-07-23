@@ -1,9 +1,70 @@
 [
-  { "id": "station_1", "kind": "station", "nameKey": "OBJECT_STATION", "mapX": 220, "mapY": 180 },
-  { "id": "station_2", "kind": "station", "nameKey": "OBJECT_STATION_2", "mapX": 140, "mapY": 260 },
-  { "id": "derelict_1", "kind": "derelict", "nameKey": "OBJECT_DERELICT_1", "mapX": 300, "mapY": 60 },
-  { "id": "derelict_2", "kind": "derelict", "nameKey": "OBJECT_DERELICT_2", "mapX": 420, "mapY": 150 },
-  { "id": "derelict_3", "kind": "derelict", "nameKey": "OBJECT_DERELICT_3", "mapX": 380, "mapY": 300 },
-  { "id": "derelict_4", "kind": "derelict", "nameKey": "OBJECT_DERELICT_4", "mapX": 180, "mapY": 320 },
-  { "id": "derelict_5", "kind": "derelict", "nameKey": "OBJECT_DERELICT_5", "mapX": 80, "mapY": 150 }
+  {
+    "id": "station_1", "kind": "station", "nameKey": "OBJECT_STATION", "mapX": 220, "mapY": 180,
+    "scene": "res://Scenes/Station.tscn", "posX": -10
+  },
+  {
+    "id": "station_2", "kind": "station", "nameKey": "OBJECT_STATION_2", "mapX": 140, "mapY": 260,
+    "scene": "res://Scenes/Station2.tscn", "posX": -10
+  },
+  {
+    "id": "derelict_1", "kind": "derelict", "nameKey": "OBJECT_DERELICT_1", "mapX": 300, "mapY": 60,
+    "scene": "res://Scenes/Derelict.tscn", "posX": 16,
+    "overrides": {
+      "ShipSim": { "SaveId": "derelict_ship_sim_1", "LayoutId": "derelict_1" },
+      "Floor": { "SaveId": "derelict_build_target_1" },
+      "Deck2/ShipSim2": { "SaveId": "derelict_ship_sim_1_deck2" },
+      "Deck2/Floor2": { "SaveId": "derelict_build_target_1_deck2" },
+      "DamagedConduit": { "SaveId": "damaged_conduit_1" },
+      "InteriorDoor": { "SaveId": "derelict_interior_door_1" }
+    }
+  },
+  {
+    "id": "derelict_2", "kind": "derelict", "nameKey": "OBJECT_DERELICT_2", "mapX": 420, "mapY": 150,
+    "scene": "res://Scenes/Derelict.tscn", "posX": 16,
+    "overrides": {
+      "ShipSim": { "SaveId": "derelict_ship_sim_2", "LayoutId": "derelict_small" },
+      "Floor": { "SaveId": "derelict_build_target_2" },
+      "Deck2/ShipSim2": { "SaveId": "derelict_ship_sim_2_deck2" },
+      "Deck2/Floor2": { "SaveId": "derelict_build_target_2_deck2" },
+      "DamagedConduit": { "SaveId": "damaged_conduit_2" },
+      "InteriorDoor": { "SaveId": "derelict_interior_door_2" }
+    }
+  },
+  {
+    "id": "derelict_3", "kind": "derelict", "nameKey": "OBJECT_DERELICT_3", "mapX": 380, "mapY": 300,
+    "scene": "res://Scenes/Derelict.tscn", "posX": 16,
+    "overrides": {
+      "ShipSim": { "SaveId": "derelict_ship_sim_3", "ProcedurallyGenerate": true },
+      "Floor": { "SaveId": "derelict_build_target_3", "GenerateLoot": true },
+      "Deck2/ShipSim2": { "SaveId": "derelict_ship_sim_3_deck2" },
+      "Deck2/Floor2": { "SaveId": "derelict_build_target_3_deck2" },
+      "DamagedConduit": { "SaveId": "damaged_conduit_3" },
+      "InteriorDoor": { "SaveId": "derelict_interior_door_3" }
+    }
+  },
+  {
+    "id": "derelict_4", "kind": "derelict", "nameKey": "OBJECT_DERELICT_4", "mapX": 180, "mapY": 320,
+    "scene": "res://Scenes/Derelict.tscn", "posX": 16,
+    "overrides": {
+      "ShipSim": { "SaveId": "derelict_ship_sim_4", "ProcedurallyGenerate": true },
+      "Floor": { "SaveId": "derelict_build_target_4", "GenerateLoot": true },
+      "Deck2/ShipSim2": { "SaveId": "derelict_ship_sim_4_deck2" },
+      "Deck2/Floor2": { "SaveId": "derelict_build_target_4_deck2" },
+      "DamagedConduit": { "SaveId": "damaged_conduit_4" },
+      "InteriorDoor": { "SaveId": "derelict_interior_door_4" }
+    }
+  },
+  {
+    "id": "derelict_5", "kind": "derelict", "nameKey": "OBJECT_DERELICT_5", "mapX": 80, "mapY": 150,
+    "scene": "res://Scenes/Derelict.tscn", "posX": 16,
+    "overrides": {
+      "ShipSim": { "SaveId": "derelict_ship_sim_5", "ProcedurallyGenerate": true },
+      "Floor": { "SaveId": "derelict_build_target_5", "GenerateLoot": true },
+      "Deck2/ShipSim2": { "SaveId": "derelict_ship_sim_5_deck2" },
+      "Deck2/Floor2": { "SaveId": "derelict_build_target_5_deck2" },
+      "DamagedConduit": { "SaveId": "damaged_conduit_5" },
+      "InteriorDoor": { "SaveId": "derelict_interior_door_5" }
+    }
+  }
 ]

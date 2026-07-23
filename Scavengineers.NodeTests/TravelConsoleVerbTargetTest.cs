@@ -12,9 +12,10 @@ using static GdUnit4.Assertions;
 
 namespace Scavengineers.NodeTests;
 
-/// <summary>Regression coverage for TravelConsoleVerbTarget's generalized N-destination model
-/// (Station + parallel Derelict NodePath arrays, resolved via GetNode in _Ready) replacing the
-/// old binary Location enum.</summary>
+/// <summary>Regression coverage for TravelConsoleVerbTarget's generalized N-destination model,
+/// which replaced the old binary Location enum. Destinations arrive via RegisterStation/
+/// RegisterDerelict — DestinationManager's job in the real scene, done by hand here — rather than
+/// the parallel NodePath arrays this originally resolved in _Ready.</summary>
 [TestSuite]
 public class TravelConsoleVerbTargetTest
 {
@@ -40,9 +41,7 @@ public class TravelConsoleVerbTargetTest
         stationDestinationAirlock.PartnerDoorRef = stationAirlock; // bidirectional — see AirlockDoorVerbTarget.RefreshBridgeEngagement
 
         var derelictGroups = new Node3D[derelictCount];
-        var derelictGroupPaths = new Godot.Collections.Array<NodePath>();
-        var derelictShipSimPaths = new Godot.Collections.Array<NodePath>();
-        ShipSim? firstDerelictShip = null;
+        var derelictShips = new ShipSim[derelictCount];
 
         for (var i = 0; i < derelictCount; i++)
         {
@@ -52,27 +51,25 @@ public class TravelConsoleVerbTargetTest
 
             var derelictShip = new ShipSim { Name = "ShipSim" };
             group.AddChild(derelictShip);
-            firstDerelictShip ??= derelictShip;
-
-            derelictGroupPaths.Add(new NodePath($"../DerelictGroup{i + 1}"));
-            derelictShipSimPaths.Add(new NodePath($"../DerelictGroup{i + 1}/ShipSim"));
+            derelictShips[i] = derelictShip;
         }
 
-        var derelictAirlock = AutoFree(new AirlockDoorVerbTarget { Name = "DerelictAirlock", ShipARef = homeShip, ShipBRef = firstDerelictShip });
+        var derelictAirlock = AutoFree(new AirlockDoorVerbTarget { Name = "DerelictAirlock", ShipARef = homeShip, ShipBRef = derelictShips.FirstOrDefault() });
         sceneTree.Root.AddChild(derelictAirlock);
 
         var console = AutoFree(new TravelConsoleVerbTarget
         {
             ShipSimRef = homeShip,
             DerelictAirlock = derelictAirlock,
-            StationGroupPaths = new Godot.Collections.Array<NodePath> { new("../StationGroup") },
             StationAirlock = stationAirlock,
-            StationShipSimPaths = new Godot.Collections.Array<NodePath> { new("../StationShip") },
-            StationDestinationAirlockPaths = new Godot.Collections.Array<NodePath> { new("../StationDestinationAirlock") },
-            DerelictGroupPaths = derelictGroupPaths,
-            DerelictShipSimPaths = derelictShipSimPaths,
         });
         sceneTree.Root.AddChild(console);
+
+        console.RegisterStation(stationGroup, stationShip, stationDestinationAirlock, buildTarget: null);
+        for (var i = 0; i < derelictCount; i++)
+        {
+            console.RegisterDerelict(derelictGroups[i], derelictShips[i], buildTarget: null);
+        }
 
         return (console, stationGroup, derelictGroups);
     }
@@ -350,14 +347,14 @@ public class TravelConsoleVerbTargetTest
 
     [TestCase]
     [RequireGodotRuntime]
-    public void GetDerelictBuildTarget_ReturnsNull_WhenTheSceneHasNotWiredDerelictBuildTargetPaths()
+    public void GetDerelictBuildTarget_ReturnsNull_WhenTheDerelictWasRegisteredWithoutABuildTarget()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var (console, _, _) = CreateConsole(sceneTree, 2);
 
-        // CreateConsole (mirroring a scene predating this feature) never sets
-        // DerelictBuildTargetPaths — GetDerelictBuildTarget must stay a safe no-op rather than
-        // throwing, exactly as ContractGiverVerbTarget.TryTakeOffer relies on via its own `?.`.
+        // CreateConsole registers every derelict with a null build target — GetDerelictBuildTarget
+        // must stay a safe no-op rather than throwing, exactly as
+        // ContractGiverVerbTarget.TryTakeOffer relies on via its own `?.`.
         AssertObject(console.GetDerelictBuildTarget(1)).IsNull(); // Derelict 1 (destination id 1, since StationCount here is 1)
         AssertObject(console.GetDerelictBuildTarget(0)).IsNull(); // a Station id — never a Derelict
         AssertObject(console.GetDerelictBuildTarget(99)).IsNull(); // out of range entirely
@@ -380,43 +377,36 @@ public class TravelConsoleVerbTargetTest
         var stationDestinationAirlock = AutoFree(new AirlockDoorVerbTarget { Name = "StationDestinationAirlock", ShipARef = stationShip, OwnsBridge = false });
         sceneTree.Root.AddChild(stationDestinationAirlock);
 
-        var derelictBuildTargetPaths = new Godot.Collections.Array<NodePath>();
-        var derelictGroupPaths = new Godot.Collections.Array<NodePath>();
-        var derelictShipSimPaths = new Godot.Collections.Array<NodePath>();
+        var derelictGroups = new Node3D[2];
+        var derelictShips = new ShipSim[2];
         var derelictBuildTargets = new ShipBuildTarget[2];
 
         for (var i = 0; i < 2; i++)
         {
             var group = AutoFree(new Node3D { Name = $"DerelictGroup{i + 1}" });
             sceneTree.Root.AddChild(group);
+            derelictGroups[i] = group;
 
             var derelictShip = new ShipSim { Name = "ShipSim" };
             group.AddChild(derelictShip);
+            derelictShips[i] = derelictShip;
 
             var buildTarget = new ShipBuildTarget { Name = "Floor", ShipSimRef = derelictShip, ShipRoot = group };
             group.AddChild(buildTarget);
             derelictBuildTargets[i] = buildTarget;
-
-            derelictGroupPaths.Add(new NodePath($"../DerelictGroup{i + 1}"));
-            derelictShipSimPaths.Add(new NodePath($"../DerelictGroup{i + 1}/ShipSim"));
-            derelictBuildTargetPaths.Add(new NodePath($"../DerelictGroup{i + 1}/Floor"));
         }
 
-        var console = AutoFree(new TravelConsoleVerbTarget
-        {
-            ShipSimRef = homeShip,
-            StationGroupPaths = new Godot.Collections.Array<NodePath> { new("../StationGroup") },
-            StationShipSimPaths = new Godot.Collections.Array<NodePath> { new("../StationShip") },
-            StationDestinationAirlockPaths = new Godot.Collections.Array<NodePath> { new("../StationDestinationAirlock") },
-            DerelictGroupPaths = derelictGroupPaths,
-            DerelictShipSimPaths = derelictShipSimPaths,
-            DerelictBuildTargetPaths = derelictBuildTargetPaths,
-        });
+        var console = AutoFree(new TravelConsoleVerbTarget { ShipSimRef = homeShip });
         sceneTree.Root.AddChild(console);
 
-        // StationCount here is 1 (StationGroupPaths/StationShipSimPaths/StationDestinationAirlockPaths
-        // all length 1 — see StationCount's own Math.Min guard), so destination id 0 is the lone
-        // Station, 1/2 are Derelict 1/2.
+        console.RegisterStation(stationGroup, stationShip, stationDestinationAirlock, buildTarget: null);
+        for (var i = 0; i < 2; i++)
+        {
+            console.RegisterDerelict(derelictGroups[i], derelictShips[i], derelictBuildTargets[i]);
+        }
+
+        // StationCount here is 1 (one RegisterStation call), so destination id 0 is the lone
+        // Station and 1/2 are Derelict 1/2.
         AssertObject(console.GetDerelictBuildTarget(0)).IsNull();
         AssertBool(ReferenceEquals(console.GetDerelictBuildTarget(1), derelictBuildTargets[0])).IsTrue();
         AssertBool(ReferenceEquals(console.GetDerelictBuildTarget(2), derelictBuildTargets[1])).IsTrue();
@@ -425,14 +415,14 @@ public class TravelConsoleVerbTargetTest
 
     [TestCase]
     [RequireGodotRuntime]
-    public void GetStationBuildTarget_ReturnsNull_WhenTheSceneHasNotWiredStationBuildTargetPaths()
+    public void GetStationBuildTarget_ReturnsNull_WhenTheStationWasRegisteredWithoutABuildTarget()
     {
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var (console, _, _) = CreateConsole(sceneTree, 2);
 
-        // CreateConsole (mirroring a scene predating this feature) never sets
-        // StationBuildTargetPaths — GetStationBuildTarget must stay a safe no-op rather than
-        // throwing, exactly as ContractGiverVerbTarget.TryTakeOffer relies on via its own `?.`.
+        // CreateConsole registers the station with a null build target — GetStationBuildTarget
+        // must stay a safe no-op rather than throwing, exactly as
+        // ContractGiverVerbTarget.TryTakeOffer relies on via its own `?.`.
         AssertObject(console.GetStationBuildTarget(0)).IsNull(); // the lone Station
         AssertObject(console.GetStationBuildTarget(1)).IsNull(); // a Derelict id — never a Station
         AssertObject(console.GetStationBuildTarget(99)).IsNull(); // out of range entirely
@@ -446,19 +436,20 @@ public class TravelConsoleVerbTargetTest
         var homeShip = AutoFree(new ShipSim());
         sceneTree.Root.AddChild(homeShip);
 
-        var stationGroupPaths = new Godot.Collections.Array<NodePath>();
-        var stationShipSimPaths = new Godot.Collections.Array<NodePath>();
-        var stationDestinationAirlockPaths = new Godot.Collections.Array<NodePath>();
-        var stationBuildTargetPaths = new Godot.Collections.Array<NodePath>();
+        var stationGroups = new Node3D[2];
+        var stationShips = new ShipSim[2];
+        var stationDestinationAirlocks = new AirlockDoorVerbTarget[2];
         var stationBuildTargets = new ShipBuildTarget[2];
 
         for (var i = 0; i < 2; i++)
         {
             var group = AutoFree(new Node3D { Name = $"StationGroup{i}" });
             sceneTree.Root.AddChild(group);
+            stationGroups[i] = group;
 
             var stationShip = new ShipSim { Name = "ShipSim" };
             group.AddChild(stationShip);
+            stationShips[i] = stationShip;
 
             var buildTarget = new ShipBuildTarget { Name = "Floor", ShipSimRef = stationShip, ShipRoot = group };
             group.AddChild(buildTarget);
@@ -466,22 +457,16 @@ public class TravelConsoleVerbTargetTest
 
             var destinationAirlock = AutoFree(new AirlockDoorVerbTarget { Name = $"StationDestinationAirlock{i}", ShipARef = stationShip, OwnsBridge = false });
             sceneTree.Root.AddChild(destinationAirlock);
-
-            stationGroupPaths.Add(new NodePath($"../StationGroup{i}"));
-            stationShipSimPaths.Add(new NodePath($"../StationGroup{i}/ShipSim"));
-            stationDestinationAirlockPaths.Add(new NodePath($"../StationDestinationAirlock{i}"));
-            stationBuildTargetPaths.Add(new NodePath($"../StationGroup{i}/Floor"));
+            stationDestinationAirlocks[i] = destinationAirlock;
         }
 
-        var console = AutoFree(new TravelConsoleVerbTarget
-        {
-            ShipSimRef = homeShip,
-            StationGroupPaths = stationGroupPaths,
-            StationShipSimPaths = stationShipSimPaths,
-            StationDestinationAirlockPaths = stationDestinationAirlockPaths,
-            StationBuildTargetPaths = stationBuildTargetPaths,
-        });
+        var console = AutoFree(new TravelConsoleVerbTarget { ShipSimRef = homeShip });
         sceneTree.Root.AddChild(console);
+
+        for (var i = 0; i < 2; i++)
+        {
+            console.RegisterStation(stationGroups[i], stationShips[i], stationDestinationAirlocks[i], stationBuildTargets[i]);
+        }
 
         // No Derelicts wired at all here — StationCount is 2, destination ids 0/1 are the two
         // Stations, and anything >= 2 is out of range.
