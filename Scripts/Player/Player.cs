@@ -183,23 +183,15 @@ public partial class Player : CharacterBody3D
     private ColorRect? _scanHighlightOverlay;
     private IReadOnlyList<VisualInstance3D> _highlightedVisuals = [];
 
-    private Label? _targetNameLabel;
-    private Label? _verbLabel;
-    private ProgressBar? _verbProgressBar;
-    private Label? _powerInfoLabel;
-    private Label? _savedLabel;
-    private Timer? _savedFlashTimer;
+    /// <summary>Everything the HUD draws (bars, labels, overlays, formatting, Tr()) — see
+    /// <see cref="PlayerHudView"/>. Player computes state and pushes a snapshot; it holds no
+    /// Label/ProgressBar references of its own anymore.</summary>
+    private PlayerHudView? _hud;
 
-    // Placeholder/tunable — how long the "Saved" confirmation stays visible after a save.
-    private const float SavedFlashSeconds = 2f;
-    private ProgressBar? _o2Bar;
-    private Label? _co2Label;
-    private ProgressBar? _co2Bar;
-    private ProgressBar? _healthBar;
-    private Label? _roomO2Label;
-    private Label? _leftHandLabel;
-    private Label? _rightHandLabel;
-    private Label? _creditsLabel;
+    /// <summary>Test-only observability, same narrow convention as <see cref="ScanModeOn"/> — lets
+    /// a NodeTest assert on rendered HUD state without reaching through a private field.</summary>
+    public PlayerHudView? Hud => _hud;
+
     private DraggableWindow? _inventoryPanel;
     private DraggableWindow? _drillWindow;
     private DraggableWindow? _flashlightWindow;
@@ -306,32 +298,8 @@ public partial class Player : CharacterBody3D
     private readonly PlayerInventory _inventory = new();
     private float _pitch;
 
-    private ProgressBar? _hungerBar;
-    private ProgressBar? _thirstBar;
-    private ProgressBar? _energyBar;
-    private Label? _drillLabel;
-    private ProgressBar? _drillBar;
-    private Label? _flashlightLabel;
-    private ProgressBar? _flashlightBar;
     private SpotLight3D? _flashlightSpot;
     private bool _flashlightOn;
-    private ColorRect? _smokeOverlay;
-    private ColorRect? _coldOverlay;
-    private ColorRect? _burnOverlay;
-    private ColorRect? _lowHealthOverlay;
-
-    // Placeholder/tunable — Health at/below this fraction shows the pulsing warning. Every other
-    // player stat (O2, freezing, burning, smoke) already gets a full-screen cue; Health is the
-    // one that currently ends the run (via the death screen) with zero advance warning.
-    private const float LowHealthThreshold = 25f;
-
-    // Placeholder/tunable — how the pulse's visible alpha oscillates, multiplied against the
-    // overlay's own base alpha (see LowHealthOverlay's color in Player.tscn). Sine-driven off
-    // Time.GetTicksMsec() rather than a manually ticked field — one less bit of state to keep in
-    // sync with delta time.
-    private const float LowHealthPulseBaseAlpha = 0.5f;
-    private const float LowHealthPulseAmplitude = 0.5f;
-    private const float LowHealthPulseSpeed = 2.5f;
 
     /// <summary>The death fallback's reload target — SaveManager already holds the reverse
     /// PlayerRef (World.tscn), this is the same reference the other way round.</summary>
@@ -490,34 +458,14 @@ public partial class Player : CharacterBody3D
         _scanHighlightOverlay = GetNode<ColorRect>("HUD/ScanHighlightOverlay");
         (_scanHighlightOverlay.Material as ShaderMaterial)?.SetShaderParameter("mask_texture", _scanHighlightViewport.GetTexture());
 
-        _targetNameLabel = GetNode<Label>("HUD/TargetNameLabel");
-        _verbLabel = GetNode<Label>("HUD/VerbLabel");
-        _verbProgressBar = GetNode<ProgressBar>("HUD/VerbProgressBar");
-        _powerInfoLabel = GetNode<Label>("HUD/PowerInfoLabel");
-        _savedLabel = GetNode<Label>("HUD/SavedLabel");
-        _savedFlashTimer = new Timer { OneShot = true, WaitTime = SavedFlashSeconds };
-        AddChild(_savedFlashTimer);
-        _savedFlashTimer.Timeout += () => _savedLabel!.Visible = false;
-        _o2Bar = GetNode<ProgressBar>("HUD/ResourcesPanel/O2Bar");
-        _co2Label = GetNode<Label>("HUD/ResourcesPanel/CO2Label");
-        _co2Bar = GetNode<ProgressBar>("HUD/ResourcesPanel/CO2Bar");
-        _healthBar = GetNode<ProgressBar>("HUD/ResourcesPanel/HealthBar");
-        _hungerBar = GetNode<ProgressBar>("HUD/ResourcesPanel/HungerBar");
-        _thirstBar = GetNode<ProgressBar>("HUD/ResourcesPanel/ThirstBar");
-        _energyBar = GetNode<ProgressBar>("HUD/ResourcesPanel/EnergyBar");
-        _roomO2Label = GetNode<Label>("HUD/ResourcesPanel/RoomO2Label");
-        _drillLabel = GetNode<Label>("HUD/ResourcesPanel/DrillLabel");
-        _drillBar = GetNode<ProgressBar>("HUD/ResourcesPanel/DrillBar");
-        _flashlightLabel = GetNode<Label>("HUD/ResourcesPanel/FlashlightLabel");
-        _flashlightBar = GetNode<ProgressBar>("HUD/ResourcesPanel/FlashlightBar");
+        // Constructed here rather than authored into Player.tscn, so the HUD split stays invisible
+        // to the scene file — no new node_paths wiring to resolve, and nothing in the .tscn that
+        // could drift out of sync with the script.
+        _hud = new PlayerHudView { Name = "HudView" };
+        AddChild(_hud);
+        _hud.Bind(GetNode("HUD"));
+
         _flashlightSpot = GetNode<SpotLight3D>("Head/Camera3D/FlashlightSpot");
-        _smokeOverlay = GetNode<ColorRect>("HUD/SmokeOverlay");
-        _coldOverlay = GetNode<ColorRect>("HUD/ColdOverlay");
-        _burnOverlay = GetNode<ColorRect>("HUD/BurnOverlay");
-        _lowHealthOverlay = GetNode<ColorRect>("HUD/LowHealthOverlay");
-        _leftHandLabel = GetNode<Label>("HUD/LeftHandLabel");
-        _rightHandLabel = GetNode<Label>("HUD/RightHandLabel");
-        _creditsLabel = GetNode<Label>("HUD/CreditsLabel");
         _inventoryPanel = GetNode<DraggableWindow>("HUD/InventoryPanel");
         _drillWindow = GetNode<DraggableWindow>("HUD/DrillWindow");
         _flashlightWindow = GetNode<DraggableWindow>("HUD/FlashlightWindow");
@@ -1865,10 +1813,6 @@ public partial class Player : CharacterBody3D
         // could easily be a different tile in the same room from the one the zone happens to use.
         // currentCell itself is computed once, up top, and reused here — same tile all tick.
         var inSmoke = ShipSimRef?.Atmosphere?.ComponentContaining(currentCell).Any(ShipSimRef.Deck.IsOnFire) ?? false;
-        if (_smokeOverlay is not null)
-        {
-            _smokeOverlay.Visible = inSmoke;
-        }
 
         // Suit resources keep draining while busy performing a verb — a task's duration is a
         // real elapsed-time cost, not a pause (docs/project-plan.md's "time acceleration ...
@@ -1910,63 +1854,32 @@ public partial class Player : CharacterBody3D
             _inventory.DrainSpecializedSlot("suit_battery", SuitBatteryDrainPerSecond * (float)delta);
         }
 
-        _o2Bar!.Value = _suitResources.O2Percent;
-
-        // Only meaningful while actually sealed — hidden the rest of the time rather than
-        // showing a permanently-0 bar that means nothing without a suit on.
-        _co2Label!.Visible = suitSealed;
-        _co2Bar!.Visible = suitSealed;
-        _co2Bar.Value = _suitResources.CO2Percent;
-
-        _healthBar!.Value = _suitResources.HealthPercent;
-        _coldOverlay!.Visible = _suitResources.IsFreezing;
-        _burnOverlay!.Visible = _suitResources.IsBurning;
-
-        var lowHealth = _suitResources.HealthPercent <= LowHealthThreshold;
-        _lowHealthOverlay!.Visible = lowHealth;
-        if (lowHealth)
-        {
-            var pulse = LowHealthPulseBaseAlpha + LowHealthPulseAmplitude * Mathf.Sin(Time.GetTicksMsec() / 1000f * LowHealthPulseSpeed);
-            _lowHealthOverlay.Modulate = new Color(1f, 1f, 1f, pulse);
-        }
-
         if (_suitResources.HealthPercent <= 0f && !_deathOpen)
         {
             Die();
         }
 
         _needs.Tick(delta);
-        _hungerBar!.Value = _needs.HungerPercent;
-        _thirstBar!.Value = _needs.ThirstPercent;
-        _energyBar!.Value = _needs.EnergyPercent;
 
-        if (roomVolume is not null)
-        {
-            _roomO2Label!.Visible = true;
-            _roomO2Label.Text = Tr("HUD_ROOM_O2") + $": {roomVolume.O2Fraction * 100:F0}%";
-        }
-        else
-        {
-            _roomO2Label!.Visible = false;
-        }
-
-        // Only shown while actually holding the drill — feedback on "loses power with usage"
-        // matters mid-task, not just when the inventory panel (with the battery slot) is open.
+        // A tool's charge is only surfaced while it's actually in hand — feedback on "loses power
+        // with usage" matters mid-task, not just when the inventory panel (with the battery slot)
+        // is open. Null means "not held", which the view renders as hidden.
         var holdingDrill = LeftHandItemId == "power_drill" || RightHandItemId == "power_drill";
-        _drillLabel!.Visible = holdingDrill;
-        _drillBar!.Visible = holdingDrill;
-        if (holdingDrill)
-        {
-            _drillBar.Value = _inventory.Drill is { HasItem: true } drill ? drill.Charge * 100 : 0;
-        }
 
-        // Same "only while holding it" feedback as the drill above.
-        _flashlightLabel!.Visible = holdingFlashlight;
-        _flashlightBar!.Visible = holdingFlashlight;
-        if (holdingFlashlight)
-        {
-            _flashlightBar.Value = _inventory.Flashlight is { HasItem: true } flashlight ? flashlight.Charge * 100 : 0;
-        }
+        _hud!.RenderVitals(new PlayerHudView.Vitals(
+            O2Percent: _suitResources.O2Percent,
+            CO2Percent: _suitResources.CO2Percent,
+            SuitSealed: suitSealed,
+            HealthPercent: _suitResources.HealthPercent,
+            IsFreezing: _suitResources.IsFreezing,
+            IsBurning: _suitResources.IsBurning,
+            InSmoke: inSmoke,
+            HungerPercent: _needs.HungerPercent,
+            ThirstPercent: _needs.ThirstPercent,
+            EnergyPercent: _needs.EnergyPercent,
+            RoomO2Fraction: roomVolume?.O2Fraction,
+            DrillCharge: holdingDrill ? _inventory.Drill is { HasItem: true } drill ? drill.Charge : 0f : null,
+            FlashlightCharge: holdingFlashlight ? _inventory.Flashlight is { HasItem: true } flashlight ? flashlight.Charge : 0f : null));
 
         UpdateVerbHud();
     }
@@ -2185,60 +2098,56 @@ public partial class Player : CharacterBody3D
         // The name label identifies whatever you're looking at, independent of whether you can
         // currently afford its verb — e.g. a damaged conduit should still read as "Damaged
         // Conduit" even while you're not holding spare parts, not go blank.
+        _hud!.RenderTargetName(TargetNameText(target));
+
+        if (verb is not null)
+        {
+            var label = verb.DisplaySuffix is { } suffix ? $"{Tr(verb.LocalizationKey)} ({suffix})" : Tr(verb.LocalizationKey);
+            var text = verbs is { Count: > 1 }
+                ? $"{label} ({_selectedVerbIndex % verbs.Count + 1}/{verbs.Count})"
+                : label;
+
+            _hud.RenderVerb(text, verb.Disabled, target!.CurrentVerbProgress);
+        }
+        else
+        {
+            _hud.RenderVerb(null, disabled: false, progress: null);
+        }
+
+        UpdateInventoryHud();
+    }
+
+    /// <summary>What the crosshair name label should read, or null to hide it. The name identifies
+    /// whatever you're looking at independent of whether you can currently afford its verb — e.g. a
+    /// damaged conduit should still read as "Damaged Conduit" while you're not holding spare parts,
+    /// not go blank.</summary>
+    private string? TargetNameText(IVerbTarget? target)
+    {
         if (target?.DisplayNameKey is { } displayNameKey)
         {
             // A loose battery's real charge is worth surfacing here too, same "label (suffix)"
-            // shape the verb label below already uses for Verb.DisplaySuffix.
+            // shape the verb label already uses for Verb.DisplaySuffix.
             var nameText = target is PickupItem { ItemId: "battery" } batteryPickup
                 ? $"{Tr(displayNameKey)} ({Mathf.RoundToInt(batteryPickup.Charge * 100)}%)"
                 : Tr(displayNameKey);
 
-            // Only while scan mode is active (see _scanModeOn/CanScan) — the PDA's health-scan
-            // cartridge is what makes the exact number visible; an ambient "this looks damaged"
-            // material cue (see ShipBuildTarget's own Maintain/Repair wiring) stays visible to
-            // everyone regardless.
-            _targetNameLabel!.Text = _scanModeOn && target.Condition is { } condition
+            // The exact condition number only while scan mode is active (see _scanModeOn/CanScan) —
+            // the PDA's health-scan cartridge is what makes it visible; the ambient "this looks
+            // damaged" material cue (see ShipBuildTarget's own Maintain/Repair wiring) stays
+            // visible to everyone regardless.
+            return _scanModeOn && target.Condition is { } condition
                 ? $"{nameText} ({Mathf.RoundToInt(condition * 100)}%)"
                 : nameText;
-            _targetNameLabel.Visible = true;
-        }
-        else if (_scanModeOn && target?.Condition is { } bareCondition)
-        {
-            // ShipBuildTarget (floor/ceiling/wall) deliberately has no DisplayNameKey — it's
-            // terrain, not a discrete object — so there's no name to prefix here, just the
-            // scanned percentage on its own.
-            _targetNameLabel!.Text = $"{Mathf.RoundToInt(bareCondition * 100)}%";
-            _targetNameLabel.Visible = true;
-        }
-        else
-        {
-            _targetNameLabel!.Visible = false;
         }
 
-        if (verb is not null)
+        // ShipBuildTarget (floor/ceiling/wall) deliberately has no DisplayNameKey — it's terrain,
+        // not a discrete object — so there's no name to prefix, just the scanned percentage.
+        if (_scanModeOn && target?.Condition is { } bareCondition)
         {
-            var progress = target!.CurrentVerbProgress;
-
-            var label = verb.DisplaySuffix is { } suffix ? $"{Tr(verb.LocalizationKey)} ({suffix})" : Tr(verb.LocalizationKey);
-            _verbLabel!.Text = verbs is { Count: > 1 }
-                ? $"{label} ({_selectedVerbIndex % verbs.Count + 1}/{verbs.Count})"
-                : label;
-            _verbLabel.Visible = true;
-            _verbLabel.Modulate = verb.Disabled ? Colors.Red : Colors.White;
-
-            _verbProgressBar!.Visible = progress is not null;
-            if (progress is not null)
-            {
-                _verbProgressBar.Value = progress.Value * 100;
-            }
-        }
-        else
-        {
-            _verbLabel!.Visible = false;
-            _verbProgressBar!.Visible = false;
+            return $"{Mathf.RoundToInt(bareCondition * 100)}%";
         }
 
-        UpdateInventoryHud();
+        return null;
     }
 
     /// <summary>Keeps the scan-mode highlight camera framing the same view as the real one every
@@ -2550,12 +2459,7 @@ public partial class Player : CharacterBody3D
     /// autosave both funnel through that one method, so both trigger this the same way. A brief
     /// visible confirmation, the same "set visible, (re)start a one-shot timer that hides it
     /// again" shape RechargeStationVerbTarget's own active-draw spike already uses.</summary>
-    public void ShowSavedFlash()
-    {
-        _savedLabel!.Visible = true;
-        _savedLabel.Text = Tr("HUD_SAVED");
-        _savedFlashTimer!.Start();
-    }
+    public void ShowSavedFlash() => _hud!.ShowSavedFlash();
 
     /// <summary>Hard death from 0 Health (see the O2-driven drain in SuitResources.Tick) —
     /// opens DeathPanel and waits for a Reload/Quit choice instead of reloading immediately.
@@ -2698,23 +2602,12 @@ public partial class Player : CharacterBody3D
             _powerInfoOn = false;
         }
 
-        _powerInfoLabel!.Visible = _powerInfoOn;
-        if (_powerInfoOn)
-        {
-            var demand = Mathf.RoundToInt(ShipSimRef?.DemandedPower() ?? 0f);
-            var capacity = Mathf.RoundToInt(ShipSim.BatteryCapacity);
-            _powerInfoLabel.Text = Tr("HUD_POWER") + $": {demand} / {capacity}";
-        }
+        _hud!.RenderPower(
+            _powerInfoOn,
+            Mathf.RoundToInt(ShipSimRef?.DemandedPower() ?? 0f),
+            Mathf.RoundToInt(ShipSim.BatteryCapacity));
 
-        _creditsLabel!.Text = Tr("HUD_CREDITS") + $": {_credits}";
-
-        _leftHandLabel!.Text = Tr("HUD_LEFT_HAND") + ": " + (LeftHandItemId is { } leftItem
-            ? Tr("ITEM_" + leftItem.ToUpperInvariant())
-            : Tr("HUD_HOLDING_EMPTY"));
-
-        _rightHandLabel!.Text = Tr("HUD_RIGHT_HAND") + ": " + (RightHandItemId is { } rightItem
-            ? Tr("ITEM_" + rightItem.ToUpperInvariant())
-            : Tr("HUD_HOLDING_EMPTY"));
+        _hud.RenderCarried(_credits, LeftHandItemId, RightHandItemId);
     }
 
     /// <summary>Rebuilds BackpackGrid's InventorySlotUI children to match the worn backpack's
