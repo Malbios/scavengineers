@@ -533,12 +533,24 @@ public partial class ShipSim : Node, IShipLayoutSaveable
         !IsOverloaded;
 
     /// <summary>Sum of PowerDraw over every fixture topologically reachable from a source —
-    /// deliberately calls _power.IsPowered directly rather than the full IsPowered above, to
+    /// deliberately reads _power's own raw powered set rather than the full IsPowered above, to
     /// avoid the circularity of "demand decides overload decides IsPowered decides demand".
     /// What the circuit is currently asking for, regardless of whether supply can actually cover
-    /// it — this is the number a power readout should show as "required."</summary>
-    public float DemandedPower() =>
-        _power is null ? 0f : Deck.Fixtures.Where(f => _power.IsPowered(new PowerNodeId(f.Id))).Sum(f => f.PowerDraw);
+    /// it — this is the number a power readout should show as "required."
+    ///
+    /// Resolves the powered set once and tests membership, rather than asking _power.IsPowered per
+    /// fixture: that made this O(F) solver passes for F fixtures, and IsOverloaded calls it, so
+    /// every per-frame IsPowered call paid for it too.</summary>
+    public float DemandedPower()
+    {
+        if (_power is null)
+        {
+            return 0f;
+        }
+
+        var powered = _power.PoweredNodes();
+        return Deck.Fixtures.Where(f => powered.Contains(new PowerNodeId(f.Id))).Sum(f => f.PowerDraw);
+    }
 
     private bool IsOverloaded => DemandedPower() > BatteryCapacity;
 
