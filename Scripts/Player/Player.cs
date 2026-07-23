@@ -26,10 +26,8 @@ public partial class Player : CharacterBody3D
 
     /// <summary>Tools with real durability — worn down by actual use (see Interact), not by
     /// WearSystem's passive tick (that's ship fixtures only). Reuses the held item's own
-    /// SlotContainer/PickupItem Charge field to mean "durability" here, the same "same field,
-    /// different meaning per item" pattern Fixture.Condition already uses for BatteryFixture
-    /// (charge) vs ConduitFixture (wear) — a fresh tool already defaults to Charge 1f, so nothing
-    /// changes for an old save.</summary>
+    /// SlotContainer/PickupItem Charge field to mean "durability" here — a fresh tool already
+    /// defaults to Charge 1f, so nothing changes for an old save.</summary>
     private static readonly string[] DurableToolIds = ["crowbar", "power_drill", "wrench"];
 
     // Placeholder/tunable — roughly 50 uses to fully wear down, same order of magnitude as
@@ -59,12 +57,10 @@ public partial class Player : CharacterBody3D
     // state; that's O2/Health's job — see SuitResources).
     private const float NeedsDebuffMoveMultiplier = 0.5f;
 
-    // Zero-g movement (placeholder/tunable) — triggers whenever the room's own O2 reads at or
-    // below ShipAtmosphereZone.ZeroGO2Threshold (see ShipSimRef.VolumeAt), same "vacuum" threshold
-    // spirit as AtmosphereVolume.Vacuum's O2Fraction of 0, with a little slack so the switch
-    // doesn't flicker right at the exact boundary while a room is still venting/equalizing. Shared
-    // with ShipAtmosphereZone's own real physics zero-g override for loose items — one definition
-    // of "this room counts as vacuum" for both.
+    // Zero-g movement (placeholder/tunable) — triggers whenever the room's O2 reads at or below
+    // ShipAtmosphereZone.ZeroGO2Threshold, with a little slack so the switch doesn't flicker right
+    // at the boundary while a room is still venting/equalizing. Shared with
+    // ShipAtmosphereZone's own real physics zero-g override for loose items.
     private const float ZeroGThrustAcceleration = 6f;
     private const float ZeroGDrag = 2f; // passive deceleration per second, always applied
     private const float ZeroGMaxSpeed = 3.5f;
@@ -77,34 +73,28 @@ public partial class Player : CharacterBody3D
     private const float N2DrainPerSecondWhileThrusting = 1f / 150f;
 
     // Placeholder/tunable — CharacterBody3D doesn't push RigidBody3D obstacles on its own
-    // (MoveAndSlide resolves the character's own motion but never applies a reciprocal impulse to
-    // whatever it collided with), so a loose item the player walks into would otherwise never
-    // move (see PickupItem). Only a briefly-frozen item (its own one-tick startup grace right
-    // after spawning) ignores the impulse — everything else is a live physics body, whether
-    // resting under normal gravity or drifting in zero-g.
+    // (MoveAndSlide resolves the character's own motion but never applies a reciprocal impulse),
+    // so a loose item the player walks into would otherwise never move.
     private const float ItemPushImpulse = 2f;
 
-    // Decompression pull (placeholder/tunable) — an open floor/ceiling breach's own "unsecured
-    // near a hole" hazard, on top of (not instead of) the slow O2/pressure drain. Pulls toward
-    // the breach's own position rather than a fixed direction, so it settles near the hole
-    // instead of launching you straight through it — ZeroGDrag keeps fighting it the whole time.
+    // Decompression pull (placeholder/tunable) — an open floor/ceiling breach's "unsecured near a
+    // hole" hazard, on top of the slow O2/pressure drain. Pulls toward the breach's own position
+    // rather than a fixed direction, so it settles near the hole instead of launching you
+    // straight through it — ZeroGDrag keeps fighting it the whole time.
     private const float DecompressionPullRange = 5f;
     private const float DecompressionPullAcceleration = 4f;
 
     // Placeholder/tunable — comfortably more than any current room's floor-to-ceiling height
-    // (3m). A 2-deck ship's own worst-case gap (standing at the ladder tile on deck 2, looking
-    // straight down through both open panels to deck 1's intact floor) is exactly
-    // ShipBuildTarget.DeckYOffset (2.05m) — still comfortably inside this. A much taller aligned
-    // stack (~7+ decks with open gaps stacked directly on top of each other) would need this
-    // revisited; not a concern for today's 2-deck ships.
+    // (3m). A 2-deck ship's own worst-case gap is exactly ShipBuildTarget.DeckYOffset (2.05m) —
+    // still comfortably inside this. A much taller aligned stack (~7+ decks) would need this
+    // revisited.
     private const float FreefallRaycastDistance = 15f;
 
     // Placeholder/tunable — vertical speed while climbing a LadderVerbTarget.
     private const float ClimbSpeed = 2.5f;
 
     // Placeholder/tunable — how strongly horizontal position is pulled back toward the ladder's
-    // own rail each tick (a soft snap, not a teleport) — high enough that drifting off the rail
-    // corrects within a few frames, not a real physical spring constant.
+    // rail each tick (a soft snap, not a teleport).
     private const float ClimbSnapStrength = 8f;
 
     // Placeholder/tunable — how far past either anchor (world Y) climbing auto-releases, so
@@ -118,9 +108,8 @@ public partial class Player : CharacterBody3D
 
     /// <summary>Which ship (and which of its tiles) currently governs the player's ambient O2
     /// reading — set at runtime by whichever <see cref="Scavengineers.Scripts.Ship.ShipAtmosphereZone"/>
-    /// the player is standing in. Both ships (and both of a ship's rooms) are loaded and
-    /// simulated simultaneously, and a room can now be sealed off from the rest of its own
-    /// ship, so this has to follow the player's actual room, not just which ship they're on.</summary>
+    /// the player is standing in. A room can be sealed off from the rest of its own ship, so this
+    /// follows the player's actual room, not just which ship they're on.</summary>
     public ShipSim? ShipSimRef { get; private set; }
 
     private Vector2I _ambientTile;
@@ -132,28 +121,21 @@ public partial class Player : CharacterBody3D
 
     /// <summary>Queries physics space for whichever ShipAtmosphereZone currently contains the
     /// player, every physics frame, rather than caching whatever the last BodyEntered signal
-    /// said. That signal-based approach missed real transitions in practice — crossing a shared
-    /// zone boundary within a single physics tick never fires "entered" at all — leaving the
-    /// ambient O2 reading stuck on a stale ship/room (permanently wrong if that ship never
-    /// regenerates air). A live query can't go stale: if no zone is found (e.g. a true gap
-    /// between two rooms), the previous reading is deliberately left alone rather than cleared,
-    /// same "hold the last room's reading" behavior as before.
+    /// said — that signal-based approach missed real transitions in practice, since crossing a
+    /// shared zone boundary within a single physics tick never fires "entered" at all. If no zone
+    /// is found (e.g. a true gap between two rooms), the previous reading is deliberately left
+    /// alone rather than cleared.
     ///
-    /// Reads the zone's TileAt(GlobalPosition) — the player's own actual current cell — rather
-    /// than the zone's fixed representative Tile: atmosphere now diffuses per-cell instead of
-    /// equalizing a whole room instantly, so a cell right next to a fresh breach can genuinely
-    /// read very differently from one across the same room.
+    /// Reads the zone's TileAt(GlobalPosition) — the player's actual current cell — rather than
+    /// the zone's fixed representative Tile, since per-cell diffusion means a cell next to a
+    /// fresh breach can read very differently from one across the same room.
     ///
-    /// Returns the zone actually found THIS frame (as opposed to the cached fields above, which
-    /// may still hold an older room's data) — the decompression-pull hazard needs this live
-    /// signal specifically: once the player has actually drifted out through a breach and left
-    /// the room's zone, continuing to pull toward that same fixed breach position from the far
-    /// side would pull them back inside, causing a pendulum (out, back in, out again) instead of
-    /// a clean exit. It also lets the pull tell "a breach in MY room" apart from "a breach in some
-    /// other room the atmosphere sim happens to still consider connected" (e.g. through a door
-    /// that's since been opened) — see the pull block's own same-zone check. Every other use of
-    /// the cached fields (O2 readout, suit drain) intentionally keeps holding the last known room
-    /// even outside a zone, so this doesn't change that.</summary>
+    /// Returns the zone actually found THIS frame, not the cached fields above — the
+    /// decompression-pull hazard needs this live signal: once the player has drifted out through
+    /// a breach and left the room's zone, continuing to pull toward that breach position from the
+    /// far side would pull them back inside, causing a pendulum instead of a clean exit. It also
+    /// lets the pull tell "a breach in MY room" apart from one in some other room the atmosphere
+    /// sim still considers connected (e.g. through a door since opened).</summary>
     private ShipAtmosphereZone? UpdateAmbientShipSim()
     {
         if (ShipAtmosphereZone.FindZoneAt(GetWorld3D(), GlobalPosition) is { } zone)
@@ -174,8 +156,8 @@ public partial class Player : CharacterBody3D
     // PDA scan-mode highlight (see IVerbTarget.HighlightVisual) — a dedicated SubViewport/Camera3D
     // pair renders ONLY whatever currently has ScanHighlightLayerBit set (a silhouette mask),
     // which a full-screen shader on _scanHighlightOverlay turns into a pulsing outline. Reserved
-    // render layer 20 (1-indexed in the editor, hence the -1 below) — picked as a layer nothing
-    // else in this project uses, so setting/clearing it never affects normal rendering.
+    // render layer 20 (1-indexed in the editor, hence the -1 below) — a layer nothing else in
+    // this project uses, so setting/clearing it never affects normal rendering.
     private const int ScanHighlightLayer = 20;
     private static readonly uint ScanHighlightLayerBit = 1u << (ScanHighlightLayer - 1);
     private SubViewport? _scanHighlightViewport;
@@ -188,33 +170,27 @@ public partial class Player : CharacterBody3D
     /// Label/ProgressBar references of its own anymore.</summary>
     private PlayerHudView? _hud;
 
-    /// <summary>Test-only observability, same narrow convention as <see cref="ScanModeOn"/> — lets
-    /// a NodeTest assert on rendered HUD state without reaching through a private field.</summary>
+    /// <summary>Test-only observability — lets a NodeTest assert on rendered HUD state without
+    /// reaching through a private field.</summary>
     public PlayerHudView? Hud => _hud;
 
     /// <summary>Every modal HUD panel — which are open, their nodes, and the world object each was
-    /// opened from. See <see cref="PanelController"/>; the eight open-flags and eight owner fields
-    /// that used to live here moved there wholesale.</summary>
+    /// opened from. See <see cref="PanelController"/>.</summary>
     private PanelController? _panels;
 
-    /// <summary>Test-only observability, same narrow convention as <see cref="ScanModeOn"/>.</summary>
     public PanelController? Panels => _panels;
 
     /// <summary>The right-click-on-an-item sub-windows (drill/flashlight/backpack/suit/PDA) plus
     /// the thruster and storage slot grids — see <see cref="InventoryWindowView"/>. Distinct from
     /// <see cref="_panels"/>: these don't suppress gameplay input and aren't in
-    /// <see cref="AnyPanelOpen"/>; they're a rendering of PlayerInventory's persistent-contents
-    /// model.</summary>
+    /// <see cref="AnyPanelOpen"/>.</summary>
     private InventoryWindowView? _windows;
 
-    /// <summary>Test-only observability, same narrow convention as <see cref="ScanModeOn"/>.</summary>
     public InventoryWindowView? Windows => _windows;
 
     /// <summary>Toggled by the scan-mode key (see _Input) — only ever true while
-    /// <see cref="CanScan"/> also holds; forced back off the moment it stops holding (checked
-    /// once a frame alongside every other HUD-state refresh), so taking off the PDA/cartridge/
-    /// helmet mid-scan turns it off automatically rather than leaving a stale "on" state that
-    /// silently does nothing.</summary>
+    /// <see cref="CanScan"/> also holds; forced back off the moment it stops holding, so taking
+    /// off the PDA/cartridge/helmet mid-scan turns it off automatically.</summary>
     private bool _scanModeOn;
 
     /// <summary>Test-only observability for scan mode's toggle state — matches this codebase's
@@ -261,20 +237,16 @@ public partial class Player : CharacterBody3D
     public SaveManager? SaveManagerRef { get; set; }
 
     /// <summary>Any full-screen-ish HUD panel that should suppress normal gameplay input while
-    /// open — shared gate for every _Input branch and both movement branches. Each panel's own
-    /// reasons for being in this set are documented on <see cref="PanelId"/>'s members' call sites;
-    /// the two with an extra movement freeze on top (Docking, because WASD becomes minigame thrust,
-    /// and Death, because a 0-Health player shouldn't drift around behind the screen) are checked
+    /// open — shared gate for every _Input branch and both movement branches. The two with an
+    /// extra movement freeze on top (Docking, because WASD becomes minigame thrust, and Death,
+    /// because a 0-Health player shouldn't drift around behind the screen) are checked
     /// individually where that matters.</summary>
     private bool AnyPanelOpen => _panels?.AnyOpen ?? false;
 
     /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-9, 0) —
-    /// also reused by VendorVerbTarget as the set of things Buy can offer, since there's
-    /// no separate item-definition data yet. "backpack" is an ordinary holdable/purchasable item
-    /// right up until it's actually equipped via drag-and-drop onto the Back slot (see
-    /// TryEquipBackpackFromHand) — no dedicated verb needed to buy or hold one. "ration_bar"/
-    /// "water_bottle" are likewise ordinary holdable items until F consumes whichever's held
-    /// (see UseHeldItem) — no dedicated equip path either.</summary>
+    /// also reused by VendorVerbTarget as the set of things Buy can offer. "backpack" is an
+    /// ordinary holdable/purchasable item until it's equipped via drag-and-drop onto the Back
+    /// slot; "ration_bar"/"water_bottle" are likewise ordinary until F consumes whichever's held.</summary>
     public static readonly string[] HotbarItems = ["scrap_metal", "spare_parts", "wall_panel", "power_cell", "battery", "switch", "recharge_station", "thruster", "n2_tank", "backpack", "ration_bar", "water_bottle", "wrench", "pda", "health_scan_cartridge", "power_scan_cartridge", "small_bin", "shelf", "large_shelf"];
 
     private enum Hand { Left, Right }
@@ -313,8 +285,7 @@ public partial class Player : CharacterBody3D
     /// <summary>Accepted-but-not-yet-resolved contracts — ticked down every physics frame (see
     /// TickActiveContracts) and checked for arrival-triggered completion (see
     /// OnArrivedAtDestination). Owned by Player, not by whichever ContractGiverVerbTarget the job
-    /// came from — a contract is the player's own obligation, not tied to a specific giver
-    /// instance for tracking purposes.</summary>
+    /// came from — a contract is the player's own obligation.</summary>
     private readonly List<Contract> _activeContracts = new();
 
     // Placeholder/tunable starting value (never owed until a contract is actually missed) —
@@ -361,8 +332,7 @@ public partial class Player : CharacterBody3D
         (_scanHighlightOverlay.Material as ShaderMaterial)?.SetShaderParameter("mask_texture", _scanHighlightViewport.GetTexture());
 
         // Constructed here rather than authored into Player.tscn, so the HUD split stays invisible
-        // to the scene file — no new node_paths wiring to resolve, and nothing in the .tscn that
-        // could drift out of sync with the script.
+        // to the scene file — no new node_paths wiring to resolve.
         _hud = new PlayerHudView { Name = "HudView" };
         AddChild(_hud);
         _hud.Bind(GetNode("HUD"));
@@ -395,11 +365,8 @@ public partial class Player : CharacterBody3D
         _panels.ThrusterWindow!.CloseRequested += CloseThrusterInventory;
         _panels.StorageWindow!.CloseRequested += CloseStorageInventory;
 
-        // Placeholder/tunable starting stipend for testing the free-form conduit wiring
-        // extensively — same "don't wait on it" spirit as the near-instant verb durations.
-        // Overwritten by ApplyPlayerState on load, same as every other fresh-start default.
-        // The debug backpack is attached first (dev convenience, not something you "found" —
-        // bypasses the normal hand-then-equip flow entirely) so the stipend below spills into
+        // Placeholder/tunable starting stipend, overwritten by ApplyPlayerState on load. The
+        // debug backpack is attached first (dev convenience) so the stipend below spills into
         // its 24 slots instead of overflowing two bare hands.
         _inventory.EquipContainerDirectly("back", "debug_backpack", new SlotContainer(24));
         _inventory.Add("scrap_metal", 50);
@@ -410,9 +377,8 @@ public partial class Player : CharacterBody3D
         _inventory.AttachSpecializedSlot("drill_battery", hasItem: true, charge: 1f);
         _inventory.Add("debug_flashlight", 1);
 
-        // Starter EVA suit, fully suited and fully charged — dev convenience for testing the
-        // suit itself immediately, same "bypasses the normal hand-then-equip flow" spirit as the
-        // debug backpack above. Overwritten by ApplyPlayerState on load like everything else here.
+        // Starter EVA suit, fully suited and fully charged — dev convenience, overwritten by
+        // ApplyPlayerState on load like everything else here.
         _inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(PlayerInventory.TorsoSlotCount));
         _inventory.AttachSpecializedSlot("suit_o2", hasItem: true, charge: 1f);
         _inventory.AttachSpecializedSlot("suit_n2", hasItem: true, charge: 1f);
@@ -421,8 +387,7 @@ public partial class Player : CharacterBody3D
         _inventory.EquipContainerDirectly("head", "eva_helmet", new SlotContainer(0));
 
         // Wrench (Maintain/Repair tool) plus a fully-loaded PDA — dev convenience so scan mode is
-        // testable immediately (helmet's already on above) rather than needing a shopping trip
-        // first. Same "bypasses hand-then-equip" spirit as the suit/backpack above.
+        // testable immediately rather than needing a shopping trip first.
         _inventory.Add("wrench", 1);
         _inventory.EquipContainerDirectly("pda", "pda", new SlotContainer(PlayerInventory.PdaSlotCount));
         _inventory.GetPersistentContents("pda")?.Add("health_scan_cartridge", 1);
@@ -541,11 +506,10 @@ public partial class Player : CharacterBody3D
         }
     }
 
-    /// <summary>Direct hotbar-style action on whatever's held, not a raycast-targeted verb, since
-    /// there's no world object involved. Eats/drinks a consumable (left hand first, then right)
-    /// if one's held; otherwise toggles the flashlight on/off — a held real flashlight, or the
-    /// debug flashlight if it's in inventory (it's never "held," so it has no hand-slot check of
-    /// its own). A no-op if neither applies.</summary>
+    /// <summary>Direct hotbar-style action on whatever's held, not a raycast-targeted verb.
+    /// Eats/drinks a consumable (left hand first, then right) if one's held; otherwise toggles
+    /// the flashlight on/off — a held real flashlight, or the debug flashlight if it's in
+    /// inventory (it's never "held," so it has no hand-slot check of its own).</summary>
     private void UseHeldItem()
     {
         if (TryConsumeHand(PlayerInventory.LeftHandSlotIndex) || TryConsumeHand(PlayerInventory.RightHandSlotIndex))
@@ -583,12 +547,10 @@ public partial class Player : CharacterBody3D
         return true;
     }
 
-    /// <summary>Hotbar-key toggle, extended from a single held-item slot to two hands: already
-    /// held in a hand -> unequip that hand (toggle off, same as today's single-hand behavior).
-    /// Otherwise -> fill whichever hand is empty, or if both are full, replace whichever was
-    /// filled most recently (Equip's own MoveBetween already swaps the displaced hand contents
-    /// back into the backpack the new item came from, so no separate unequip step is needed for
-    /// the replace case).</summary>
+    /// <summary>Already held in a hand -> unequip that hand. Otherwise -> fill whichever hand is
+    /// empty, or if both are full, replace whichever was filled most recently — Equip's own
+    /// MoveBetween already swaps the displaced hand contents back into the backpack the new item
+    /// came from, so no separate unequip step is needed for the replace case.</summary>
     private void ToggleHeldItem(string itemId)
     {
         if (LeftHandItemId == itemId)
@@ -623,10 +585,7 @@ public partial class Player : CharacterBody3D
         _lastFilledHand = targetHand;
     }
 
-    /// <summary>Called by InventorySlotUI's Back slot when something is dragged onto it — equips
-    /// a backpack only if the dragged hand slot really is one (a sensible drag gesture check;
-    /// PlayerInventory.EquipBackpackFromHand doesn't care which exact hand it came from, since
-    /// the item is fungible right up until the moment it's equipped).</summary>
+    /// <summary>Equips a backpack only if the dragged hand slot really is one.</summary>
     public void TryEquipBackpackFromHand(int fromSlotIndex)
     {
         if (fromSlotIndex < 0 || fromSlotIndex >= _inventory.Hands.Slots.Count)
@@ -644,13 +603,10 @@ public partial class Player : CharacterBody3D
 
     /// <summary>Places a bare, non-fungible item token (a worn container just taken off) directly
     /// into `destination` if it's a valid, ordinary, currently-empty slot compatible with the
-    /// item (see ItemCatalog.FitsInStorage) — used by TryUnequipItem/TryUnequipBackpack so an
-    /// unequip drop respects wherever the player actually dropped it, instead of always aiming
-    /// for a hand. False (no placement made, caller falls back to trying any hand) for a
-    /// non-ordinary destination (IsBackSlot/EquippedSlotName/SpecializedSlotKey/IsUnusedBodySlot —
-    /// the same "ordinary slot" completeness check _DropData's generic MoveBetween fallback
-    /// relies on), an already-occupied slot, or an incompatible destination for an item that
-    /// doesn't fit storage.</summary>
+    /// item — used by TryUnequipItem/TryUnequipBackpack so an unequip drop respects wherever the
+    /// player actually dropped it, instead of always aiming for a hand. False (caller falls back
+    /// to trying any hand) for a non-ordinary destination, an already-occupied slot, or an
+    /// incompatible destination for an item that doesn't fit storage.</summary>
     private bool TryPlaceAt(InventorySlotUI? destination, string itemId)
     {
         if (destination is null
@@ -673,14 +629,10 @@ public partial class Player : CharacterBody3D
         return true;
     }
 
-    /// <summary>Called by an ordinary hand slot's InventorySlotUI when the equipped backpack
-    /// itself (dragged from the Back slot) is dropped onto it — or, when `destination` is null,
-    /// by a path with no specific drop target (see the equivalent generalized
-    /// <see cref="TryUnequipItem"/>). Its contents are permanent (see PlayerInventory's
-    /// persistent-contents model) and never travel with this decision, so unequipping is just
-    /// placing the bare backpack token: at the actual drop destination if it's a valid, empty,
-    /// compatible ordinary slot; else in any hand with room; else it stays equipped ("nothing
-    /// vanishes").</summary>
+    /// <summary>Its contents are permanent and never travel with this decision, so unequipping
+    /// is just placing the bare backpack token: at the actual drop destination if it's a valid,
+    /// empty, compatible ordinary slot; else in any hand with room; else it stays equipped
+    /// ("nothing vanishes").</summary>
     public void TryUnequipBackpack(InventorySlotUI? destination = null)
     {
         if (_inventory.Backpack is not { } backpack)
@@ -694,15 +646,12 @@ public partial class Player : CharacterBody3D
         }
     }
 
-    /// <summary>Called by a Torso/Head equip slot (see InventorySlotUI.EquippedSlotName) when
-    /// something is dragged onto it — equips it only if the dragged item's own ItemCatalog.EquipSlot
-    /// actually declares this slot name, generalizing <see cref="TryEquipBackpackFromHand"/>'s
-    /// hardcoded-"backpack" check into a tag-driven one that works for any future equippable
-    /// item. Reads/clears the dragged item from whatever real container it's currently sitting
-    /// in — a hand, a worn backpack's own contents, even the torso's own pocket slots — not just
-    /// a hand specifically (unlike TryEquipBackpackFromHand, which only special-cases the
-    /// backpack item id and is left as-is). `containerSlotCount` is the inner inventory size to
-    /// give the freshly-equipped item (0 for a container-less item like the helmet).</summary>
+    /// <summary>Equips only if the dragged item's ItemCatalog.EquipSlot actually declares this
+    /// slot name, generalizing <see cref="TryEquipBackpackFromHand"/>'s hardcoded-"backpack" check
+    /// into a tag-driven one. Reads/clears the dragged item from whatever real container it's
+    /// currently sitting in — a hand, a worn backpack's contents, even the torso's own pocket
+    /// slots. `containerSlotCount` is the inner inventory size to give the freshly-equipped item
+    /// (0 for a container-less item like the helmet).</summary>
     public void TryEquipItemFrom(SlotContainer sourceContainer, int fromSlotIndex, string slotName, int containerSlotCount)
     {
         if (fromSlotIndex < 0 || fromSlotIndex >= sourceContainer.Slots.Count)
@@ -724,12 +673,10 @@ public partial class Player : CharacterBody3D
 
         if (slotName == "torso")
         {
-            // The suit's 4 tank/filter/battery sub-slots are per-suit persistent state, same as
-            // its pocket contents (see PlayerInventory's persistent-contents model) — they no
-            // longer come and go with worn state, so re-equipping a suit that was merely taken
-            // off (not genuinely discarded) must NOT wipe whatever's already loaded. Only attach
-            // fresh-empty ones the first time the suit is ever acquired (each is null only before
-            // that, or after a genuine world-discard — see DropEquippedItemInWorld).
+            // The suit's 4 tank/filter/battery sub-slots are per-suit persistent state — they
+            // don't come and go with worn state, so re-equipping a suit merely taken off (not
+            // genuinely discarded) must NOT wipe whatever's already loaded. Only attach
+            // fresh-empty ones the first time the suit is ever acquired.
             if (_inventory.SuitO2 is null) _inventory.AttachSpecializedSlot("suit_o2", hasItem: false, charge: 0f);
             if (_inventory.SuitN2 is null) _inventory.AttachSpecializedSlot("suit_n2", hasItem: false, charge: 0f);
             if (_inventory.SuitFilter is null) _inventory.AttachSpecializedSlot("suit_filter", hasItem: false, charge: 0f);
@@ -758,28 +705,18 @@ public partial class Player : CharacterBody3D
         }
     }
 
-    /// <summary>Which equip slot a container-carrying item's own ContainerPickupItem should
-    /// re-equip into on pickup, for a caller (namely SaveManager, and the bare-token drop path
-    /// below) that only knows the item id, not the slot it actually came from — the backpack's is
-    /// hardcoded by item id (same "backpack"/"debug_backpack" special-casing ToggleItemWindow's
-    /// own switch already uses; its equip slot was never expressed as an items.json
-    /// <c>equipSlot</c> the way Torso/Head items are), everything else defers to
-    /// ItemCatalog.EquipSlot. Prefer passing the real slot name directly to SpawnDroppedContainer
-    /// wherever the caller already knows it (see DropEquippedItemInWorld) — this project's
-    /// isolated NodeTests catalog always returns null from ItemCatalog.EquipSlot regardless of
-    /// item id (see PlayerEquipSlotTest's own doc comment), so a path that could avoid depending
-    /// on it should.</summary>
+    /// <summary>Which equip slot a container-carrying item's ContainerPickupItem should re-equip
+    /// into on pickup, for a caller that only knows the item id, not the slot it came from — the
+    /// backpack's is hardcoded by item id, since its equip slot was never expressed as an
+    /// items.json <c>equipSlot</c>; everything else defers to ItemCatalog.EquipSlot.</summary>
     private static string EquipSlotNameFor(string itemId) =>
         itemId is "backpack" or "debug_backpack" ? "back" : ItemCatalog.EquipSlot(itemId) ?? "back";
 
     /// <summary>Captures the EVA suit torso's tank/filter/battery sub-slot state and fully
     /// detaches all four — the one place this state is actually removed from the player, used by
-    /// every genuine-discard path (a worn torso dropped, or a bare suit token dropped from a
-    /// hand/backpack slot) so it travels onto the dropped world item (see ContainerPickupItem)
-    /// instead of the "eject back into general inventory" behavior a mere unequip now uses (see
-    /// PlayerInventory's persistent-contents model). No-op (all null) unless `isSuit` is true —
-    /// left to the caller to determine (a reliable `slotName == "torso"` check where the item's
-    /// worn slot is already known, or an ItemCatalog.EquipSlot fallback where it isn't).</summary>
+    /// every genuine-discard path so it travels onto the dropped world item (see
+    /// ContainerPickupItem) instead of the "eject back into general inventory" behavior a mere
+    /// unequip uses. No-op (all null) unless `isSuit` is true.</summary>
     private ((bool, float)? O2, (bool, float)? N2, (bool, float)? Filter, (bool, float)? Battery) CaptureAndDetachSuitTanks(bool isSuit)
     {
         if (!isSuit)
@@ -802,13 +739,10 @@ public partial class Player : CharacterBody3D
 
     /// <summary>Spawns a full container's world representation at `position` — used both for an
     /// unequip-while-full drop (see TryUnequipBackpack) and by SaveManager to respawn dropped
-    /// containers on load. The container's own _Ready() (fired synchronously by AddChild, since
-    /// the tree is already running) builds its own visual/collision from ItemId via
-    /// ItemVisualBuilder — nothing else needed here. `equipSlotName` defaults to a catalog-derived
-    /// guess (see EquipSlotNameFor) for a caller with no better information (e.g. SaveManager) —
-    /// pass it explicitly wherever it's already known. The 4 tank params are only ever non-null
-    /// for a genuinely-discarded EVA suit (see CaptureAndDetachSuitTanks) — null for a plain
-    /// backpack drop.</summary>
+    /// containers on load. `equipSlotName` defaults to a catalog-derived guess (see
+    /// EquipSlotNameFor) for a caller with no better information — pass it explicitly wherever
+    /// it's already known. The 4 tank params are only ever non-null for a genuinely-discarded EVA
+    /// suit.</summary>
     public void SpawnDroppedContainer(string itemId, SlotContainer contents, Vector3 position, string? equipSlotName = null,
         (bool HasItem, float Charge)? suitO2 = null, (bool HasItem, float Charge)? suitN2 = null,
         (bool HasItem, float Charge)? suitFilter = null, (bool HasItem, float Charge)? suitBattery = null)
@@ -871,11 +805,10 @@ public partial class Player : CharacterBody3D
             return;
         }
 
-        // A bare, non-fungible container token (a backpack or suit that's merely being carried,
-        // not worn) has permanent contents of its own (see PlayerInventory's persistent-contents
-        // model) that must travel with it into the world, same "genuine discard" treatment a
-        // worn one gets below — otherwise they'd be silently orphaned in the player's own
-        // persistent-contents map, unreachable but never freed.
+        // A bare, non-fungible container token (a backpack or suit merely being carried, not
+        // worn) has permanent contents of its own that must travel with it into the world, same
+        // "genuine discard" treatment a worn one gets below — otherwise they'd be silently
+        // orphaned in the player's persistent-contents map, unreachable but never freed.
         if (_inventory.GetPersistentContents(slot.ItemId) is { } persistentContents)
         {
             container.SetSlot(source.SlotIndex, null);
@@ -891,9 +824,8 @@ public partial class Player : CharacterBody3D
 
     /// <summary>Always drops the backpack (empty or not) at `position` — unlike
     /// TryUnequipBackpack's onto-a-hand-slot gesture, which prefers stashing an empty backpack
-    /// back into a hand instead. Dragging it out into the world is a deliberate "put it down," so
-    /// it always ends up loose. A genuine discard, so its persistent contents leave the player
-    /// entirely (see PlayerInventory.DiscardPersistentContents) rather than just being unworn.</summary>
+    /// back into a hand instead. A genuine discard, so its persistent contents leave the player
+    /// entirely rather than just being unworn.</summary>
     private void DropBackpackInWorld(Vector3 position, Vector3 normal)
     {
         if (_inventory.Backpack is not { } backpack)
@@ -906,10 +838,8 @@ public partial class Player : CharacterBody3D
         SpawnDroppedContainer(backpack.ItemId, backpack.Contents, RestingDropPosition(position, normal, backpack.ItemId), "back");
     }
 
-    /// <summary>Same "always drops it, deliberate put-down, genuine discard" shape as
-    /// <see cref="DropBackpackInWorld"/>, generalized to any Torso/Head/Pda equip slot — used when
-    /// dragging a worn item straight into open space (see WorldDropZone) rather than onto another
-    /// slot.</summary>
+    /// <summary>Same shape as <see cref="DropBackpackInWorld"/>, generalized to any Torso/Head/Pda
+    /// equip slot.</summary>
     private void DropEquippedItemInWorld(string slotName, Vector3 position, Vector3 normal)
     {
         if (_inventory.GetEquippedContainer(slotName) is not { } equipped)
@@ -927,9 +857,7 @@ public partial class Player : CharacterBody3D
     /// <summary>Projects a ray from the camera through the drop's screen position — the first
     /// mouse-position-based raycast in this codebase (InteractRay is a fixed forward crosshair
     /// ray). Returns null (refuse the drop) if nothing solid is within MaxDropReachMeters, e.g.
-    /// aiming out an open breach or off a platform's edge. Returns the hit surface's own normal
-    /// alongside the position — see RestingDropPosition for why that's needed on top of the
-    /// small fixed nudge already applied here.</summary>
+    /// aiming out an open breach or off a platform's edge.</summary>
     private (Vector3 Position, Vector3 Normal)? ResolveWorldDropPosition(Vector2 screenPosition)
     {
         if (_camera is null)
@@ -951,20 +879,16 @@ public partial class Player : CharacterBody3D
         var normal = (Vector3)result["normal"];
 
         // Nudge off the surface along its normal so the item doesn't spawn half-embedded — a
-        // small fixed amount, enough to dodge z-fighting on any surface. NOT enough clearance on
-        // its own for a bulkier item to avoid spawning past the surface's own collision shape
-        // entirely (see RestingDropPosition, which every actual spawn call site adds on top of
-        // this for the specific item being dropped).
+        // small fixed amount, enough to dodge z-fighting. NOT enough clearance on its own for a
+        // bulkier item to avoid spawning past the surface's own collision shape (see
+        // RestingDropPosition, which every spawn call site adds on top of this).
         return ((Vector3)result["position"] + normal * 0.05f, normal);
     }
 
-    /// <summary>Adds this item's own collision half-extent (see ItemVisualBuilder.RestingHalfHeight)
-    /// on top of ResolveWorldDropPosition's own small fixed surface nudge, along the surface's own
-    /// hit normal rather than always assuming "up" — a fixed up-nudge worked fine for a floor hit
-    /// (normal already ~Up there) but did nothing to clear a WALL hit (a near-horizontal normal),
-    /// so a dropped item aimed at a wall spawned still embedded in it instead of ending up on the
-    /// floor nearby the way gravity settles every other drop. Using the real normal generalizes
-    /// correctly to any surface (floor, wall, ceiling) with no special-casing.</summary>
+    /// <summary>Adds this item's own collision half-extent on top of ResolveWorldDropPosition's
+    /// small fixed surface nudge, along the surface's real hit normal rather than always assuming
+    /// "up" — a fixed up-nudge worked fine for a floor hit but did nothing to clear a WALL hit (a
+    /// near-horizontal normal), so a dropped item aimed at a wall spawned still embedded in it.</summary>
     private static Vector3 RestingDropPosition(Vector3 surfacePosition, Vector3 surfaceNormal, string itemId) =>
         surfacePosition + surfaceNormal * ItemVisualBuilder.RestingHalfHeight(ItemCatalog.ShapeKind(itemId));
 
@@ -976,16 +900,13 @@ public partial class Player : CharacterBody3D
     public static bool SuppressMouseCaptureForTests { get; set; }
 
     // Instance method, not static: the FocusEntered connection below is then tied to this
-    // Player's lifetime, so Godot auto-disconnects it when this instance is freed (e.g. on a
-    // scene change). A static method's connection has no instance to track, so travelling
-    // between scenes would try to reconnect the exact same callable and hit "already connected."
-    // Not mechanically covered by an automated test: SuppressMouseCaptureForTests (see its own
-    // doc comment) makes every CaptureMouse() call a no-op for the whole NodeTests suite, on
-    // purpose, so it can't observe the AnyPanelOpen branch below either — the same flag that
-    // protects the developer's real cursor during a test run also hides this exact bug from
-    // being test-driven. Verified by code review only: regaining OS window focus (FocusEntered,
-    // wired below) used to unconditionally recapture the mouse even with a panel open, yanking
-    // it into FPS-look mode with e.g. the shop still visible underneath.
+    // Player's lifetime, so Godot auto-disconnects it when this instance is freed. A static
+    // method's connection has no instance to track, so travelling between scenes would try to
+    // reconnect the exact same callable and hit "already connected." Not mechanically covered by
+    // an automated test — SuppressMouseCaptureForTests makes CaptureMouse() a no-op for the whole
+    // NodeTests suite, so it can't observe the AnyPanelOpen branch either. Verified by code
+    // review only: regaining OS window focus used to unconditionally recapture the mouse even
+    // with a panel open, yanking it into FPS-look mode with e.g. the shop still visible underneath.
     private void CaptureMouse()
     {
         if (SuppressMouseCaptureForTests || AnyPanelOpen)
@@ -1078,10 +999,8 @@ public partial class Player : CharacterBody3D
         RefreshContractBoard();
     }
 
-    /// <summary>Called by ContractBoardPanel's Available-tab row buttons — moves the named offer
-    /// from the giver's own board into this player's active list (so it can't be double-accepted
-    /// — see ContractGiverVerbTarget.TryTakeOffer), seeding its own countdown from the rolled
-    /// Contract.RemainingSeconds.</summary>
+    /// <summary>Moves the named offer from the giver's board into this player's active list so it
+    /// can't be double-accepted, seeding its countdown from the rolled Contract.RemainingSeconds.</summary>
     public void AcceptContract(string instanceId)
     {
         if (_panels!.OpenContractGiver?.TryTakeOffer(instanceId) is { } contract)
@@ -1092,13 +1011,10 @@ public partial class Player : CharacterBody3D
         RefreshContractBoard();
     }
 
-    /// <summary>Called by ContractBoardPanel's Active-tab row buttons — only ever wired up as
-    /// actionable (see RefreshContractBoard's own ActionAvailable check, which uses the same
-    /// CanTurnIn) for RetrieveItem/SalvageQuota (turn-in anywhere) and CargoDelivery (turn-in only
-    /// at the destination Station's own contract-giver — you have to hand the cargo to that
-    /// Station's contractor, not just arrive carrying it); Survey completes automatically on
-    /// arrival instead (see OnArrivedAtDestination) and never gets a live button here. The type/
-    /// location check below is a defensive backstop, not the primary gate.</summary>
+    /// <summary>Only ever wired up as actionable for RetrieveItem/SalvageQuota (turn in anywhere)
+    /// and CargoDelivery (turn in only at the destination Station's contract-giver); Survey
+    /// completes automatically on arrival instead (see OnArrivedAtDestination). The type/location
+    /// check below is a defensive backstop, not the primary gate.</summary>
     public void TryTurnInContract(string instanceId)
     {
         var contract = _activeContracts.FirstOrDefault(c => c.InstanceId == instanceId);
@@ -1115,12 +1031,9 @@ public partial class Player : CharacterBody3D
         RefreshContractBoard();
     }
 
-    /// <summary>Whether `contract` is even the *kind* of contract that turns in via
-    /// TryTurnInContract at all, and — for CargoDelivery specifically — whether the currently open
-    /// contract-giver's own Station is the contract's destination. `_openContractGiver.ConsoleRef`
-    /// is the single shared Home-Ship console, so `CurrentDestinationId` reflects wherever the
-    /// ship is physically docked right now — the same Station the open board's own giver lives
-    /// on, since the board can only ever be open while standing in front of it.</summary>
+    /// <summary>Whether `contract` is even the *kind* that turns in via TryTurnInContract, and —
+    /// for CargoDelivery — whether the currently open contract-giver's own Station is the
+    /// contract's destination.</summary>
     private bool CanTurnIn(Contract contract) => contract.Type switch
     {
         ContractType.RetrieveItem or ContractType.SalvageQuota => true,
@@ -1147,10 +1060,8 @@ public partial class Player : CharacterBody3D
 
     public void CloseContractBoard() => _panels!.Close(PanelId.ContractBoard);
 
-    /// <summary>Called every physics frame regardless of any panel being open — a contract's own
-    /// deadline keeps running whether or not the board is currently on screen. Expiry (not
-    /// completed in time) removes it and adds its FailureFee to PendingDebt rather than the
-    /// contract just quietly vanishing.</summary>
+    /// <summary>A contract's deadline keeps running whether or not the board is on screen. Expiry
+    /// removes it and adds its FailureFee to PendingDebt rather than quietly vanishing.</summary>
     private void TickActiveContracts(double delta)
     {
         foreach (var contract in _activeContracts.ToList())
@@ -1164,12 +1075,10 @@ public partial class Player : CharacterBody3D
         }
     }
 
-    /// <summary>Called by TravelConsoleVerbTarget.CompleteDocking right after a real arrival (not
-    /// a save-load restore, which calls ApplyCurrentLocation directly without this hook) —
-    /// settles any owed debt the instant the ship docks at any Station, and auto-completes Survey
-    /// contracts targeting wherever it just arrived. RetrieveItem/SalvageQuota/CargoDelivery
-    /// deliberately aren't checked here — those complete via TryTurnInContract instead (see
-    /// ContractType's own doc comment on why the four types split this way).</summary>
+    /// <summary>Called right after a real arrival (not a save-load restore, which calls
+    /// ApplyCurrentLocation directly without this hook) — settles any owed debt the instant the
+    /// ship docks at any Station, and auto-completes Survey contracts targeting wherever it just
+    /// arrived. RetrieveItem/SalvageQuota/CargoDelivery complete via TryTurnInContract instead.</summary>
     public void OnArrivedAtDestination(int destinationId, bool isStation)
     {
         if (isStation)
@@ -1196,9 +1105,8 @@ public partial class Player : CharacterBody3D
     private bool HasCartridgeEquipped(string? cartridgeId) =>
         cartridgeId is not null && _inventory.GetEquippedContainer("pda") is { } pda && pda.Contents.CountOf(cartridgeId) > 0;
 
-    /// <summary>Pays down PendingDebt by whatever's affordable right now (never negative Credits,
-    /// same guarded shape as TrySpendCredits) — any shortfall just carries over to the next
-    /// Station arrival rather than blocking anything.</summary>
+    /// <summary>Pays down PendingDebt by whatever's affordable right now — any shortfall just
+    /// carries over to the next Station arrival.</summary>
     private void SettlePendingDebt()
     {
         var payment = System.Math.Min(_pendingDebt, _credits);
@@ -1208,28 +1116,14 @@ public partial class Player : CharacterBody3D
         }
     }
 
-    /// <summary>Called by ThrusterVerbTarget.ExecuteVerb — same shape as OpenShop/OpenTravelMap
-    /// (a world-verb-triggered panel, not a right-click-on-held-item sub-window), since a thruster
-    /// is interacted with directly in the world rather than reached through PlayerInventory.</summary>
     public void OpenThrusterInventory(ThrusterVerbTarget thruster) => _panels!.OpenThrusterInventory(thruster);
 
     public void CloseThrusterInventory() => _panels!.Close(PanelId.Thruster);
 
-    /// <summary>Called by StorageVerbTarget.ExecuteVerb — same shape as OpenThrusterInventory.</summary>
     public void OpenStorageInventory(StorageVerbTarget storage) => _panels!.OpenStorageInventory(storage);
 
     public void CloseStorageInventory() => _panels!.Close(PanelId.Storage);
 
-    /// <summary>Right-click-on-inventory-item entry point (see InventorySlotUI) — toggles open/
-    /// closed whichever window (if any) represents that item's own inventory. A no-op for any
-    /// item that doesn't have one. Gated on <see cref="PlayerInventory.GetPersistentContents"/>
-    /// rather than "currently worn" (<c>_inventory.Backpack</c>/<c>Torso</c>), since a backpack/
-    /// suit's contents are reachable whether it's worn, merely held in a hand, or (for the
-    /// backpack) sitting in another backpack's slot — see PlayerInventory's persistent-contents
-    /// model. Tracks which item id is currently open (<see cref="_openBackpackItemId"/>/
-    /// <see cref="_openSuitItemId"/>) so UpdateInventoryHud re-points the window's slots at that
-    /// specific item's contents every frame, not just whichever one (if any) happens to be
-    /// worn.</summary>
     public void ToggleItemWindow(string itemId) => _windows!.ToggleItemWindow(_inventory, itemId);
 
     public override void _PhysicsProcess(double delta)
@@ -1251,23 +1145,18 @@ public partial class Player : CharacterBody3D
         var roomVolume = ShipSimRef?.VolumeAt(currentCell);
         var inZeroG = (roomVolume?.O2Fraction ?? 0.21) <= ShipAtmosphereZone.ZeroGO2Threshold
             || (!IsOnFloor() && NoFloorBelow());
-        // Climbing overrides the normal grounded/zero-g fork below for this tick, regardless of
-        // what the room's own atmosphere/floor reading says — a mid-climb player between two
-        // decks needs Floating (no floor-snap fighting the rail) either way.
+        // Climbing overrides the normal grounded/zero-g fork for this tick regardless of the
+        // room's atmosphere/floor reading — a mid-climb player between two decks needs Floating
+        // (no floor-snap fighting the rail) either way.
         MotionMode = _climbing || inZeroG ? MotionModeEnum.Floating : MotionModeEnum.Grounded;
 
-        // A ship with no life support (e.g. the Derelict) never regenerates air, so a room's
-        // O2Fraction can stay at "reads as vacuum" forever even after its own breach is patched
-        // and it's properly sealed off again — inZeroG alone can't tell "still actively venting"
-        // apart from "permanently dead air, but sealed and safe now." The decompression-pull
-        // hazard specifically needs the real graph check instead, or it keeps pulling toward some
-        // other, unrelated breach elsewhere on the ship (through a closed, sealed door) just
-        // because it's within raw range — see the pull block below.
+        // A ship with no life support never regenerates air, so a room's O2Fraction can stay at
+        // "reads as vacuum" even after its own breach is patched and resealed — inZeroG alone
+        // can't tell "still actively venting" apart from "permanently dead air, but safe now."
+        // The decompression-pull hazard needs the real graph check instead, or it keeps pulling
+        // toward an unrelated breach elsewhere on the ship through a closed, sealed door.
         var isConnectedToOutside = ShipSimRef?.Atmosphere?.IsConnectedToOutside(currentCell) ?? false;
 
-        // Read before this frame's _needs.Tick further down — one frame of staleness against a
-        // drain that only moves per-second is irrelevant, and movement needs this before the
-        // grounded/zero-g branches run.
         var needsDebuffActive = _needs.HungerPercent <= 0f || _needs.ThirstPercent <= 0f || _needs.EnergyPercent <= 0f;
         var moveMultiplier = needsDebuffActive ? NeedsDebuffMoveMultiplier : 1f;
 
@@ -1277,8 +1166,7 @@ public partial class Player : CharacterBody3D
         {
             if (IsBusy || AnyPanelOpen)
             {
-                // Same "freeze movement, don't force an exit" shape the zero-g thrust block below
-                // already uses while busy/a panel is open — grabbing on again resumes exactly
+                // Freeze movement rather than force an exit — grabbing on again resumes exactly
                 // where you left off instead of losing your place on the ladder.
                 velocity = Vector3.Zero;
             }
@@ -1300,10 +1188,9 @@ public partial class Player : CharacterBody3D
                 velocity.Y = verticalInput * ClimbSpeed;
 
                 // Space lets go early; otherwise auto-release once past either anchor by
-                // ClimbReleaseMargin — deliberately NOT Escape too (unlike a held item's own
-                // release gesture), since Escape's existing _Input handler falls through to
-                // un-capturing the mouse when no panel is open, which would be a jarring side
-                // effect of just letting go of a ladder.
+                // ClimbReleaseMargin — deliberately NOT Escape too, since Escape's own _Input
+                // handler falls through to un-capturing the mouse when no panel is open, which
+                // would be a jarring side effect of just letting go of a ladder.
                 if (Input.IsPhysicalKeyPressed(Key.Space)
                     || GlobalPosition.Y >= _climbTopY + ClimbReleaseMargin
                     || GlobalPosition.Y <= _climbBottomY - ClimbReleaseMargin)
@@ -1315,16 +1202,12 @@ public partial class Player : CharacterBody3D
         }
         else if (inZeroG)
         {
-            // Thrust-based, not direct-velocity — you drift and have to counter-thrust to stop,
-            // a first real taste of the "precise maneuvering is earned" framing
-            // docs/architecture/locomotion.md describes for the complete game's free-float mode.
+            // Thrust-based, not direct-velocity — you drift and have to counter-thrust to stop.
             velocity = velocity.MoveToward(Vector3.Zero, ZeroGDrag * (float)delta);
 
             // Computed once, reused by both the thrust block below and the decompression-pull
-            // block further down — same condition either way: a real jetpack (torso worn, N2
-            // tank charged) means you can actively counter being sucked toward a breach, not just
-            // move under your own power. See the thrust block's own doc comment for why Torso is
-            // checked explicitly rather than just SuitN2 non-null.
+            // block further down — a real jetpack (torso worn, N2 tank charged) means you can
+            // actively counter being sucked toward a breach, not just move under your own power.
             var hasWorkingThrusters = _inventory.Torso is not null && _inventory.SuitN2 is { HasItem: true, Charge: > 0f };
 
             if (!IsBusy && !_panels!.IsOpen(PanelId.Death) && !_panels.IsOpen(PanelId.Docking))
@@ -1360,15 +1243,12 @@ public partial class Player : CharacterBody3D
                     thrust += Vector3.Down;
                 }
 
-                // The EVA suit's N2 tank is the jetpack — sustained thrust works anywhere in
-                // zero-g (no more push-off-a-surface requirement), but only while the torso is
+                // The EVA suit's N2 tank is the jetpack — sustained thrust only while the torso is
                 // worn with a charged N2 tank. No suit/no N2/empty N2 means thrust input is
-                // simply ignored (pure drift, ZeroGDrag above still applies) — you need the suit
-                // to move under thrust in zero-g at all, matching needing it to survive there.
-                // Torso worn is checked explicitly (not just SuitN2 non-null) because the suit's
-                // tank state is now persistent/decoupled from worn state (see PlayerInventory's
-                // persistent-contents model) — a loaded N2 tank can still exist while the suit
-                // merely sits in a hand.
+                // simply ignored (pure drift, ZeroGDrag above still applies). Torso worn is
+                // checked explicitly, not just SuitN2 non-null, because the suit's tank state is
+                // persistent/decoupled from worn state — a loaded N2 tank can exist while the
+                // suit merely sits in a hand.
                 if (thrust != Vector3.Zero && hasWorkingThrusters)
                 {
                     velocity += thrust.Normalized() * ZeroGThrustAcceleration * moveMultiplier * (float)delta;
@@ -1484,8 +1364,8 @@ public partial class Player : CharacterBody3D
         Velocity = velocity;
         MoveAndSlide();
 
-        // Shove any loose item the player collided with this frame — see ItemPushImpulse's own
-        // doc comment for why this doesn't happen automatically.
+        // Shove any loose item the player collided with this frame — see ItemPushImpulse for why
+        // this doesn't happen automatically.
         for (var i = 0; i < GetSlideCollisionCount(); i++)
         {
             if (GetSlideCollision(i).GetCollider() is RigidBody3D { Freeze: false } rigidBody)
@@ -1494,20 +1374,16 @@ public partial class Player : CharacterBody3D
             }
         }
 
-        // The real beam only exists while the flashlight is both held and toggled on, and its own
+        // The real beam only exists while the flashlight is both held and toggled on, and its
         // battery still has charge — unequipping/swapping it out of hand turns it off
         // automatically without touching _flashlightOn, and an empty battery just as silently
-        // stops it lighting (same "Charge: > 0f" gating IsAffordable already uses for the drill).
-        // The debug flashlight (see fresh-game stipend) shares the same _flashlightOn toggle so it
-        // can be switched off too, but skips the held/battery gating — it's a testing convenience,
-        // not something you hold, and it has no battery to drain.
+        // stops it lighting.
         var holdingFlashlight = LeftHandItemId == "flashlight" || RightHandItemId == "flashlight";
         var realFlashlightOn = _flashlightOn && holdingFlashlight && _inventory.Flashlight is { HasItem: true, Charge: > 0f };
         // Deliberately still keyed to the literal debug item, not ItemCatalog.IsToggleableLight —
-        // that flag only means "the F-key toggle applies to this item," not "bypasses hand/battery
-        // gating entirely, on merely carrying it." Those are different properties that happen to
-        // both be true for this one dev-only item; generalizing this specific check would make an
-        // unheld real flashlight sitting in the backpack incorrectly project a beam too.
+        // that flag only means "the F-key toggle applies," not "bypasses hand/battery gating on
+        // merely carrying it." Generalizing this check would make an unheld real flashlight
+        // sitting in the backpack incorrectly project a beam too.
         var debugFlashlightOn = _flashlightOn && _inventory.Has("debug_flashlight", 1);
         _flashlightSpot!.Visible = realFlashlightOn || debugFlashlightOn;
 
@@ -1516,24 +1392,15 @@ public partial class Player : CharacterBody3D
             _inventory.Flashlight!.Charge = Mathf.Max(0f, _inventory.Flashlight.Charge - FlashlightChargeDrainPerSecond * (float)delta);
         }
 
-        // A burning cell is real smoke, not just a number — it drains O2 faster (see
-        // SuitResources.Tick's inSmoke case) and gets a screen overlay below so it's actually
+        // A burning cell is real smoke — it drains O2 faster and gets a screen overlay so it's
         // felt, not just read off the O2 bar. Checked across the player's whole current room
-        // (ComponentContaining), not just _ambientTile's own exact cell — _ambientTile is a
-        // zone's fixed representative tile for reading the room's lumped O2/pressure (correct for
-        // that, since the whole room shares one value), but a fire is a specific cell, which
-        // could easily be a different tile in the same room from the one the zone happens to use.
-        // currentCell itself is computed once, up top, and reused here — same tile all tick.
+        // (ComponentContaining), not just _ambientTile's exact cell, since a fire is a specific
+        // cell that could be a different tile in the same room from the zone's own representative.
         var inSmoke = ShipSimRef?.Atmosphere?.ComponentContaining(currentCell).Any(ShipSimRef.Deck.IsOnFire) ?? false;
 
-        // Suit resources keep draining while busy performing a verb — a task's duration is a
-        // real elapsed-time cost, not a pause (docs/project-plan.md's "time acceleration ...
-        // pays the full bill" framing). A breached room's dropping O2 burns the suit's own
-        // reserve faster on top of the flat drain, and smoke burns O2 faster too (see
-        // SuitResources.Tick). Once O2 bottoms out, it starts draining Health instead — a hard
-        // 0-Health death, handled below. Extreme ambient temperature (a breach gone properly
-        // cold, or standing in an active fire's heat) drains Health too, compounding with O2
-        // depletion instead of being a separate stat (see SuitResources.Tick).
+        // Suit resources keep draining while busy performing a verb — a task's duration is a real
+        // elapsed-time cost, not a pause. Once O2 bottoms out, it starts draining Health instead —
+        // a hard 0-Health death, handled below.
         var ambientTemperature = roomVolume?.Temperature ?? AtmosphereVolume.Breathable.Temperature;
 
         // "Sealed" = the EVA suit's torso is worn; each tank/filter/battery reads as depleted
@@ -1548,9 +1415,9 @@ public partial class Player : CharacterBody3D
         _suitResources.Tick(delta, roomVolume?.O2Fraction ?? 0.21, ambientTemperature, inSmoke,
             suitSealed, o2TankDepleted, n2TankDepleted, filterDepleted, batteryDepleted);
 
-        // Tank/filter/battery charge bookkeeping lives here, not in SuitResources itself (see its
-        // own Tick doc) — each only drains while actually doing its job (sealed and not already
-        // empty). N2 isn't drained here at all — it's input-driven by sustained-thrust movement.
+        // Tank/filter/battery charge bookkeeping lives here, not in SuitResources itself — each
+        // only drains while actually doing its job. N2 isn't drained here — it's input-driven by
+        // sustained-thrust movement.
         if (suitSealed && !o2TankDepleted)
         {
             _inventory.DrainSpecializedSlot("suit_o2", O2TankDrainPerSecond * (float)delta);
@@ -1573,9 +1440,8 @@ public partial class Player : CharacterBody3D
 
         _needs.Tick(delta);
 
-        // A tool's charge is only surfaced while it's actually in hand — feedback on "loses power
-        // with usage" matters mid-task, not just when the inventory panel (with the battery slot)
-        // is open. Null means "not held", which the view renders as hidden.
+        // A tool's charge is only surfaced while it's actually in hand. Null means "not held",
+        // which the view renders as hidden.
         var holdingDrill = LeftHandItemId == "power_drill" || RightHandItemId == "power_drill";
 
         _hud!.RenderVitals(new PlayerHudView.Vitals(
@@ -1599,15 +1465,13 @@ public partial class Player : CharacterBody3D
 
     /// <summary>Test-only observability: how many times this Player has completed a full
     /// _PhysicsProcess. Tests need this because SceneTree's PhysicsFrame signal fires at the
-    /// *start* of a physics frame, before any node's _PhysicsProcess runs — so awaiting it and
-    /// then asserting on HUD state (which UpdateInventoryHud writes from here) is a race that
-    /// loses under load. Same narrow test-accessor convention as <see cref="ScanModeOn"/>.</summary>
+    /// *start* of a physics frame, before any node's _PhysicsProcess runs, so awaiting it and
+    /// then asserting on HUD state is a race that loses under load.</summary>
     public long PhysicsFramesProcessed { get; private set; }
 
-    /// <summary>Called by LadderVerbTarget.ExecuteVerb — starts continuous climbing between the
-    /// two given world points (each deck's own floor height at the ladder tile). Refused while
-    /// busy with another verb or any HUD panel is open, same gating every other player-initiated
-    /// action already uses.</summary>
+    /// <summary>Starts continuous climbing between the two given world points (each deck's own
+    /// floor height at the ladder tile). Refused while busy with another verb or any HUD panel
+    /// is open.</summary>
     public void BeginClimbing(Vector3 bottomWorld, Vector3 topWorld)
     {
         if (IsBusy || AnyPanelOpen)
@@ -1621,16 +1485,13 @@ public partial class Player : CharacterBody3D
         _climbAnchorXZ = new Vector2(bottomWorld.X, bottomWorld.Z);
     }
 
-    /// <summary>Test/UI-observable mirror of the private _climbing flag — same "expose a bool for
-    /// external state checks" shape as IsBusy.</summary>
     public bool IsClimbing => _climbing;
 
-    /// <summary>No ship structure at all within a generous distance straight down — you've
-    /// walked/fallen off the edge of a ship (a removed wall or floor) into open space, not just
-    /// lost your footing inside a room that still has a floor nearby. Independent of room O2:
-    /// atmosphere venting is gradual (AtmosphereSystem.Vent's Lerp), so a freshly-breached room
-    /// can take several seconds to read as vacuum — too slow to save you from an immediate fall
-    /// through a hole you just made.</summary>
+    /// <summary>No ship structure within a generous distance straight down — you've walked/fallen
+    /// off the edge of a ship into open space. Independent of room O2: atmosphere venting is
+    /// gradual (AtmosphereSystem.Vent's Lerp), so a freshly-breached room can take several seconds
+    /// to read as vacuum — too slow to save you from an immediate fall through a hole you just
+    /// made.</summary>
     private bool NoFloorBelow()
     {
         var spaceState = GetWorld3D().DirectSpaceState;
@@ -1638,21 +1499,15 @@ public partial class Player : CharacterBody3D
             GlobalPosition, GlobalPosition + Vector3.Down * FreefallRaycastDistance);
         query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
         // Layer 1 only — the Home Ship's floor aim-helper body (layer "build_aim_only") is
-        // deliberately non-blocking and must not register as real floor here, or a genuine hole
-        // through it would never trigger zero-g.
+        // deliberately non-blocking and must not register as real floor here.
         query.CollisionMask = 1;
 
-        // IntersectRay returns an empty Dictionary on a miss, populated
-        // (position/normal/collider/...) on a hit.
         return spaceState.IntersectRay(query).Count == 0;
     }
 
     /// <summary>Whether the player's interact ray is on this exact target right now — used by
     /// TravelConsoleVerbTarget to decide whether arrival should pop the docking panel open
-    /// immediately or wait for the player to interact with the console again (see
-    /// TravelConsoleVerbTarget.OnTravelComplete). Re-raycasts via GetCurrentVerbTarget rather
-    /// than reading a cached "last interacted target," matching how every other "is the player
-    /// looking at X" question in this codebase is answered live, not from stale state.</summary>
+    /// immediately or wait for the player to interact with the console again.</summary>
     public bool IsLookingAt(IVerbTarget target) => ReferenceEquals(GetCurrentVerbTarget(), target);
 
     private IVerbTarget? GetCurrentVerbTarget()
@@ -1749,16 +1604,12 @@ public partial class Player : CharacterBody3D
     }
 
     /// <summary>A verb with no item Requirements is always affordable. One that does have
-    /// Requirements needs the player to actually be holding that exact item in either hand
-    /// (real PlayerInventory slots — see LeftHandItemId/RightHandItemId) with enough of it in
-    /// the inventory — this is the single place every item-gated verb (repair hull breach,
-    /// repair damaged conduit, install conduit, ...) is gated, so a target never needs its own
-    /// affordability logic. One extra clause is specific to the power drill (the only stateful
-    /// tool so far, see PlayerInventory.SpecializedSlot) — holding it isn't enough, it also needs an
-    /// installed battery with real charge left. Another gates every DurableToolIds entry
-    /// (including power_drill itself) on its own held-slot durability — a worn-out crowbar/
-    /// wrench/drill simply stops working until replaced (see DamageToolInHand's own doc comment;
-    /// no in-place repair for held tools in this pass).</summary>
+    /// Requirements needs the player to actually be holding that exact item in either hand with
+    /// enough of it in the inventory — the single place every item-gated verb is gated, so a
+    /// target never needs its own affordability logic. One extra clause is specific to the power
+    /// drill — holding it isn't enough, it also needs an installed battery with real charge left.
+    /// Another gates every DurableToolIds entry on its own held-slot durability — a worn-out
+    /// crowbar/wrench/drill simply stops working until replaced.</summary>
     private bool IsAffordable(Verb verb) =>
         verb.Requirements.Count == 0 ||
         verb.Requirements.All(r =>
@@ -1768,26 +1619,21 @@ public partial class Player : CharacterBody3D
             (!DurableToolIds.Contains(r.ItemId) || ToolCharge(r.ItemId) > 0f));
 
     /// <summary>The Charge (durability) of whichever hand currently holds `itemId` — 0 if it
-    /// isn't actually held right now, matching IsAffordable's own "not held at all" failure
-    /// mode.</summary>
+    /// isn't actually held right now.</summary>
     private float ToolCharge(string itemId) =>
         (LeftHandItemId == itemId ? _inventory.Slots[PlayerInventory.LeftHandSlotIndex]
             : RightHandItemId == itemId ? _inventory.Slots[PlayerInventory.RightHandSlotIndex]
             : null)?.Charge ?? 0f;
 
     /// <summary>The single place a target's verbs are filtered to affordable ones and ordered
-    /// for cycling/selection — every caller (Interact, CycleSelectedVerb, UpdateVerbHud) must
-    /// see the exact same list, since _selectedVerbIndex indexes into whatever this returns.
-    /// Creating/using verbs always sort before deconstruction/scrapping ones (a stable sort, so
-    /// relative order within each group is otherwise unchanged) — see Verb.IsDestructive.</summary>
+    /// for cycling/selection — every caller must see the exact same list, since
+    /// _selectedVerbIndex indexes into whatever this returns. Creating/using verbs always sort
+    /// before deconstruction/scrapping ones (a stable sort — see Verb.IsDestructive).</summary>
     private List<Verb> SelectableVerbs(IVerbTarget? target) =>
         target?.AvailableVerbs.Where(IsAffordable).OrderBy(v => v.IsDestructive).ToList() ?? [];
 
     private void UpdateVerbHud()
     {
-        // No depletion check needed here anymore: a hand is a real PlayerInventory slot now, so
-        // TryRemove draining it to 0 already clears it back to null on its own (see
-        // PlayerInventory.TryRemove) — nothing to poll for.
         var target = GetCurrentVerbTarget();
 
         if (target != _lastTarget)
@@ -1799,8 +1645,8 @@ public partial class Player : CharacterBody3D
         UpdateScanHighlight(target);
 
         // A verb already in progress on this exact target keeps showing/counting down as-is —
-        // its Requirements were already deducted to start it, so re-checking affordability here
-        // would hide the HUD partway through an already-succeeding action.
+        // its Requirements were already deducted, so re-checking affordability here would hide
+        // the HUD partway through an already-succeeding action.
         var verbs = SelectableVerbs(target);
         var verb = IsBusy && _busyTarget == target
             ? _busyVerb
@@ -1815,9 +1661,6 @@ public partial class Player : CharacterBody3D
         buildTarget?.SetPreviewVerb(verb);
         _activeBuildTarget = buildTarget;
 
-        // The name label identifies whatever you're looking at, independent of whether you can
-        // currently afford its verb — e.g. a damaged conduit should still read as "Damaged
-        // Conduit" even while you're not holding spare parts, not go blank.
         _hud!.RenderTargetName(TargetNameText(target));
 
         if (verb is not null)
@@ -1838,30 +1681,26 @@ public partial class Player : CharacterBody3D
     }
 
     /// <summary>What the crosshair name label should read, or null to hide it. The name identifies
-    /// whatever you're looking at independent of whether you can currently afford its verb — e.g. a
-    /// damaged conduit should still read as "Damaged Conduit" while you're not holding spare parts,
-    /// not go blank.</summary>
+    /// whatever you're looking at independent of whether you can currently afford its verb — e.g.
+    /// a damaged conduit should still read as "Damaged Conduit" while not holding spare parts.</summary>
     private string? TargetNameText(IVerbTarget? target)
     {
         if (target?.DisplayNameKey is { } displayNameKey)
         {
-            // A loose battery's real charge is worth surfacing here too, same "label (suffix)"
-            // shape the verb label already uses for Verb.DisplaySuffix.
             var nameText = target is PickupItem { ItemId: "battery" } batteryPickup
                 ? $"{Tr(displayNameKey)} ({Mathf.RoundToInt(batteryPickup.Charge * 100)}%)"
                 : Tr(displayNameKey);
 
-            // The exact condition number only while scan mode is active (see _scanModeOn/CanScan) —
-            // the PDA's health-scan cartridge is what makes it visible; the ambient "this looks
-            // damaged" material cue (see ShipBuildTarget's own Maintain/Repair wiring) stays
-            // visible to everyone regardless.
+            // The exact condition number only while scan mode is active — the PDA's health-scan
+            // cartridge is what makes it visible; the ambient "this looks damaged" material cue
+            // stays visible to everyone regardless.
             return _scanModeOn && target.Condition is { } condition
                 ? $"{nameText} ({Mathf.RoundToInt(condition * 100)}%)"
                 : nameText;
         }
 
         // ShipBuildTarget (floor/ceiling/wall) deliberately has no DisplayNameKey — it's terrain,
-        // not a discrete object — so there's no name to prefix, just the scanned percentage.
+        // not a discrete object — so just the scanned percentage.
         if (_scanModeOn && target?.Condition is { } bareCondition)
         {
             return $"{Mathf.RoundToInt(bareCondition * 100)}%";
@@ -1871,11 +1710,9 @@ public partial class Player : CharacterBody3D
     }
 
     /// <summary>Keeps the scan-mode highlight camera framing the same view as the real one every
-    /// frame (so its silhouette mask lines up pixel-for-pixel with the live scene), and moves the
-    /// highlight render layer bit onto whichever target's HighlightVisual is current — cleared
-    /// entirely the moment scan mode is off or nothing valid is aimed at, so the shader's mask
-    /// (and therefore its outline) goes empty rather than lingering on a stale target. A target
-    /// can offer more than one mesh (e.g. an airlock's separate frame + slab) — every one of them
+    /// frame, and moves the highlight render layer bit onto whichever target's HighlightVisual is
+    /// current — cleared entirely the moment scan mode is off or nothing valid is aimed at. A
+    /// target can offer more than one mesh (e.g. an airlock's separate frame + slab) — every one
     /// gets the layer bit together.</summary>
     private void UpdateScanHighlight(IVerbTarget? target)
     {
@@ -1890,10 +1727,9 @@ public partial class Player : CharacterBody3D
 
         foreach (var visual in _highlightedVisuals)
         {
-            // Guards against a target that was destroyed (uninstalled/scrapped/dismantled) while
-            // still scan-highlighted — its VisualInstance3D children are freed along with it, but
-            // this list isn't rebuilt until the next differing `desired` (see below), so a stale
-            // reference can reach here. Same guard convention as _openThruster/_openStorage above.
+            // Guards against a target that was destroyed while still scan-highlighted — its
+            // VisualInstance3D children are freed along with it, but this list isn't rebuilt
+            // until the next differing `desired`, so a stale reference can reach here.
             if (GodotObject.IsInstanceValid(visual))
             {
                 visual.SetLayerMaskValue(ScanHighlightLayer, false);
@@ -1909,10 +1745,8 @@ public partial class Player : CharacterBody3D
     }
 
     /// <summary>Which backpack-type item (if any) the player owns anywhere — worn, merely held,
-    /// or stored inside another backpack — used by CapturePlayerState to know which item's
-    /// persistent contents belong in the save's BackpackSlots (see PlayerSaveData.
-    /// OwnedBackpackItemId). Only one of "backpack"/"debug_backpack" is ever realistically owned
-    /// at once in practice, so this doesn't attempt to handle both existing simultaneously.</summary>
+    /// or stored inside another backpack. Only one of "backpack"/"debug_backpack" is ever
+    /// realistically owned at once, so this doesn't handle both existing simultaneously.</summary>
     private string? OwnedBackpackItemId =>
         _inventory.GetPersistentContents("backpack") is not null ? "backpack"
         : _inventory.GetPersistentContents("debug_backpack") is not null ? "debug_backpack"
@@ -2019,8 +1853,7 @@ public partial class Player : CharacterBody3D
         }
         else
         {
-            // Legacy save predating per-slot state (see PlayerSaveData.HandSlots) — replay the
-            // old aggregate dict instead.
+            // Legacy save predating per-slot state — replay the old aggregate dict instead.
             foreach (var (itemId, count) in data.Inventory)
             {
                 _inventory.Add(itemId, count);
@@ -2029,10 +1862,8 @@ public partial class Player : CharacterBody3D
 
         // Owned-anywhere persistent contents are restored first (independent of worn state) —
         // an old save predating OwnedBackpackItemId/HasEvaSuit falls back to the worn-only
-        // markers (BackpackItemId/TorsoItemId), since those were the only signal available for
-        // "does this item exist" back then. EquipContainerDirectly below reuses whichever entry
-        // was seeded here (see its own "first acquisition wins" contract) rather than
-        // double-restoring, so a worn item's contents aren't captured/restored twice.
+        // markers. EquipContainerDirectly below reuses whichever entry was seeded here (see its
+        // "first acquisition wins" contract) rather than double-restoring.
         var ownedBackpackItemId = data.OwnedBackpackItemId ?? data.BackpackItemId;
         if (ownedBackpackItemId is not null)
         {
@@ -2071,9 +1902,8 @@ public partial class Player : CharacterBody3D
         }
 
         // Same owned-anywhere-first shape as the backpack above — the suit's tank/filter/battery
-        // sub-slots are restored unconditionally alongside its pocket contents (mirroring the
-        // real equip flow in Player.TryEquipItemFrom), since Stage 3 made them per-suit
-        // persistent state decoupled from worn state too, not just its 2 pocket slots.
+        // sub-slots are restored unconditionally alongside its pocket contents, since they're
+        // per-suit persistent state decoupled from worn state too.
         if (data.HasEvaSuit || data.TorsoItemId is not null)
         {
             var torsoContents = new SlotContainer(PlayerInventory.TorsoSlotCount);
@@ -2096,12 +1926,10 @@ public partial class Player : CharacterBody3D
             _inventory.EquipContainerDirectly("head", headItemId, new SlotContainer(0));
         }
 
-        // Same owned-anywhere-first shape as the backpack/suit above — an old save predating
-        // HasPda falls back to the worn-only marker (PdaItemId), since that was the only signal
-        // available for "does this item exist" back then. Math.Max (not the raw saved value):
-        // a save from before the power-scan cartridge existed was captured with PdaSlotCount == 1
-        // — grow it to the current slot count on load instead of leaving it permanently stuck at
-        // its old, smaller size.
+        // Same owned-anywhere-first shape as the backpack/suit above. Math.Max, not the raw saved
+        // value: a save from before the power-scan cartridge existed was captured with
+        // PdaSlotCount == 1 — grow it to the current slot count on load instead of leaving it
+        // stuck at its old, smaller size.
         var pdaSlotCount = System.Math.Max(data.PdaSlotCount, PlayerInventory.PdaSlotCount);
 
         if (data.HasPda || data.PdaItemId is not null)
@@ -2176,26 +2004,21 @@ public partial class Player : CharacterBody3D
     public void RefillSuitResources() => _suitResources.RestoreFrom(100f, 100f);
 
     /// <summary>Called by SaveManager.Save() at the end of every successful save — F5 and
-    /// autosave both funnel through that one method, so both trigger this the same way. A brief
-    /// visible confirmation, the same "set visible, (re)start a one-shot timer that hides it
-    /// again" shape RechargeStationVerbTarget's own active-draw spike already uses.</summary>
+    /// autosave both funnel through that one method. A brief visible confirmation.</summary>
     public void ShowSavedFlash() => _hud!.ShowSavedFlash();
 
-    /// <summary>Hard death from 0 Health (see the O2-driven drain in SuitResources.Tick) —
-    /// opens DeathPanel and waits for a Reload/Quit choice instead of reloading immediately.
-    /// The call site guards this with a Death-panel-not-already-open check, so it only fires once
-    /// per death, not every physics frame HealthPercent stays at/below 0 while the panel waits.</summary>
+    /// <summary>Hard death from 0 Health — opens DeathPanel and waits for a Reload/Quit choice
+    /// instead of reloading immediately. The call site guards this with a Death-panel-not-
+    /// already-open check, so it only fires once per death.</summary>
     private void Die()
     {
         GD.Print("[Player] Died — awaiting reload/quit choice.");
         _panels!.Open(PanelId.Death);
     }
 
-    /// <summary>DeathPanel's Reload button — reloads the last save so the player picks back up
-    /// from wherever they last saved. Falls back to a full O2/Health restore in place (no
-    /// position/inventory reset — there's nothing more specific to reset to yet) if there's no
-    /// save to reload, e.g. a fresh game that died before ever pressing F5 or autosave firing
-    /// once.</summary>
+    /// <summary>Reloads the last save so the player picks back up from wherever they last saved.
+    /// Falls back to a full O2/Health restore in place if there's no save to reload, e.g. a fresh
+    /// game that died before ever pressing F5 or autosave firing once.</summary>
     public void ReloadAfterDeath()
     {
         GD.Print("[Player] Reload chosen — reloading last save.");
@@ -2213,19 +2036,17 @@ public partial class Player : CharacterBody3D
 
     /// <summary>True while the death screen is up, waiting on a Reload/Quit choice — checked by
     /// SaveManager.Save() so autosave/F5 can't silently overwrite the last good save with this
-    /// 0-Health state while the player hasn't chosen yet (which would make Reload immediately
-    /// re-trigger death from the very save it just loaded).</summary>
+    /// 0-Health state before the player has chosen (which would make Reload immediately re-trigger
+    /// death from the very save it just loaded).</summary>
     public bool IsAwaitingDeathChoice => _panels?.IsOpen(PanelId.Death) ?? false;
 
-    /// <summary>The Bunk's Sleep-completion hook — a full night's rest.</summary>
     public void RestEnergy() => _needs.Rest(100f);
 
     private void UpdateInventoryHud()
     {
         // Unlike the backpack/suit/pda contents (reached by itemId, always safe to dereference),
         // PanelController.OpenThruster/OpenStorage are live Node references that Uninstall/Scrap
-        // can QueueFree() out from under their window while it's open — checked here, where the
-        // panel state lives, rather than inside the view.
+        // can QueueFree() out from under their window while it's open.
         if (_panels!.IsOpen(PanelId.Thruster) && !GodotObject.IsInstanceValid(_panels.OpenThruster))
         {
             CloseThrusterInventory();

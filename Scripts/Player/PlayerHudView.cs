@@ -2,20 +2,12 @@ using Godot;
 
 namespace Scavengineers.Scripts.Player;
 
-/// <summary>
-/// Everything the player HUD *draws*, split out of Player.cs. Player computes state and pushes it
-/// here as a snapshot once a frame; this class owns every Label/ProgressBar/ColorRect under the
-/// HUD, all the <c>Tr()</c> calls, all the number formatting, and the one piece of purely visual
-/// animation (the low-health pulse). It reads nothing back and decides nothing — if a method here
-/// ever needs to ask Player a question, that logic belongs on Player's side of the line.
-///
-/// <para>Constructed in code by <see cref="Player._Ready"/> and handed the HUD root, rather than
-/// being a node authored into Player.tscn. That's deliberate: it keeps the whole split invisible to
-/// the scene file, so there's no new <c>node_paths</c> wiring to get wrong (this project has been
-/// bitten by .tscn export resolution before) and no risk of a scene/script mismatch. Resolving its
-/// own children from the root it's given is the same thing Player was doing inline a moment
-/// earlier.</para>
-/// </summary>
+/// <summary>Everything the player HUD *draws*. Player computes state and pushes it here as a
+/// snapshot once a frame; this class owns every Label/ProgressBar/ColorRect under the HUD, all
+/// the <c>Tr()</c> calls, all the number formatting, and the one piece of purely visual animation
+/// (the low-health pulse). It reads nothing back and decides nothing. Constructed in code by
+/// <see cref="Player._Ready"/> and handed the HUD root, rather than being a node authored into
+/// Player.tscn, so there's no new <c>node_paths</c> wiring to get wrong.</summary>
 public partial class PlayerHudView : Node
 {
     // Placeholder/tunable — Health at/below this fraction shows the pulsing warning. Every other
@@ -63,9 +55,8 @@ public partial class PlayerHudView : Node
 
     private Timer? _savedFlashTimer;
 
-    /// <summary>Test-only observability, matching this codebase's narrow test-accessor convention
-    /// (see Player.ScanModeOn): lets a NodeTest assert on what the HUD actually rendered without
-    /// having to reach through Player into a private field.</summary>
+    /// <summary>Test-only observability: lets a NodeTest assert on what the HUD actually rendered
+    /// without having to reach through Player into a private field.</summary>
     public ColorRect? LowHealthOverlay => _lowHealthOverlay;
 
     public ColorRect? SmokeOverlay => _smokeOverlay;
@@ -78,8 +69,7 @@ public partial class PlayerHudView : Node
 
     /// <summary>Resolves every HUD node from <paramref name="hudRoot"/>. Separate from
     /// <c>_Ready</c> so Player can call it at a controlled point in its own startup rather than
-    /// depending on child-vs-parent _Ready ordering — the same explicit-wiring style the rest of
-    /// this project's dynamically-built nodes already use.</summary>
+    /// depending on child-vs-parent _Ready ordering.</summary>
     public void Bind(Node hudRoot)
     {
         _o2Bar = hudRoot.GetNode<ProgressBar>("ResourcesPanel/O2Bar");
@@ -115,10 +105,9 @@ public partial class PlayerHudView : Node
     }
 
     /// <summary>One frame's worth of everything the resource panel and full-screen overlays show.
-    /// A snapshot rather than a live reference back to Player/SuitResources, so this class can't
-    /// start reaching for state it wasn't handed. Nullable members mean "hide this readout": the
-    /// room O2 line when there's no room reading at all, and the drill/flashlight pair when that
-    /// tool isn't in hand.</summary>
+    /// A snapshot rather than a live reference back to Player/SuitResources. Nullable members mean
+    /// "hide this readout": the room O2 line when there's no room reading, and the drill/
+    /// flashlight pair when that tool isn't in hand.</summary>
     public readonly record struct Vitals(
         double O2Percent,
         double CO2Percent,

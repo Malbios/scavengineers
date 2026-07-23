@@ -2,15 +2,10 @@ using System;
 
 namespace Scavengineers.Scripts.Player;
 
-/// <summary>
-/// The player's own long-horizon survival needs (hunger, thirst, energy) — distinct from
+/// <summary>The player's long-horizon survival needs (hunger, thirst, energy) — distinct from
 /// <see cref="SuitResources"/>'s short-horizon EVA budget (O2/power drain over minutes; these
-/// drain over a much longer span, matching the home-ship-loop pressure docs/project-plan.md's
-/// time-acceleration note already anticipates: "fatigue, hunger, suit O2, power all tick").
-/// Constant-rate drain; hitting 0% on any of the three applies a real movement-speed debuff
-/// (see Player.NeedsDebuffMoveMultiplier) — no longer the unconsequenced "later system" deferral
-/// SuitResources' own O2/power once were.
-/// </summary>
+/// drain over a much longer span). Constant-rate drain; hitting 0% on any of the three applies a
+/// real movement-speed debuff (see Player.NeedsDebuffMoveMultiplier).</summary>
 public sealed class PlayerNeeds
 {
     private const float HungerDrainPerSecond = 100f / 1200f; // placeholder/tunable: empties over ~20 minutes

@@ -2,13 +2,9 @@ using Godot;
 
 namespace Scavengineers.Scripts.Player;
 
-/// <summary>
-/// Phase 0 Spike 3 — throwaway free-float push-off feel prototype. Deliberately isolated
-/// from <see cref="Player"/>/GreyboxRoom (see docs/architecture/locomotion.md): no gravity,
-/// no stabilizer, no sustained thrust — tap a direction for a one-off impulse, then drift on
-/// pure inertia until you hit something. This is the raw feel being tested, not a finished
-/// control scheme.
-/// </summary>
+/// <summary>Throwaway free-float push-off feel prototype, isolated from <see cref="Player"/>: no
+/// gravity, no stabilizer, no sustained thrust — tap a direction for a one-off impulse, then
+/// drift on pure inertia until you hit something.</summary>
 public partial class FloatPlayer : CharacterBody3D
 {
     private const float PushImpulse = 2.5f;
@@ -76,9 +72,8 @@ public partial class FloatPlayer : CharacterBody3D
 
     private void TryPushOff(Key key)
     {
-        // This is a push-*off* (Ostranauts-style: kick off a surface), not sustained thruster
-        // EVA — no reaction mass to push against means no impulse, per docs/architecture/
-        // locomotion.md's distinction between the two movement modes.
+        // This is a push-*off* (kick off a surface), not sustained thruster EVA — no reaction
+        // mass to push against means no impulse.
         if (!_isTouchingSurface)
         {
             return;

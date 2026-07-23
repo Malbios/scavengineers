@@ -5,21 +5,13 @@ using Scavengineers.Scripts.Inventory;
 
 namespace Scavengineers.Scripts.Player;
 
-/// <summary>
-/// The right-click-on-an-item sub-windows — drill battery, flashlight battery, backpack, EVA suit,
-/// PDA — plus the slot grids inside the thruster and storage windows. Split out of Player.cs.
-///
-/// <para>These are distinct from <see cref="PanelController"/>'s modal panels: they don't suppress
-/// gameplay input and aren't in <c>AnyPanelOpen</c>. What they are is a rendering of
-/// <see cref="PlayerInventory"/>'s persistent-contents model — each window points at whichever
-/// item's contents it was opened for, and that item may be worn, merely held, or tucked inside
-/// another container. Because equipping/unequipping creates a *new* SlotContainer instance, the
-/// windows are re-pointed every frame rather than on an equip event; that per-frame re-point is
-/// this class's main job.</para>
-///
-/// <para>Constructed in code by <see cref="Player._Ready"/> and handed the HUD root, same as
-/// <see cref="PlayerHudView"/> and <see cref="PanelController"/>.</para>
-/// </summary>
+/// <summary>The right-click-on-an-item sub-windows — drill battery, flashlight battery, backpack,
+/// EVA suit, PDA — plus the slot grids inside the thruster and storage windows. Distinct from
+/// <see cref="PanelController"/>'s modal panels: they don't suppress gameplay input. What they are
+/// is a rendering of <see cref="PlayerInventory"/>'s persistent-contents model — each window
+/// points at whichever item's contents it was opened for, and that item may be worn, merely held,
+/// or tucked inside another container. Because equipping/unequipping creates a *new*
+/// SlotContainer instance, the windows are re-pointed every frame rather than on an equip event.</summary>
 public partial class InventoryWindowView : Node
 {
     private DraggableWindow? _drillWindow;
@@ -58,10 +50,8 @@ public partial class InventoryWindowView : Node
 
     private string? _openPdaItemId;
 
-    /// <summary>Every spawned slot addresses the player the same way the scene-authored ones do.
-    /// Taken from Bind rather than read off the template node: the template's own PlayerRef is
-    /// never set (it's a hidden prototype, not a live slot), so copying from it would leave every
-    /// duplicate unwired.</summary>
+    /// <summary>Taken from Bind rather than read off the template node: the template's own
+    /// PlayerRef is never set (it's a hidden prototype, not a live slot).</summary>
     private Player? _player;
 
     public DraggableWindow? DrillWindow => _drillWindow;
@@ -132,11 +122,10 @@ public partial class InventoryWindowView : Node
         };
     }
 
-    /// <summary>Right-click-on-inventory-item entry point (see InventorySlotUI) — toggles whichever
-    /// window represents that item's own inventory, or does nothing for an item that has none.
-    /// Gated on <see cref="PlayerInventory.GetPersistentContents"/> rather than "currently worn",
-    /// since a backpack/suit/PDA's contents are reachable whether it's worn, merely held, or (for
-    /// the backpack) sitting in another backpack's slot.</summary>
+    /// <summary>Right-click-on-inventory-item entry point — toggles whichever window represents
+    /// that item's inventory. Gated on <see cref="PlayerInventory.GetPersistentContents"/> rather
+    /// than "currently worn", since a backpack/suit/PDA's contents are reachable whether it's
+    /// worn, merely held, or tucked inside another container.</summary>
     public void ToggleItemWindow(PlayerInventory inventory, string itemId)
     {
         switch (itemId)
@@ -162,8 +151,8 @@ public partial class InventoryWindowView : Node
         }
     }
 
-    /// <summary>Closes every window here. Player wires this to PanelController.InventoryClosed —
-    /// none of these are useful without the main inventory panel open to drag items to and from.</summary>
+    /// <summary>Closes every window here — none are useful without the main inventory panel open
+    /// to drag items to and from.</summary>
     public void CloseAll()
     {
         _drillWindow!.Visible = false;
@@ -177,10 +166,9 @@ public partial class InventoryWindowView : Node
     }
 
     /// <summary>Re-points every open window at its item's current contents, rebuilding the
-    /// variable-size grids when their slot count changed, and closes any window whose item is gone.
-    /// Thruster/storage contents are passed in rather than resolved here: they come from live world
-    /// nodes that PanelController owns and that can be freed mid-frame, so Player does that
-    /// validity check where the panel state lives.</summary>
+    /// variable-size grids when their slot count changed, and closes any window whose item is
+    /// gone. Thruster/storage contents are passed in rather than resolved here: they come from
+    /// live world nodes that PanelController owns and can be freed mid-frame.</summary>
     public void Refresh(PlayerInventory inventory, SlotContainer? thrusterContents, SlotContainer? storageContents)
     {
         var backpackContents = ContentsFor(inventory, ref _openBackpackItemId, _backpackWindow!);

@@ -2,15 +2,11 @@ using System;
 
 namespace Scavengineers.Scripts.Player;
 
-/// <summary>
-/// The exploration-pressure mechanic (docs/project-plan.md §4): a limited-time budget while
-/// away from safety. Constant-rate drain, plus extra O2 drain proportional to how far the
-/// surrounding atmosphere has dropped from breathable — a breached room actually costs you,
-/// not just a cosmetic backdrop. Once O2 bottoms out, it starts draining Health — and extreme
-/// ambient temperature (a breach gone properly cold, or standing in an active fire's heat) drains
-/// Health too, compounding with O2 depletion rather than being a separate stat/bar: a vented room
-/// is airless *and* freezing at once, one threat, not two independent meters.
-/// </summary>
+/// <summary>The exploration-pressure mechanic: a limited-time budget while away from safety.
+/// Constant-rate drain, plus extra O2 drain proportional to how far the surrounding atmosphere
+/// has dropped from breathable. Once O2 bottoms out, it starts draining Health — and extreme
+/// ambient temperature drains Health too, compounding with O2 depletion rather than being a
+/// separate stat: a vented room is airless *and* freezing at once, one threat, not two.</summary>
 public sealed class SuitResources
 {
     private const float O2DrainPerSecond = 100f / 300f; // empties over ~5 minutes
@@ -50,35 +46,25 @@ public sealed class SuitResources
     public float HealthPercent { get; private set; } = 100f;
 
     /// <summary>0-100, starts at 0 — the player's own exhaled CO2 building up inside a sealed EVA
-    /// suit. Only rises while <see cref="Tick"/>'s <c>suitSealed</c> is true (you only build up
-    /// CO2 breathing your own recycled air), and vents back toward 0 the moment you're not sealed
-    /// (taking the suit off is CO2's safety valve) — a personal <see cref="SuitResources"/>-level
-    /// stat, not an ambient/room-level gas the shared atmosphere solver needs to know about.</summary>
+    /// suit. Only rises while <see cref="Tick"/>'s <c>suitSealed</c> is true, and vents back
+    /// toward 0 the moment you're not sealed.</summary>
     public float CO2Percent { get; private set; }
 
     /// <summary>Whether the ambient temperature was critically cold as of the last Tick — read by
-    /// Player.cs to drive a screen overlay, not persisted (recomputed fresh every tick).</summary>
+    /// Player.cs to drive a screen overlay, not persisted.</summary>
     public bool IsFreezing { get; private set; }
 
-    /// <summary>Whether the ambient temperature was critically hot as of the last Tick — same
-    /// non-persisted, overlay-driving shape as <see cref="IsFreezing"/>.</summary>
     public bool IsBurning { get; private set; }
 
-    /// <summary>All 5 EVA-suit parameters are additive with defaults so every pre-suit call site
-    /// (an un-suited player, or an old test) keeps compiling and behaving exactly as before —
-    /// <paramref name="suitSealed"/> defaults false, and the four <c>*Depleted</c> flags default
-    /// true (fail-safe: an omitted flag reads as "absent/empty," not "somehow already installed").
-    /// All tank/filter/battery *charge* bookkeeping (which slot holds what, draining a tank's own
-    /// Charge over time or from sustained thrust) lives in Player.cs/PlayerInventory, exactly
-    /// where the drill/flashlight's own charge-draining already does — this class only ever
-    /// receives simple booleans/floats each tick and stays 100% headless-testable.</summary>
+    /// <summary>All 5 EVA-suit parameters default fail-safe (<paramref name="suitSealed"/> false,
+    /// every <c>*Depleted</c> flag true) so every pre-suit call site keeps compiling and behaving
+    /// as before. Tank/filter/battery *charge* bookkeeping lives in Player.cs/PlayerInventory —
+    /// this class only receives simple booleans/floats each tick and stays headless-testable.</summary>
     public void Tick(double delta, double ambientO2Fraction = BreathableO2Fraction, double ambientTemperature = BreathableTemperature, bool inSmoke = false,
         bool suitSealed = false, bool o2TankDepleted = true, bool n2TankDepleted = true, bool filterDepleted = true, bool batteryDepleted = true)
     {
         // Airtight and fed by a working tank: O2Percent doesn't drain from ambient at all (the
-        // tank's own Charge — a separate quantity Player.cs drains — is what's actually being
-        // consumed). Once the tank empties, or the suit isn't sealed, this is exactly today's
-        // unchanged ambient formula — an un-suited player is unaffected by any of this.
+        // tank's own Charge, a separate quantity Player.cs drains, is what's being consumed).
         if (!suitSealed || o2TankDepleted)
         {
             var exposureFraction = Math.Clamp(1 - ambientO2Fraction / BreathableO2Fraction, 0, 1);
@@ -92,10 +78,9 @@ public sealed class SuitResources
         IsFreezing = ambientTemperature <= CriticalColdKelvin;
         IsBurning = ambientTemperature >= CriticalHeatKelvin;
 
-        // A charged suit battery protects against the ambient cold/burn Health drain (heating/
-        // cooling) — note IsFreezing/IsBurning themselves stay ambient-temperature-driven and
-        // unchanged, so the overlay still shows even while protected ("it's cold, your suit's
-        // handling it" is correct feedback, not a bug).
+        // A charged suit battery protects against the ambient cold/burn Health drain — note
+        // IsFreezing/IsBurning stay ambient-temperature-driven regardless, so the overlay still
+        // shows even while protected ("it's cold, your suit's handling it" is correct feedback).
         var batteryProtecting = suitSealed && !batteryDepleted;
 
         var healthDrain = 0f;

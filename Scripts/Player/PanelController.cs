@@ -23,26 +23,12 @@ public enum PanelId
     Death,
 }
 
-/// <summary>
-/// Owns the player's modal HUD panels, split out of Player.cs: which are open, the nodes
-/// themselves, the world object each one was opened from, and the mouse-mode transition that goes
-/// with showing/hiding them.
-///
-/// <para>This replaced eight near-identical open/close pairs on Player — each one setting its own
-/// <c>bool</c>, stashing its own world-object reference, flipping its own panel's Visible, and
-/// calling Input.MouseMode/CaptureMouse by hand — plus an <c>AnyPanelOpen</c> that had to name all
-/// eight flags and was the thing you had to remember to extend. One id-keyed mechanism now does
-/// all of it, so adding a panel means adding an enum member and registering its node.</para>
-///
-/// <para>Player keeps a thin public method per panel (<c>OpenShop</c>, <c>CloseTravelMap</c>, …)
-/// because VerbTargets and the panels themselves call those directly; those now just delegate
-/// here. Panel *content* stays on Player's side — it owns the inventory and contract list the shop
-/// and board are populated from — so this class exposes the typed panel nodes rather than trying
-/// to reach that data itself.</para>
-///
-/// <para>Constructed in code by <see cref="Player._Ready"/> and handed the HUD root, for the same
-/// reason as <see cref="PlayerHudView"/>: the split stays invisible to Player.tscn.</para>
-/// </summary>
+/// <summary>Owns the player's modal HUD panels: which are open, the nodes themselves, the world
+/// object each one was opened from, and the mouse-mode transition that goes with showing/hiding
+/// them. One id-keyed mechanism, so adding a panel means adding an enum member and registering
+/// its node. Panel *content* stays on Player's side — it owns the inventory and contract list the
+/// shop and board are populated from — so this class exposes the typed panel nodes rather than
+/// trying to reach that data itself.</summary>
 public partial class PanelController : Node
 {
     private readonly Dictionary<PanelId, Control> _panels = new();
@@ -72,8 +58,7 @@ public partial class PanelController : Node
     public DraggableWindow? StorageWindow { get; private set; }
 
     /// <summary>The world object whichever panel was opened from, so the panel's own callbacks can
-    /// be routed back to it. Each is set on open and cleared on close, together with its flag —
-    /// previously eight separate fields on Player that could drift out of step with their bool.</summary>
+    /// be routed back to it. Each is set on open and cleared on close.</summary>
     public TravelConsoleVerbTarget? OpenTravelConsole { get; private set; }
 
     public TravelConsoleVerbTarget? OpenDockingConsole { get; private set; }
@@ -116,8 +101,6 @@ public partial class PanelController : Node
         Death = hudRoot.GetNode<DeathPanel>("DeathPanel");
         _worldDropZone = hudRoot.GetNode<WorldDropZone>("WorldDropZone");
 
-        // Every panel addresses the player the same way (see InventorySlotUI.PlayerRef and the rest
-        // of this project's self-addressing convention).
         TravelMap.PlayerRef = player;
         Docking.PlayerRef = player;
         Shop.PlayerRef = player;
@@ -191,9 +174,8 @@ public partial class PanelController : Node
         }
     }
 
-    // Typed open-with-owner entry points. Setting the owner and opening the panel are one step, so
-    // the two can never disagree — the failure mode the eight separate field-pairs on Player made
-    // possible.
+    // Typed open-with-owner entry points. Setting the owner and opening the panel are one step,
+    // so the two can never disagree.
 
     public void OpenTravelMap(TravelConsoleVerbTarget console)
     {
@@ -234,10 +216,9 @@ public partial class PanelController : Node
     }
 
     /// <summary>The Escape chain: closes the topmost closable panel and reports whether it closed
-    /// anything, so Player's own Escape handler can fall through to releasing the mouse when
-    /// nothing was open. Docking and Death are deliberately absent — neither has a silent-abandon
-    /// path (see their own doc comments on Player); the only ways out are finishing or an
-    /// in-panel choice.</summary>
+    /// anything, so Player's Escape handler can fall through to releasing the mouse when nothing
+    /// was open. Docking and Death are deliberately absent — neither has a silent-abandon path;
+    /// the only ways out are finishing or an in-panel choice.</summary>
     public bool CloseTopmostClosable()
     {
         foreach (var id in new[] { PanelId.TravelMap, PanelId.Shop, PanelId.ContractBoard, PanelId.Thruster, PanelId.Storage, PanelId.Inventory })

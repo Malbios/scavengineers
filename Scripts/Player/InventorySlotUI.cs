@@ -3,17 +3,14 @@ using Scavengineers.Scripts.Inventory;
 
 namespace Scavengineers.Scripts.Player;
 
-/// <summary>
-/// One slot of the inventory panel (Scenes/Player.tscn's HUD/InventoryPanel) — shows whichever
-/// item (if any) currently occupies <see cref="SlotIndex"/> in <see cref="Container"/>, and
-/// participates in Godot's native Control drag-and-drop so slots can be reordered/merged by
-/// mouse. Also doubles as the one special "Back" slot (<see cref="IsBackSlot"/>) representing
-/// the equipped backpack itself — a non-fungible item with no ordinary (itemId, count) slot
-/// representation, addressed through <see cref="PlayerRef"/> instead of <see cref="Container"/>.
-/// Both are wired by Player.cs after it finds these slots in its own _Ready(), not via [Export]
-/// — PlayerInventory/SlotContainer are plain C# classes, not Resources/Nodes, so the editor
-/// can't reference them directly.
-/// </summary>
+/// <summary>One slot of the inventory panel — shows whichever item (if any) currently occupies
+/// <see cref="SlotIndex"/> in <see cref="Container"/>, and participates in Godot's native Control
+/// drag-and-drop so slots can be reordered/merged by mouse. Also doubles as the one special
+/// "Back" slot (<see cref="IsBackSlot"/>) representing the equipped backpack itself — a
+/// non-fungible item with no ordinary (itemId, count) slot representation, addressed through
+/// <see cref="PlayerRef"/> instead of <see cref="Container"/>. Both are wired by Player.cs after
+/// it finds these slots in its own _Ready(), not via [Export] — PlayerInventory/SlotContainer are
+/// plain C# classes, not Resources/Nodes.</summary>
 public partial class InventorySlotUI : Control
 {
     [Export]
@@ -31,19 +28,15 @@ public partial class InventorySlotUI : Control
     /// <summary>Non-empty only for a specialized sub-slot (e.g. "drill_battery",
     /// "flashlight_battery", or the EVA suit's tank slots) — reads/writes that device's own
     /// battery/tank via <see cref="PlayerRef"/>'s generic <c>PlayerInventory.SpecializedSlot</c>
-    /// mechanism, the same non-fungible-item-via-PlayerRef shape <see cref="IsBackSlot"/> already
-    /// established. Shows a synthetic single-item slot (count always 1) when loaded — the
-    /// device's actual charge is shown separately (e.g. HUD/ResourcesPanel's DrillBar), not on
-    /// this slot. Empty string = ordinary slot.</summary>
+    /// mechanism. Shows a synthetic single-item slot (count always 1) — the device's actual
+    /// charge is shown separately, not on this slot. Empty string = ordinary slot.</summary>
     [Export]
     public string SpecializedSlotKey { get; set; } = "";
 
     /// <summary>Non-empty only for the Torso/Head equip slots — reads/writes a whole worn item
-    /// (with its own <see cref="PlayerInventory.EquippedContainer"/>, possibly 0-slot for a
-    /// container-less item like the helmet) via <see cref="PlayerRef"/>, the same
-    /// non-fungible-item-via-PlayerRef shape <see cref="IsBackSlot"/> already established —
-    /// generalized (via <see cref="Player.TryEquipItemFrom"/>'s tag-driven check) rather than
-    /// hardcoded per item the way the Back slot still is. Empty string = ordinary slot.</summary>
+    /// via <see cref="PlayerRef"/>, generalized (via <see cref="Player.TryEquipItemFrom"/>'s
+    /// tag-driven check) rather than hardcoded per item the way the Back slot still is. Empty
+    /// string = ordinary slot.</summary>
     [Export]
     public string EquippedSlotName { get; set; } = "";
 
@@ -65,8 +58,8 @@ public partial class InventorySlotUI : Control
 
     public SlotContainer? Container { get; set; }
 
-    /// <summary>Wired on every slot (not just Back) — ordinary slots need it too, to react when
-    /// the equipped backpack itself is dragged from the Back slot onto them (see _DropData).</summary>
+    /// <summary>Wired on every slot, not just Back — ordinary slots need it too, to react when
+    /// the equipped backpack is dragged from the Back slot onto them (see _DropData).</summary>
     public Player? PlayerRef { get; set; }
 
     private Control? _icon;
@@ -124,9 +117,8 @@ public partial class InventorySlotUI : Control
         _countLabel.Text = occupied.Count.ToString();
     }
 
-    /// <summary>Rebuilds the icon's own child rects from this item's shapeKind (see
-    /// ItemVisualBuilder.IconPartsFor) — only called when the occupying item actually changes
-    /// (see Refresh's own _iconItemId tracking), not every _Process tick.</summary>
+    /// <summary>Rebuilds the icon's own child rects from this item's shapeKind — only called
+    /// when the occupying item actually changes, not every _Process tick.</summary>
     private void RebuildIconParts(string itemId)
     {
         ClearIconParts();
@@ -168,9 +160,7 @@ public partial class InventorySlotUI : Control
         else if (ChargeableSlotCharge() is { } charge)
         {
             // A specialized slot's Count is always the synthetic "1" from CurrentSlot() —
-            // showing charge instead is the actually useful number here (how much is left), not
-            // how many. Named generically off CurrentSlot()'s own item id rather than assuming
-            // "battery", since a future specialized slot (e.g. an EVA suit's O2 tank) won't be.
+            // showing charge instead is the useful number here (how much is left), not how many.
             var itemId = CurrentSlot()?.ItemId ?? "battery";
             Tooltip.Text = $"{Tr("ITEM_" + itemId.ToUpperInvariant())}: {Mathf.RoundToInt(charge * 100)}%";
         }
@@ -191,12 +181,9 @@ public partial class InventorySlotUI : Control
         Tooltip.GlobalPosition = GetGlobalMousePosition() + new Vector2(16, 16);
     }
 
-    /// <summary>Charge fraction (0-1) for the drill/flashlight battery slots specifically, or for
-    /// an ordinary hand/backpack/thruster-tank-dock slot that happens to hold any of
-    /// PlayerInventory.ChargeableItemIds (battery, o2_tank, n2_tank, co2_filter — see SlotContainer's
-    /// own per-slot Charge) — null for every other slot, including an empty drill/flashlight
-    /// (that case already falls through to CurrentSlot() returning null, i.e. "empty slot"
-    /// tooltip handling).</summary>
+    /// <summary>Charge fraction (0-1) for the drill/flashlight battery slots, or for an ordinary
+    /// hand/backpack/thruster-tank-dock slot holding any of PlayerInventory.ChargeableItemIds —
+    /// null for every other slot.</summary>
     private float? ChargeableSlotCharge()
     {
         if (SpecializedSlotKey.Length > 0)
@@ -206,12 +193,10 @@ public partial class InventorySlotUI : Control
 
         if (IsBackSlot || EquippedSlotName.Length > 0 || IsUnusedBodySlot)
         {
-            // None of these represent a literal chargeable-item slot — a worn backpack/torso/
-            // helmet, or an always-empty Legs/feet slot, never has its own Charge to show. Without
-            // this guard they'd fall through to the generic Container/SlotIndex check below, whose
-            // Container/SlotIndex (set to Hands/0 by Player._Ready's blanket EquipSlots loop) is
-            // otherwise meaningless here — coincidentally showing a charge from whatever's in the
-            // player's left hand.
+            // None of these represent a literal chargeable-item slot. Without this guard they'd
+            // fall through to the generic Container/SlotIndex check below, whose Container/
+            // SlotIndex (set to Hands/0 by Player._Ready's blanket EquipSlots loop) is otherwise
+            // meaningless here — coincidentally showing a charge from the player's left hand.
             return null;
         }
 
@@ -230,13 +215,9 @@ public partial class InventorySlotUI : Control
     }
 
     /// <summary>Right-click opens whichever window (if any) represents this slot's occupying
-    /// item's own inventory (drill/flashlight battery, worn backpack contents) — see
-    /// Player.ToggleItemWindow. A separate event path from the left-click drag-and-drop below, so
-    /// it doesn't interfere with it. Only accepts the event when there's actually an item here —
-    /// an EMPTY slot's right-click is genuinely a no-op for this slot, so it's left to bubble up
-    /// to the containing DraggableWindow's own right-click-closes-the-window handler (a right-
-    /// click on an occupied slot, by contrast, took a real action here and must not also
-    /// immediately close the window it's sitting in).</summary>
+    /// item's inventory. Only accepts the event when there's actually an item here — an empty
+    /// slot's right-click is left to bubble up to the containing DraggableWindow's own
+    /// right-click-closes-the-window handler.</summary>
     public override void _GuiInput(InputEvent @event)
     {
         if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Right, Pressed: true } && CurrentSlot() is { } occupied)
@@ -264,7 +245,7 @@ public partial class InventorySlotUI : Control
 
         // The source slot itself, not just an index — hand and backpack-contents slots address
         // *different* SlotContainer instances, so a bare index alone can't say which array it
-        // came from (see SlotContainer.MoveBetween).
+        // came from.
         return this;
     }
 
@@ -275,14 +256,12 @@ public partial class InventorySlotUI : Control
             return false;
         }
 
-        // An item that doesn't fit storage (see ItemCatalog.FitsInStorage — currently just the
-        // EVA suit's torso piece) can only ever land in a hand — reject the drag in real time
-        // (Godot shows its native "can't drop here" cursor while hovering) for any other ordinary
-        // destination, whether the dragged item is a bare token or the worn suit itself being
-        // dragged straight off its equip slot. Mirrors _DropData's own matching guard so the
-        // drag-time feedback and the actual drop outcome never disagree. Doesn't apply to
-        // Back/Torso/Head/specialized-slot destinations — those go through equip/unequip
-        // dispatch, not this generic storage-fit check.
+        // An item that doesn't fit storage (currently just the EVA suit's torso piece) can only
+        // ever land in a hand — reject the drag in real time (Godot shows its native "can't drop
+        // here" cursor) for any other ordinary destination. Mirrors _DropData's own matching
+        // guard so drag-time feedback and the actual drop outcome never disagree. Doesn't apply
+        // to Back/Torso/Head/specialized-slot destinations — those go through equip/unequip
+        // dispatch instead.
         if (!IsBackSlot && EquippedSlotName.Length == 0 && SpecializedSlotKey.Length == 0
             && Container is { } container && PlayerRef is not null && !ReferenceEquals(container, PlayerRef.Inventory.Hands)
             && source.CurrentSlot()?.ItemId is { } itemId && !ItemCatalog.FitsInStorage(itemId))
@@ -368,8 +347,8 @@ public partial class InventorySlotUI : Control
             return;
         }
 
-        // An item that doesn't fit storage (see ItemCatalog.FitsInStorage — currently just the
-        // EVA suit's torso piece) can only ever land in a hand, never a backpack/pocket slot.
+        // An item that doesn't fit storage can only ever land in a hand, never a backpack/pocket
+        // slot.
         if (!ReferenceEquals(Container, PlayerRef.Inventory.Hands)
             && source.Container.Slots[source.SlotIndex] is { } draggedItem
             && !ItemCatalog.FitsInStorage(draggedItem.ItemId))
@@ -389,9 +368,7 @@ public partial class InventorySlotUI : Control
 
         if (IsUnusedBodySlot)
         {
-            // Nothing can ever occupy Legs/LeftFoot/RightFoot — always empty, never falls through
-            // to the generic Container-based lookup below, whose Container/SlotIndex (set to
-            // Hands/0 by Player._Ready's blanket EquipSlots loop) is otherwise meaningless here.
+            // Nothing can ever occupy Legs/LeftFoot/RightFoot — always empty.
             return null;
         }
 

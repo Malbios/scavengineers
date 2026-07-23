@@ -4,26 +4,21 @@ using Godot;
 
 namespace Scavengineers.Scripts.Player;
 
-/// <summary>Lets any HUD window Control be repositioned by dragging a designated title-bar
-/// child — shared by the main inventory panel and every per-item window (drill/flashlight
-/// battery, backpack contents). Purely a runtime reposition: doesn't touch anchors, so it works
-/// regardless of each window's existing (centered) default layout. Also owns this window's own
-/// close affordances (X button + right-click-on-background) — see CloseRequested.</summary>
+/// <summary>Lets any HUD window Control be repositioned by dragging a designated title-bar child
+/// — shared by the main inventory panel and every per-item window. Purely a runtime reposition:
+/// doesn't touch anchors, so it works regardless of each window's existing default layout.</summary>
 public partial class DraggableWindow : PanelContainer
 {
     [Export]
     public Control? TitleBar { get; set; }
 
-    /// <summary>Top-right X button — optional (null for any window that hasn't been wired with
-    /// one) so this stays a drop-in addition rather than requiring every consumer to update at
-    /// once.</summary>
+    /// <summary>Top-right X button — optional so this stays a drop-in addition rather than
+    /// requiring every consumer to update at once.</summary>
     [Export]
     public Button? CloseButton { get; set; }
 
     /// <summary>Fired by CloseButton and by a right-click landing on this window's own body (not
-    /// a child control — see _GuiInput) — Player.cs subscribes once per window to whatever
-    /// closing that specific window actually entails (some also clear an "open item id" alongside
-    /// just hiding, see ToggleItemWindow's own closing branches).</summary>
+    /// a child control — see _GuiInput).</summary>
     public event Action? CloseRequested;
 
     private bool _dragging;
@@ -40,12 +35,9 @@ public partial class DraggableWindow : PanelContainer
     }
 
     /// <summary>Right-click anywhere on this window's own body (not consumed by a child, e.g. a
-    /// slot's own right-click action — see InventorySlotUI's matching AcceptEvent) closes it, a
-    /// quicker alternative to precisely hitting the small X button. Godot's Control _GuiInput
-    /// bubbles from the topmost hit control up through its ancestors when an event isn't
-    /// explicitly accepted, so this only ever fires for a click that landed on genuinely empty
-    /// window space — a slot's own right-click handler accepting the event first stops it from
-    /// ever reaching here.</summary>
+    /// slot's own right-click action) closes it. Godot's Control _GuiInput bubbles from the
+    /// topmost hit control up through its ancestors when an event isn't explicitly accepted, so
+    /// this only fires for a click that landed on genuinely empty window space.</summary>
     public override void _GuiInput(InputEvent @event)
     {
         if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Right, Pressed: true })
