@@ -16,3 +16,7 @@ AI-generated **textures, decals, and icons** are fine to log here. AI-generated 
 | `Assets/Textures/station_floor_{albedo,normal}.png` | Procedurally generated (custom C# script, not AI-generated) | Project-owned | 2026-07-13 | Bold teal panel pair, ~1m tiles, clean (no grunge) — Station floor |
 | `Assets/Textures/station_wall_{albedo,normal}.png` | Procedurally generated (custom C# script, not AI-generated) | Project-owned | 2026-07-13 | Bold teal panel pair, ~2m tiles, clean (no grunge) — Station walls |
 | `Assets/Textures/station_ceiling_{albedo,normal}.png` | Procedurally generated (custom C# script, not AI-generated) | Project-owned | 2026-07-13 | Bold teal panel pair, ~1.3m tiles, clean (no grunge) — Station ceiling |
+| `Shaders/scan_highlight.gdshader` | Hand-authored GDShader (not AI-generated) | Project-owned | 2026-07-23 | `canvas_item` overlay: samples the scan-highlight render layer as a silhouette mask and draws a pulsing outline around it (PDA scan mode) — logged retroactively; the file predates this row |
+
+`Assets/Materials/*.tres` are plain Godot `StandardMaterial3D` resources that only reference the
+textures already logged above — no separate provenance, nothing external in them.

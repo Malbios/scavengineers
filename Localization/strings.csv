@@ -143,3 +143,7 @@ CONTRACT_TYPE_RETRIEVEITEM,Retrieve,Beschaffen
 CONTRACT_TYPE_CARGODELIVERY,Cargo Delivery,Frachtlieferung
 CONTRACT_TYPE_SALVAGEQUOTA,Salvage Quota,Bergungsquote
 CONTRACT_TYPE_SURVEY,Survey,Untersuchung
+HUD_POWER,Power,Energie
+HUD_DOCKING_DISTANCE,Distance,Entfernung
+HUD_DOCKING_SPEED,Speed,Geschwindigkeit
+HUD_DOCKING_MISALIGNMENT,Misalignment,Fehlausrichtung

@@ -22,6 +22,13 @@ public static class ItemCatalog
 
     private static Dictionary<string, ItemDefinition>? _items;
 
+    /// <summary>The same definitions as <see cref="Items"/>, in the order Data/items.json declares
+    /// them — <see cref="StorageItemIds"/>/<see cref="TradeableItemIds"/> read this rather than the
+    /// dictionary so their ordering is defined by the data file rather than by Dictionary
+    /// enumeration order (which .NET explicitly doesn't guarantee). That ordering is player-visible:
+    /// it's the order the shop panel lists items in.</summary>
+    private static List<ItemDefinition>? _ordered;
+
     /// <summary>Safe fallback (1) for an unknown item id — a missing/renamed catalog entry
     /// degrades to "doesn't stack" rather than crashing or throwing, same spirit as the
     /// save-schema doc's "missing-ID fallback is a placeholder + log, never a crash."</summary>
@@ -97,29 +104,97 @@ public static class ItemCatalog
     /// storage install verbs are generated from this instead of a hardcoded list, so a new
     /// storage tier needs only an items.json entry, no code change.</summary>
     public static IReadOnlyCollection<string> StorageItemIds =>
-        Items.Where(kv => kv.Value.StorageSlotCount > 0).Select(kv => kv.Key).ToList();
+        Ordered.Where(d => d.StorageSlotCount > 0).Select(d => d.Id).ToList();
 
-    private static Dictionary<string, ItemDefinition> Items => _items ??= Load();
+    /// <summary>What the vendor charges to sell this item to the player — 0 (the default, and the
+    /// fallback for an unknown item id) means "not for sale", which is what keeps this off tools,
+    /// debug items and quest items without needing a second exclusion list. Buy is always higher
+    /// than <see cref="SellPrice"/> so there's no trivial buy-then-sell arbitrage loop.</summary>
+    public static int BuyPrice(string itemId) =>
+        Items.TryGetValue(itemId, out var item) ? item.BuyPrice : 0;
+
+    /// <summary>What the vendor pays the player for this item — same 0-means-untradeable
+    /// convention as <see cref="BuyPrice"/>.</summary>
+    public static int SellPrice(string itemId) =>
+        Items.TryGetValue(itemId, out var item) ? item.SellPrice : 0;
+
+    /// <summary>Every item the vendor trades, in items.json order — VendorVerbTarget's Buy/Sell
+    /// lists are generated from this instead of a hardcoded price table paired with a separate
+    /// hardcoded item list, so a new tradeable item needs only an items.json entry. An item is
+    /// tradeable iff it has a nonzero <see cref="BuyPrice"/>, same "the data decides" shape as
+    /// <see cref="StorageItemIds"/>.</summary>
+    public static IReadOnlyList<string> TradeableItemIds =>
+        Ordered.Where(d => d.BuyPrice > 0).Select(d => d.Id).ToList();
+
+    private static Dictionary<string, ItemDefinition> Items
+    {
+        get
+        {
+            EnsureLoaded();
+            return _items!;
+        }
+    }
+
+    private static List<ItemDefinition> Ordered
+    {
+        get
+        {
+            EnsureLoaded();
+            return _ordered!;
+        }
+    }
+
+    private static void EnsureLoaded()
+    {
+        if (_items is not null)
+        {
+            return;
+        }
+
+        _ordered = Load();
+        _items = _ordered.ToDictionary(d => d.Id);
+    }
 
     /// <summary>Test-only seam: lets Scavengineers.Scripts.Tests seed the catalog directly,
-    /// bypassing <see cref="Load"/>'s Godot.FileAccess call, which needs a running engine.</summary>
-    internal static void SeedForTests(Dictionary<string, ItemDefinition> items) => _items = items;
+    /// bypassing <see cref="Load"/>'s Godot.FileAccess call, which needs a running engine.
+    /// Dictionary order is whatever the caller's own dictionary enumerates as — a seeding test
+    /// that cares about <see cref="TradeableItemIds"/>/<see cref="StorageItemIds"/> ordering
+    /// should use <see cref="SeedForTests(List{ItemDefinition})"/> instead.</summary>
+    internal static void SeedForTests(Dictionary<string, ItemDefinition> items)
+    {
+        _ordered = items.Values.ToList();
+        _items = items;
+    }
+
+    /// <summary>Ordered counterpart of <see cref="SeedForTests(Dictionary{string, ItemDefinition})"/>
+    /// — mirrors the real <see cref="Load"/> path exactly (a list, keyed afterwards), so a test can
+    /// assert on the data-file-order-dependent id lists. Also the seam Scavengineers.NodeTests uses:
+    /// that project is its own Godot project with no res://Data/ of its own, so the real Load()
+    /// always yields an empty catalog there (see its own project.godot).</summary>
+    internal static void SeedForTests(List<ItemDefinition> items)
+    {
+        _ordered = items;
+        _items = items.ToDictionary(d => d.Id);
+    }
 
     /// <summary>Test-only seam: clears the seeded/cached catalog between tests so one test's
     /// seed data can't leak into the next.</summary>
-    internal static void ResetForTests() => _items = null;
+    internal static void ResetForTests()
+    {
+        _items = null;
+        _ordered = null;
+    }
 
-    private static Dictionary<string, ItemDefinition> Load()
+    private static List<ItemDefinition> Load()
     {
         if (!Godot.FileAccess.FileExists(ResourcePath))
         {
             GD.PushWarning($"[ItemCatalog] {ResourcePath} not found — every item will fall back to a stack size of {DefaultMaxStackSize}.");
-            return new Dictionary<string, ItemDefinition>();
+            return [];
         }
 
         var json = Godot.FileAccess.GetFileAsString(ResourcePath);
-        var definitions = JsonSerializer.Deserialize<List<ItemDefinition>>(json) ?? [];
-        return definitions.ToDictionary(d => d.Id);
+        return JsonSerializer.Deserialize<List<ItemDefinition>>(json) ?? [];
     }
 
     internal sealed class ItemDefinition
@@ -153,5 +228,12 @@ public static class ItemCatalog
 
         [JsonPropertyName("storageSlotCount")]
         public int StorageSlotCount { get; set; }
+
+        /// <summary>0 (the default) means untradeable — see <see cref="BuyPrice(string)"/>.</summary>
+        [JsonPropertyName("buyPrice")]
+        public int BuyPrice { get; set; }
+
+        [JsonPropertyName("sellPrice")]
+        public int SellPrice { get; set; }
     }
 }

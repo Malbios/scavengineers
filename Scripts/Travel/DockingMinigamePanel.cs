@@ -57,6 +57,16 @@ public partial class DockingMinigamePanel : PanelContainer
     private float _distanceRemaining;
     private float _closingVelocity;
     private bool _aborted;
+
+    /// <summary>Test-only observability for the approach's own simulated state — same narrow
+    /// test-accessor convention as Player.ScanModeOn. Exists so a test can assert on the real
+    /// simulation rather than parsing it back out of <see cref="StatusLabel"/>'s display text,
+    /// which is localized (and, in the catalog-less NodeTests project, echoes raw Tr() keys).</summary>
+    public float DistanceRemaining => _distanceRemaining;
+
+    public float CurrentCombinedSpeed => CombinedSpeed();
+
+    public bool Aborted => _aborted;
     private Timer? _abortResetTimer;
     private readonly RandomNumberGenerator _rng = new();
 
@@ -205,7 +215,10 @@ public partial class DockingMinigamePanel : PanelContainer
         var withinTolerance = WithinDockTolerance;
         View.WithinTolerance = withinTolerance;
         DockButton!.Disabled = !withinTolerance;
-        StatusLabel!.Text = $"Distance: {_distanceRemaining:F0}   Speed: {CombinedSpeed():F1}   Misalignment: {_lateralOffset.Length():F1}";
+        StatusLabel!.Text =
+            Tr("HUD_DOCKING_DISTANCE") + $": {_distanceRemaining:F0}   "
+            + Tr("HUD_DOCKING_SPEED") + $": {CombinedSpeed():F1}   "
+            + Tr("HUD_DOCKING_MISALIGNMENT") + $": {_lateralOffset.Length():F1}";
     }
 
     private void OnDockPressed()

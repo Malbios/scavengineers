@@ -15,6 +15,31 @@ Full detail: `docs/project-plan.md` §5 "Ship representation" and Appendix A (th
 - **Rendering is a pure function of model state** (A8) — this is what lets an off-screen ship simulate with no meshes loaded (see `multi-ship-fleet.md`).
 - **Wall covers are post-MVP, optional** (A7): a real Tier-2 fixture over exposed wiring/piping, doesn't affect airtightness, gives protection/insulation/(later) habitability bonuses. MVP ships exposed-only.
 
+## Implemented today
+
+- **Tier 1** is `Scavengineers.Sim.ShipModel.Deck` — cells, sealed edges, per-cell breaches
+  (reason-tagged by `StructuralSurface`), per-*edge* wall breaches, and per-cell/per-edge health.
+  The edge rule holds: `Deck.Normalize` canonicalizes every edge pair, so one wall serves both
+  tiles and `WearSystem` decays each interior edge exactly once.
+- **Tier 2** is `Fixture` and its subtypes (`Conduit`/`Switch`/`Machine`/`Battery`/`Thruster`/
+  `Storage`), each carrying a tile + `FixtureSurface`. Conduit connectivity is **adjacent-cell**,
+  i.e. the MVP option recommended below — `PowerSystem.AreConnected` is Manhattan distance ≤ 1.
+- **Tier 3** is `PickupItem`/`ContainerPickupItem` — real `RigidBody3D`s that float in zero-g via
+  `ShipAtmosphereZone`'s gravity override.
+- **Multi-deck is real** (A5): a layout may declare a `secondDeck` plus a `ladderCell`
+  (`Data/Ships/layouts.json`); the second deck is its own `ShipSim` with `DeckIndex = 1` and a
+  `PrimaryDeckRef`, offset vertically by `ShipBuildTarget.DeckYOffset` so deck 2's floor plane
+  meets deck 1's ceiling plane. Depth is capped at one extra deck. Traversal is
+  `LadderVerbTarget` + `Player.BeginClimbing`.
+- **Layouts are data-driven**: `ShipLayoutCatalog` reads `Data/Ships/layouts.json`; a ship can
+  instead set `ProcedurallyGenerate` and roll a `ShipLayoutGenerator` layout from a saved seed.
+- **Building is verb-driven and free-form** via `ShipBuildTarget` — floor/ceiling panels, wall
+  segments on edges, floor and wall conduits, machines on edges, plus `Extend Floor` to claim new
+  cells beyond the ship's original footprint.
+
+Not yet built: wall covers (post-MVP by design), machinery footprints larger than one tile, and
+pathfinding of any kind (no NPCs yet, so nothing reads the structural tier for navigation).
+
 ## Open sub-decisions (A9) — don't block Phase 0/1 on these
 
 - Conduit connectivity granularity: adjacent-cell (recommended for MVP) vs. explicit port-to-port.

@@ -2703,7 +2703,7 @@ public partial class Player : CharacterBody3D
         {
             var demand = Mathf.RoundToInt(ShipSimRef?.DemandedPower() ?? 0f);
             var capacity = Mathf.RoundToInt(ShipSim.BatteryCapacity);
-            _powerInfoLabel.Text = $"Power: {demand} / {capacity}";
+            _powerInfoLabel.Text = Tr("HUD_POWER") + $": {demand} / {capacity}";
         }
 
         _creditsLabel!.Text = Tr("HUD_CREDITS") + $": {_credits}";

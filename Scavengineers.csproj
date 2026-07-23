@@ -9,6 +9,16 @@
     <ProjectReference Include="Scavengineers.Sim/Scavengineers.Sim.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Scavengineers.NodeTests references this project as a real assembly (unlike
+         Scavengineers.Scripts.Tests, which compiles the Godot-free Scripts/ files straight into
+         itself and so gets `internal` access for free). Without this, its tests can't reach the
+         *ForTests seams — e.g. ItemCatalog.SeedForTests, which that project genuinely needs since
+         it's its own Godot project with no res://Data/ of its own for the real Load() to read. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Scavengineers.NodeTests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
     <!-- These are their own SDK-style projects; without this exclude, this project's default
          recursive glob would also compile their .cs files (and double-add references/usings). -->
     <Compile Remove="Scavengineers.Sim/**/*.cs" />

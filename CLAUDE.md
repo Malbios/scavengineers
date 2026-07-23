@@ -40,8 +40,24 @@ These require explicit user sign-off, plan mode, and a passing test + editor smo
 
 ## Current status
 
-Phase 0 (setup & risk spikes) is complete — all three spikes (grounded movement/interaction, headless atmosphere/power sim, free-float feel) and localization scaffolding are committed. Phase 1 (greybox vertical slice) is well underway: home ship + derelict travel, suit resources, inventory/install/repair/consume, save/load, hull breach and power hazards, airlocks, a station shop, and multi-derelict navigation all exist and work. No formal Phase 1 exit-gate check (`docs/project-plan.md` §7) has been done yet, though functionality already extends past a minimal single-wreck slice.
+Phase 0 (setup & risk spikes) is complete — all three spikes (grounded movement/interaction, headless atmosphere/power sim, free-float feel) and localization scaffolding are committed.
 
-A real test harness exists and runs today across three projects: `Scavengineers.Sim.Tests` (pure C# sim logic, xUnit), `Scavengineers.Scripts.Tests` (Godot-adjacent C# logic, xUnit), and `Scavengineers.NodeTests` (GdUnit4, Godot node/scene-level tests). Run headless via `GODOT_BIN=<path> dotnet test <project>`.
+Phase 1 (greybox vertical slice) is well past its original shape. Built and working today:
+
+- **Loop:** home ship, 2 stations, 5 derelicts, travel console + travel map + docking minigame, airlocks with real per-side doors and atmosphere bridging.
+- **Sim:** per-cell atmosphere with whole-component venting, power grid with a battery budget and ship-wide brownout, conduit fire hazard, passive wear on every fixture and structural surface.
+- **Player:** grounded + free-float + thruster EVA + ladder climbing, EVA suit with O2/N2/CO2-filter/battery sub-slots, hunger/thirst/energy/health, death and reload.
+- **Interaction:** the generalized verb system across ~15 target types, free-form building (floor/ceiling/wall/conduit/machines/`Extend Floor`), two-tier Maintain/Repair upkeep, installable storage furniture, PDA scan cartridges.
+- **Content systems:** data-driven items and ship layouts, a procedural layout generator, multi-deck derelicts, contracts (retrieve/deliver) with deadlines and debt, a station vendor economy, save/load + autosave.
+
+No formal Phase 1 exit-gate check (`docs/project-plan.md` §7) has been done yet. Functionality extends well past a minimal single-wreck slice; the gate is about *felt* tension over a 5–10 minute run, which is a judgement call that hasn't been made.
+
+Known architectural debt worth knowing before you build on it (details in the relevant `docs/architecture/*.md`):
+
+- Every destination is a hand-placed sibling group in `Scenes/World.tscn`, and all 13 `ShipSim` decks tick full-fidelity every frame regardless of presence — the strategic-layer/bubble model and the sim-LOD seam are both unbuilt.
+- `Scripts/Verbs/ShipBuildTarget.cs` (~2 800 lines) and `Scripts/Player/Player.cs` (~2 400 lines) are the two god classes; new features gravitate to them by default. Resist that.
+- Live sim state (atmosphere volumes, fires, in-flight verb progress) is not serialized, despite the save-schema rule requiring it.
+
+A real test harness exists and runs today across three projects: `Scavengineers.Sim.Tests` (pure C# sim logic, xUnit), `Scavengineers.Scripts.Tests` (Godot-adjacent C# logic, xUnit), and `Scavengineers.NodeTests` (GdUnit4, Godot node/scene-level tests). Run headless via `GODOT_BIN=<path> dotnet test <project>`. All three pass as of 2026-07-23 (75 / 1107 / 254).
 
 CI is still intentionally deferred — no `.github/workflows` exists yet. Add one only when explicitly asked.

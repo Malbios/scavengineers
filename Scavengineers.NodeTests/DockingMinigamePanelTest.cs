@@ -109,18 +109,18 @@ public class DockingMinigamePanelTest
         var panel = MakePanel((SceneTree)Engine.GetMainLoop());
 
         // Approaching at a real clip — a positive closing velocity already under way. dt=1s (not
-        // the usual sub-frame tick) so the resulting distance change comfortably clears
-        // StatusLabel's own :F0 rounding — a sub-1-unit change would round away and false-pass.
+        // the usual sub-frame tick) so the resulting distance change is unambiguously larger than
+        // float noise. Reads DistanceRemaining directly rather than parsing StatusLabel's text:
+        // that text is localized, so scraping it made this test depend on the English copy.
         panel.ResetAttempt(startingOffset: Vector2.Zero, startingVelocity: Vector2.Zero, startingDistance: 50f);
         panel.Tick(1f, Vector2.Zero, 1f); // Space: builds up positive closing speed.
-        var distanceWhileClosing = float.Parse(panel.StatusLabel!.Text.Split("Distance: ")[1].Split(' ')[0]);
+        var distanceWhileClosing = panel.DistanceRemaining;
 
         // Ctrl (-1) — should push back the other way, not just stop accelerating.
         panel.Tick(1f, Vector2.Zero, -1f);
         panel.Tick(1f, Vector2.Zero, -1f);
         panel.Tick(1f, Vector2.Zero, -1f);
-        var distanceAfterReversing = float.Parse(panel.StatusLabel!.Text.Split("Distance: ")[1].Split(' ')[0]);
 
-        AssertFloat(distanceAfterReversing).IsGreater(distanceWhileClosing);
+        AssertFloat(panel.DistanceRemaining).IsGreater(distanceWhileClosing);
     }
 }
