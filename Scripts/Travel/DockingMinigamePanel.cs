@@ -3,15 +3,12 @@ using PlayerScript = Scavengineers.Scripts.Player.Player;
 
 namespace Scavengineers.Scripts.Travel;
 
-/// <summary>The docking minigame's own real-time simulation and UI — own two independent axes,
-/// same "own reference back to Player, Player owns the reference to whichever world target is
-/// currently open" shape TravelMapPanel/ThrusterVerbTarget's own windows already use (see
-/// Player._openDockingConsole): lateral alignment (WASD, inertia-based, same accelerate/drag
-/// shape as Player's own zero-g thrust) and closing distance (Space to thrust in, Ctrl to
-/// actively back off). Too fast (combined velocity) or too misaligned aborts the attempt — a
-/// free retry via a brief message + reset,
-/// not a failed trip. The Dock button only does anything once all three tolerances hold at
-/// once.</summary>
+/// <summary>The docking minigame's own real-time simulation and UI — two independent axes:
+/// lateral alignment (WASD, inertia-based, same accelerate/drag shape as Player's own zero-g
+/// thrust) and closing distance (Space to thrust in, Ctrl to actively back off). Too fast
+/// (combined velocity) or too misaligned aborts the attempt — a free retry via a brief message +
+/// reset, not a failed trip. The Dock button only does anything once all three tolerances hold
+/// at once.</summary>
 public partial class DockingMinigamePanel : PanelContainer
 {
     [Export]
@@ -26,8 +23,6 @@ public partial class DockingMinigamePanel : PanelContainer
     [Export]
     public Label? HintLabel { get; set; }
 
-    /// <summary>Set by Player._Ready, same self-addressing shape InventorySlotUI.PlayerRef and
-    /// every other panel's own PlayerRef already use.</summary>
     public PlayerScript? PlayerRef { get; set; }
 
     // Placeholder/tunable — everything below is abstract "offset units," not meters, picked to
@@ -58,10 +53,9 @@ public partial class DockingMinigamePanel : PanelContainer
     private float _closingVelocity;
     private bool _aborted;
 
-    /// <summary>Test-only observability for the approach's own simulated state — same narrow
-    /// test-accessor convention as Player.ScanModeOn. Exists so a test can assert on the real
-    /// simulation rather than parsing it back out of <see cref="StatusLabel"/>'s display text,
-    /// which is localized (and, in the catalog-less NodeTests project, echoes raw Tr() keys).</summary>
+    /// <summary>Test-only observability for the approach's simulated state — lets a test assert
+    /// on the real simulation rather than parsing it back out of <see cref="StatusLabel"/>'s
+    /// display text, which is localized.</summary>
     public float DistanceRemaining => _distanceRemaining;
 
     public float CurrentCombinedSpeed => CombinedSpeed();
@@ -81,11 +75,10 @@ public partial class DockingMinigamePanel : PanelContainer
         _abortResetTimer.Timeout += () => ResetAttempt();
     }
 
-    /// <summary>Called by Player.OpenDockingMinigame — starts (or restarts) the approach from a
-    /// fresh, randomized misalignment so a retry doesn't look identical to the previous one.
-    /// Every parameter is an explicit-override test seam (null means "use the normal randomized/
-    /// default value," matching this codebase's established SavePath/AutosaveIntervalSeconds-
-    /// style testability convention) — production callers never pass any of them.</summary>
+    /// <summary>Starts (or restarts) the approach from a fresh, randomized misalignment so a
+    /// retry doesn't look identical to the previous one. Every parameter is an explicit-override
+    /// test seam (null means "use the normal randomized/default value") — production callers
+    /// never pass any of them.</summary>
     public void ResetAttempt(Vector2? startingOffset = null, Vector2? startingVelocity = null, float? startingDistance = null)
     {
         _aborted = false;
@@ -137,8 +130,7 @@ public partial class DockingMinigamePanel : PanelContainer
         }
 
         // Space = closing thrust (toward the port), Ctrl = its counter (actively backing off) —
-        // same paired-opposite-keys shape Player's own zero-g float movement already uses for
-        // its own Space-up/Ctrl-down thrust pair, not a new convention.
+        // same paired-opposite-keys shape Player's own zero-g float movement uses.
         var closingAxis = 0f;
         if (Input.IsPhysicalKeyPressed(Key.Space))
         {
@@ -153,14 +145,12 @@ public partial class DockingMinigamePanel : PanelContainer
         Tick((float)delta, thrust, closingAxis);
     }
 
-    /// <summary>The minigame's own pure simulation step, factored out of _PhysicsProcess so it
-    /// can be driven with synthetic input directly — Input.IsPhysicalKeyPressed reflects real,
-    /// continuously-held OS key state that NodeTests has no established way to fake (unlike the
-    /// one-shot InputEventKey Player's own tests already simulate), so this is what actually
-    /// makes the abort/tolerance logic testable at all. closingAxis is signed (+1 = Space,
-    /// -1 = Ctrl, 0 = neither/both) rather than a bool, so the closing velocity can go negative
-    /// (actively backing away from the port) instead of only ever decaying passively toward
-    /// zero.</summary>
+    /// <summary>The minigame's pure simulation step, factored out of _PhysicsProcess so it can be
+    /// driven with synthetic input directly — Input.IsPhysicalKeyPressed reflects real,
+    /// continuously-held OS key state that NodeTests has no way to fake, so this is what makes
+    /// the abort/tolerance logic testable at all. closingAxis is signed (+1 = Space, -1 = Ctrl, 0
+    /// = neither/both) rather than a bool, so the closing velocity can go negative instead of
+    /// only ever decaying passively toward zero.</summary>
     public void Tick(float dt, Vector2 lateralThrust, float closingAxis)
     {
         if (_aborted)

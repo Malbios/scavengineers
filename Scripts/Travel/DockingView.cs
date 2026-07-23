@@ -2,12 +2,10 @@ using Godot;
 
 namespace Scavengineers.Scripts.Travel;
 
-/// <summary>Draws the docking minigame's own visual metaphor — a fixed ring (the docking port)
-/// at the view's center and a marker offset from it by <see cref="LateralOffset"/> (the ship's
-/// current misalignment) — on top of a StarfieldBackground sibling reused as-is for the
-/// background (see the DockingPanel node in Player.tscn). Same bare-Control-with-_Draw shape as
-/// StarfieldBackground itself, just for a different, continuously-changing visual rather than a
-/// fixed-until-resize one.</summary>
+/// <summary>Draws the docking minigame's visual metaphor — a fixed ring (the docking port) at
+/// the view's center and a marker offset from it by <see cref="LateralOffset"/> (the ship's
+/// current misalignment), on top of a StarfieldBackground sibling reused as-is for the
+/// background.</summary>
 public partial class DockingView : Control
 {
     // Placeholder/tunable — how many pixels one unit of DockingMinigamePanel's own abstract

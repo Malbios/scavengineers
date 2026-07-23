@@ -11,26 +11,22 @@ using PlayerScript = Scavengineers.Scripts.Player.Player;
 
 namespace Scavengineers.Scripts.SaveLoad;
 
-/// <summary>
-/// F5 saves, F9 loads. Kept as its own node/concern rather than folded into Player's input
-/// handling. Scoped to GreyboxRoom (the real demo scene) — the throwaway FloatSpike doesn't
-/// need this.
-/// </summary>
+/// <summary>F5 saves, F9 loads. Kept as its own node/concern rather than folded into Player's
+/// input handling.</summary>
 public partial class SaveManager : Node
 {
     /// <summary>Shared default, also used directly by ShipSim.ProcedurallyGenerate to read its
-    /// own seed off disk (see IShipLayoutSaveable's own doc comment for why that read can't go
-    /// through the normal ApplySaveState callback). A ShipSim has no reference to this node — the
-    /// path itself is the only thing that needs to be shared, not a NodePath wiring.</summary>
+    /// own seed off disk. A ShipSim has no reference to this node — the path itself is the only
+    /// thing that needs to be shared.</summary>
     public static readonly string DefaultSavePath = ProjectSettings.GlobalizePath("user://savegame.json");
 
-    /// <summary>Instance property (not a static constant) so a test can point this at a temp file
-    /// instead of the player's real save data — every production caller just uses the default.</summary>
+    /// <summary>Instance property, not a static constant, so a test can point this at a temp file
+    /// instead of the player's real save data.</summary>
     public string SavePath { get; set; } = DefaultSavePath;
 
     /// <summary>Placeholder/tunable — how often autosave fires. Instance property, not a
-    /// constant, for the same reason SavePath already is one: a test needs to point this at a
-    /// much shorter interval than real play ever would, set before this node enters the tree.</summary>
+    /// constant, so a test can dial it down to a much shorter interval before this node enters
+    /// the tree.</summary>
     public float AutosaveIntervalSeconds { get; set; } = 300f;
 
     [Export]
@@ -148,9 +144,9 @@ public partial class SaveManager : Node
         _player?.ShowSavedFlash();
     }
 
-    /// <summary>Returns whether a save was actually applied — false (no-op, logged) for a missing
-    /// or unreadable file, so callers like Player.Die() can fall back instead of retrying a load
-    /// that will never succeed.</summary>
+    /// <summary>Returns whether a save was actually applied — false for a missing or unreadable
+    /// file, so callers like Player.Die() can fall back instead of retrying a load that will
+    /// never succeed.</summary>
     public bool Load()
     {
         if (!File.Exists(SavePath))
@@ -232,9 +228,8 @@ public partial class SaveManager : Node
             }
         }
 
-        // Loose world objects, not tied to any owner node's own ApplyBuildState — cleared and
-        // respawned wholesale here instead, same "clear then reapply" shape as ShipBuildTarget's
-        // ClearAllBuildState/ApplyBuildState uses for its own dynamically-placed machines.
+        // Loose world objects, not tied to any owner node's ApplyBuildState — cleared and
+        // respawned wholesale here instead.
         foreach (var node in GetTree().GetNodesInGroup("dropped_container"))
         {
             node.QueueFree();
@@ -278,9 +273,8 @@ public partial class SaveManager : Node
     }
 
     /// <summary>Reads just the ShipLayoutSeeds dictionary off disk, synchronously — called
-    /// directly by ShipSim.ProcedurallyGenerate at the very top of its own _Ready(), before this
-    /// (or any) SaveManager instance necessarily exists yet. Null for a missing/unreadable file,
-    /// same "can't load, fall back" shape as <see cref="Load"/>'s own file-read guard — a
+    /// directly by ShipSim.ProcedurallyGenerate at the top of its own _Ready(), before this (or
+    /// any) SaveManager instance necessarily exists. Null for a missing/unreadable file — a
     /// caller finding no seed for its own SaveId (or this returning null entirely) both correctly
     /// mean "roll a fresh one."</summary>
     public static Dictionary<string, int>? TryReadShipLayoutSeeds(string savePath)

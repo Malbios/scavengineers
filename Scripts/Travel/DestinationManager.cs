@@ -8,23 +8,15 @@ using Scavengineers.Scripts.Verbs;
 
 namespace Scavengineers.Scripts.Travel;
 
-/// <summary>
-/// Builds the tactical bubble at startup: instantiates every <see cref="DestinationCatalog"/> entry
-/// under <see cref="BubbleRoot"/> and registers it with the travel console.
+/// <summary>Builds the tactical bubble at startup: instantiates every
+/// <see cref="DestinationCatalog"/> entry under <see cref="BubbleRoot"/> and registers it with
+/// the travel console. A new destination is one row of Data/destinations.json — no scene edit.
 ///
-/// <para>This replaced eight hand-placed sibling groups in World.tscn and seven parallel
-/// <c>NodePath</c> arrays on <c>TravelConsoleVerbTarget</c>. A new destination is now one row of
-/// Data/destinations.json — no scene edit, no array entries to keep in step, and no way for the
-/// data list and the scene wiring to disagree about how many destinations exist (the console used
-/// to warn about exactly that).</para>
-///
-/// <para>Every destination is instantiated once, at startup, and kept — presence is still toggled
-/// by <c>TravelConsoleVerbTarget.SetShipPresence</c>. Freeing the ones you aren't at is a separate,
+/// Every destination is instantiated once, at startup, and kept — presence is still toggled by
+/// <c>TravelConsoleVerbTarget.SetShipPresence</c>. Freeing the ones you aren't at is a separate,
 /// larger step: <c>ShipSim</c> is a Node that owns its <c>ShipSystems</c>, so freeing it would
-/// destroy the very sim the coarse LOD tick exists to keep running, and would drop the build state,
-/// layout seed and mission items SaveManager reads off the live tree. See
-/// docs/architecture/space-and-travel.md.</para>
-/// </summary>
+/// destroy the very sim the coarse LOD tick exists to keep running, and would drop the build
+/// state, layout seed and mission items SaveManager reads off the live tree.</summary>
 public partial class DestinationManager : Node
 {
     /// <summary>Where instantiated destinations are parented. Its own transform is left alone —
@@ -73,9 +65,8 @@ public partial class DestinationManager : Node
             return null;
         }
 
-        // Both before AddChild, deliberately: a node's _Ready fires on entering the tree, and
-        // ShipSim reads LayoutId/ProcedurallyGenerate there while ShipBuildTarget reads
-        // GenerateLoot. Applying afterwards would set the right values too late to matter.
+        // Both before AddChild: a node's _Ready fires on entering the tree, and ShipSim reads
+        // LayoutId/ProcedurallyGenerate there while ShipBuildTarget reads GenerateLoot.
         instance.Name = destination.Id;
         instance.Position = destination.Position;
         ApplyOverrides(destination, instance);
@@ -98,9 +89,9 @@ public partial class DestinationManager : Node
 
             foreach (var (property, value) in properties)
             {
-                // Node.Set on an unknown property is silent, so a typo here would leave the node on
-                // its scene default — which for a SaveId means two destinations quietly sharing one
-                // save key. Worth a warning rather than a mystery.
+                // Node.Set on an unknown property is silent, so a typo here would leave the node
+                // on its scene default — which for a SaveId means two destinations quietly
+                // sharing one save key.
                 if (!known.Contains(property))
                 {
                     GD.PushWarning($"[DestinationManager] '{destination.Id}' overrides '{nodePath}.{property}', which doesn't exist on that node — ignored.");
@@ -122,10 +113,10 @@ public partial class DestinationManager : Node
         _ => value.ToString(),
     };
 
-    /// <summary>Hands the console the four nodes it needs per destination. Found by type among the
+    /// <summary>Hands the console the nodes it needs per destination. Found by type among the
     /// instance's *direct* children rather than by name: a Derelict has a second ShipSim and a
-    /// second ShipBuildTarget, but they live under its Deck2 child, so a non-recursive search picks
-    /// the primary deck without this needing to know either scene's node names.</summary>
+    /// second ShipBuildTarget, but they live under its Deck2 child, so a non-recursive search
+    /// picks the primary deck.</summary>
     private void Register(DestinationCatalog.DestinationDefinition destination, Node3D instance)
     {
         if (ConsoleRef is null)
@@ -144,7 +135,7 @@ public partial class DestinationManager : Node
         }
 
         // The contract giver reaches back out of its own subtree to read the console's destination
-        // list, which no NodePath in the destination scene can express now that its depth in the
+        // list, which no NodePath in the destination scene can express since its depth in the
         // tree is decided at runtime.
         foreach (var contractGiver in children.OfType<ContractGiverVerbTarget>())
         {

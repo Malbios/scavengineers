@@ -8,15 +8,11 @@ using Godot;
 
 namespace Scavengineers.Scripts.Contracts;
 
-/// <summary>
-/// The game's contract-template data, loaded from Data/contracts.json (same data-driven
-/// convention as ItemCatalog/Data/items.json — CLAUDE.md's data-driven non-negotiable). A
-/// template describes a *kind* of job with ranges; <see cref="Roll"/> resolves those ranges into
-/// one concrete <see cref="Contract"/> instance. Deliberately uses plain System.Random, not
-/// Godot's RandomNumberGenerator — same reasoning as ShipLayoutGenerator's own doc comment:
-/// RandomNumberGenerator is a full RefCounted-derived Godot class with engine-dependency risk,
-/// System.Random is pure BCL and keeps this class (and its tests) fully engine-free.
-/// </summary>
+/// <summary>The game's contract-template data, loaded from Data/contracts.json (CLAUDE.md's
+/// data-driven non-negotiable). A template describes a *kind* of job with ranges;
+/// <see cref="Roll"/> resolves those ranges into one concrete <see cref="Contract"/> instance.
+/// Deliberately uses plain System.Random, not Godot's RandomNumberGenerator (a RefCounted-derived
+/// Godot class), to keep this class and its tests fully engine-free.</summary>
 public static class ContractCatalog
 {
     private const string ResourcePath = "res://Data/contracts.json";
@@ -27,20 +23,16 @@ public static class ContractCatalog
 
     internal static IReadOnlyList<ContractTemplate> AllTemplates => Templates;
 
-    /// <summary>Test-only seam: lets Scavengineers.Scripts.Tests seed the catalog directly,
-    /// bypassing <see cref="Load"/>'s Godot.FileAccess call, which needs a running engine.</summary>
+    /// <summary>Test-only seam bypassing <see cref="Load"/>'s Godot.FileAccess call.</summary>
     internal static void SeedForTests(List<ContractTemplate> templates) => _templates = templates;
 
-    /// <summary>Test-only seam: clears the seeded/cached catalog between tests so one test's
-    /// seed data can't leak into the next.</summary>
     internal static void ResetForTests() => _templates = null;
 
     /// <summary>Resolves one template's ranges into a concrete, acceptable Contract — a fresh
-    /// InstanceId every call (even for the same template), the item pool picked uniformly at
-    /// random (null if the template has none, e.g. CargoDelivery/Survey), count/reward each
-    /// independently rolled within their own [min, max] range. Leaves every destination-id field
-    /// null — the caller (ContractGiverVerbTarget) fills those in from its own live console
-    /// access, which this pure catalog has no knowledge of.</summary>
+    /// InstanceId every call, the item pool picked uniformly at random (null if the template has
+    /// none, e.g. CargoDelivery/Survey), count/reward each independently rolled within their own
+    /// range. Leaves every destination-id field null — the caller (ContractGiverVerbTarget) fills
+    /// those in from its own live console access.</summary>
     public static Contract Roll(string templateId, Random rng)
     {
         var template = Templates.First(t => t.Id == templateId);

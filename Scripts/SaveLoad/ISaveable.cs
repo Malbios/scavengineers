@@ -1,10 +1,7 @@
 namespace Scavengineers.Scripts.SaveLoad;
 
-/// <summary>
-/// Deliberately narrow — matches what actually needs saving today (docs/architecture/
-/// save-schema.md). Both current stateful world objects reduce to a single boolean; this
-/// contract generalizes further only when real content needs richer state.
-/// </summary>
+/// <summary>Deliberately narrow — matches what actually needs saving today. Generalizes further
+/// only when real content needs richer state.</summary>
 public interface ISaveable
 {
     /// <summary>Stable, hand-assigned identifier — never derived from scene-tree position

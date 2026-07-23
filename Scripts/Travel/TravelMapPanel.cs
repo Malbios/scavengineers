@@ -7,9 +7,7 @@ namespace Scavengineers.Scripts.Travel;
 
 /// <summary>The travel console's map screen — one Button per destination, spawned fresh into
 /// <see cref="MapArea"/> at each entry's own map position every time <see cref="Populate"/> runs,
-/// rather than requiring one hand-placed, individually-wired scene node per destination. Lives
-/// under Player.tscn's HUD CanvasLayer like every other piece of UI in this project (see
-/// InventoryPanel/DrillWindow/etc.) — not a separately instanced scene.</summary>
+/// rather than requiring one hand-placed, individually-wired scene node per destination.</summary>
 public partial class TravelMapPanel : PanelContainer
 {
     [Export]
@@ -24,9 +22,6 @@ public partial class TravelMapPanel : PanelContainer
     [Export]
     public Button? CancelButton { get; set; }
 
-    /// <summary>Set by Player._Ready, same self-addressing shape InventorySlotUI.PlayerRef
-    /// already uses — lets this panel call back into Player without Player needing to reach in
-    /// and manage this panel's own button-click plumbing.</summary>
     public PlayerScript? PlayerRef { get; set; }
 
     // Placeholder/tunable — tints the selected destination's icon so it's visually obvious at a
@@ -38,8 +33,6 @@ public partial class TravelMapPanel : PanelContainer
 
     public override void _Ready()
     {
-        // Reuses the existing VERB_TRAVEL key rather than a duplicate one, matching the reuse
-        // precedent AirlockDoorVerbTarget's own PryVerb sets with VERB_PRY_DOOR.
         TravelButton!.Text = Tr("VERB_TRAVEL");
         CancelButton!.Text = Tr("HUD_TRAVEL_MAP_CANCEL");
 

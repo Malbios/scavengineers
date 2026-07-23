@@ -7,28 +7,18 @@ using Godot;
 
 namespace Scavengineers.Scripts.Travel;
 
-/// <summary>
-/// The strategic layer's location list, loaded from Data/destinations.json — which places exist,
-/// what they're called, and where they sit on the travel map.
+/// <summary>The strategic layer's location list, loaded from Data/destinations.json — which
+/// places exist, what they're called, and where they sit on the travel map: "a map/graph of
+/// locations — pure data, no physics".
 ///
-/// <para>This is the first half of the strategic/tactical split in
-/// docs/architecture/space-and-travel.md: "a map/graph of locations — pure data, no physics". It
-/// replaced <c>TravelConsoleVerbTarget</c>'s <c>StationMapPositions</c>/<c>DerelictMapPositions</c>
-/// arrays and its hardcoded <c>OBJECT_STATION</c> / <c>$"OBJECT_DERELICT_{i + 1}"</c> label
-/// construction, which meant a destination's *identity* was spread across two inspector arrays and
-/// a string built by index.</para>
-///
-/// <para>The destination *ordering* here is load-bearing and must not be reshuffled: a destination
-/// is addressed by its index across the whole list (stations first, then derelicts), and that index
+/// The destination *ordering* here is load-bearing and must not be reshuffled: a destination is
+/// addressed by its index across the whole list (stations first, then derelicts), and that index
 /// is what save files and accepted contracts store. Appending is safe; reordering or removing
-/// silently repoints an in-flight CargoDelivery at the wrong place. Same stable-id discipline as
-/// docs/architecture/save-schema.md's content-ID rule, applied to positions in a list.</para>
+/// silently repoints an in-flight CargoDelivery at the wrong place.
 ///
-/// <para>The *node* side lives here too now: <see cref="DestinationDefinition.Scene"/> plus
-/// <see cref="DestinationDefinition.Overrides"/> are what <c>DestinationManager</c> instantiates at
-/// startup, replacing seven parallel <c>NodePath</c> arrays on the travel console and eight
-/// hand-placed sibling groups in World.tscn. Adding a destination is one entry in this file.</para>
-/// </summary>
+/// The *node* side lives here too: <see cref="DestinationDefinition.Scene"/> plus
+/// <see cref="DestinationDefinition.Overrides"/> are what <c>DestinationManager</c> instantiates
+/// at startup. Adding a destination is one entry in this file.</summary>
 public static class DestinationCatalog
 {
     private const string ResourcePath = "res://Data/destinations.json";
@@ -44,14 +34,14 @@ public static class DestinationCatalog
     public static int DerelictCount => Destinations.Count(d => !d.IsStation);
 
     /// <summary>Null for an index outside the list — a caller resolving an unknown destination
-    /// degrades rather than throwing, same safe-fallback spirit as ItemCatalog/ShipLayoutCatalog.</summary>
+    /// degrades rather than throwing.</summary>
     public static DestinationDefinition? At(int index) =>
         index >= 0 && index < Destinations.Count ? Destinations[index] : null;
 
     private static List<DestinationDefinition> Destinations => _destinations ??= Load();
 
-    /// <summary>Test-only seam, matching ItemCatalog/ShipLayoutCatalog's own — Load needs a running
-    /// Godot engine, and Scavengineers.NodeTests has no res://Data/ of its own.</summary>
+    /// <summary>Test-only seam — Load needs a running Godot engine, and Scavengineers.NodeTests
+    /// has no res://Data/ of its own.</summary>
     internal static void SeedForTests(List<DestinationDefinition> destinations) => _destinations = destinations;
 
     internal static void ResetForTests() => _destinations = null;
@@ -109,7 +99,7 @@ public static class DestinationCatalog
         /// <summary>The scene DestinationManager instantiates for this destination. Two
         /// destinations can share one scene and differ only by <see cref="Overrides"/> (all five
         /// Derelicts do) — a variant scene is for differences that aren't scalars, like Station 2's
-        /// own figure placement and materials (Scenes/Station2.tscn inherits Station.tscn).</summary>
+        /// own figure placement and materials.</summary>
         [JsonPropertyName("scene")]
         public string Scene { get; set; } = "";
 

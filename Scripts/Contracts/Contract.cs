@@ -1,15 +1,11 @@
 namespace Scavengineers.Scripts.Contracts;
 
 /// <summary>A rolled/accepted contract instance — distinct from ContractCatalog.ContractTemplate
-/// (the data-driven, unrolled JSON row): a template describes a *kind* of job with ranges
-/// (reward, count, deadline); a Contract is one specific offer/acceptance with those ranges
-/// already resolved. Target destination ids (which Derelict/Station) are deliberately left for
-/// whoever rolls this (see ContractGiverVerbTarget) rather than ContractCatalog itself, since
-/// picking a real target needs live access to TravelConsoleVerbTarget's current Derelict/Station
-/// counts — data outside what a pure catalog loader should know about. A record (not a plain
-/// class), matching this codebase's own convention for small immutable-ish data shapes (Verb,
-/// TravelMapEntry, ShopEntry) — ContractGiverVerbTarget fills in the destination fields left null
-/// by ContractCatalog.Roll via a `with` expression rather than mutating the original.</summary>
+/// (the data-driven, unrolled JSON row): a template describes a *kind* of job with ranges; a
+/// Contract is one specific offer/acceptance with those ranges already resolved. Target
+/// destination ids are deliberately left for whoever rolls this (see ContractGiverVerbTarget)
+/// rather than ContractCatalog itself, since picking a real target needs live access to
+/// TravelConsoleVerbTarget's current Derelict/Station counts.</summary>
 public sealed record Contract
 {
     public required string InstanceId { get; init; }
@@ -39,8 +35,7 @@ public sealed record Contract
 
     public int FailureFee { get; init; }
 
-    /// <summary>Ticked down once a second while accepted (Player owns the actual countdown timer)
-    /// — expiry with this at or below zero removes the contract and adds FailureFee to
-    /// Player.PendingDebt.</summary>
+    /// <summary>Ticked down once a second while accepted (Player owns the countdown timer) —
+    /// expiry at or below zero removes the contract and adds FailureFee to Player.PendingDebt.</summary>
     public float RemainingSeconds { get; set; }
 }
