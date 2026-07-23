@@ -289,11 +289,13 @@ public class PlayerEquipSlotTest
         legSlot.AddChild(new Label { Name = "Count" });
         sceneTree.Root.AddChild(legSlot);
 
-        // Two-step await (matches InteriorDoorVerbTargetTest's established convention) — a single
-        // ProcessFrame isn't always enough for _Ready() to have wired _icon/_countLabel and for
-        // _Process's own Refresh() to have run by the time we check.
+        // Waits on the *slot's* own idle _Process (InventorySlotUI.Refresh), not on Player —
+        // legSlot is a standalone node here, added straight to the root, so Player's physics tick
+        // says nothing about whether it has refreshed yet. Two-step await matches
+        // InteriorDoorVerbTargetTest's established convention: a single ProcessFrame isn't always
+        // enough for _Ready() to have wired _icon/_countLabel and for Refresh() to have run.
         await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
 
         var icon = legSlot.GetNode<ColorRect>("Icon");
         AssertBool(icon.Visible).IsFalse();
@@ -480,8 +482,7 @@ public class PlayerEquipSlotTest
         // a Control's raw Godot default is Visible, so checking before any frame has ticked
         // would see that default instead of the game's own closed-by-default state.
         var suitWindow = player.GetNode<Control>("HUD/SuitWindow");
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+        await FrameWait.UntilPlayerProcessedAsync(sceneTree, player);
         AssertBool(suitWindow.Visible).IsFalse();
 
         player.ToggleItemWindow("eva_torso_suit");
@@ -490,8 +491,7 @@ public class PlayerEquipSlotTest
 
         // Two-step await (matches this project's established convention) so UpdateInventoryHud's
         // per-frame Container re-point has actually run by the time we check it.
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+        await FrameWait.UntilPlayerProcessedAsync(sceneTree, player);
 
         var pocket1 = player.GetNode<InventorySlotUI>("HUD/SuitWindow/Layout/SuitGrid/Pocket1");
         AssertBool(ReferenceEquals(pocket1.Container, player.Inventory.GetPersistentContents("eva_torso_suit"))).IsTrue();
@@ -507,8 +507,7 @@ public class PlayerEquipSlotTest
         ResetTorsoAndHeadFromStipend(player.Inventory);
 
         var suitWindow = player.GetNode<Control>("HUD/SuitWindow");
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+        await FrameWait.UntilPlayerProcessedAsync(sceneTree, player);
         AssertBool(suitWindow.Visible).IsFalse();
 
         player.ToggleItemWindow("eva_torso_suit");
@@ -561,16 +560,14 @@ public class PlayerEquipSlotTest
         player.Inventory.GetEquippedContainer("pda")!.Contents.Add("health_scan_cartridge", 1);
 
         var pdaWindow = player.GetNode<Control>("HUD/PdaWindow");
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+        await FrameWait.UntilPlayerProcessedAsync(sceneTree, player);
         AssertBool(pdaWindow.Visible).IsFalse();
 
         player.ToggleItemWindow("pda");
 
         AssertBool(pdaWindow.Visible).IsTrue();
 
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
+        await FrameWait.UntilPlayerProcessedAsync(sceneTree, player);
 
         var cartridgeSlot = player.GetNode<InventorySlotUI>("HUD/PdaWindow/Layout/PdaGrid/Cartridge1");
         AssertBool(ReferenceEquals(cartridgeSlot.Container, player.Inventory.GetPersistentContents("pda"))).IsTrue();

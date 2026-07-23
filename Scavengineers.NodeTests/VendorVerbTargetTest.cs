@@ -60,8 +60,13 @@ public partial class VendorVerbTargetTest
         new() { Id = TestExpensive, MaxStackSize = 1, BuyPrice = 40, SellPrice = 15 },
     });
 
-    [After]
-    public void ResetCatalog() => ItemCatalog.ResetForTests();
+    // Deliberately NO [After] ItemCatalog.ResetForTests(). Resetting sets the catalog back to null,
+    // so the *next* suite to touch it re-runs Load() — which in this project-less test process
+    // finds no res://Data/items.json, emits another GD.PushWarning, and generally reintroduces
+    // exactly the kind of cross-suite timing variation this suite already caused once. Leaving the
+    // seed in place means Load() runs at most once per process, as it did before this suite existed.
+    // Safe precisely because the seeded ids are synthetic: no other suite queries them, and every
+    // real id stays unknown to the catalog, resolving to the same defaults an empty one gives.
 
     private static (VendorVerbTarget Vendor, PlayerScript Player) CreateVendorWithPlayer(SceneTree sceneTree)
     {

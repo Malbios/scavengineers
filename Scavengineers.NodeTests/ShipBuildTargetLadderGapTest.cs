@@ -37,7 +37,7 @@ public class ShipBuildTargetLadderGapTest
         var buildTarget = new ShipBuildTarget { ShipSimRef = shipSim, ShipRoot = shipRoot, PanelMesh = new BoxMesh(), PanelCollisionShape = new BoxShape3D() };
         shipRoot.AddChild(buildTarget);
 
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
+        await FrameWait.UntilAsync(sceneTree, () => buildTarget.InitialGenerationComplete);
 
         var colliders = buildTarget.GetChildren().OfType<CollisionShape3D>().ToList();
         AssertBool(colliders.Any(c => c.Position.IsEqualApprox(FloorPos))).IsTrue();
@@ -62,7 +62,7 @@ public class ShipBuildTargetLadderGapTest
         var buildTarget = new ShipBuildTarget { ShipSimRef = secondDeck, ShipRoot = shipRoot, PanelMesh = new BoxMesh(), PanelCollisionShape = new BoxShape3D() };
         shipRoot.AddChild(buildTarget);
 
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
+        await FrameWait.UntilAsync(sceneTree, () => buildTarget.InitialGenerationComplete);
 
         var colliders = buildTarget.GetChildren().OfType<CollisionShape3D>().ToList();
         AssertBool(colliders.Any(c => c.Position.IsEqualApprox(FloorPos))).IsFalse();

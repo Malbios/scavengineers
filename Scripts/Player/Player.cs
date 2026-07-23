@@ -192,20 +192,17 @@ public partial class Player : CharacterBody3D
     /// a NodeTest assert on rendered HUD state without reaching through a private field.</summary>
     public PlayerHudView? Hud => _hud;
 
-    private DraggableWindow? _inventoryPanel;
+    /// <summary>Every modal HUD panel — which are open, their nodes, and the world object each was
+    /// opened from. See <see cref="PanelController"/>; the eight open-flags and eight owner fields
+    /// that used to live here moved there wholesale.</summary>
+    private PanelController? _panels;
+
+    /// <summary>Test-only observability, same narrow convention as <see cref="ScanModeOn"/>.</summary>
+    public PanelController? Panels => _panels;
+
     private DraggableWindow? _drillWindow;
     private DraggableWindow? _flashlightWindow;
     private DraggableWindow? _backpackWindow;
-    private TravelMapPanel? _travelMapPanel;
-    private TravelConsoleVerbTarget? _openTravelConsole;
-    private DockingMinigamePanel? _dockingPanel;
-    private TravelConsoleVerbTarget? _openDockingConsole;
-    private ShopPanel? _shopPanel;
-    private VendorVerbTarget? _openShopVendor;
-    private ContractBoardPanel? _contractBoardPanel;
-    private ContractGiverVerbTarget? _openContractGiver;
-    private DeathPanel? _deathPanel;
-    private WorldDropZone? _worldDropZone;
     private Control? _backpackGrid;
     private InventorySlotUI? _backpackSlotTemplate;
     private readonly List<InventorySlotUI> _backpackSlotUIs = new();
@@ -242,15 +239,15 @@ public partial class Player : CharacterBody3D
 
     /// <summary>A thruster's own N2 tank slot window — one static slot, same shape as the PDA's
     /// single cartridge pocket above, just pointed at whichever ThrusterVerbTarget's own Contents
-    /// is currently open (see _openThruster) instead of a PlayerInventory-owned container.</summary>
-    private DraggableWindow? _thrusterWindow;
+    /// is currently open (see PanelController.OpenThruster) instead of a PlayerInventory-owned
+    /// container. The window itself belongs to PanelController (it's a modal panel); only its
+    /// inner slot is inventory-view state, so only that is held here.</summary>
     private InventorySlotUI? _thrusterTankSlot;
 
-    /// <summary>An installed shelf/bin's own storage window — unlike the thruster's single fixed
+    /// <summary>An installed shelf/bin's own storage grid — unlike the thruster's single fixed
     /// slot, a storage unit's slot count is genuinely variable per instance, so this follows the
     /// Backpack's rebuild-on-count-change shape (see _backpackSlotTemplate/_backpackSlotUIs/
     /// _backpackSlotUICount) rather than the Thruster's single static slot.</summary>
-    private DraggableWindow? _storageWindow;
     private Control? _storageGrid;
     private InventorySlotUI? _storageSlotTemplate;
     private readonly List<InventorySlotUI> _storageSlotUIs = new();
@@ -306,65 +303,13 @@ public partial class Player : CharacterBody3D
     [Export]
     public SaveManager? SaveManagerRef { get; set; }
 
-    /// <summary>Whether the mouse-driven inventory panel (Tab) is currently open — while true,
-    /// look/Interact/verb-cycling/mouse-recapture are all suppressed so clicking and dragging in
-    /// the panel doesn't also fire world interactions or yank the mouse back into captured mode
-    /// mid-drag.</summary>
-    private bool _inventoryOpen;
-
-    /// <summary>Whether the travel console's map screen is currently open — same "suppress
-    /// look/Interact/verb-cycling/mouse-recapture" gating as _inventoryOpen, via <see
-    /// cref="AnyPanelOpen"/>, so opening the map mid-game doesn't also let the player walk off or
-    /// interact with something else behind it.</summary>
-    private bool _travelMapOpen;
-
-    /// <summary>Whether the docking minigame is currently open — same suppress-everything gating
-    /// as every other panel, via <see cref="AnyPanelOpen"/>, plus its own movement freeze (like
-    /// <see cref="_deathOpen"/>) since WASD is repurposed as minigame thrust input while this is
-    /// open. Deliberately NOT in the Escape-key chain — same "no silent abandon" reasoning as the
-    /// death screen; the only ways out are a successful dock or an in-minigame abort-and-retry.</summary>
-    private bool _dockingOpen;
-
-    /// <summary>Whether the station trade console's shop screen is currently open — same
-    /// suppress-everything gating as _inventoryOpen/_travelMapOpen, via <see cref="AnyPanelOpen"/>.
-    /// Interact() is already gated by AnyPanelOpen, so Shop and the travel map can never both be
-    /// open at once — there's no ordering to get wrong between them.</summary>
-    private bool _shopOpen;
-
-    /// <summary>Whether the contract-giver's board screen is currently open — same
-    /// suppress-everything gating as Shop, via <see cref="AnyPanelOpen"/>.</summary>
-    private bool _contractBoardOpen;
-
-    /// <summary>Whether a thruster's own N2 tank slot window is currently open — same
-    /// suppress-everything gating as Shop/TravelMap (verb-triggered from a world object, not a
-    /// right-click-on-held-item sub-window like Suit/Backpack/PDA), via <see cref="AnyPanelOpen"/>.</summary>
-    private bool _thrusterInventoryOpen;
-
-    /// <summary>Which thruster's own SlotContainer the window is currently pointed at — a live
-    /// node reference (not an itemId lookup like _openBackpackItemId, since a thruster isn't
-    /// reachable through PlayerInventory) that can be QueueFree()'d out from under the window via
-    /// Uninstall/Scrap while it's open — see UpdateInventoryHud's IsInstanceValid guard.</summary>
-    private ThrusterVerbTarget? _openThruster;
-
-    /// <summary>Whether a shelf/bin's own storage window is currently open — same shape as
-    /// _thrusterInventoryOpen above.</summary>
-    private bool _storageOpen;
-
-    /// <summary>Which storage unit's own SlotContainer the window is currently pointed at — same
-    /// shape as _openThruster above (a live node reference that can be QueueFree()'d out from
-    /// under the window via Uninstall/Scrap while it's open).</summary>
-    private StorageVerbTarget? _openStorage;
-
-    /// <summary>Whether the death screen is currently up, awaiting a Reload/Quit choice — same
-    /// suppress-everything gating as Shop/TravelMap/ThrusterInventory, via <see
-    /// cref="AnyPanelOpen"/>, plus its own movement freeze (see the zero-g/grounded blocks in
-    /// _PhysicsProcess) since a 0-Health player standing around or drifting behind the screen
-    /// isn't something any other panel needs to prevent.</summary>
-    private bool _deathOpen;
-
     /// <summary>Any full-screen-ish HUD panel that should suppress normal gameplay input while
-    /// open — shared gate for every _Input branch that used to check _inventoryOpen alone.</summary>
-    private bool AnyPanelOpen => _inventoryOpen || _travelMapOpen || _dockingOpen || _shopOpen || _contractBoardOpen || _thrusterInventoryOpen || _storageOpen || _deathOpen;
+    /// open — shared gate for every _Input branch and both movement branches. Each panel's own
+    /// reasons for being in this set are documented on <see cref="PanelId"/>'s members' call sites;
+    /// the two with an extra movement freeze on top (Docking, because WASD becomes minigame thrust,
+    /// and Death, because a 0-Health player shouldn't drift around behind the screen) are checked
+    /// individually where that matters.</summary>
+    private bool AnyPanelOpen => _panels?.AnyOpen ?? false;
 
     /// <summary>The game's whole known item catalog, doubling as the hotbar slots (keys 1-9, 0) —
     /// also reused by VendorVerbTarget as the set of things Buy can offer, since there's
@@ -465,24 +410,16 @@ public partial class Player : CharacterBody3D
         AddChild(_hud);
         _hud.Bind(GetNode("HUD"));
 
+        _panels = new PanelController { Name = "Panels" };
+        AddChild(_panels);
+        _panels.Bind(GetNode("HUD"), this, CaptureMouse);
+        _panels.InventoryClosed += CloseItemWindows;
+
         _flashlightSpot = GetNode<SpotLight3D>("Head/Camera3D/FlashlightSpot");
-        _inventoryPanel = GetNode<DraggableWindow>("HUD/InventoryPanel");
         _drillWindow = GetNode<DraggableWindow>("HUD/DrillWindow");
         _flashlightWindow = GetNode<DraggableWindow>("HUD/FlashlightWindow");
         _backpackWindow = GetNode<DraggableWindow>("HUD/BackpackWindow");
         _backpackGrid = GetNode<Control>("HUD/BackpackWindow/Layout/BackpackGrid");
-        _travelMapPanel = GetNode<TravelMapPanel>("HUD/TravelMapPanel");
-        _travelMapPanel.PlayerRef = this;
-        _dockingPanel = GetNode<DockingMinigamePanel>("HUD/DockingPanel");
-        _dockingPanel.PlayerRef = this;
-        _shopPanel = GetNode<ShopPanel>("HUD/ShopPanel");
-        _shopPanel.PlayerRef = this;
-        _contractBoardPanel = GetNode<ContractBoardPanel>("HUD/ContractBoardPanel");
-        _contractBoardPanel.PlayerRef = this;
-        _deathPanel = GetNode<DeathPanel>("HUD/DeathPanel");
-        _deathPanel.PlayerRef = this;
-        _worldDropZone = GetNode<WorldDropZone>("HUD/WorldDropZone");
-        _worldDropZone.PlayerRef = this;
 
         foreach (var child in GetNode("HUD/InventoryPanel/Layout/EquipSlots").GetChildren())
         {
@@ -516,11 +453,9 @@ public partial class Player : CharacterBody3D
         _pdaCartridgeSlot2 = GetNode<InventorySlotUI>("HUD/PdaWindow/Layout/PdaGrid/Cartridge2");
         _pdaCartridgeSlot2.PlayerRef = this;
 
-        _thrusterWindow = GetNode<DraggableWindow>("HUD/ThrusterWindow");
         _thrusterTankSlot = GetNode<InventorySlotUI>("HUD/ThrusterWindow/Layout/ThrusterGrid/Tank1");
         _thrusterTankSlot.PlayerRef = this;
 
-        _storageWindow = GetNode<DraggableWindow>("HUD/StorageWindow");
         _storageGrid = GetNode<Control>("HUD/StorageWindow/Layout/StorageGrid");
         _storageSlotTemplate = GetNode<InventorySlotUI>("HUD/StorageWindow/Layout/StorageGrid/SlotTemplate");
 
@@ -528,7 +463,7 @@ public partial class Player : CharacterBody3D
         // existing toggle-off path already does (see ToggleItemWindow's closing branches/
         // CloseInventory), just reachable without needing to re-press the same hotkey/re-click
         // the same slot.
-        _inventoryPanel.CloseRequested += CloseInventory;
+        _panels.InventoryWindow!.CloseRequested += CloseInventory;
         _drillWindow.CloseRequested += () => _drillWindow!.Visible = false;
         _flashlightWindow.CloseRequested += () => _flashlightWindow!.Visible = false;
         _backpackWindow.CloseRequested += () =>
@@ -546,8 +481,8 @@ public partial class Player : CharacterBody3D
             _pdaWindow!.Visible = false;
             _openPdaItemId = null;
         };
-        _thrusterWindow.CloseRequested += CloseThrusterInventory;
-        _storageWindow.CloseRequested += CloseStorageInventory;
+        _panels.ThrusterWindow!.CloseRequested += CloseThrusterInventory;
+        _panels.StorageWindow!.CloseRequested += CloseStorageInventory;
 
         // Placeholder/tunable starting stipend for testing the free-form conduit wiring
         // extensively — same "don't wait on it" spirit as the near-instant verb durations.
@@ -633,9 +568,11 @@ public partial class Player : CharacterBody3D
         {
             CaptureMouse();
         }
-        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy && !_travelMapOpen && !_dockingOpen && !_shopOpen && !_contractBoardOpen && !_thrusterInventoryOpen && !_storageOpen && !_deathOpen)
+        // Every panel *except* the inventory blocks Tab — you can always toggle the inventory shut
+        // again, but never open it over a shop/board/docking/death screen.
+        else if (@event is InputEventKey { Keycode: Key.Tab, Pressed: true } && !IsBusy && !_panels!.AnyOpenExcept(PanelId.Inventory))
         {
-            if (_inventoryOpen)
+            if (_panels!.IsOpen(PanelId.Inventory))
             {
                 CloseInventory();
             }
@@ -646,31 +583,10 @@ public partial class Player : CharacterBody3D
         }
         else if (@event is InputEventKey { Keycode: Key.Escape, Pressed: true })
         {
-            if (_travelMapOpen)
-            {
-                CloseTravelMap();
-            }
-            else if (_shopOpen)
-            {
-                CloseShop();
-            }
-            else if (_contractBoardOpen)
-            {
-                CloseContractBoard();
-            }
-            else if (_thrusterInventoryOpen)
-            {
-                CloseThrusterInventory();
-            }
-            else if (_storageOpen)
-            {
-                CloseStorageInventory();
-            }
-            else if (_inventoryOpen)
-            {
-                CloseInventory();
-            }
-            else
+            // Closes whichever panel is topmost, or — with nothing open — releases the mouse.
+            // Docking and Death deliberately have no Escape path (see PanelController's own
+            // CloseTopmostClosable): neither offers a silent abandon.
+            if (!_panels!.CloseTopmostClosable())
             {
                 Input.MouseMode = Input.MouseModeEnum.Visible;
             }
@@ -1169,27 +1085,16 @@ public partial class Player : CharacterBody3D
         Input.MouseMode = Input.MouseModeEnum.Captured;
     }
 
-    private void OpenInventory()
+    private void OpenInventory() => _panels!.Open(PanelId.Inventory);
+
+    private void CloseInventory() => _panels!.Close(PanelId.Inventory);
+
+    /// <summary>Drops every right-click-on-item sub-window — none of them are useful without the
+    /// main inventory panel open to drag items to and from. Subscribed to
+    /// PanelController.InventoryClosed rather than called from CloseInventory directly, so it also
+    /// fires when the panel is closed via its own X button or the Escape chain.</summary>
+    private void CloseItemWindows()
     {
-        _inventoryOpen = true;
-        if (_inventoryPanel is not null)
-        {
-            _inventoryPanel.Visible = true;
-        }
-
-        _worldDropZone!.Visible = true;
-        Input.MouseMode = Input.MouseModeEnum.Visible;
-    }
-
-    private void CloseInventory()
-    {
-        _inventoryOpen = false;
-        if (_inventoryPanel is not null)
-        {
-            _inventoryPanel.Visible = false;
-        }
-
-        // None of the item windows are useful without the main panel open to drag items to/from.
         _drillWindow!.Visible = false;
         _flashlightWindow!.Visible = false;
         _backpackWindow!.Visible = false;
@@ -1198,78 +1103,46 @@ public partial class Player : CharacterBody3D
         _openSuitItemId = null;
         _pdaWindow!.Visible = false;
         _openPdaItemId = null;
-        _worldDropZone!.Visible = false;
-
-        CaptureMouse();
     }
 
     /// <summary>Called by TravelConsoleVerbTarget.ExecuteVerb — opens the map instead of that
     /// verb starting travel directly, same shape as OpenInventory but triggered from a world
     /// interaction rather than a hotkey.</summary>
-    public void OpenTravelMap(TravelConsoleVerbTarget console)
-    {
-        _travelMapOpen = true;
-        _openTravelConsole = console;
-        _travelMapPanel!.Populate(console.BuildMapEntries(), console.CurrentDestinationId);
-        _travelMapPanel.Visible = true;
-        Input.MouseMode = Input.MouseModeEnum.Visible;
-    }
+    public void OpenTravelMap(TravelConsoleVerbTarget console) => _panels!.OpenTravelMap(console);
 
     /// <summary>Called by TravelMapPanel's Travel button — hands the chosen destination back to
     /// whichever console opened the map, then closes it regardless of whether travel actually
     /// started (BeginTravel itself no-ops for an already-current/out-of-range destination).</summary>
     public void ConfirmTravel(int destinationId)
     {
-        _openTravelConsole?.BeginTravel(destinationId);
+        _panels!.OpenTravelConsole?.BeginTravel(destinationId);
         CloseTravelMap();
     }
 
-    public void CloseTravelMap()
-    {
-        _travelMapOpen = false;
-        _openTravelConsole = null;
-        _travelMapPanel!.Visible = false;
-        CaptureMouse();
-    }
+    public void CloseTravelMap() => _panels!.Close(PanelId.TravelMap);
 
     /// <summary>Called by TravelConsoleVerbTarget.OnTravelComplete — opens automatically once the
     /// travel timer elapses (not requiring a second console interaction, since the player already
     /// committed via the travel map) and starts the minigame's first attempt.</summary>
-    public void OpenDockingMinigame(TravelConsoleVerbTarget console)
-    {
-        _dockingOpen = true;
-        _openDockingConsole = console;
-        _dockingPanel!.Visible = true;
-        _dockingPanel.ResetAttempt();
-        Input.MouseMode = Input.MouseModeEnum.Visible;
-    }
+    public void OpenDockingMinigame(TravelConsoleVerbTarget console) => _panels!.OpenDocking(console);
 
     /// <summary>Called by DockingMinigamePanel's Dock button once it succeeds — resolves arrival
     /// on whichever console opened the minigame, then closes it. No cancel/Escape path exists
     /// (see _dockingOpen's own doc comment) — this is the only way the panel ever closes.</summary>
     public void CompleteDocking()
     {
-        _openDockingConsole?.CompleteDocking();
+        _panels!.OpenDockingConsole?.CompleteDocking();
         CloseDockingMinigame();
     }
 
-    public void CloseDockingMinigame()
-    {
-        _dockingOpen = false;
-        _openDockingConsole = null;
-        _dockingPanel!.Visible = false;
-        CaptureMouse();
-    }
+    public void CloseDockingMinigame() => _panels!.Close(PanelId.Docking);
 
     /// <summary>Called by VendorVerbTarget.ExecuteVerb — opens the shop panel instead of
     /// the old per-item Buy/Sell verb-cycling, same shape as OpenTravelMap.</summary>
     public void OpenShop(VendorVerbTarget vendor)
     {
-        _shopOpen = true;
-        _openShopVendor = vendor;
+        _panels!.OpenShop(vendor);
         RefreshShop();
-        _shopPanel!.Visible = true;
-        Input.MouseMode = Input.MouseModeEnum.Visible;
     }
 
     /// <summary>Called by ShopPanel's row buttons — buys/sells one unit and immediately refreshes
@@ -1277,40 +1150,31 @@ public partial class Player : CharacterBody3D
     /// than closing the panel like a one-shot travel confirmation would.</summary>
     public void BuyItem(string itemId)
     {
-        _openShopVendor?.TryBuy(itemId);
+        _panels!.OpenVendor?.TryBuy(itemId);
         RefreshShop();
     }
 
     public void SellItem(string itemId)
     {
-        _openShopVendor?.TrySell(itemId);
+        _panels!.OpenVendor?.TrySell(itemId);
         RefreshShop();
     }
 
     private void RefreshShop()
     {
-        if (_openShopVendor is not null)
+        if (_panels!.OpenVendor is { } vendor)
         {
-            _shopPanel!.Populate(_openShopVendor.BuildBuyEntries(), _openShopVendor.BuildSellEntries());
+            _panels.Shop!.Populate(vendor.BuildBuyEntries(), vendor.BuildSellEntries());
         }
     }
 
-    public void CloseShop()
-    {
-        _shopOpen = false;
-        _openShopVendor = null;
-        _shopPanel!.Visible = false;
-        CaptureMouse();
-    }
+    public void CloseShop() => _panels!.Close(PanelId.Shop);
 
     /// <summary>Called by ContractGiverVerbTarget.ExecuteVerb — same shape as OpenShop.</summary>
     public void OpenContractBoard(ContractGiverVerbTarget giver)
     {
-        _contractBoardOpen = true;
-        _openContractGiver = giver;
+        _panels!.OpenContractBoard(giver);
         RefreshContractBoard();
-        _contractBoardPanel!.Visible = true;
-        Input.MouseMode = Input.MouseModeEnum.Visible;
     }
 
     /// <summary>Called by ContractBoardPanel's Available-tab row buttons — moves the named offer
@@ -1319,7 +1183,7 @@ public partial class Player : CharacterBody3D
     /// Contract.RemainingSeconds.</summary>
     public void AcceptContract(string instanceId)
     {
-        if (_openContractGiver?.TryTakeOffer(instanceId) is { } contract)
+        if (_panels!.OpenContractGiver?.TryTakeOffer(instanceId) is { } contract)
         {
             _activeContracts.Add(contract);
         }
@@ -1359,13 +1223,13 @@ public partial class Player : CharacterBody3D
     private bool CanTurnIn(Contract contract) => contract.Type switch
     {
         ContractType.RetrieveItem or ContractType.SalvageQuota => true,
-        ContractType.CargoDelivery => _openContractGiver?.ConsoleRef?.CurrentDestinationId == contract.DestinationStationId,
+        ContractType.CargoDelivery => _panels!.OpenContractGiver?.ConsoleRef?.CurrentDestinationId == contract.DestinationStationId,
         _ => false,
     };
 
     private void RefreshContractBoard()
     {
-        if (_openContractGiver is null)
+        if (_panels!.OpenContractGiver is not { } giver)
         {
             return;
         }
@@ -1373,20 +1237,14 @@ public partial class Player : CharacterBody3D
         var activeEntries = _activeContracts
             .Select(c => new ContractBoardEntry(
                 c.InstanceId,
-                _openContractGiver.Describe(c),
+                giver.Describe(c),
                 ActionAvailable: CanTurnIn(c) && c.ItemId is { } itemId && _inventory.Has(itemId, c.Count)))
             .ToList();
 
-        _contractBoardPanel!.Populate(_openContractGiver.BuildAvailableEntries(), activeEntries);
+        _panels.ContractBoard!.Populate(giver.BuildAvailableEntries(), activeEntries);
     }
 
-    public void CloseContractBoard()
-    {
-        _contractBoardOpen = false;
-        _openContractGiver = null;
-        _contractBoardPanel!.Visible = false;
-        CaptureMouse();
-    }
+    public void CloseContractBoard() => _panels!.Close(PanelId.ContractBoard);
 
     /// <summary>Called every physics frame regardless of any panel being open — a contract's own
     /// deadline keeps running whether or not the board is currently on screen. Expiry (not
@@ -1452,38 +1310,14 @@ public partial class Player : CharacterBody3D
     /// <summary>Called by ThrusterVerbTarget.ExecuteVerb — same shape as OpenShop/OpenTravelMap
     /// (a world-verb-triggered panel, not a right-click-on-held-item sub-window), since a thruster
     /// is interacted with directly in the world rather than reached through PlayerInventory.</summary>
-    public void OpenThrusterInventory(ThrusterVerbTarget thruster)
-    {
-        _thrusterInventoryOpen = true;
-        _openThruster = thruster;
-        _thrusterWindow!.Visible = true;
-        Input.MouseMode = Input.MouseModeEnum.Visible;
-    }
+    public void OpenThrusterInventory(ThrusterVerbTarget thruster) => _panels!.OpenThrusterInventory(thruster);
 
-    public void CloseThrusterInventory()
-    {
-        _thrusterInventoryOpen = false;
-        _openThruster = null;
-        _thrusterWindow!.Visible = false;
-        CaptureMouse();
-    }
+    public void CloseThrusterInventory() => _panels!.Close(PanelId.Thruster);
 
     /// <summary>Called by StorageVerbTarget.ExecuteVerb — same shape as OpenThrusterInventory.</summary>
-    public void OpenStorageInventory(StorageVerbTarget storage)
-    {
-        _storageOpen = true;
-        _openStorage = storage;
-        _storageWindow!.Visible = true;
-        Input.MouseMode = Input.MouseModeEnum.Visible;
-    }
+    public void OpenStorageInventory(StorageVerbTarget storage) => _panels!.OpenStorageInventory(storage);
 
-    public void CloseStorageInventory()
-    {
-        _storageOpen = false;
-        _openStorage = null;
-        _storageWindow!.Visible = false;
-        CaptureMouse();
-    }
+    public void CloseStorageInventory() => _panels!.Close(PanelId.Storage);
 
     /// <summary>Right-click-on-inventory-item entry point (see InventorySlotUI) — toggles open/
     /// closed whichever window (if any) represents that item's own inventory. A no-op for any
@@ -1615,7 +1449,7 @@ public partial class Player : CharacterBody3D
             // checked explicitly rather than just SuitN2 non-null.
             var hasWorkingThrusters = _inventory.Torso is not null && _inventory.SuitN2 is { HasItem: true, Charge: > 0f };
 
-            if (!IsBusy && !_deathOpen && !_dockingOpen)
+            if (!IsBusy && !_panels!.IsOpen(PanelId.Death) && !_panels.IsOpen(PanelId.Docking))
             {
                 var thrust = Vector3.Zero;
                 if (Input.IsPhysicalKeyPressed(Key.W))
@@ -1733,7 +1567,7 @@ public partial class Player : CharacterBody3D
                 velocity.Y -= Gravity * (float)delta;
             }
 
-            if (IsBusy || _deathOpen || _dockingOpen)
+            if (IsBusy || _panels!.IsOpen(PanelId.Death) || _panels.IsOpen(PanelId.Docking))
             {
                 velocity.X = 0;
                 velocity.Z = 0;
@@ -1854,7 +1688,7 @@ public partial class Player : CharacterBody3D
             _inventory.DrainSpecializedSlot("suit_battery", SuitBatteryDrainPerSecond * (float)delta);
         }
 
-        if (_suitResources.HealthPercent <= 0f && !_deathOpen)
+        if (_suitResources.HealthPercent <= 0f && !_panels!.IsOpen(PanelId.Death))
         {
             Die();
         }
@@ -1882,7 +1716,15 @@ public partial class Player : CharacterBody3D
             FlashlightCharge: holdingFlashlight ? _inventory.Flashlight is { HasItem: true } flashlight ? flashlight.Charge : 0f : null));
 
         UpdateVerbHud();
+        PhysicsFramesProcessed++;
     }
+
+    /// <summary>Test-only observability: how many times this Player has completed a full
+    /// _PhysicsProcess. Tests need this because SceneTree's PhysicsFrame signal fires at the
+    /// *start* of a physics frame, before any node's _PhysicsProcess runs — so awaiting it and
+    /// then asserting on HUD state (which UpdateInventoryHud writes from here) is a race that
+    /// loses under load. Same narrow test-accessor convention as <see cref="ScanModeOn"/>.</summary>
+    public long PhysicsFramesProcessed { get; private set; }
 
     /// <summary>Called by LadderVerbTarget.ExecuteVerb — starts continuous climbing between the
     /// two given world points (each deck's own floor height at the ladder tile). Refused while
@@ -2231,7 +2073,7 @@ public partial class Player : CharacterBody3D
             HasFlashlight = _inventory.Flashlight is not null,
             FlashlightHasBattery = _inventory.Flashlight?.HasItem ?? false,
             FlashlightCharge = _inventory.Flashlight?.Charge ?? 0f,
-            InventoryWindow = new WindowPosition(_inventoryPanel!.Position.X, _inventoryPanel.Position.Y),
+            InventoryWindow = new WindowPosition(_panels!.InventoryWindow!.Position.X, _panels.InventoryWindow.Position.Y),
             DrillWindow = new WindowPosition(_drillWindow!.Position.X, _drillWindow.Position.Y),
             FlashlightWindow = new WindowPosition(_flashlightWindow!.Position.X, _flashlightWindow.Position.Y),
             BackpackWindow = new WindowPosition(_backpackWindow!.Position.X, _backpackWindow.Position.Y),
@@ -2259,7 +2101,7 @@ public partial class Player : CharacterBody3D
                 : new List<SlotSaveData?>(),
             PdaSlotCount = ownedPdaContents?.Slots.Count ?? PlayerInventory.PdaSlotCount,
             PdaWindow = new WindowPosition(_pdaWindow!.Position.X, _pdaWindow.Position.Y),
-            ThrusterWindow = new WindowPosition(_thrusterWindow!.Position.X, _thrusterWindow.Position.Y),
+            ThrusterWindow = new WindowPosition(_panels.ThrusterWindow!.Position.X, _panels.ThrusterWindow.Position.Y),
             ActiveContracts = _activeContracts.Select(c => new ContractSaveData
             {
                 InstanceId = c.InstanceId,
@@ -2400,7 +2242,7 @@ public partial class Player : CharacterBody3D
         // its scene-authored default position.
         if (data.InventoryWindow is { } inventoryWindowPos)
         {
-            _inventoryPanel!.Position = new Vector2(inventoryWindowPos.X, inventoryWindowPos.Y);
+            _panels!.InventoryWindow!.Position = new Vector2(inventoryWindowPos.X, inventoryWindowPos.Y);
         }
 
         if (data.DrillWindow is { } drillWindowPos)
@@ -2425,7 +2267,7 @@ public partial class Player : CharacterBody3D
 
         if (data.ThrusterWindow is { } thrusterWindowPos)
         {
-            _thrusterWindow!.Position = new Vector2(thrusterWindowPos.X, thrusterWindowPos.Y);
+            _panels!.ThrusterWindow!.Position = new Vector2(thrusterWindowPos.X, thrusterWindowPos.Y);
         }
 
         if (data.SuitWindow is { } suitWindowPos)
@@ -2463,14 +2305,12 @@ public partial class Player : CharacterBody3D
 
     /// <summary>Hard death from 0 Health (see the O2-driven drain in SuitResources.Tick) —
     /// opens DeathPanel and waits for a Reload/Quit choice instead of reloading immediately.
-    /// The call site guards this with !_deathOpen, so it only fires once per death, not every
-    /// physics frame HealthPercent stays at/below 0 while the panel waits.</summary>
+    /// The call site guards this with a Death-panel-not-already-open check, so it only fires once
+    /// per death, not every physics frame HealthPercent stays at/below 0 while the panel waits.</summary>
     private void Die()
     {
         GD.Print("[Player] Died — awaiting reload/quit choice.");
-        _deathOpen = true;
-        _deathPanel!.Visible = true;
-        Input.MouseMode = Input.MouseModeEnum.Visible;
+        _panels!.Open(PanelId.Death);
     }
 
     /// <summary>DeathPanel's Reload button — reloads the last save so the player picks back up
@@ -2486,9 +2326,7 @@ public partial class Player : CharacterBody3D
             RefillSuitResources();
         }
 
-        _deathOpen = false;
-        _deathPanel!.Visible = false;
-        CaptureMouse();
+        _panels!.Close(PanelId.Death);
     }
 
     /// <summary>DeathPanel's Quit button — no confirmation dialog; death is already the "are you
@@ -2499,7 +2337,7 @@ public partial class Player : CharacterBody3D
     /// SaveManager.Save() so autosave/F5 can't silently overwrite the last good save with this
     /// 0-Health state while the player hasn't chosen yet (which would make Reload immediately
     /// re-trigger death from the very save it just loaded).</summary>
-    public bool IsAwaitingDeathChoice => _deathOpen;
+    public bool IsAwaitingDeathChoice => _panels?.IsOpen(PanelId.Death) ?? false;
 
     /// <summary>The Bunk's Sleep-completion hook — a full night's rest.</summary>
     public void RestEnergy() => _needs.Rest(100f);
@@ -2559,24 +2397,24 @@ public partial class Player : CharacterBody3D
         _pdaCartridgeSlot2!.Container = pdaContents;
 
         // Unlike the backpack/suit/pda contents above (reached by itemId, always safe to
-        // dereference), _openThruster is a live Node reference that Uninstall/Scrap can
-        // QueueFree() out from under this window while it's open — check validity before touching
-        // it at all, not just before reading its Contents.
-        if (_thrusterInventoryOpen && !GodotObject.IsInstanceValid(_openThruster))
+        // dereference), PanelController.OpenThruster is a live Node reference that Uninstall/Scrap
+        // can QueueFree() out from under this window while it's open — check validity before
+        // touching it at all, not just before reading its Contents.
+        if (_panels!.IsOpen(PanelId.Thruster) && !GodotObject.IsInstanceValid(_panels.OpenThruster))
         {
             CloseThrusterInventory();
         }
 
-        _thrusterTankSlot!.Container = _openThruster?.Contents;
+        _thrusterTankSlot!.Container = _panels.OpenThruster?.Contents;
 
-        // Same IsInstanceValid guard as _openThruster above — a storage unit's own slot count is
+        // Same IsInstanceValid guard as the thruster above — a storage unit's own slot count is
         // genuinely variable, so this also follows the backpack's rebuild-on-count-change shape.
-        if (_storageOpen && !GodotObject.IsInstanceValid(_openStorage))
+        if (_panels.IsOpen(PanelId.Storage) && !GodotObject.IsInstanceValid(_panels.OpenStorage))
         {
             CloseStorageInventory();
         }
 
-        var storageContents = GodotObject.IsInstanceValid(_openStorage) ? _openStorage!.Contents : null;
+        var storageContents = GodotObject.IsInstanceValid(_panels.OpenStorage) ? _panels.OpenStorage!.Contents : null;
         _storageGrid!.Visible = storageContents is not null;
         var storageSlotCount = storageContents?.Slots.Count ?? 0;
         if (storageSlotCount != _storageSlotUICount)

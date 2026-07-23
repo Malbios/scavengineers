@@ -47,7 +47,7 @@ public class ShipBuildTargetLootTest
         };
         shipRoot.AddChild(buildTarget);
 
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
+        await FrameWait.UntilAsync(sceneTree, () => buildTarget.InitialGenerationComplete);
 
         var pickups = shipRoot.GetChildren().OfType<PickupItem>().ToList();
 
@@ -88,7 +88,10 @@ public class ShipBuildTargetLootTest
         };
         shipRoot.AddChild(buildTarget);
 
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
+        // Asserting an absence, so there's a real condition to wait for after all: generation
+        // having *finished* is exactly what makes "nothing spawned" meaningful rather than "we
+        // looked too early".
+        await FrameWait.UntilAsync(sceneTree, () => buildTarget.InitialGenerationComplete);
 
         AssertBool(shipRoot.GetChildren().OfType<PickupItem>().Any()).IsFalse();
 

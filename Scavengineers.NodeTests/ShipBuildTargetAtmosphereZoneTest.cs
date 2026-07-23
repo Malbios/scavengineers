@@ -35,7 +35,10 @@ public class ShipBuildTargetAtmosphereZoneTest
         // GenerateAtmosphereZonesFromRoomLayout runs via CallDeferred (ShipSimRef's own Deck may
         // not be built yet at AddChild time) — same two-step await InteriorDoorVerbTargetTest
         // already uses for its own CallDeferred-driven initial state.
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
+        await FrameWait.UntilAsync(sceneTree, () => buildTarget.InitialGenerationComplete);
+
+        // One more physics frame after generation: the zones are Area3Ds, and the physics server
+        // needs a step before a point query can find them.
         await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.PhysicsFrame);
 
         return (shipSim, buildTarget, shipRoot);

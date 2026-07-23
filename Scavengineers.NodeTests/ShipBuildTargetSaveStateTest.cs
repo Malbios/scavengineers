@@ -33,9 +33,11 @@ public class ShipBuildTargetSaveStateTest
         var buildTarget = new ShipBuildTarget { ShipSimRef = shipSim, ShipRoot = shipRoot, PanelMesh = new BoxMesh() };
         shipRoot.AddChild(buildTarget);
 
-        // Lets GenerateFloorCeilingPanels' CallDeferred populate _floorPanels/_ceilingPanels
-        // before ApplyBuildState/CaptureBuildState iterate them.
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
+        // Lets the deferred generation populate _floorPanels/_ceilingPanels before
+        // ApplyBuildState/CaptureBuildState iterate them. Waits on the real completion signal
+        // rather than a single frame — the deferred flush isn't guaranteed to land inside the
+        // first one, which is what made this test fail intermittently under load.
+        await FrameWait.UntilAsync(sceneTree, () => buildTarget.InitialGenerationComplete);
 
         var data = new BuildTargetSaveData
         {
@@ -81,7 +83,7 @@ public class ShipBuildTargetSaveStateTest
         var buildTarget = new ShipBuildTarget { ShipSimRef = shipSim, ShipRoot = shipRoot, PanelMesh = new BoxMesh() };
         shipRoot.AddChild(buildTarget);
 
-        await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
+        await FrameWait.UntilAsync(sceneTree, () => buildTarget.InitialGenerationComplete);
 
         buildTarget.ApplyBuildState(new BuildTargetSaveData
         {

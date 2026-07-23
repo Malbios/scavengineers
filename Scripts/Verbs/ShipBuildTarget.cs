@@ -725,21 +725,44 @@ public partial class ShipBuildTarget : StaticBody3D, IVerbTarget, IBuildTargetSa
         // at this exact point depending on scene-tree sibling order (the established fix for
         // this same class of ordering issue elsewhere in the project, e.g. ShipSim's own
         // deferred vacuum seeding).
-        CallDeferred(nameof(GenerateFloorCeilingPanels));
+        //
+        // One deferred entry point rather than four separate CallDeferred queue entries: the four
+        // steps have a required order among themselves (panels exist before zones are sized off
+        // them, the default layout is seeded before loot lands on it), and four independent queue
+        // entries only preserved that by luck — nothing stopped another node's deferred work from
+        // interleaving between them. It also gives the whole batch a single completion signal (see
+        // InitialGenerationComplete).
+        CallDeferred(nameof(RunInitialGeneration));
+    }
+
+    /// <summary>True once <see cref="RunInitialGeneration"/> has finished. Exists for tests: this
+    /// node's whole visible state (floor/ceiling panels, seeded layout, atmosphere zones, loot)
+    /// appears during a deferred call, so a test that just awaits one ProcessFrame and asserts is
+    /// racing the deferred flush — which is exactly what made ShipBuildTargetLadderGapTest,
+    /// ShipBuildTargetLootTest and ShipBuildTargetSaveStateTest fail intermittently under load.
+    /// Same narrow test-observability convention as Player.ScanModeOn.</summary>
+    public bool InitialGenerationComplete { get; private set; }
+
+    private void RunInitialGeneration()
+    {
+        GenerateFloorCeilingPanels();
+
         if (SeedDefaultLayout)
         {
-            CallDeferred(nameof(SeedDefaultShipLayout));
+            SeedDefaultShipLayout();
         }
 
         if (GenerateAtmosphereZones)
         {
-            CallDeferred(nameof(GenerateAtmosphereZonesFromRoomLayout));
+            GenerateAtmosphereZonesFromRoomLayout();
         }
 
         if (GenerateLoot)
         {
-            CallDeferred(nameof(SpawnGeneratedLoot));
+            SpawnGeneratedLoot();
         }
+
+        InitialGenerationComplete = true;
     }
 
     /// <summary>ToggleLightVerbTarget's own _PhysicsProcess is what keeps RoomLight in sync with
