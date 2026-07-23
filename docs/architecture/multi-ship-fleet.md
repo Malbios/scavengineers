@@ -21,15 +21,18 @@ Full detail: `docs/project-plan.md` §4 (deferred features), §5 "Multi-ship sea
   in, and `Scavengineers.Sim.ShipModel.Ship` is a list of decks from v1.
 - **Ships-as-a-list in the save: partly held.** Per-ship state is keyed by `SaveId` in flat
   dictionaries rather than an explicit ship list, and carries no location or LOD field — see
-  `save-schema.md`'s "known gaps".
+  `save-schema.md`'s "known gaps". Live sim state itself *is* now saved per ship.
 - **Crew-as-agents: vacuously held.** No crew exist, and nothing ties ship simulation to the
   player's presence.
-- **Sim LOD: not held, and now actually needed.** All 13 `ShipSim`s tick full-fidelity
-  atmosphere + wear + fire from `_PhysicsProcess` every frame, whether or not the player is
-  aboard — `TravelConsoleVerbTarget.SetShipPresence` hides and decollides an absent
-  ship but doesn't stop it processing. The sim *can* run coarse (it's a plain `Tick(dt)` over
-  headless C#, exactly as the seam intended); nothing calls it that way yet. This is the cheapest
-  place the LOD work could land, and the reason to do it is now performance, not fleet play.
+- **Sim LOD: held.** `Scavengineers.Sim.Fleet.ShipSystems` bundles a ship's `Deck` plus its
+  atmosphere/power/fire/wear systems as a plain object with no Godot dependency — so a ship genuinely
+  can simulate with no scene, which is what this seam always asked for and what the old
+  node-owned fields made impossible. `ShipSim` owns one and delegates.
+  `TravelConsoleVerbTarget.SetShipPresence` sets `ShipSim.IsPresent`, and an absent ship switches to
+  `TickCoarse`: it banks elapsed time and spends it in one-second lumps. Deliberately *not* frozen —
+  a derelict left venting is still vented on return, and one left intact has still worn. Freezing
+  would make time pass only where the player is looking, which inverts the "presentation skip is not
+  a cost skip" rule (plan §5).
 
 ## Explicitly deferred
 

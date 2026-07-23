@@ -34,20 +34,23 @@ Rules genuinely held:
 - Per-tile / per-edge shape as described above: conduits, wall conduits, walls, floor/ceiling
   breaches, extended cells, per-surface health entries, per-conduit conditions, machines.
 
+- **Live sim state is saved** via `IShipStateSaveable` → `SaveData.Ships`, keyed by `ShipSim.SaveId`
+  (all 13 decks in `World.tscn` carry a stable one). Each entry holds every cell's
+  `AtmosphereVolume` plus the burning-cell set. Applied *after* `ApplyBuildState`, deliberately:
+  build state reconstructs walls and breaches, which decide whether a room is open to vacuum, so
+  restoring air first would let the very next tick re-vent rooms the save had already repaired.
+  Fires are replaced wholesale, so a save with none genuinely puts a burning ship out.
+
 ## Known gaps against the rules above
 
-- **"Serialize live sim state, not just static layout" is only partly true.** Saved: structural
-  and fixture state, surface/fixture health, battery and thruster charge, suit resources, contract
-  `RemainingSeconds`. **Not saved:** per-cell `AtmosphereVolume` (pressure / O₂ / temperature),
-  `Deck.Fires`, and any in-flight verb progress (`IVerbTarget.CurrentVerbProgress`). The doc's own
-  named example — "a fire mid-spread" — does not survive a round trip. Loading mid-session masks
-  this (the live systems simply keep their current values), so it only shows up on
-  quit-and-reload, where a vented-and-repaired room comes back at whatever its `_Ready` seeding
-  produces rather than what was saved.
-- **Ships are not serialized as an explicit list.** They're flat dictionaries keyed by each node's
-  `SaveId`, which is functionally per-ship but carries no ship identity, strategic-map location,
-  or sim-LOD state — the three things `multi-ship-fleet.md` expects a fleet save to hold. Adding
-  them is a schema change (i.e. a v2 + migration), not an additive field.
+- **In-flight verb progress is not saved**, deliberately for now: every verb is ~0.6 s and
+  button-held, so persisting a fraction of one is meaningless. The rule is really about
+  long-duration background tasks, which don't exist until time acceleration does — revisit
+  alongside that feature, not before.
+- **Ships are not serialized as an explicit list.** They're flat dictionaries keyed by `SaveId`,
+  which is functionally per-ship but carries no strategic-map location or sim-LOD state — two of the
+  things `multi-ship-fleet.md` expects a fleet save to hold. Adding them is a schema change (a v2 +
+  migration), not an additive field.
 
 ## Before editing this subsystem
 

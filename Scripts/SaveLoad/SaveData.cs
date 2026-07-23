@@ -28,6 +28,14 @@ public sealed class SaveData
     /// the time that would fire, the ship's Deck already exists.</summary>
     public Dictionary<string, int> ShipLayoutSeeds { get; set; } = new();
 
+    /// <summary>Per-ship live simulation state — the atmosphere in every cell and which cells are
+    /// burning — keyed by ShipSim.SaveId. This is the "serialize live sim state, not just static
+    /// layout" rule in docs/architecture/save-schema.md, which the save format previously didn't
+    /// honour: everything structural round-tripped, but a ship you'd vented came back at whatever
+    /// its startup seeding produced, and a fire mid-spread was simply lost. Purely additive: empty
+    /// for any save predating this, in which case startup seeding still applies exactly as before.</summary>
+    public Dictionary<string, ShipStateSaveData> Ships { get; set; } = new();
+
     /// <summary>Full backpacks (or other containers, later) sitting loose in the world — not
     /// tied to any ShipBuildTarget, so none of the lists above fit. Scanned/respawned by
     /// SaveManager via the "dropped_container" group (see ContainerPickupItem).</summary>
@@ -139,6 +147,24 @@ public sealed class BuildTargetSaveData
     /// convention as those lists.</summary>
     public Dictionary<string, float> ConduitConditions { get; set; } = new();
 }
+
+/// <summary>One ship's live sim state (see <see cref="SaveData.Ships"/>). Plain DTOs, deliberately
+/// decoupled from Scavengineers.Sim's own CellCoord/AtmosphereVolume, same convention as
+/// <see cref="BuildTargetSaveData"/>.</summary>
+public sealed class ShipStateSaveData
+{
+    /// <summary>Every modelled cell's pressure/O2/temperature. Written in full rather than
+    /// diffed against a default: unlike structural health, there's no single "unmodified" value to
+    /// omit against — a breathable cell and a vacuum cell are equally ordinary, and which one a
+    /// given ship *should* start at is exactly the thing this is here to stop guessing at.</summary>
+    public List<CellVolume> Volumes { get; set; } = new();
+
+    /// <summary>Cells currently on fire. Applied as a wholesale replacement, so a save with none
+    /// genuinely puts a burning ship out rather than merely adding nothing.</summary>
+    public List<TileCoord> Fires { get; set; } = new();
+}
+
+public readonly record struct CellVolume(int X, int Y, double Pressure, double O2Fraction, double Temperature);
 
 public readonly record struct TileCoord(int X, int Y);
 

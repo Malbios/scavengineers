@@ -97,6 +97,16 @@ public partial class SaveManager : Node
             }
         }
 
+        foreach (var shipStateSaveable in FindSaveables<IShipStateSaveable>())
+        {
+            // An unnamed ship is skipped rather than colliding on the empty-string key with every
+            // other unnamed one — which would silently give them all the last one's atmosphere.
+            if (!string.IsNullOrEmpty(shipStateSaveable.SaveId))
+            {
+                data.Ships[shipStateSaveable.SaveId] = shipStateSaveable.CaptureShipState();
+            }
+        }
+
         foreach (var node in GetTree().GetNodesInGroup("dropped_container"))
         {
             if (node is not ContainerPickupItem { Contents: { } contents } container)
@@ -207,6 +217,18 @@ public partial class SaveManager : Node
             if (data.ObjectStringStates.TryGetValue(stateSaveable.SaveId, out var state))
             {
                 stateSaveable.ApplySaveState(state);
+            }
+        }
+
+        // After the build targets above, deliberately: ApplyBuildState reconstructs walls and
+        // breaches, which is what decides whether a room is sealed or open to vacuum. Restoring the
+        // air first would leave the very next tick re-venting rooms whose breach the save had
+        // already repaired.
+        foreach (var shipStateSaveable in FindSaveables<IShipStateSaveable>())
+        {
+            if (data.Ships.TryGetValue(shipStateSaveable.SaveId, out var shipState))
+            {
+                shipStateSaveable.ApplyShipState(shipState);
             }
         }
 

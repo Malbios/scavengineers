@@ -5,8 +5,8 @@ using System.Linq;
 using Godot;
 using Scavengineers.Scripts.SaveLoad;
 using Scavengineers.Sim.Atmosphere;
+using Scavengineers.Sim.Fleet;
 using Scavengineers.Sim.Grid;
-using Scavengineers.Sim.Hazards;
 using Scavengineers.Sim.Power;
 using Scavengineers.Sim.ShipModel;
 
@@ -21,7 +21,7 @@ namespace Scavengineers.Scripts.Ship;
 /// data-driven ship layouts (arbitrary footprints) are still separate, larger future work —
 /// this is a fixed-shape stand-in, just no longer a single abstract cell.
 /// </summary>
-public partial class ShipSim : Node, IShipLayoutSaveable
+public partial class ShipSim : Node, IShipLayoutSaveable, IShipStateSaveable
 {
     // Public so ShipBuildTarget.SeedDefaultShipLayout can size its own corridor-wall seeding off
     // the same single source of truth instead of re-hardcoding it.
@@ -216,14 +216,24 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     [Export]
     public bool HasBunk { get; set; }
 
-    public Deck Deck { get; private set; } = null!;
+    public Deck Deck => _systems.Deck;
 
-    public AtmosphereSystem? Atmosphere => _atmosphere;
+    public AtmosphereSystem? Atmosphere => _systems?.Atmosphere;
 
-    private AtmosphereSystem? _atmosphere;
+    /// <summary>This ship's whole simulation, owned as a plain object rather than as fields on this
+    /// node — see <see cref="ShipSystems"/>. The node is the thing that knows about scenes, frames
+    /// and exports; the systems below it don't, which is what lets a ship keep simulating while
+    /// nobody's aboard.</summary>
+    private ShipSystems _systems = null!;
+
+    /// <summary>False while the player is somewhere else and this ship isn't physically present
+    /// (see TravelConsoleVerbTarget.SetShipPresence). It keeps simulating either way — an absent
+    /// derelict still wears down, still vents through its own breaches — just in coarse lumps
+    /// rather than every frame. Defaults true so a ship nobody ever tells otherwise (the Home Ship,
+    /// and every ship in a test) behaves exactly as before.</summary>
+    public bool IsPresent { get; set; } = true;
+
     private PowerSystem? _power;
-    private FireSystem? _fire;
-    private WearSystem? _wear;
     private BatteryFixture? _battery;
 
     public override void _Ready()
@@ -259,12 +269,12 @@ public partial class ShipSim : Node, IShipLayoutSaveable
             ApplyLayout(ShipLayoutCatalog.TryGet(LayoutId));
         }
 
-        Deck = new Deck();
+        var deck = new Deck();
         for (var i = 0; i < GridWidth; i++)
         {
             for (var j = 0; j < GridDepth; j++)
             {
-                Deck.AddCell(new CellCoord(i, j));
+                deck.AddCell(new CellCoord(i, j));
             }
         }
 
@@ -272,7 +282,7 @@ public partial class ShipSim : Node, IShipLayoutSaveable
         {
             foreach (var j in DoorwayRows)
             {
-                Deck.AddCell(new CellCoord(-i, j));
+                deck.AddCell(new CellCoord(-i, j));
             }
         }
 
@@ -280,7 +290,7 @@ public partial class ShipSim : Node, IShipLayoutSaveable
         {
             foreach (var j in DoorwayRows)
             {
-                Deck.AddCell(new CellCoord(GridWidth + i, j));
+                deck.AddCell(new CellCoord(GridWidth + i, j));
             }
         }
 
@@ -290,20 +300,16 @@ public partial class ShipSim : Node, IShipLayoutSaveable
             {
                 if (!DoorwayRows.Contains(j))
                 {
-                    Deck.SealEdge(new CellCoord(splitColumn - 1, j), new CellCoord(splitColumn, j));
+                    deck.SealEdge(new CellCoord(splitColumn - 1, j), new CellCoord(splitColumn, j));
                 }
             }
         }
 
-        // Always present, even for a never-breached ship (e.g. the Home Ship) — it needs a
-        // real AtmosphereSystem to bridge against once an AirlockDoorVerbTarget links the two
-        // ships' atmospheres. A never-breached deck just sits at Breathable and never changes.
-        _atmosphere = new AtmosphereSystem(Deck, hasLifeSupport: HasLifeSupport);
-
-        // Always present, same "every ship gets one regardless of its other hazard flags" shape
-        // as _atmosphere above — passive wear applies everywhere, not just to ships that opted
-        // into a specific hazard.
-        _wear = new WearSystem(Deck);
+        // Atmosphere and wear exist on every ship, regardless of its other hazard flags. Even a
+        // never-breached ship (e.g. the Home Ship) needs a real AtmosphereSystem to bridge against
+        // once an AirlockDoorVerbTarget links two ships' atmospheres; its deck just sits at
+        // Breathable and never changes.
+        _systems = new ShipSystems(deck, hasLifeSupport: HasLifeSupport);
 
         if (HasHullBreaches)
         {
@@ -349,7 +355,7 @@ public partial class ShipSim : Node, IShipLayoutSaveable
             Deck.AddFixture(new MachineFixture(StationAirlockFixtureId, StationAirlockCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
             Deck.AddFixture(new MachineFixture(DerelictAirlockFixtureId, DerelictAirlockCell, FixtureSurface.FloorUnderside) { PowerDraw = IdleDraw });
 
-            _power = new PowerSystem(Deck);
+            _power = _systems.EnsurePower();
         }
 
         if (HasBunk)
@@ -365,10 +371,10 @@ public partial class ShipSim : Node, IShipLayoutSaveable
                 Condition = 0.1f,
             });
 
-            _power ??= new PowerSystem(Deck);
+            _power = _systems.EnsurePower();
             _power.MarkSource(new PowerNodeId(FireGeneratorFixtureId));
 
-            _fire = new FireSystem(Deck, _atmosphere, _power);
+            _systems.EnableFire();
         }
     }
 
@@ -426,14 +432,14 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     // second flood-fill here — see CLAUDE.md's "one solver" rule.
     private void SeedVacuumFromInitialBreaches()
     {
-        if (_atmosphere is null)
+        if (_systems is null)
         {
             return;
         }
 
-        foreach (var cell in _atmosphere.CellsConnectedToOutside())
+        foreach (var cell in _systems.Atmosphere.CellsConnectedToOutside())
         {
-            _atmosphere.ApplyExternalVolume(cell, AtmosphereVolume.Vacuum);
+            _systems.Atmosphere.ApplyExternalVolume(cell, AtmosphereVolume.Vacuum);
         }
     }
 
@@ -477,11 +483,21 @@ public partial class ShipSim : Node, IShipLayoutSaveable
         }
     }
 
+    /// <summary>Full fidelity while the player is here; a coarse level-of-detail tick otherwise
+    /// (see <see cref="ShipSystems.TickCoarse"/> and docs/architecture/multi-ship-fleet.md's sim-LOD
+    /// seam). An absent ship still pays every cost in full — it banks elapsed time and spends it in
+    /// one-second lumps rather than sixty per second — which matters because a derelict you left
+    /// venting should still be vented when you get back.</summary>
     public override void _PhysicsProcess(double delta)
     {
-        _atmosphere?.Tick(delta);
-        _fire?.Tick(delta);
-        _wear?.Tick(delta);
+        if (IsPresent)
+        {
+            _systems.Tick(delta);
+        }
+        else
+        {
+            _systems.TickCoarse(delta);
+        }
     }
 
     /// <summary>Breathable if this ship's atmosphere isn't wired up at all (e.g. queried before
@@ -499,21 +515,21 @@ public partial class ShipSim : Node, IShipLayoutSaveable
     /// original crash-prevention scenario this fallback exists for).</summary>
     public AtmosphereVolume VolumeAt(CellCoord cell)
     {
-        if (_atmosphere is null)
+        if (_systems is null)
         {
             return AtmosphereVolume.Breathable;
         }
 
         if (Deck.Cells.Contains(cell))
         {
-            return _atmosphere.VolumeAt(cell);
+            return _systems.Atmosphere.VolumeAt(cell);
         }
 
         foreach (var neighbor in cell.OrthogonalNeighbors())
         {
             if (Deck.Cells.Contains(neighbor))
             {
-                return _atmosphere.VolumeAt(neighbor);
+                return _systems.Atmosphere.VolumeAt(neighbor);
             }
         }
 
@@ -658,6 +674,35 @@ public partial class ShipSim : Node, IShipLayoutSaveable
         {
             thruster.Condition = Mathf.Clamp(value, 0f, 1f);
         }
+    }
+
+    /// <summary>This ship's live sim state for the save file — see <see cref="IShipStateSaveable"/>.
+    /// Captures what the air and fire are currently doing, which no other save contract covers:
+    /// ShipBuildTarget records what has been built, not what the atmosphere has since done to
+    /// it.</summary>
+    public ShipStateSaveData CaptureShipState()
+    {
+        var state = new ShipStateSaveData();
+
+        foreach (var (cell, volume) in _systems.CaptureVolumes())
+        {
+            state.Volumes.Add(new CellVolume(cell.X, cell.Y, volume.Pressure, volume.O2Fraction, volume.Temperature));
+        }
+
+        foreach (var cell in Deck.Fires)
+        {
+            state.Fires.Add(new TileCoord(cell.X, cell.Y));
+        }
+
+        return state;
+    }
+
+    public void ApplyShipState(ShipStateSaveData state)
+    {
+        _systems.ApplyVolumes(state.Volumes.Select(v =>
+            (new CellCoord(v.X, v.Y), new AtmosphereVolume(v.Pressure, v.O2Fraction, v.Temperature))));
+
+        _systems.ApplyFires(state.Fires.Select(f => new CellCoord(f.X, f.Y)));
     }
 
     /// <summary>0-1 charge fraction for a specific thruster's own N2 tank — 0 if the given id

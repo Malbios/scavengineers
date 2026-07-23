@@ -574,12 +574,19 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
         }
     }
 
-    /// <summary>Toggles all three halves of "is this ship actually here": Node3D.Visible for
+    /// <summary>Toggles all four halves of "is this ship actually here": Node3D.Visible for
     /// rendering, every descendant CollisionShape3D's own Disabled flag for physics — Visible
-    /// alone doesn't stop the player from walking/floating into a hidden ship's geometry — and
-    /// every descendant IPhysicsPresenceAware (loose PickupItem/ContainerPickupItem pickups),
-    /// since a live RigidBody3D has nothing to rest on once this group's own collision is
-    /// disabled and would otherwise fall through the now-decollided floor forever.</summary>
+    /// alone doesn't stop the player from walking/floating into a hidden ship's geometry — every
+    /// descendant IPhysicsPresenceAware (loose PickupItem/ContainerPickupItem pickups), since a
+    /// live RigidBody3D has nothing to rest on once this group's own collision is disabled and
+    /// would otherwise fall through the now-decollided floor forever, and every descendant
+    /// ShipSim's own simulation level of detail.
+    ///
+    /// <para>That last one is deliberately NOT "stop simulating": an absent ship drops to a coarse
+    /// tick (see ShipSim.IsPresent / ShipSystems.TickCoarse) rather than freezing, so a derelict
+    /// you left venting is still vented when you return and one you left intact has still worn a
+    /// little. Freezing it would make time pass only where the player is looking, which is exactly
+    /// the "presentation skip is not a cost skip" rule docs/project-plan.md §5 rejects.</para></summary>
     private static void SetShipPresence(Node3D? group, bool present)
     {
         if (group is null)
@@ -602,6 +609,11 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
             if (node is IPhysicsPresenceAware presenceAware)
             {
                 presenceAware.SetPhysicsPresence(present);
+            }
+
+            if (node is ShipSim shipSim)
+            {
+                shipSim.IsPresent = present;
             }
         }
     }
