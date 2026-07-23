@@ -4,14 +4,12 @@ using Scavengineers.Scripts.Travel;
 
 namespace Scavengineers.Scripts.Tests;
 
-/// <summary>Guards against a bug this project already hit once (commit bdcd15a): a .tscn
-/// [node ...] header silently accepts and ignores properties (like collision_layer) that Godot's
-/// parser only recognizes as separate property lines below the header, so Ceiling/FloorAimHelper
-/// stayed on the default collision layer and kept physically blocking movement. Reads the real
-/// scene file's text directly (no Godot runtime needed) rather than a NodeTest, since
-/// Scavengineers.NodeTests is its own separate, scene-less Godot project and can't load
-/// res://Scenes/World.tscn at all (see PlayerTestHarness's own doc comment for the same
-/// constraint).</summary>
+/// <summary>Guards against a bug this project already hit once: a .tscn [node ...] header
+/// silently accepts and ignores properties (like collision_layer) that Godot's parser only
+/// recognizes as separate property lines below the header, so Ceiling/FloorAimHelper stayed on
+/// the default collision layer and kept physically blocking movement. Reads the scene file's text
+/// directly — Scavengineers.NodeTests is its own scene-less Godot project and can't load
+/// res://Scenes/World.tscn at all.</summary>
 public class WorldSceneRegressionTests
 {
     private static string RepoRoot()
@@ -41,18 +39,10 @@ public class WorldSceneRegressionTests
         Assert.Contains(propertyLines, l => l.Trim() == "collision_layer = 2");
     }
 
-    /// <summary>Every destination is instantiated at runtime from Data/destinations.json, and the
-    /// scenes they name are shared — all five Derelicts are one Derelict.tscn. So a SaveId authored
-    /// in a shared scene is inherited by every destination that doesn't override it in JSON.
-    /// SaveManager keys purely by id, so two live nodes sharing one means the second capture
-    /// silently overwrites the first and both load the same state back. Nothing errors; the wrong
-    /// wreck just has your walls.
-    ///
-    /// A JSON typo is the live hazard now: DestinationManager warns on an unknown property, but the
-    /// node still keeps its scene default, which for a SaveId is exactly this collision.
-    ///
-    /// This caught Derelict.tscn's Deck2/Floor2 shipping SaveId "derelict_build_target_1_deck2"
-    /// with no per-derelict override, so all five wrecks' second-deck build state collided.</summary>
+    /// <summary>All five Derelicts share one Derelict.tscn, so a SaveId not overridden per-
+    /// destination in destinations.json collides across every instance — SaveManager keys purely
+    /// by id, so the wrong wreck silently ends up with another wreck's saved state. This caught
+    /// Derelict.tscn's Deck2/Floor2 shipping one shared SaveId with no per-derelict override.</summary>
     [Fact]
     public void NoTwoDestinations_ShareASaveId_OnceTheirJsonOverridesAreApplied()
     {

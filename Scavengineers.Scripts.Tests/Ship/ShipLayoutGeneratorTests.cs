@@ -62,11 +62,8 @@ public class ShipLayoutGeneratorTests
 
         foreach (var breach in layout.InitialBreaches)
         {
-            // Each of the 4 categories below uses an "outside" sentinel (-1, GridWidth,
-            // GridDepth) that only ever appears on a genuine boundary edge -- a RoomSplitColumns
-            // edge's "outside" is always a real adjacent room cell, so it can never match any of
-            // these, making this check sufficient on its own (no separate split-edge exclusion
-            // needed).
+            // The "outside" sentinel (-1, GridWidth, GridDepth) below only ever appears on a
+            // genuine boundary edge, never on a RoomSplitColumns edge's real adjacent-room cell.
             var isNorth = breach.CellY == 0 && breach.OutsideY == -1;
             var isSouth = breach.CellY == 5 && breach.OutsideY == 6;
             var isWest = breach.CellX == 0 && breach.OutsideX == -1 && !doorwayRows.Contains(breach.CellY);

@@ -244,11 +244,9 @@ public class AtmosphereSystemTests
     [Fact]
     public void BreachedCorridor_AllCellsVentTogether_NoDistanceBasedLag()
     {
-        // Realistic depressurization: internal pressure equalizes far faster than air escapes
-        // through the hole, so a connected volume has no time to develop a distance-based
-        // gradient — every cell in a breached corridor vents in lockstep, not hop-by-hop delayed
-        // (see Vent's own doc comment). Near and far cells start identical and get the identical
-        // Lerp toward the identical target every tick, so they stay exactly equal, not just close.
+        // Every cell in a breached corridor vents in lockstep, not hop-by-hop delayed — near and
+        // far cells start identical and get the identical Lerp every tick, so they stay exactly
+        // equal, not just close.
         var deck = new Deck();
         const int corridorLength = 16;
         for (var i = 0; i < corridorLength; i++)

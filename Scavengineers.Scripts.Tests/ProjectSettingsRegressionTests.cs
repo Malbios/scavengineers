@@ -1,16 +1,10 @@
 namespace Scavengineers.Scripts.Tests;
 
-/// <summary>Guards against a bug this project already hit once: adding
-/// window/stretch/scale_mode="integer" via the Godot editor's Project Settings UI (while bumping
-/// the window resolution to 1920x1080) desynced the mouse-to-viewport coordinate transform used
-/// for all GUI hit-testing — every clickable rect rendered in the correct visual spot but its
-/// actual hit-test area was offset by roughly a third of the screen, so drag-and-drop/right-click/
-/// window-title-bar dragging all silently missed their targets. Keyboard input (Tab) was
-/// completely unaffected and nothing printed to the console, making it look exactly like a code
-/// regression in Player.cs/InventorySlotUI.cs — restoring the separately-dropped
-/// window/stretch/aspect="expand" did NOT fix it; only removing scale_mode="integer" entirely did.
-/// Reads the real project.godot file's text directly (no Godot runtime needed), same pattern as
-/// WorldSceneRegressionTests.</summary>
+/// <summary>Guards against a bug this project already hit once: window/stretch/scale_mode="integer"
+/// desynced the mouse-to-viewport hit-test transform (clicks looked right but landed a third of
+/// the screen off) while keyboard input and the console stayed silent, making it look like a code
+/// regression rather than a project-settings one. Reads project.godot's text directly, no Godot
+/// runtime needed.</summary>
 public class ProjectSettingsRegressionTests
 {
     private static string RepoRoot()

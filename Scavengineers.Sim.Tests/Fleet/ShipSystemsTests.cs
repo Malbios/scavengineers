@@ -40,13 +40,9 @@ public class ShipSystemsTests
 
         var cell = new CellCoord(0, 0);
 
-        // Wear integrates linearly over dt, so "same total time" must mean "same total decay" —
-        // the property that makes an absent ship's costs genuinely unskipped rather than discounted.
-        //
-        // Compared as a fraction of the decay itself, not to N decimal places: WearSystem works in
-        // float, and 120 small subtractions genuinely don't land bit-identically on the same value
-        // as 2 large ones. That rounding difference is noise (parts per million of an already tiny
-        // number); a *discount* would show up as a whole-percent gap, which this still catches.
+        // Compared as a fraction of the decay, not to N decimal places: float rounding means 120
+        // small subtractions won't land bit-identically on 2 large ones, but that's noise — a
+        // real discount would show up as a whole-percent gap, which this still catches.
         var presentDecay = 1f - present.Deck.FloorHealth(cell);
         var absentDecay = 1f - absent.Deck.FloorHealth(cell);
 

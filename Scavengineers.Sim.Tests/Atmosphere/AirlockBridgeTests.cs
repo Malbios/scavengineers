@@ -42,11 +42,8 @@ public class AirlockBridgeTests
     [Fact]
     public void Open_WithNeitherSideBreached_ConvergesTowardSharedAverage()
     {
-        // Neither side has its own path to outside here, so the bridge just pools the two cells
-        // toward each other — the direct-to-vacuum branch (see the tests below) only kicks in
-        // once one side already has its own leak. Every other test in this file uses a breached
-        // derelict cell, which always trips that branch — this is the one test that actually
-        // exercises plain averaging.
+        // The only test here with neither side breached — just pools the two cells toward each
+        // other, unlike every other test's direct-to-vacuum branch.
         var (home, homeCell) = BreathableSystem();
 
         var staleCell = new CellCoord(0, 0);
@@ -84,10 +81,8 @@ public class AirlockBridgeTests
     [Fact]
     public void Open_VentsTheWholeHomeShipTogether_NoDistanceBasedLag()
     {
-        // Once the doorway cell is marked externally vented, home's OWN Tick vents its whole
-        // connected component uniformly (see AtmosphereSystem's own Vent doc comment) - matching
-        // realistic depressurization, where internal pressure equalizes far faster than air
-        // escapes through a hole, so a far cell doesn't get a "moment of grace."
+        // Home's own Tick vents its whole connected component uniformly once marked, so a far
+        // cell gets no "moment of grace" over the doorway cell.
         var doorwayCell = new CellCoord(0, 0);
         var homeDeck = new Deck();
         for (var i = 0; i < 10; i++)
@@ -141,17 +136,9 @@ public class AirlockBridgeTests
     [Fact]
     public void Open_RapidlyVentsTheHomeRoomToo_MatchingTheBreachsOwnSpeed()
     {
-        // Design choice, not a bug: once the airlock is open, any path to outer space should feel
-        // dangerous immediately, not just for the room with the actual hole — a slower bridge
-        // rate was tried first (treating the airlock as a narrow chokepoint so a quick transit
-        // wouldn't cost air), but that undersold the danger of opening an airlock into a breached
-        // room at all. The bridge's rate matches AtmosphereSystem's own vent rate, so the home
-        // room's connected air drains just as fast as the breach itself.
-        //
-        // Threshold re-verified after the whole-component-vent redesign: once marked, home's own
-        // Tick vents its entire 5-cell component uniformly at VentRatePerSecond, not just the
-        // doorway cell — converges to essentially zero (~3.6e-6 %) within 3 seconds, since a
-        // whole small component now empties just as fast as a single cell would.
+        // Design choice, not a bug: opening an airlock into a breached room should feel dangerous
+        // immediately for the whole connected home room, not just the cell with the actual hole —
+        // the bridge's rate matches AtmosphereSystem's own vent rate.
         var doorwayCell = new CellCoord(0, 0);
         var homeDeck = new Deck();
         for (var i = 0; i < 5; i++)
@@ -205,12 +192,9 @@ public class AirlockBridgeTests
     [Fact]
     public void Open_WithABreachElsewhereInTheDerelictRoom_StillRapidlyDrainsTheHomeShipToo()
     {
-        // IsConnectedToOutside checks the derelict's whole connected component, not just the
-        // bridged cell — so a breach anywhere in that component (not necessarily at the doorway)
-        // still marks Home's side as leaking, and Home's own Tick then vents its whole component
-        // uniformly. Per the explicit design call, the source (Home, full of air, with life
-        // support) must also rapidly drain, not sit safe just because the actual hole is
-        // elsewhere in the derelict.
+        // A breach anywhere in the derelict's connected component (not just at the doorway) still
+        // marks home's side as leaking — home must rapidly drain too, not sit safe just because
+        // the actual hole is elsewhere.
         var doorwayCell = new CellCoord(0, 0);
         var breachCell = new CellCoord(4, 0); // several hops from the doorway, not the same cell
 
@@ -244,13 +228,8 @@ public class AirlockBridgeTests
     [Fact]
     public void Open_WithLifeSupport_LifeSupportDoesNotBlockTheWholeComponentVent()
     {
-        // Vent and Regenerate are mutually exclusive per component now (see Tick) - once marked,
-        // a component is vented, full stop, regardless of life support or room size. This
-        // confirms life support doesn't slow or block that at all: every cell in a multi-cell,
-        // life-support-equipped Home still converges to near-vacuum together with the doorway,
-        // not held at a safe plateau by regen (the old failure mode this branch used to guard
-        // against via Diffuse-dilution, which no longer applies since Diffuse never runs for a
-        // vented component).
+        // Vent and Regenerate are mutually exclusive per component — life support must not slow
+        // or block a marked component's vent, even one it's actively equipped on.
         var doorwayCell = new CellCoord(0, 0);
         var farCell = new CellCoord(7, 0);
         var homeDeck = new Deck();

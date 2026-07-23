@@ -1,7 +1,6 @@
 namespace Scavengineers.Scripts.Tests.Ship;
 
-/// <summary>Forces every test class that seeds the shared static <c>ShipLayoutCatalog</c> onto
-/// one non-parallel xUnit collection — same rationale as ItemCatalogCollection.</summary>
+/// <summary>Same rationale as ItemCatalogCollection, for <c>ShipLayoutCatalog</c>'s seeded state.</summary>
 [CollectionDefinition(Name, DisableParallelization = true)]
 public class ShipLayoutCatalogCollection
 {
