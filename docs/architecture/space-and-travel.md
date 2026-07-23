@@ -77,16 +77,40 @@ scene refactor, digest after, diff. The Station extraction was verified this way
 digest lines the only change was the 16 node headers renamed by unifying `ShopFigure2`/
 `ContractFigure2` onto the shared scene's names. **Run it before and after any `.tscn` surgery.**
 
-One hazard instancing adds: a SaveId authored in `Station.tscn` is inherited by both instances, so
-a new saveable node there needs a matching override on `Station2` or the two Stations share one save
-key and one silently overwrites the other. `WorldSceneRegressionTests` guards exactly that.
+One hazard instancing adds: a SaveId authored in a shared scene is inherited by every instance that
+doesn't override it, and `SaveManager` keys purely by id — so two live nodes sharing one id means
+the second capture silently overwrites the first and every instance loads the same state back.
+`WorldSceneRegressionTests` resolves each instance's *effective* id and asserts no two collide. It
+found this already live in `Derelict.tscn`: `Deck2/Floor2` shipped one hardcoded id that no derelict
+overrode, so all five wrecks' second-deck build state was one shared slot.
 
-**What remains:** destinations are still *hand-placed* instances rather than instantiated on
-arrival. `DestinationCatalog` gains a `scene` field, a `BubbleRoot` replaces the fixed sibling
-groups, and the travel console's NodePath arrays go away. Per-ship sim state already survives
-outside a live node (`ShipSystems` + `SaveData.Ships`), but per-destination *build* state does not —
-`ShipBuildTarget` owns its own save state, so freeing an absent destination's node would lose it.
-That cache is the real prerequisite, not the scene work.
+### What remains, and the dependency the plan understates
+
+Destinations are still *hand-placed* instances rather than instantiated from data. Two separable
+steps, and the plan (§ Phase 5) runs them together as one — worth pulling apart, because the second
+is much larger than it looks:
+
+**1. Instantiate from data at startup.** `DestinationCatalog` gains a `scene` field plus the
+per-instance property overrides currently authored in `World.tscn` (save ids, `LayoutId`,
+`ProcedurallyGenerate`, `GenerateLoot`); a `BubbleRoot` replaces the fixed sibling groups; the
+travel console's seven parallel `NodePath` arrays become lookups against the manager. This is where
+the actual payoff is: **a sixth destination becomes one row of `destinations.json`** instead of a
+scene edit plus three array entries. Every node stays in the tree, so the save system is untouched.
+
+**2. Free the absent destination.** This is the expensive half, and it *conflicts with work already
+done*. `ShipSim` is a `Node` that owns its `ShipSystems`, so freeing an absent destination destroys
+the very sim the coarse LOD tick exists to keep running — an absent ship wouldn't tick slowly, it
+would cease to exist. Freeing also drops four things `SaveManager` reads straight off the live tree:
+`ShipBuildTarget`'s build state, the procgen `LayoutSeed`, `IStateSaveable`/`ISaveable` door and
+console state, and any contract `mission_item` sitting in that wreck.
+
+So step 2's real prerequisite is the **`FleetRegistry`** of the plan's Phase 4 — sim ownership moved
+off the node so a destination's state outlives its scene — plus a capture-on-unload cache for the
+node-owned save state. Not the scene work. Do step 1 first; it is a strict prerequisite either way,
+and it delivers the content-scalability win on its own.
+
+Until step 2 lands, the only cost of step 1's absent destinations is resident greybox geometry,
+which at eight destinations is not a real cost.
 
 ## Before editing this subsystem
 
