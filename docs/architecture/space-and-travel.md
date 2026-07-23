@@ -56,22 +56,37 @@ costs today, now that the other consequences are fixed:
   abstraction; nothing in the scene reflects the strategic layer.
 - Every destination's geometry is resident whether or not you're there.
 
-**Why it stopped here.** Derelicts are already a shared `Derelict.tscn` and could be instanced at
-runtime tomorrow. Stations can't: both are authored inline in `World.tscn`, and the `Station` block
-references 32 `SubResource`s and 10 `ExtResource`s from that file's shared header. Extracting it
-into its own scene means relocating or duplicating all of those and remapping the ids — and
-**nothing in the test suite loads `World.tscn`**. `Scavengineers.NodeTests` is a separate,
-scene-less Godot project; `WorldSceneRegressionTests` reads the file as *text*. The only real check
-is `godot --headless --quit`, which catches an unresolved resource but not a mesh silently pointing
-at the wrong `SubResource` of the right type. That is the "locally plausible but globally wrong"
-failure mode `docs/project-plan.md` §6 warns about, so it wants the Godot editor's own
-scene-extraction tooling rather than blind text surgery.
+**Both destination kinds are now real scenes.** Derelicts always were (`Scenes/Derelict.tscn`);
+`Scenes/Station.tscn` was extracted out of `World.tscn`, which both Stations now instance —
+Station 1 with only a transform, Station 2 with its own save ids and its own two NPCs.
 
-**The order to do it in:** extract `Station.tscn` in the editor first (verify visually, commit on
-its own), then instancing is a contained change — `DestinationCatalog` gains a `scene` field, a
-`BubbleRoot` replaces the fixed groups, and the travel console's NodePath arrays go away. Per-ship
-sim state already survives outside a live node (`ShipSystems` + `SaveData.Ships`), so the
-save-loses-absent-destinations hazard that would otherwise come with instancing is already handled.
+Verifying that extraction needed a tool, because **nothing in the test suite loads `World.tscn`**:
+`Scavengineers.NodeTests` is a separate, scene-less Godot project, and `WorldSceneRegressionTests`
+reads the file as *text*. `godot --headless --quit` catches an unresolved resource but not a mesh
+silently pointing at the wrong `SubResource` of the right type — the "locally plausible but globally
+wrong" failure `docs/project-plan.md` §6 warns about. `Tools/scene_digest.gd` closes that gap:
+
+```powershell
+& $godot --headless --path . --script res://Tools/scene_digest.gd -- res://Scenes/World.tscn
+```
+
+It instantiates a scene *without* adding it to the tree (so no `_Ready` runs) and prints every
+node's path, class, script, groups and stored properties, expanding sub-resources inline so a mesh
+is compared by its actual size and material rather than by which id it points at. Digest before a
+scene refactor, digest after, diff. The Station extraction was verified this way: over all 31,277
+digest lines the only change was the 16 node headers renamed by unifying `ShopFigure2`/
+`ContractFigure2` onto the shared scene's names. **Run it before and after any `.tscn` surgery.**
+
+One hazard instancing adds: a SaveId authored in `Station.tscn` is inherited by both instances, so
+a new saveable node there needs a matching override on `Station2` or the two Stations share one save
+key and one silently overwrites the other. `WorldSceneRegressionTests` guards exactly that.
+
+**What remains:** destinations are still *hand-placed* instances rather than instantiated on
+arrival. `DestinationCatalog` gains a `scene` field, a `BubbleRoot` replaces the fixed sibling
+groups, and the travel console's NodePath arrays go away. Per-ship sim state already survives
+outside a live node (`ShipSystems` + `SaveData.Ships`), but per-destination *build* state does not —
+`ShipBuildTarget` owns its own save state, so freeing an absent destination's node would lose it.
+That cache is the real prerequisite, not the scene work.
 
 ## Before editing this subsystem
 
