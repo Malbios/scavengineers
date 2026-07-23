@@ -1,0 +1,9 @@
+[
+  { "id": "station_1", "kind": "station", "nameKey": "OBJECT_STATION", "mapX": 220, "mapY": 180 },
+  { "id": "station_2", "kind": "station", "nameKey": "OBJECT_STATION_2", "mapX": 140, "mapY": 260 },
+  { "id": "derelict_1", "kind": "derelict", "nameKey": "OBJECT_DERELICT_1", "mapX": 300, "mapY": 60 },
+  { "id": "derelict_2", "kind": "derelict", "nameKey": "OBJECT_DERELICT_2", "mapX": 420, "mapY": 150 },
+  { "id": "derelict_3", "kind": "derelict", "nameKey": "OBJECT_DERELICT_3", "mapX": 380, "mapY": 300 },
+  { "id": "derelict_4", "kind": "derelict", "nameKey": "OBJECT_DERELICT_4", "mapX": 180, "mapY": 320 },
+  { "id": "derelict_5", "kind": "derelict", "nameKey": "OBJECT_DERELICT_5", "mapX": 80, "mapY": 150 }
+]

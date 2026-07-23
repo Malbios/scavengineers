@@ -33,7 +33,6 @@ public class ContractSystemTest
         var stationGroupPaths = new Godot.Collections.Array<NodePath>();
         var stationShipSimPaths = new Godot.Collections.Array<NodePath>();
         var stationDestinationAirlockPaths = new Godot.Collections.Array<NodePath>();
-        var stationMapPositions = new Godot.Collections.Array<Vector2>();
         var stationBuildTargetPaths = new Godot.Collections.Array<NodePath>();
 
         AirlockDoorVerbTarget? stationAirlock = null;
@@ -69,7 +68,6 @@ public class ContractSystemTest
             stationShipSimPaths.Add(new NodePath($"../StationShip{i}"));
             stationDestinationAirlockPaths.Add(new NodePath($"../StationDestinationAirlock{i}"));
             stationBuildTargetPaths.Add(new NodePath($"../StationGroup{i}/Floor"));
-            stationMapPositions.Add(new Vector2(i * 100, i * 100));
         }
 
         var derelictGroup = AutoFree(new Node3D { Name = "DerelictGroup1" });
@@ -95,12 +93,10 @@ public class ContractSystemTest
             StationAirlock = stationAirlock,
             StationShipSimPaths = stationShipSimPaths,
             StationDestinationAirlockPaths = stationDestinationAirlockPaths,
-            StationMapPositions = stationMapPositions,
             StationBuildTargetPaths = stationBuildTargetPaths,
             DerelictGroupPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1") },
             DerelictShipSimPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/ShipSim") },
             DerelictBuildTargetPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/Floor") },
-            DerelictMapPositions = new Godot.Collections.Array<Vector2> { new(10, 10) },
             BaseTravelSeconds = 0.3f,
             MinTravelSeconds = 0.1f,
         });

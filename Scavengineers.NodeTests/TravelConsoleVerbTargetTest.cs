@@ -42,7 +42,6 @@ public class TravelConsoleVerbTargetTest
         var derelictGroups = new Node3D[derelictCount];
         var derelictGroupPaths = new Godot.Collections.Array<NodePath>();
         var derelictShipSimPaths = new Godot.Collections.Array<NodePath>();
-        var derelictMapPositions = new Godot.Collections.Array<Vector2>();
         ShipSim? firstDerelictShip = null;
 
         for (var i = 0; i < derelictCount; i++)
@@ -57,7 +56,6 @@ public class TravelConsoleVerbTargetTest
 
             derelictGroupPaths.Add(new NodePath($"../DerelictGroup{i + 1}"));
             derelictShipSimPaths.Add(new NodePath($"../DerelictGroup{i + 1}/ShipSim"));
-            derelictMapPositions.Add(new Vector2(i * 10, i * 10));
         }
 
         var derelictAirlock = AutoFree(new AirlockDoorVerbTarget { Name = "DerelictAirlock", ShipARef = homeShip, ShipBRef = firstDerelictShip });
@@ -71,10 +69,8 @@ public class TravelConsoleVerbTargetTest
             StationAirlock = stationAirlock,
             StationShipSimPaths = new Godot.Collections.Array<NodePath> { new("../StationShip") },
             StationDestinationAirlockPaths = new Godot.Collections.Array<NodePath> { new("../StationDestinationAirlock") },
-            StationMapPositions = new Godot.Collections.Array<Vector2> { new(220, 180) },
             DerelictGroupPaths = derelictGroupPaths,
             DerelictShipSimPaths = derelictShipSimPaths,
-            DerelictMapPositions = derelictMapPositions,
         });
         sceneTree.Root.AddChild(console);
 
@@ -387,7 +383,6 @@ public class TravelConsoleVerbTargetTest
         var derelictBuildTargetPaths = new Godot.Collections.Array<NodePath>();
         var derelictGroupPaths = new Godot.Collections.Array<NodePath>();
         var derelictShipSimPaths = new Godot.Collections.Array<NodePath>();
-        var derelictMapPositions = new Godot.Collections.Array<Vector2>();
         var derelictBuildTargets = new ShipBuildTarget[2];
 
         for (var i = 0; i < 2; i++)
@@ -405,7 +400,6 @@ public class TravelConsoleVerbTargetTest
             derelictGroupPaths.Add(new NodePath($"../DerelictGroup{i + 1}"));
             derelictShipSimPaths.Add(new NodePath($"../DerelictGroup{i + 1}/ShipSim"));
             derelictBuildTargetPaths.Add(new NodePath($"../DerelictGroup{i + 1}/Floor"));
-            derelictMapPositions.Add(new Vector2(i * 10, i * 10));
         }
 
         var console = AutoFree(new TravelConsoleVerbTarget
@@ -414,17 +408,15 @@ public class TravelConsoleVerbTargetTest
             StationGroupPaths = new Godot.Collections.Array<NodePath> { new("../StationGroup") },
             StationShipSimPaths = new Godot.Collections.Array<NodePath> { new("../StationShip") },
             StationDestinationAirlockPaths = new Godot.Collections.Array<NodePath> { new("../StationDestinationAirlock") },
-            StationMapPositions = new Godot.Collections.Array<Vector2> { new(220, 180) },
             DerelictGroupPaths = derelictGroupPaths,
             DerelictShipSimPaths = derelictShipSimPaths,
             DerelictBuildTargetPaths = derelictBuildTargetPaths,
-            DerelictMapPositions = derelictMapPositions,
         });
         sceneTree.Root.AddChild(console);
 
-        // StationCount here is 1 (StationGroupPaths/StationShipSimPaths/StationDestinationAirlockPaths/
-        // StationMapPositions all length 1 — see StationCount's own Math.Min guard), so
-        // destination id 0 is the lone Station, 1/2 are Derelict 1/2.
+        // StationCount here is 1 (StationGroupPaths/StationShipSimPaths/StationDestinationAirlockPaths
+        // all length 1 — see StationCount's own Math.Min guard), so destination id 0 is the lone
+        // Station, 1/2 are Derelict 1/2.
         AssertObject(console.GetDerelictBuildTarget(0)).IsNull();
         AssertBool(ReferenceEquals(console.GetDerelictBuildTarget(1), derelictBuildTargets[0])).IsTrue();
         AssertBool(ReferenceEquals(console.GetDerelictBuildTarget(2), derelictBuildTargets[1])).IsTrue();
@@ -457,7 +449,6 @@ public class TravelConsoleVerbTargetTest
         var stationGroupPaths = new Godot.Collections.Array<NodePath>();
         var stationShipSimPaths = new Godot.Collections.Array<NodePath>();
         var stationDestinationAirlockPaths = new Godot.Collections.Array<NodePath>();
-        var stationMapPositions = new Godot.Collections.Array<Vector2>();
         var stationBuildTargetPaths = new Godot.Collections.Array<NodePath>();
         var stationBuildTargets = new ShipBuildTarget[2];
 
@@ -480,7 +471,6 @@ public class TravelConsoleVerbTargetTest
             stationShipSimPaths.Add(new NodePath($"../StationGroup{i}/ShipSim"));
             stationDestinationAirlockPaths.Add(new NodePath($"../StationDestinationAirlock{i}"));
             stationBuildTargetPaths.Add(new NodePath($"../StationGroup{i}/Floor"));
-            stationMapPositions.Add(new Vector2(i * 10, i * 10));
         }
 
         var console = AutoFree(new TravelConsoleVerbTarget
@@ -489,7 +479,6 @@ public class TravelConsoleVerbTargetTest
             StationGroupPaths = stationGroupPaths,
             StationShipSimPaths = stationShipSimPaths,
             StationDestinationAirlockPaths = stationDestinationAirlockPaths,
-            StationMapPositions = stationMapPositions,
             StationBuildTargetPaths = stationBuildTargetPaths,
         });
         sceneTree.Root.AddChild(console);

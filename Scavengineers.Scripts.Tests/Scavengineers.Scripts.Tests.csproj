@@ -37,6 +37,7 @@
     <Compile Include="..\Scripts\Contracts\Contract.cs" Link="Scripts\Contracts\Contract.cs" />
     <Compile Include="..\Scripts\Contracts\ContractCatalog.cs" Link="Scripts\Contracts\ContractCatalog.cs" />
     <Compile Include="..\Scripts\Ship\ShipLayoutCatalog.cs" Link="Scripts\Ship\ShipLayoutCatalog.cs" />
+    <Compile Include="..\Scripts\Travel\DestinationCatalog.cs" Link="Scripts\Travel\DestinationCatalog.cs" />
     <Compile Include="..\Scripts\Ship\ShipLayoutGenerator.cs" Link="Scripts\Ship\ShipLayoutGenerator.cs" />
     <Compile Include="..\Scripts\Verbs\Verb.cs" Link="Scripts\Verbs\Verb.cs" />
     <Compile Include="..\Scripts\Verbs\IVerbTarget.cs" Link="Scripts\Verbs\IVerbTarget.cs" />

@@ -29,27 +29,54 @@ Travel runs through `TravelConsoleVerbTarget` (+ `TravelMapPanel`, `DockingMinig
 
 **This is the retrofit the two-layer model exists to avoid, and it has already happened five
 times.** The earlier version of this doc warned "don't extend the 'just add another fixed sibling
-group' pattern to a second wreck" — that warning is now historical, not preventative. Two
-consequences worth naming rather than rediscovering:
+group' pattern to a second wreck" — that warning is now historical, not preventative.
 
-- `SetShipPresence` hides and decollides a group but does **not** stop its `_PhysicsProcess`, so
-  every `ShipSim` in the scene — 13 of them, since each Derelict instance carries a second-deck
-  `ShipSim` as well — ticks full-fidelity atmosphere/wear/fire every physics frame regardless of
-  where the player is. That's exactly the seam `multi-ship-fleet.md`'s sim-LOD rule reserves — it
-  is now a real need, not a speculative one.
+### The strategic layer is real data now
+
+`Data/destinations.json` + `DestinationCatalog` hold the location list — id, kind, display name,
+map position — which is the "map/graph of locations, pure data, no physics" half of the model. It
+replaced two parallel inspector arrays (`StationMapPositions`/`DerelictMapPositions`) *and* labels
+built by index (`$"OBJECT_DERELICT_{i + 1}"`), so a destination's identity now lives in one row of
+one file. `TravelConsoleVerbTarget` warns at startup if the catalog and the scene wiring disagree
+about how many destinations exist.
+
+**Destination ordering in that file is load-bearing**: a destination is addressed by its index
+across the whole list, stations first. Appending is safe; reordering or removing silently repoints
+in-flight `CargoDelivery` contracts. `DestinationCatalogTests` guards the ordering and id
+uniqueness against the real file.
+
+### The tactical layer is not — this is the remaining gap
+
+Ships are still hand-placed sibling groups, not instantiated into a bubble at runtime. What that
+costs today, now that the other consequences are fixed:
+
+- ~~All 13 `ShipSim`s tick full-fidelity every frame~~ — **fixed**: absent ships drop to a coarse
+  LOD tick (see `multi-ship-fleet.md`).
 - Every destination shares one world origin, so "felt distance" is entirely a travel-timer
-  abstraction; nothing in the scene reflects the strategic layer at all.
+  abstraction; nothing in the scene reflects the strategic layer.
+- Every destination's geometry is resident whether or not you're there.
 
-The intended shape stays as described above: the strategic layer picks a destination and a bubble
-is **instantiated at runtime**. Migrating to it means replacing the fixed sibling groups with
-runtime instancing of `Derelict.tscn` under a bubble root — the per-instance data (`LayoutId`,
-seed, breach placement) is already data-driven, so the ship *content* is not the blocker; the
-scene topology and `TravelConsoleVerbTarget`'s parallel NodePath arrays are.
+**Why it stopped here.** Derelicts are already a shared `Derelict.tscn` and could be instanced at
+runtime tomorrow. Stations can't: both are authored inline in `World.tscn`, and the `Station` block
+references 32 `SubResource`s and 10 `ExtResource`s from that file's shared header. Extracting it
+into its own scene means relocating or duplicating all of those and remapping the ids — and
+**nothing in the test suite loads `World.tscn`**. `Scavengineers.NodeTests` is a separate,
+scene-less Godot project; `WorldSceneRegressionTests` reads the file as *text*. The only real check
+is `godot --headless --quit`, which catches an unresolved resource but not a mesh silently pointing
+at the wrong `SubResource` of the right type. That is the "locally plausible but globally wrong"
+failure mode `docs/project-plan.md` §6 warns about, so it wants the Godot editor's own
+scene-extraction tooling rather than blind text surgery.
+
+**The order to do it in:** extract `Station.tscn` in the editor first (verify visually, commit on
+its own), then instancing is a contained change — `DestinationCatalog` gains a `scene` field, a
+`BubbleRoot` replaces the fixed groups, and the travel console's NodePath arrays go away. Per-ship
+sim state already survives outside a live node (`ShipSystems` + `SaveData.Ships`), so the
+save-loses-absent-destinations hazard that would otherwise come with instancing is already handled.
 
 ## Before editing this subsystem
 
 Any physics-bearing scene must stay within the ≤~10 km bubble bound and re-center near origin — don't let a "just this once" scene span the strategic layer's distances directly.
 
 Adding a **sixth** hand-placed destination group is the point to stop and do the runtime-instancing
-work instead — each new one now costs a scene edit plus four parallel NodePath array entries on the
-travel console, and adds another always-ticking `ShipSim`.
+work instead — a new one costs a `destinations.json` row *plus* a scene edit and three parallel
+NodePath array entries on the travel console.

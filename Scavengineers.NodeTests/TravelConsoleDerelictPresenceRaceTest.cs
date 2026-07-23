@@ -78,10 +78,8 @@ public class TravelConsoleDerelictPresenceRaceTest
             StationAirlock = stationAirlock,
             StationShipSimPaths = new Godot.Collections.Array<NodePath> { new("../StationShip") },
             StationDestinationAirlockPaths = new Godot.Collections.Array<NodePath> { new("../StationDestinationAirlock") },
-            StationMapPositions = new Godot.Collections.Array<Vector2> { new(220, 180) },
             DerelictGroupPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1") },
             DerelictShipSimPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/ShipSim") },
-            DerelictMapPositions = new Godot.Collections.Array<Vector2> { Vector2.Zero },
         };
 
         // Ordering matters: console (HomeShip's branch) is added as a sibling BEFORE the derelict

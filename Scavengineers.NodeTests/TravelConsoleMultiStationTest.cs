@@ -1,9 +1,12 @@
 using System.Linq;
 using System.Threading.Tasks;
 
+using System.Collections.Generic;
+
 using GdUnit4;
 using Godot;
 using Scavengineers.Scripts.Ship;
+using Scavengineers.Scripts.Travel;
 using Scavengineers.Sim.Grid;
 using Scavengineers.Sim.ShipModel;
 
@@ -21,6 +24,22 @@ namespace Scavengineers.NodeTests;
 [TestSuite]
 public class TravelConsoleMultiStationTest
 {
+    /// <summary>The travel map's names and positions come from DestinationCatalog (i.e. from
+    /// Data/destinations.json) now, and this project has no res://Data/ of its own — so the real
+    /// Load() yields an empty catalog and BuildMapEntries would list nothing. Seeded here to match
+    /// the harness's own two-stations-one-derelict shape.
+    ///
+    /// No [After] reset, and no need for the synthetic-id caution ItemCatalog's own seeding needs:
+    /// nothing else in this project reads DestinationCatalog, so a leak into another suite is
+    /// inert, and resetting would only make the next reader re-run Load() and re-warn.</summary>
+    [Before]
+    public void SeedDestinations() => DestinationCatalog.SeedForTests(new List<DestinationCatalog.DestinationDefinition>
+    {
+        new() { Id = "station_1", Kind = "station", NameKey = "OBJECT_STATION" },
+        new() { Id = "station_2", Kind = "station", NameKey = "OBJECT_STATION_2" },
+        new() { Id = "derelict_1", Kind = "derelict", NameKey = "OBJECT_DERELICT_1" },
+    });
+
     private static (TravelConsoleVerbTarget Console, AirlockDoorVerbTarget StationAirlock, AirlockDoorVerbTarget[] StationDestinationAirlocks, AirlockDoorVerbTarget DerelictAirlock) MakeHarness(SceneTree sceneTree)
     {
         var homeShip = AutoFree(new ShipSim { HasPowerGrid = true });
@@ -29,7 +48,6 @@ public class TravelConsoleMultiStationTest
         var stationGroupPaths = new Godot.Collections.Array<NodePath>();
         var stationShipSimPaths = new Godot.Collections.Array<NodePath>();
         var stationDestinationAirlockPaths = new Godot.Collections.Array<NodePath>();
-        var stationMapPositions = new Godot.Collections.Array<Vector2>();
         var stationDestinationAirlocks = new AirlockDoorVerbTarget[2];
 
         AirlockDoorVerbTarget? stationAirlock = null;
@@ -59,7 +77,6 @@ public class TravelConsoleMultiStationTest
             stationGroupPaths.Add(new NodePath($"../StationGroup{i}"));
             stationShipSimPaths.Add(new NodePath($"../StationShip{i}"));
             stationDestinationAirlockPaths.Add(new NodePath($"../StationDestinationAirlock{i}"));
-            stationMapPositions.Add(new Vector2(i * 100, i * 100));
         }
 
         var derelictGroup = AutoFree(new Node3D { Name = "DerelictGroup1" });
@@ -79,10 +96,8 @@ public class TravelConsoleMultiStationTest
             StationAirlock = stationAirlock,
             StationShipSimPaths = stationShipSimPaths,
             StationDestinationAirlockPaths = stationDestinationAirlockPaths,
-            StationMapPositions = stationMapPositions,
             DerelictGroupPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1") },
             DerelictShipSimPaths = new Godot.Collections.Array<NodePath> { new("../DerelictGroup1/ShipSim") },
-            DerelictMapPositions = new Godot.Collections.Array<Vector2> { new(10, 10) },
             BaseTravelSeconds = 0.3f,
             MinTravelSeconds = 0.1f,
         });

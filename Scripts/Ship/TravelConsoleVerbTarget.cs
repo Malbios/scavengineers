@@ -116,10 +116,6 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     [Export]
     public Godot.Collections.Array<NodePath> StationDestinationAirlockPaths { get; set; } = new();
 
-    // Placeholder/tunable — arbitrary spatial layout for the travel map, no gameplay effect.
-    [Export]
-    public Godot.Collections.Array<Vector2> StationMapPositions { get; set; } = new();
-
     /// <summary>Each Station's own Floor (ShipBuildTarget) — resolves a destination id to a spawn
     /// point for ContractGiverVerbTarget's CargoDelivery contracts (see GetStationBuildTarget),
     /// mirroring DerelictBuildTargetPaths/GetDerelictBuildTarget below. Deliberately NOT folded
@@ -142,10 +138,6 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
 
     [Export]
     public Godot.Collections.Array<NodePath> DerelictShipSimPaths { get; set; } = new();
-
-    // Placeholder/tunable — arbitrary spatial layout for the travel map, no gameplay effect.
-    [Export]
-    public Godot.Collections.Array<Vector2> DerelictMapPositions { get; set; } = new();
 
     /// <summary>Each Derelict's own Floor (ShipBuildTarget) — resolves a destination id to a
     /// spawn point for ContractGiverVerbTarget's RetrieveItem contracts (see
@@ -182,15 +174,15 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     private Timer? _maintenanceTimer;
     private bool _maintaining;
 
-    /// <summary>Bounds every loop/lookup below defensively against the four parallel Station
-    /// arrays being resized inconsistently by hand in the inspector.</summary>
+    /// <summary>Bounds every loop/lookup below defensively against the parallel Station arrays
+    /// being resized inconsistently by hand in the inspector. Map positions dropped out of this
+    /// bound when they moved to DestinationCatalog — one fewer array to keep in step.</summary>
     private int StationCount => Math.Min(
         Math.Min(_stationGroups.Count, _stationShipSims.Count),
-        Math.Min(_stationDestinationAirlocks.Count, StationMapPositions.Count));
+        _stationDestinationAirlocks.Count);
 
-    /// <summary>Bounds every loop/lookup below defensively against the three parallel Derelict
-    /// arrays above being resized inconsistently by hand in the inspector.</summary>
-    private int DerelictCount => Math.Min(_derelictGroups.Count, Math.Min(_derelictShipSims.Count, DerelictMapPositions.Count));
+    /// <summary>Same, for the Derelict arrays.</summary>
+    private int DerelictCount => Math.Min(_derelictGroups.Count, _derelictShipSims.Count);
 
     public IReadOnlyList<Verb> AvailableVerbs =>
         [
@@ -228,15 +220,25 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     public override void _Ready()
     {
         if (StationGroupPaths.Count != StationShipSimPaths.Count
-            || StationGroupPaths.Count != StationDestinationAirlockPaths.Count
-            || StationGroupPaths.Count != StationMapPositions.Count)
+            || StationGroupPaths.Count != StationDestinationAirlockPaths.Count)
         {
             GD.PushWarning("[TravelConsoleVerbTarget] Mismatched station array lengths — extra entries ignored.");
         }
 
-        if (DerelictGroupPaths.Count != DerelictShipSimPaths.Count || DerelictGroupPaths.Count != DerelictMapPositions.Count)
+        if (DerelictGroupPaths.Count != DerelictShipSimPaths.Count)
         {
             GD.PushWarning("[TravelConsoleVerbTarget] Mismatched derelict array lengths — extra entries ignored.");
+        }
+
+        // The data list and the scene wiring are separate halves of the same thing, so a mismatch
+        // means either an unreachable destination (described but not wired) or an unnamed one
+        // (wired but absent from the catalog, which BuildMapEntries then can't label).
+        if (DestinationCatalog.All.Count > 0
+            && (DestinationCatalog.StationCount != StationGroupPaths.Count || DestinationCatalog.DerelictCount != DerelictGroupPaths.Count))
+        {
+            GD.PushWarning(
+                $"[TravelConsoleVerbTarget] destinations.json describes {DestinationCatalog.StationCount} station(s)/{DestinationCatalog.DerelictCount} derelict(s) " +
+                $"but the scene wires {StationGroupPaths.Count}/{DerelictGroupPaths.Count} — only wired destinations are offered.");
         }
 
         foreach (var path in StationGroupPaths)
@@ -452,18 +454,28 @@ public partial class TravelConsoleVerbTarget : StaticBody3D, IVerbTarget, IState
     /// without special-casing individual destinations itself. Station 0 keeps the original
     /// "OBJECT_STATION" key (no "_1" suffix) so the existing, already-localized single-station
     /// save doesn't need a fresh translation just to keep reading the same on screen.</summary>
+    /// <summary>The travel map's rows, straight from <see cref="DestinationCatalog"/> — name and
+    /// map position are data now, rather than an inspector array paired with a label built by index
+    /// (<c>$"OBJECT_DERELICT_{i + 1}"</c>). Bounded by the *wired* counts, not the catalog's own:
+    /// a destination described in data but with no scene subtree behind it yet would be selectable
+    /// and then travel nowhere, so it's better omitted than offered.</summary>
     public IReadOnlyList<TravelMapEntry> BuildMapEntries()
     {
         var entries = new List<TravelMapEntry>();
-        for (var i = 0; i < StationCount; i++)
-        {
-            var key = i == 0 ? "OBJECT_STATION" : $"OBJECT_STATION_{i + 1}";
-            entries.Add(new(i, key, StationMapPositions[i], _currentDestination == i));
-        }
 
-        for (var i = 0; i < DerelictCount; i++)
+        for (var i = 0; i < DestinationCatalog.All.Count; i++)
         {
-            entries.Add(new(StationCount + i, $"OBJECT_DERELICT_{i + 1}", DerelictMapPositions[i], _currentDestination == StationCount + i));
+            var destination = DestinationCatalog.All[i];
+            var wired = destination.IsStation
+                ? i < StationCount
+                : i - DestinationCatalog.StationCount < DerelictCount;
+
+            if (!wired)
+            {
+                continue;
+            }
+
+            entries.Add(new(i, destination.NameKey, destination.MapPosition, _currentDestination == i));
         }
 
         return entries;
