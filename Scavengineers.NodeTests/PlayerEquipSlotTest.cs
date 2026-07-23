@@ -10,24 +10,18 @@ using static GdUnit4.Assertions;
 
 namespace Scavengineers.NodeTests;
 
-/// <summary>Regression coverage for the new generalized Torso/Head equip-slot flow
-/// (Player.TryEquipItemFrom/TryUnequipItem) and the Legs/LeftFoot/RightFoot "blocked while
-/// the EVA suit's torso is worn" gate. Equips directly via PlayerInventory.EquipContainerDirectly
-/// rather than exercising TryEquipItemFrom's own ItemCatalog.EquipSlot gate — this project's
-/// isolated NodeTests res:// has no Data/items.json (see PlayerTestHarness's own doc comment), so
-/// ItemCatalog.EquipSlot always returns null here regardless of item id; that specific gate is
-/// covered instead by ItemCatalogTests.EquipSlot_ReturnsTheDeclaredSlot (Scavengineers.Scripts.Tests,
-/// where ItemCatalog.SeedForTests actually works) plus manual playtest.</summary>
+/// <summary>Regression coverage for the generalized Torso/Head equip-slot flow
+/// (Player.TryEquipItemFrom/TryUnequipItem) and the Legs/LeftFoot/RightFoot "blocked while the EVA
+/// suit's torso is worn" gate. Equips directly via PlayerInventory.EquipContainerDirectly rather
+/// than through ItemCatalog.EquipSlot — this project's isolated NodeTests catalog has no real
+/// Data/items.json, so that gate always returns null here regardless of item id; it's covered
+/// instead by ItemCatalogTests.EquipSlot_ReturnsTheDeclaredSlot plus manual playtest.</summary>
 [TestSuite]
 public class PlayerEquipSlotTest
 {
-    /// <summary>The harness's fresh-game stipend really runs in _Ready() and now includes a
-    /// starter EVA suit (torso+helmet, fully suited) — undo that first so a test that wants to
-    /// exercise its own from-scratch equip/unequip scenario isn't fighting the stipend's own
-    /// already-worn suit. Also discards the stipend's persistent-contents entries for the suit
-    /// pieces (not just unwearing them) — under the persistent-contents model, an item's inner
-    /// contents survive being unworn, so a test that re-equips "eva_torso_suit" with its own
-    /// fresh container would otherwise silently get the stipend's leftover (empty) one back.</summary>
+    /// <summary>The harness's fresh-game stipend already wears a starter EVA suit — undo that,
+    /// including its persistent-contents entries (which survive unwearing), so a test's own
+    /// from-scratch equip doesn't silently inherit the stipend's leftover container.</summary>
     private static void ResetTorsoAndHeadFromStipend(PlayerInventory inventory)
     {
         var torsoItemId = inventory.Torso?.ItemId;
@@ -49,12 +43,8 @@ public class PlayerEquipSlotTest
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
         ResetTorsoAndHeadFromStipend(player.Inventory);
-        // The harness's fresh-game stipend also loads up the debug backpack/hands — in this
-        // project's isolated, catalog-less NodeTests environment (see PlayerTestHarness's own
-        // doc comment), every item's MaxStackSize falls back to 1, so the 50-count scrap_metal
-        // stipend overflows past the 24-slot debug backpack into both bare hands. Clear them
-        // explicitly so this test's own "room exists" precondition is real, not accidentally
-        // already-full from that.
+        // The stipend's scrap_metal overflows the debug backpack into both hands here (catalog-
+        // less MaxStackSize falls back to 1) — clear them so "room exists" is a real precondition.
         player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, null);
         player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, null);
         player.Inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2));
@@ -69,11 +59,8 @@ public class PlayerEquipSlotTest
     [RequireGodotRuntime]
     public void TryUnequipItem_StaysEquipped_WhenBothHandsAreFullAndNoDestinationGiven_EvenWithNonEmptyPocketContents()
     {
-        // Under the persistent-contents model, a worn item's contents never travel with the
-        // unequip decision (see PlayerInventory.GetPersistentContents) — so unlike the old
-        // "non-empty container forces a world drop" behavior, both hands being full with no
-        // drop destination now just means the suit can't come off right now and stays worn,
-        // same "nothing vanishes" contract as an empty one.
+        // Contents never travel with the unequip decision, so both hands full with no drop
+        // destination just means the suit stays worn — same "nothing vanishes" contract as empty.
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
         ResetTorsoAndHeadFromStipend(player.Inventory);
@@ -99,9 +86,8 @@ public class PlayerEquipSlotTest
         player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, null);
         player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, null);
         player.Inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2));
-        // Simulates what TryEquipItemFrom's own torso-specific glue does on a real equip —
-        // exercised directly here since that path needs a real ItemCatalog.EquipSlot match,
-        // unreachable in this project's isolated NodeTests catalog (see class doc comment).
+        // Simulates TryEquipItemFrom's own torso-specific glue — exercised directly since that
+        // path needs a real ItemCatalog.EquipSlot match, unreachable here (see class doc).
         player.Inventory.AttachSpecializedSlot("suit_o2", hasItem: true, charge: 0.6f);
         player.Inventory.AttachSpecializedSlot("suit_n2", hasItem: false, charge: 0f);
         player.Inventory.AttachSpecializedSlot("suit_filter", hasItem: false, charge: 0f);
@@ -123,13 +109,9 @@ public class PlayerEquipSlotTest
     [RequireGodotRuntime]
     public void TryUnequipItem_PlacesTheBareTokenAtTheActualDropDestination_NotJustAHand()
     {
-        // The FitsInStorage-based "suit can't go in a backpack" restriction itself is covered by
-        // ItemCatalogTests (Scavengineers.Scripts.Tests, where SeedForTests actually configures
-        // it) plus manual playtest — this project's isolated NodeTests catalog has no real
-        // Data/items.json, so FitsInStorage always returns its "unknown item" default (true)
-        // here regardless of item id (see this class's own doc comment). The helmet fits
-        // everywhere either way, so it's a valid destination-respecting case regardless of that
-        // limitation.
+        // FitsInStorage's suit-specific restriction is covered by ItemCatalogTests instead (see
+        // class doc) — the helmet fits everywhere regardless, so this is still a valid
+        // destination-respecting case.
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
         ResetTorsoAndHeadFromStipend(player.Inventory);
@@ -137,8 +119,8 @@ public class PlayerEquipSlotTest
         player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, ("widget", 1, 1f));
         player.Inventory.EquipContainerDirectly("head", "eva_helmet", new SlotContainer(0));
 
-        // A standalone container, not the (stipend-filled) real backpack — keeps this test's
-        // "is this exact slot empty" precondition isolated from stipend noise.
+        // A standalone container, not the stipend-filled real backpack, isolates this test's
+        // "is this exact slot empty" precondition from stipend noise.
         var destinationContainer = new SlotContainer(2);
         var destination = AutoFree(new InventorySlotUI { Container = destinationContainer, SlotIndex = 0 });
 
@@ -177,9 +159,6 @@ public class PlayerEquipSlotTest
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
         ResetTorsoAndHeadFromStipend(player.Inventory);
-        // Both hands genuinely full — the torso's own 2 pocket slots are empty, so the unequip
-        // attempt reaches the "isEmpty, but nowhere for it to go" branch and re-equips instead of
-        // actually coming off.
         player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1, 1f));
         player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, ("widget", 1, 1f));
         player.Inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2));
@@ -187,9 +166,7 @@ public class PlayerEquipSlotTest
 
         player.TryUnequipItem("torso");
 
-        // The suit never actually left, so its sub-slots must be exactly as they were —
-        // regressing this would silently strip a worn suit's tanks any time both hands
-        // happen to be full at the moment you tried (and failed) to take it off.
+        // The suit never actually left, so its sub-slots must be exactly as they were.
         AssertBool(player.Inventory.Torso is { ItemId: "eva_torso_suit" }).IsTrue();
         AssertBool(player.Inventory.SuitO2 is { HasItem: true }).IsTrue();
         AssertBool(Mathf.IsEqualApprox(player.Inventory.SuitO2!.Charge, 0.6f)).IsTrue();
@@ -232,10 +209,8 @@ public class PlayerEquipSlotTest
     [RequireGodotRuntime]
     public void CanDropData_StillAcceptsAnOrdinaryCompatibleItem_LikeTheHelmet_OntoABackpackSlot()
     {
-        // The helmet has no storage restriction (unlike the suit's torso piece) — this should
-        // stay accepted regardless of ItemCatalog state, unlike the suit-specific rejection case
-        // below, which needs the real Data/items.json (see this class's own doc comment) and is
-        // covered instead by ItemCatalogTests.FitsInStorage plus manual playtest.
+        // The helmet has no storage restriction, so this stays accepted regardless of ItemCatalog
+        // state — unlike the suit-specific rejection case, covered by ItemCatalogTests instead.
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
         ResetTorsoAndHeadFromStipend(player.Inventory);
@@ -251,11 +226,8 @@ public class PlayerEquipSlotTest
     [RequireGodotRuntime]
     public void CanDropData_ChecksTheSourcesCurrentItem_NotJustAnOrdinaryContainerSlot()
     {
-        // Regression coverage for the mechanism itself (not the FitsInStorage gate's real
-        // value, which this project's isolated NodeTests catalog can't exercise) — dragging a
-        // *worn* item (EquippedSlotName-sourced, no ordinary Container/SlotIndex of its own)
-        // must resolve via source.CurrentSlot(), not silently skip the check because the source
-        // isn't an ordinary indexed slot.
+        // Dragging a *worn* item (EquippedSlotName-sourced, no ordinary Container/SlotIndex) must
+        // resolve via source.CurrentSlot(), not silently skip the check.
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
         ResetTorsoAndHeadFromStipend(player.Inventory);
@@ -264,9 +236,8 @@ public class PlayerEquipSlotTest
         var source = AutoFree(new InventorySlotUI { EquippedSlotName = "torso", PlayerRef = player });
         var destination = AutoFree(new InventorySlotUI { Container = new SlotContainer(2), PlayerRef = player });
 
-        // Doesn't throw, and resolves a real verdict either way — the actual true/false value
-        // here just reflects this environment's catalog-less FitsInStorage default (true), not
-        // the real game's suit-specific restriction.
+        // Just needs to resolve without throwing — the true/false value reflects this
+        // environment's catalog-less FitsInStorage default, not the real game's restriction.
         destination!._CanDropData(Vector2.Zero, Variant.From(source));
     }
 
@@ -274,12 +245,9 @@ public class PlayerEquipSlotTest
     [RequireGodotRuntime]
     public async Task UnusedBodySlot_NeverDisplaysAnItem_EvenWhenTheSharedHandsContainerHasSomethingAtIndexZero()
     {
-        // Regression test: Player._Ready's blanket EquipSlots loop points every child's Container
-        // at _inventory.Hands (harmless for Torso/Head/SpecializedSlot-driven slots, which check
-        // their own PlayerRef-based state first) — but Legs/LeftFoot/RightFoot never set their
-        // own SlotIndex, so it defaults to 0. Before the fix, CurrentSlot() had no IsUnusedBodySlot
-        // guard and fell through to reading Hands.Slots[0] directly, showing whatever's in the
-        // player's left hand on a slot that should always be empty.
+        // Regression test: Legs/LeftFoot/RightFoot never set their own SlotIndex (defaults to 0),
+        // and CurrentSlot() used to have no IsUnusedBodySlot guard, so it fell through to reading
+        // Hands.Slots[0] directly — showing the left hand's item on a slot that should stay empty.
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
         player.Inventory.Hands.SetSlot(PlayerInventory.LeftHandSlotIndex, ("widget", 1, 1f));
@@ -289,11 +257,8 @@ public class PlayerEquipSlotTest
         legSlot.AddChild(new Label { Name = "Count" });
         sceneTree.Root.AddChild(legSlot);
 
-        // Waits on the *slot's* own idle _Process (InventorySlotUI.Refresh), not on Player —
-        // legSlot is a standalone node here, added straight to the root, so Player's physics tick
-        // says nothing about whether it has refreshed yet. Two-step await matches
-        // InteriorDoorVerbTargetTest's established convention: a single ProcessFrame isn't always
-        // enough for _Ready() to have wired _icon/_countLabel and for Refresh() to have run.
+        // Waits on the slot's own idle _Process (Refresh), not on Player — legSlot is standalone
+        // here, so Player's physics tick says nothing about whether it has refreshed yet.
         await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
         await sceneTree.ToSignal(sceneTree, SceneTree.SignalName.ProcessFrame);
 
@@ -306,8 +271,8 @@ public class PlayerEquipSlotTest
     public void TryDropInWorld_EquippedTorsoSlot_SpawnsTheSuitAsAWorldPickup_NotWhateverIsInTheLeftHand()
     {
         // Regression test: TryDropInWorld had no EquippedSlotName check, so dragging a worn
-        // Torso/Head item into open space fell through to the generic Container/SlotIndex path
-        // (Hands/0) and would silently drop/clear whatever was in the left hand instead.
+        // Torso/Head item fell through to the generic Container/SlotIndex path (Hands/0) and
+        // would silently drop/clear whatever was in the left hand instead.
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
         ResetTorsoAndHeadFromStipend(player.Inventory);
@@ -338,13 +303,10 @@ public class PlayerEquipSlotTest
     [RequireGodotRuntime]
     public void TryDropInWorld_AimedAtAVerticalWall_NudgesAlongTheWallsNormal_NotStraightUp()
     {
-        // Regression test: RestingDropPosition used to always nudge straight up regardless of
-        // the raycast's own hit normal — fine for a floor hit (already ~Up there), but a wall hit
-        // has a horizontal normal, so the up-only nudge did nothing to clear the item away from
-        // the wall's own collision, leaving it embedded instead of ending up on the floor nearby
-        // the way gravity settles every other drop. Aiming dead-center at this wall's front face
-        // hits with a purely horizontal normal (~(0,0,1)) — the fix nudges along THAT normal, so
-        // the dropped item's Y should stay at the wall's own height (0), not boosted upward.
+        // Regression test: RestingDropPosition used to always nudge straight up regardless of the
+        // raycast's hit normal, embedding items dropped against a wall instead of resting them
+        // nearby. Aiming dead-center at this wall hits with a horizontal normal (~(0,0,1)) — the
+        // fix nudges along THAT normal, so the dropped item's Y should stay at 0, not boosted up.
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
         ResetTorsoAndHeadFromStipend(player.Inventory);
@@ -421,16 +383,13 @@ public class PlayerEquipSlotTest
     [RequireGodotRuntime]
     public void TryDropInWorld_BareBackpackTokenInAHand_CarriesItsPersistentContentsIntoTheWorld()
     {
-        // A backpack that's merely being carried (not worn) still has permanent contents of its
-        // own (see PlayerInventory's persistent-contents model) — dropping the bare token from a
-        // hand must carry them along, not silently orphan them in the player's own
-        // persistent-contents map.
+        // A carried-not-worn backpack still has persistent contents of its own — dropping the
+        // bare token from a hand must carry them along, not orphan them in the player's map.
         var sceneTree = (SceneTree)Engine.GetMainLoop();
         var player = PlayerTestHarness.CreateAttached(sceneTree);
         ResetTorsoAndHeadFromStipend(player.Inventory);
-        // The stipend's own debug_backpack already occupies "back" — clear it (and its
-        // persistent contents, same reasoning as ResetTorsoAndHeadFromStipend above) so this
-        // test's own fresh "backpack" equip has a free slot and a clean, empty container.
+        // The stipend's debug_backpack already occupies "back" — clear it and its persistent
+        // contents so this test's fresh "backpack" equip gets a clean container.
         player.Inventory.ClearEquippedContainer("back");
         player.Inventory.DiscardPersistentContents("debug_backpack");
         AssertBool(player.Inventory.EquipContainerDirectly("back", "backpack", new SlotContainer(2))).IsTrue();
@@ -471,16 +430,13 @@ public class PlayerEquipSlotTest
         ResetTorsoAndHeadFromStipend(player.Inventory);
         player.Inventory.EquipContainerDirectly("torso", "eva_torso_suit", new SlotContainer(2));
         player.Inventory.Torso!.Contents.Add("scrap_metal", 1);
-        // Take it off into a hand (bare token, contents persist — see PlayerInventory's
-        // persistent-contents model) rather than going through the full unequip flow, so this
-        // test only exercises the preview mechanic itself.
+        // Bypasses the full unequip flow (contents persist regardless) so this test only
+        // exercises the preview mechanic itself.
         player.Inventory.ClearEquippedContainer("torso");
         AssertBool(player.Inventory.Torso is null).IsTrue();
 
-        // Let the harness's normal per-frame update (UpdateInventoryHud) run at least once
-        // first, establishing the real "no window open" baseline exactly like real gameplay —
-        // a Control's raw Godot default is Visible, so checking before any frame has ticked
-        // would see that default instead of the game's own closed-by-default state.
+        // A Control's raw Godot default is Visible, so let one frame of UpdateInventoryHud run
+        // first to establish the real closed-by-default baseline before checking it.
         var suitWindow = player.GetNode<Control>("HUD/SuitWindow");
         await FrameWait.UntilPlayerProcessedAsync(sceneTree, player);
         AssertBool(suitWindow.Visible).IsFalse();

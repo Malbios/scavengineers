@@ -145,12 +145,9 @@ public class ContractSystemTest
         var (player, _, giver) = MakeHarness(sceneTree);
         var startingCredits = player.Credits;
 
-        // power_cell (not scrap_metal): the debug-loadout starting kit (Player._Ready) already
-        // seeds ~24 scrap_metal via Add(), which (maxStackSize falls back to 1 in this isolated
-        // catalog — see ShipBuildTargetStorageTest's own doc comment) fills most/all of the
-        // 24-slot debug backpack, leaving no reliable room for a plain Add() call here. Setting
-        // the hand slot directly bypasses Add's room/stacking checks entirely, same pattern
-        // PlayerToolDurabilityTest already uses for deterministic setup.
+        // power_cell (not scrap_metal): the debug-loadout kit already fills most of the backpack
+        // with scrap_metal, leaving no reliable room for a plain Add() call. Setting the hand
+        // slot directly bypasses that entirely.
         giver.AddOfferForTests(new Contract { InstanceId = "c1", TemplateId = "salvage_quota", Type = ContractType.SalvageQuota, ItemId = "power_cell", Count = 2, Reward = 20, FailureFee = 10, RemainingSeconds = 200f });
         player.AcceptContract("c1");
         player.Inventory.Hands.SetSlot(PlayerInventory.RightHandSlotIndex, ("power_cell", 2, 1f));

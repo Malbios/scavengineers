@@ -303,10 +303,7 @@ public class TravelConsoleVerbTargetTest
         }
 
         // While traveling: TravelConsoleActiveDraw(8) + 7 * ThrusterActiveDraw(2) = 22, over
-        // BatteryCapacity(20) — the ship-wide brownout this active-draw spike is meant to prove
-        // still exists once a ship is equipped well past the point of useful travel-time reduction
-        // (BaseTravelSeconds/MinTravelSeconds's floor caps out well before 7 thrusters actually
-        // help).
+        // BatteryCapacity(20) — deliberately overloaded to trigger the ship-wide brownout.
         console.BeginTravel(1);
         await sceneTree.ToSignal(sceneTree.CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
 
@@ -334,14 +331,9 @@ public class TravelConsoleVerbTargetTest
         console.BeginTravel(1);
         await sceneTree.ToSignal(sceneTree.CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
 
-        // A 2-thruster ship is a normal, expected loadout (installing a 2nd thruster to shorten
-        // the trip is the obvious move) — it must not brownout the whole grid the instant travel
-        // starts. Demand: TravelConsoleActiveDraw(8) + 2 * ThrusterActiveDraw(2) = 12, comfortably
-        // under BatteryCapacity(20). This harness only wires the console/thrusters/battery
-        // together (no Bunk/airlock conduits — see CreateConsole/ShipSim's own "added unwired"
-        // comment), so IsPowered is checked against the console fixture itself; on a real, fully-
-        // conduited ship the same non-overload means every other device on the grid (airlocks,
-        // lights) stays powered too.
+        // A normal 2-thruster loadout must not brownout the grid: demand is
+        // TravelConsoleActiveDraw(8) + 2*ThrusterActiveDraw(2) = 12, comfortably under
+        // BatteryCapacity(20).
         AssertBool(console.ShipSimRef!.IsPowered(ShipSim.TravelConsoleFixtureId)).IsTrue();
     }
 

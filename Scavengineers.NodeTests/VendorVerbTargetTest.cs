@@ -12,31 +12,16 @@ using static GdUnit4.Assertions;
 
 namespace Scavengineers.NodeTests;
 
-/// <summary>Regression coverage for the shop's Buy/Sell entry-building and transaction methods.
-/// All four depend on resolving the player via the "player" group (same lookup
-/// ContainerPickupItem.GetPlayer already uses elsewhere), which needs a real PlayerScript
-/// instance — Credits/Inventory are plain field-initialized state, unaffected by _Ready(), so a
-/// minimal subclass that overrides _Ready() to skip the real one's dozens of HUD GetNode calls
-/// (and its debug stipend) gives a clean, fully isolated Player without loading Player.tscn — this
-/// test project (Scavengineers.NodeTests) is its own separate Godot project with no Scenes/ of
-/// its own, so the real scene isn't even loadable here.
+/// <summary>Regression coverage for the shop's Buy/Sell entry-building and transaction methods,
+/// via a minimal PlayerScript subclass that skips the real _Ready()'s HUD/stipend setup (this
+/// project can't load Player.tscn at all) and a minimal seeded ItemCatalog (no real
+/// Data/items.json here either).
 ///
-/// That same isolation means there's no res://Data/items.json here either, so the real
-/// ItemCatalog.Load() would yield an empty catalog and every price would read 0 — the vendor now
-/// reads prices from the catalog rather than its own hardcoded table. This suite therefore seeds a
-/// minimal catalog of its own.
-///
-/// The seeded ids are deliberately synthetic (<c>test_*</c>) rather than real ones like
-/// scrap_metal/wall_panel. ItemCatalog is process-wide static and gdUnit4 gives no guarantee that
-/// this suite's seed is torn down before another suite runs, so seeding *real* ids leaks changed
-/// MaxStackSize/EquipSlot values into unrelated suites — which is exactly what happened: it made
-/// ShipBuildTargetLootTest and PlayerEquipSlotTest fail intermittently, depending on suite order.
-/// With synthetic ids a leak is inert: every other suite queries real ids, which stay unknown to
-/// the catalog and so keep resolving to precisely the same defaults as the empty catalog they see
-/// today.
-///
-/// TestCheap is the "known-empty, not part of any stipend" item throughout, since the test player's
-/// inventory starts genuinely empty.</summary>
+/// The seeded ids are deliberately synthetic (<c>test_*</c>): ItemCatalog is process-wide static
+/// with no guaranteed teardown between suites, and seeding real ids once leaked changed
+/// MaxStackSize/EquipSlot values into ShipBuildTargetLootTest/PlayerEquipSlotTest, causing
+/// intermittent failures depending on suite order. Synthetic ids make a leak inert since no other
+/// suite queries them.</summary>
 [TestSuite]
 public partial class VendorVerbTargetTest
 {
@@ -60,13 +45,9 @@ public partial class VendorVerbTargetTest
         new() { Id = TestExpensive, MaxStackSize = 1, BuyPrice = 40, SellPrice = 15 },
     });
 
-    // Deliberately NO [After] ItemCatalog.ResetForTests(). Resetting sets the catalog back to null,
-    // so the *next* suite to touch it re-runs Load() — which in this project-less test process
-    // finds no res://Data/items.json, emits another GD.PushWarning, and generally reintroduces
-    // exactly the kind of cross-suite timing variation this suite already caused once. Leaving the
-    // seed in place means Load() runs at most once per process, as it did before this suite existed.
-    // Safe precisely because the seeded ids are synthetic: no other suite queries them, and every
-    // real id stays unknown to the catalog, resolving to the same defaults an empty one gives.
+    // Deliberately NO [After] ItemCatalog.ResetForTests() — resetting would make the next suite
+    // re-run Load() and reintroduce the cross-suite timing variation this suite exists to avoid.
+    // Safe because the seeded ids are synthetic, so no other suite queries them.
 
     private static (VendorVerbTarget Vendor, PlayerScript Player) CreateVendorWithPlayer(SceneTree sceneTree)
     {

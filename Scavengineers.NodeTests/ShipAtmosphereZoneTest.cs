@@ -131,15 +131,10 @@ public class ShipAtmosphereZoneTest
         AssertBool(ReferenceEquals(deepInB, zoneB)).IsTrue();
     }
 
-    /// <summary>Regression coverage for the airlock bug where standing right at a closed docked
-    /// airlock read the far (docked) ship's atmosphere instead of the Home Ship's own: the
-    /// previous test above only ever queried points exclusively inside one zone's range (8.5 is
-    /// outside zoneB's [10,14], 13.5 is outside zoneA's [8,12]) — it never actually exercised a
-    /// point genuinely inside BOTH shapes at once, which is exactly what a real docked airlock
-    /// threshold produces (see ShipAtmosphereZone.ContainmentMargin's own doc comment for the
-    /// real-scene numbers). x=10.5 sits inside both zoneA's [8,12] and zoneB's [10,14] — margin
-    /// 1.5 into zoneA (center 10) vs only 0.5 into zoneB (center 12), so the more-centrally-
-    /// contained zone (A) must win, not whichever IntersectPoint enumerates first.</summary>
+    /// <summary>Regression coverage for standing right at a closed docked airlock reading the far
+    /// ship's atmosphere instead of home's own: x=10.5 sits inside both zoneA's [8,12] and zoneB's
+    /// [10,14] — margin 1.5 into zoneA vs only 0.5 into zoneB, so the more-centrally-contained
+    /// zone must win, not whichever IntersectPoint enumerates first.</summary>
     [TestCase]
     [RequireGodotRuntime]
     public async Task FindZoneAt_WhenGenuinelyInsideBothShapes_PicksTheMoreCentrallyContainedZone()
@@ -162,16 +157,12 @@ public class ShipAtmosphereZoneTest
         AssertBool(ReferenceEquals(inOverlap, zoneA)).IsTrue();
     }
 
-    /// <summary>Regression coverage for a real bug this project hit: a docked Derelict's own room
-    /// zone (ShipZoneWideShape, 10 units wide) sitting right next to its docking corridor spans
-    /// far enough past its own hull to reach clear across the docking seam into the Home Ship's
-    /// own (much smaller, ~2.2-unit) corridor zone — and an un-normalized (raw world-unit)
-    /// containment margin is systematically biased toward whichever shape is physically bigger,
-    /// so the small, correct zone lost almost everywhere except right at the very edge. Mirrors
-    /// the real sizes/positions: a small zone (matching the Home Ship's corridor) at world x=10,
-    /// half-width 1.1, vs a big zone (matching the Derelict's room) at world x=14, half-width 5 —
-    /// their spans overlap over x∈[9,11.1]. A point deep inside the SMALL zone's own span, but
-    /// only shallowly not-quite-central for the BIG zone, must still resolve to the small zone.</summary>
+    /// <summary>Regression coverage for a real bug: a docked Derelict's much bigger room zone
+    /// reached across the docking seam into the Home Ship's small corridor zone, and an
+    /// un-normalized (raw world-unit) containment margin is systematically biased toward whichever
+    /// shape is physically bigger, so the small, correct zone lost almost everywhere. A point deep
+    /// inside the small zone's own span, but only shallowly inside the big one, must still resolve
+    /// to the small zone.</summary>
     [TestCase]
     [RequireGodotRuntime]
     public async Task FindZoneAt_WhenASmallZoneOverlapsAMuchBiggerOne_StillPicksTheSmallZoneWhenDeeperInsideIt()
@@ -199,18 +190,12 @@ public class ShipAtmosphereZoneTest
         AssertBool(ReferenceEquals(midSmallZone, smallZone)).IsTrue();
     }
 
-    /// <summary>Regression coverage for a second real bug found debugging the same airlock issue:
-    /// the very first version of the size-normalized tie-break above still failed in the real
-    /// game, because it compared ALL THREE axes (X/Y/Z) — and every room-type zone in this game
-    /// shares roughly the same vertical (Y) span (floor-to-ceiling, centered around Y≈1), so a
-    /// real player position near the floor (Y≈0) sits far enough from that shared center that Y
-    /// becomes the smallest (binding) margin for EVERY candidate almost equally, collapsing the
-    /// tie-break back to arbitrary IntersectPoint order. Confirmed via real in-game debug
-    /// logging: three overlapping zones all reported the identical 0.092 margin at once. Only the
-    /// horizontal (X/Z) axes should ever decide "which room" — this test queries at Y=0 (floor
-    /// level) against zones centered at Y=1, deliberately NOT aligned with the zone's own
-    /// vertical center, which is exactly what the previous "same zone sizes" tests above never
-    /// exercised (they queried at Y=1, matching every zone's own center perfectly).</summary>
+    /// <summary>Regression coverage for a second real bug: comparing all three axes (X/Y/Z) broke
+    /// down because every room-type zone shares roughly the same vertical span, so a real player
+    /// position near the floor made Y the smallest margin for every candidate almost equally,
+    /// collapsing the tie-break back to arbitrary order. Only the horizontal (X/Z) axes should
+    /// ever decide "which room" — this queries at floor level (Y≈0), deliberately off the zones'
+    /// shared Y-center.</summary>
     [TestCase]
     [RequireGodotRuntime]
     public async Task FindZoneAt_QueriedNearTheFloor_StillPicksByHorizontalContainment_NotVerticalOffset()

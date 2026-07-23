@@ -70,14 +70,9 @@ public class PickupItemTest
         AssertBool(item.Freeze).IsFalse();
     }
 
-    /// <summary>A vented, breached room (mirrors Player.cs's own decompression-pull hazard setup)
-    /// — one hull breach at (0,0), vented for a single 1s tick so O2Fraction/Pressure land at
-    /// AtmosphereSystem's own documented ~0.67% remaining (well below ZeroGO2Threshold, but a
-    /// small nonzero pullStrength rather than a float-underflowed zero from over-venting). The
-    /// zone's CollisionShape3D is a generous box so FindZoneAt can see a test item placed either
-    /// right at the breach or a good distance above it (TileAt only reads X/Z, so moving along Y
-    /// alone changes distance-to-breach without ever leaving cell (0,0)'s own room/pressure
-    /// reading).</summary>
+    /// <summary>A vented, breached room mirroring Player.cs's own decompression-pull hazard setup
+    /// — a generous CollisionShape3D lets FindZoneAt see a test item placed either right at the
+    /// breach or well above it, since TileAt only reads X/Z.</summary>
     private static (ShipSim ShipSim, ShipBuildTarget BuildTarget, ShipAtmosphereZone Zone) MakeBreachedRoom(SceneTree sceneTree)
     {
         var shipRoot = AutoFree(new Node3D());
@@ -89,12 +84,9 @@ public class PickupItemTest
         var cell = new CellCoord(0, 0);
         shipSim.Deck.BreachHull(cell, StructuralSurface.Floor);
 
-        // Small per-tick dt (a real 60Hz physics step), not one big Tick(1) — Vent's own Lerp
-        // factor is Clamp(VentRatePerSecond * dt, 0, 1), so a single dt=1 call clamps straight to
-        // 1 (an instant, exact jump to Vacuum) rather than the gradual approach a real frame rate
-        // produces. 60 steps of dt=1/60 lands just under ZeroGO2Threshold with a small but clearly
-        // nonzero Pressure/O2Fraction remaining — enough to exercise a real (nonzero) pullStrength
-        // rather than either "still fully breathable" or "exactly vacuum, zero pull" edge case.
+        // Small per-tick dt (a real 60Hz physics step), not one big Tick(1) — a single dt=1 call
+        // clamps Vent's Lerp factor straight to an instant jump to Vacuum instead of the gradual
+        // approach this test needs to land just under ZeroGO2Threshold with a nonzero pull left.
         for (var i = 0; i < 60; i++)
         {
             shipSim.Atmosphere!.Tick(1.0 / 60.0);
@@ -262,12 +254,11 @@ public class PickupItemTest
         AssertBool(item.Freeze).IsTrue();
     }
 
-    /// <summary>Regression coverage for the "sealed room still feels a distant breach through a
-    /// closed door" bug: cell0 (the "first room") had its own breach patched and is now sealed
-    /// off from cell1 (a closed door edge) — cell1 still has its own active breach. A ship with no
-    /// life support (default) never regenerates air, so cell0's O2Fraction stays at "reads as
-    /// vacuum" forever even though it's properly sealed and disconnected now — inZeroG alone
-    /// can't tell these apart, so the fix adds a real IsConnectedToOutside check.</summary>
+    /// <summary>Regression coverage for "sealed room still feels a distant breach through a closed
+    /// door": cell0's breach is patched and sealed off from cell1's still-active one. With no life
+    /// support, cell0's O2Fraction stays at "reads as vacuum" forever even though it's properly
+    /// disconnected — inZeroG alone can't tell these apart, hence the real IsConnectedToOutside
+    /// check.</summary>
     private static (ShipSim ShipSim, ShipBuildTarget BuildTarget, ShipAtmosphereZone Zone, CellCoord Cell0, CellCoord Cell1) MakeSealedRoomBehindAPatchedBreach(SceneTree sceneTree)
     {
         var shipRoot = AutoFree(new Node3D());
@@ -286,12 +277,8 @@ public class PickupItemTest
         }
         shipSim.Deck.RepairHull(cell0, StructuralSurface.Floor);
         shipSim.Deck.SealEdge(cell0, cell1); // the closed door
-        // cell0 sits at a grid corner, so (1,0) and (0,1) are its only two in-grid neighbors
-        // (the other two directions are off-grid, already excluded automatically). Sealing just
-        // the door edge above isn't enough on its own — cell0 could still reach cell1 (and thus
-        // Outside) the long way around via (0,1) and the rest of the open floor plan. Sealing
-        // this second edge too makes cell0 a fully isolated one-cell "sealed room, one door,
-        // currently closed" — the actual topology this bug needs to reproduce.
+        // Sealing just the door isn't enough — cell0 could still reach Outside the long way
+        // around via (0,1). Seal that edge too to fully isolate cell0.
         shipSim.Deck.SealEdge(cell0, new CellCoord(cell0.X, cell0.Y + 1));
 
         shipSim.Deck.BreachHull(cell1, StructuralSurface.Floor);
@@ -359,12 +346,9 @@ public class PickupItemTest
     }
 
     /// <summary>Regression coverage for "sucked toward a breach through the dividing wall instead
-    /// of through the doorway": cell0 (Room1) and cell1 (Room2) are joined by an UNSEALED edge (an
-    /// open door), and cell1 has its own active breach — so cell0 IS legitimately connected to
-    /// Outside via the open door (unlike the sealed-room test above). But the breach itself is
-    /// physically in Room2's own zone, not Room1's, so a straight-line pull from Room1 toward it
-    /// would cut through the dividing wall. Two small, non-overlapping zone shapes (one per cell)
-    /// stand in for the two separate rooms.</summary>
+    /// of through the doorway": cell0 is legitimately connected to Outside via an open door to
+    /// cell1, but the breach is physically in cell1's own zone, so a straight-line pull from cell0
+    /// would cut through the wall between them.</summary>
     private static (ShipSim ShipSim, ShipBuildTarget BuildTarget, ShipAtmosphereZone Room1Zone, CellCoord Cell0) MakeTwoRoomsJoinedByAnOpenDoorWithABreachInTheFarRoom(SceneTree sceneTree)
     {
         var shipRoot = AutoFree(new Node3D());

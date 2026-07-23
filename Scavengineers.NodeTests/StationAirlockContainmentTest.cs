@@ -9,15 +9,10 @@ using static GdUnit4.Assertions;
 namespace Scavengineers.NodeTests;
 
 /// <summary>Regression coverage for the two-independent-doors-per-Station-connection fix: the
-/// Home Ship's own StationAirlock and a Station's own DestinationAirlock only actually bridge
-/// atmosphere when BOTH report open (AirlockDoorVerbTarget.PartnerDoorRef), and each seals a real
-/// edge within its own ship's Deck when closed (SealsLocalEdge). This is what stops opening the
-/// wrong/non-current door from flooding the whole Home Ship — the originally reported bug, where
-/// two always-present adjacent doors shared one unsealed corridor blob. Ticks _PhysicsProcess
-/// directly (same synchronous, deterministic style as ShipSimTest's own atmosphere coverage)
-/// rather than awaiting real engine frames, since AirlockBridge's own self-sustaining
-/// MarkExternallyVented design (see its doc comment) converges correctly regardless of per-call
-/// ordering.</summary>
+/// Home Ship's StationAirlock and a Station's DestinationAirlock only bridge atmosphere when BOTH
+/// report open, and each seals a real edge in its own Deck when closed — stopping the wrong/non-
+/// current door from flooding the whole Home Ship, the originally reported bug. Ticks
+/// _PhysicsProcess directly rather than awaiting real engine frames.</summary>
 [TestSuite]
 public class StationAirlockContainmentTest
 {
