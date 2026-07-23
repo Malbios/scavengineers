@@ -54,10 +54,12 @@ No formal Phase 1 exit-gate check (`docs/project-plan.md` §7) has been done yet
 
 Known architectural debt worth knowing before you build on it (details in the relevant `docs/architecture/*.md`):
 
-- Every destination is a hand-placed sibling group in `Scenes/World.tscn`, and all 13 `ShipSim` decks tick full-fidelity every frame regardless of presence — the strategic-layer/bubble model and the sim-LOD seam are both unbuilt.
-- `Scripts/Verbs/ShipBuildTarget.cs` (~2 800 lines) and `Scripts/Player/Player.cs` (~2 400 lines) are the two god classes; new features gravitate to them by default. Resist that.
-- Live sim state (atmosphere volumes, fires, in-flight verb progress) is not serialized, despite the save-schema rule requiring it.
+- **Every destination is still a hand-placed sibling group in `Scenes/World.tscn`.** The strategic layer is real data now (`Data/destinations.json` + `DestinationCatalog`), but nothing is instantiated at runtime. Blocked on extracting `Station.tscn` out of `World.tscn`, which needs the Godot editor — see `docs/architecture/space-and-travel.md` for why and for the order to do it in.
+- **`Scripts/Verbs/ShipBuildTarget.cs` (~2 800 lines) is the remaining god class.** Its pieces are genuinely entangled — 37 `[Export]` resources and 7 placement dictionaries that every candidate collaborator reads — so a split there needs a real seam, not just a new file. `Player.cs` was decomposed (2 422 → 1 958) into `PlayerHudView` / `PanelController` / `InventoryWindowView`; follow that pattern's *rule*, not its shape: split where the data boundary is real.
+- Verb progress isn't serialized. Deliberate — every verb is ~0.6 s and button-held; revisit with time acceleration, not before.
 
-A real test harness exists and runs today across three projects: `Scavengineers.Sim.Tests` (pure C# sim logic, xUnit), `Scavengineers.Scripts.Tests` (Godot-adjacent C# logic, xUnit), and `Scavengineers.NodeTests` (GdUnit4, Godot node/scene-level tests). Run headless via `GODOT_BIN=<path> dotnet test <project>`. All three pass as of 2026-07-23 (75 / 1107 / 254).
+A real test harness exists and runs today across three projects: `Scavengineers.Sim.Tests` (pure C# sim logic, xUnit), `Scavengineers.Scripts.Tests` (Godot-adjacent C# logic, xUnit), and `Scavengineers.NodeTests` (GdUnit4, Godot node/scene-level tests). Run headless via `GODOT_BIN=<path> dotnet test <project>`. All three pass as of 2026-07-23 (86 / 1117 / 258).
+
+**Verifying NodeTests properly:** most node startup here happens in a `CallDeferred` from `_Ready`, and `SceneTree.PhysicsFrame` fires *before* any `_PhysicsProcess` — so tests that await a fixed number of frames and then assert are racing, and they win on an idle machine. Wait on a condition instead (`Scavengineers.NodeTests/FrameWait.cs`). To surface this class of bug at all, force a rebuild before each run (`(Get-Item <some .cs>).LastWriteTime = Get-Date`) and run 4-6 times; a few clean back-to-back runs prove nothing.
 
 CI is still intentionally deferred — no `.github/workflows` exists yet. Add one only when explicitly asked.
