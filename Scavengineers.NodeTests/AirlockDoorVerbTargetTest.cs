@@ -1,6 +1,7 @@
 using GdUnit4;
 using Godot;
 using Scavengineers.Scripts.Ship;
+using Scavengineers.Sim.Grid;
 
 using static GdUnit4.Assertions;
 
@@ -100,5 +101,30 @@ public class AirlockDoorVerbTargetTest
         // does — see RebindFarSide's own doc comment for why both directions matter.
         AssertBool(ReferenceEquals(newPartner.PartnerDoorRef, airlock)).IsTrue();
         AssertObject(originalPartner.PartnerDoorRef).IsNull();
+    }
+
+    /// <summary>Regression coverage for a shared, rebindable airlock (StationAirlock/
+    /// DerelictAirlock) whose far side was never bound because it doesn't match the player's
+    /// current destination type — e.g. DerelictAirlock while docked at a Station. ShipBRef stays
+    /// permanently null in that case, and used to make AvailableVerbs return [] entirely (not even
+    /// Pry). A door with no bound far side represents empty space on the other side, and must stay
+    /// fully operable, breaching only its own ship's side when opened.</summary>
+    [TestCase]
+    [RequireGodotRuntime]
+    public void AirlockWithNoBoundFarSide_StillOffersVerbs_AndBreachesOnlyItsOwnSideWhenOpened()
+    {
+        var sceneTree = (SceneTree)Engine.GetMainLoop();
+        var shipA = AutoFree(new ShipSim());
+        sceneTree.Root.AddChild(shipA);
+
+        var airlock = AutoFree(new AirlockDoorVerbTarget { ShipARef = shipA, TileA = new Vector2I(13, 2) });
+        sceneTree.Root.AddChild(airlock);
+        airlock.Docked = false;
+
+        AssertThat(airlock.AvailableVerbs).IsNotEmpty();
+
+        airlock.ApplySaveState(true);
+
+        AssertBool(shipA.Deck.IsHullBreached(new CellCoord(13, 2))).IsTrue();
     }
 }

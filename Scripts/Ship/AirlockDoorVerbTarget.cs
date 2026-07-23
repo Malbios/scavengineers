@@ -148,7 +148,7 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
     {
         get
         {
-            if (ShipARef is null || (OwnsBridge && _bridge is null))
+            if (ShipARef is null)
             {
                 return [];
             }
@@ -220,7 +220,7 @@ public partial class AirlockDoorVerbTarget : StaticBody3D, IVerbTarget, ISaveabl
             return;
         }
 
-        if (ShipARef is null || (OwnsBridge && _bridge is null) || _cycling || (verb.Id != OpenVerb.Id && verb.Id != CloseVerb.Id && verb.Id != PryVerb.Id))
+        if (ShipARef is null || _cycling || (verb.Id != OpenVerb.Id && verb.Id != CloseVerb.Id && verb.Id != PryVerb.Id))
         {
             return;
         }
