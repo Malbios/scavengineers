@@ -14,11 +14,9 @@ public enum StructuralSurface
     Wall,
 }
 
-/// <summary>
-/// The shared structural tier (Tier 1 + Tier 2 per docs/architecture/ship-model.md) that
-/// atmosphere, power, and (later) rooms/data all read — one canonical source instead of
-/// each subsystem owning its own private copy of the ship's layout.
-/// </summary>
+/// <summary>The shared structural tier that atmosphere, power, and (later) rooms/data all read —
+/// one canonical source instead of each subsystem owning its own private copy of the ship's
+/// layout.</summary>
 public sealed class Deck
 {
     private readonly HashSet<CellCoord> _cells = [];
@@ -49,11 +47,9 @@ public sealed class Deck
 
     public void AddCell(CellCoord cell) => _cells.Add(cell);
 
-    /// <summary>Also purges every other set's entries for this coordinate (breaches, wall-edge
-    /// breaches, sealed edges, fixtures) — leaving them behind would let a removed cell's stale
-    /// data resurface as a phantom breach/fixture for any future consumer that doesn't separately
-    /// filter through <see cref="Cells"/> first, and would grow these sets unbounded across
-    /// repeated dynamic-expansion extend/remove cycles.</summary>
+    /// <summary>Also purges every other set's entries for this coordinate — leaving them behind
+    /// would let a removed cell's stale data resurface as a phantom breach/fixture, and would
+    /// grow these sets unbounded across repeated dynamic-expansion extend/remove cycles.</summary>
     public void RemoveCell(CellCoord cell)
     {
         _cells.Remove(cell);
@@ -75,13 +71,11 @@ public sealed class Deck
 
     public bool IsEdgeSealed(CellCoord a, CellCoord b) => _sealedEdges.Contains(Normalize(a, b));
 
-    /// <summary>Defaults to <see cref="StructuralSurface.Wall"/> so every pre-existing caller
-    /// (hull breaches, airlock venting) keeps compiling unchanged — only floor/ceiling callers
-    /// need to name their reason explicitly. For Wall specifically, this is a per-*cell* flag —
-    /// correct for a direct "this whole room is exposed to vacuum" event (an airlock venting),
-    /// but not for a specific wall segment (see <see cref="BreachWallEdge"/> for that; a cell can
-    /// have several independently open wall directions at once, which a single per-cell flag
-    /// can't distinguish).</summary>
+    /// <summary>Defaults to <see cref="StructuralSurface.Wall"/> so pre-existing callers (hull
+    /// breaches, airlock venting) keep compiling unchanged. For Wall specifically, this is a
+    /// per-*cell* flag — correct for a direct "this whole room is exposed to vacuum" event, but
+    /// not for a specific wall segment (see <see cref="BreachWallEdge"/> for that; a cell can
+    /// have several independently open wall directions at once).</summary>
     public void BreachHull(CellCoord cell, StructuralSurface surface = StructuralSurface.Wall) =>
         _breaches.Add((cell, surface));
 
@@ -94,22 +88,18 @@ public sealed class Deck
     public bool IsHullBreached(CellCoord cell, StructuralSurface surface) => _breaches.Contains((cell, surface));
 
     /// <summary>A specific hull-boundary wall segment (an edge to a cell that doesn't exist),
-    /// tracked per edge rather than per cell — the piece <see cref="BreachHull"/>/<see cref="RepairHull"/>
-    /// can't represent, since a cell can have more than one independently open wall direction at
-    /// once (most visibly a freshly extended floor tile, open on every side but the one it was
-    /// extended from).</summary>
+    /// tracked per edge rather than per cell — a cell can have more than one independently open
+    /// wall direction at once (most visibly a freshly extended floor tile).</summary>
     public void BreachWallEdge(CellCoord a, CellCoord b) => _wallEdgeBreaches.Add(Normalize(a, b));
 
     public void RepairWallEdge(CellCoord a, CellCoord b) => _wallEdgeBreaches.Remove(Normalize(a, b));
 
     public bool IsWallEdgeBreached(CellCoord a, CellCoord b) => _wallEdgeBreaches.Contains(Normalize(a, b));
 
-    /// <summary>Structural health, 0-1 per cell/edge — missing means full health (1.0), same
-    /// "absence is the default" convention <see cref="_sealedEdges"/>/<see cref="_breaches"/>
-    /// already use, so every existing cell needs no explicit seeding. Decayed by
-    /// <see cref="Hazards.WearSystem"/>'s passive tick; repaired via
-    /// <see cref="RepairFloor"/>/<see cref="RepairCeiling"/>/<see cref="RepairWall"/> (see
-    /// ShipBuildTarget's own Maintain/Repair verbs).</summary>
+    /// <summary>Structural health, 0-1 per cell/edge — missing means full health (1.0), so every
+    /// existing cell needs no explicit seeding. Decayed by <see cref="Hazards.WearSystem"/>'s
+    /// passive tick; repaired via <see cref="RepairFloor"/>/<see cref="RepairCeiling"/>/
+    /// <see cref="RepairWall"/>.</summary>
     public float FloorHealth(CellCoord cell) => _floorHealth.GetValueOrDefault(cell, 1f);
 
     public float CeilingHealth(CellCoord cell) => _ceilingHealth.GetValueOrDefault(cell, 1f);
@@ -118,8 +108,7 @@ public sealed class Deck
 
     /// <summary>Reduces floor health by `amount` (clamped at 0) — reaching exactly 0 calls the
     /// *existing* <see cref="BreachHull"/> automatically, so decay is just a new cause feeding the
-    /// same breach mechanic every other consumer (atmosphere, movement, panels) already reads;
-    /// nothing downstream needs to know health exists at all.</summary>
+    /// same breach mechanic every other consumer already reads.</summary>
     public void DamageFloor(CellCoord cell, float amount)
     {
         var health = Math.Max(0f, FloorHealth(cell) - amount);
@@ -151,10 +140,9 @@ public sealed class Deck
         }
     }
 
-    /// <summary>Resets health to full — does *not* itself clear a breach (repairing is only ever
-    /// offered while a surface isn't breached; a genuinely breached surface needs the existing,
-    /// more expensive Install verb instead, which resets health as part of installing a fresh
-    /// panel).</summary>
+    /// <summary>Resets health to full — does *not* itself clear a breach; a genuinely breached
+    /// surface needs the existing, more expensive Install verb instead, which resets health as
+    /// part of installing a fresh panel.</summary>
     public void RepairFloor(CellCoord cell) => _floorHealth[cell] = 1f;
 
     public void RepairCeiling(CellCoord cell) => _ceilingHealth[cell] = 1f;
@@ -162,9 +150,7 @@ public sealed class Deck
     public void RepairWall(CellCoord a, CellCoord b) => _wallHealth[Normalize(a, b)] = 1f;
 
     /// <summary>Sets health to an absolute value with no clamping or breach side-effect — used
-    /// only by save/load restore (see ShipBuildTarget.ApplyBuildState), which reconstructs breach
-    /// state separately and explicitly; DamageFloor's own breach-on-zero side effect would be
-    /// redundant (and load-order-dependent) here.</summary>
+    /// only by save/load restore, which reconstructs breach state separately and explicitly.</summary>
     public void SetFloorHealth(CellCoord cell, float health) => _floorHealth[cell] = health;
 
     public void SetCeilingHealth(CellCoord cell, float health) => _ceilingHealth[cell] = health;

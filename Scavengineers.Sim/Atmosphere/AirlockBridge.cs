@@ -2,28 +2,20 @@ using Scavengineers.Sim.Grid;
 
 namespace Scavengineers.Sim.Atmosphere;
 
-/// <summary>
-/// Links two otherwise-independent <see cref="AtmosphereSystem"/>s (e.g. two docked ships) —
-/// deliberately a bolt-on, not a merge of the two ships' connectivity graphs — see
-/// docs/architecture/atmosphere-power-sim.md.
+/// <summary>Links two otherwise-independent <see cref="AtmosphereSystem"/>s (e.g. two docked
+/// ships) — deliberately a bolt-on, not a merge of the two ships' connectivity graphs.
 ///
-/// When neither side has its own path to Outside, this just pools the two named cells toward each
-/// other (an open airlock as one more diffusion-style edge). Once either side already has its own
-/// leak to vacuum (see <see cref="AtmosphereSystem.IsConnectedToOutside"/>), the bridge stops
-/// averaging and instead marks both cells via <see cref="AtmosphereSystem.MarkExternallyVented"/>:
-/// each side's own <see cref="AtmosphereSystem.Tick"/> then vents its entire connected component —
-/// including the bridged cell — uniformly toward vacuum, the same way a direct hull breach would.
-/// This matches real depressurization (the whole connected volume drops together, no
-/// distance-based lag) and means the bridge itself no longer does any Lerp math for the leaking
-/// case — venting only actually happens once the marked system's own Tick runs (see
-/// AirlockBridgeTests for the ordering this depends on).
-/// </summary>
+/// When neither side has its own path to Outside, this just pools the two named cells toward
+/// each other (an open airlock as one more diffusion-style edge). Once either side already has
+/// its own leak to vacuum, the bridge stops averaging and instead marks both cells via
+/// <see cref="AtmosphereSystem.MarkExternallyVented"/>: each side's own Tick then vents its
+/// entire connected component — including the bridged cell — uniformly toward vacuum, the same
+/// way a direct hull breach would. This matches real depressurization (the whole connected
+/// volume drops together, no distance-based lag).</summary>
 public sealed class AirlockBridge(AtmosphereSystem systemA, CellCoord cellA, AtmosphereSystem systemB, CellCoord cellB)
 {
-    // Placeholder/tunable — only used by the non-leaking averaging branch below now; the leaking
-    // branch (either side already has its own path to Outside) no longer uses this rate at all,
-    // since it just marks both cells and lets each system's own Vent (at AtmosphereSystem's
-    // VentRatePerSecond) handle the actual drain.
+    // Placeholder/tunable — only used by the non-leaking averaging branch below; the leaking
+    // branch just marks both cells and lets each system's own Vent handle the actual drain.
     private const double EqualizeRatePerSecond = 5.0;
 
     public bool IsOpen { get; set; }

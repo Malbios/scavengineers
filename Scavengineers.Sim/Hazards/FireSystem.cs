@@ -5,16 +5,13 @@ using Scavengineers.Sim.ShipModel;
 
 namespace Scavengineers.Sim.Hazards;
 
-/// <summary>
-/// The conduit fire loop from docs/project-plan.md Appendix A7: a conduit that's powered,
-/// damaged, and sitting in enough oxygen sparks and burns — no scripting, just those three
-/// existing states (power/condition/atmosphere) intersecting. A pure reader of
-/// <see cref="ShipModel.Deck"/>'s fixtures plus the ship's own <see cref="Power.PowerSystem"/>
-/// and <see cref="Atmosphere.AtmosphereSystem"/>; writes fire state back onto the Deck (mirrors
-/// how hull breaches are tracked) and atmosphere state back via
+/// <summary>The conduit fire loop: a conduit that's powered, damaged, and sitting in enough
+/// oxygen sparks and burns — no scripting, just those three existing states (power/condition/
+/// atmosphere) intersecting. A pure reader of <see cref="ShipModel.Deck"/>'s fixtures plus the
+/// ship's own <see cref="Power.PowerSystem"/> and <see cref="Atmosphere.AtmosphereSystem"/>;
+/// writes fire state back onto the Deck and atmosphere state back via
 /// <see cref="AtmosphereSystem.ApplyExternalVolume"/> (the same hook <see cref="AirlockBridge"/>
-/// already uses).
-/// </summary>
+/// uses).</summary>
 public sealed class FireSystem(Deck deck, AtmosphereSystem atmosphere, PowerSystem power)
 {
     private const float DamagedConditionThreshold = 0.3f;
@@ -25,9 +22,8 @@ public sealed class FireSystem(Deck deck, AtmosphereSystem atmosphere, PowerSyst
 
     // Placeholder/tunable — ~20s to fully degrade a neighbor from full Condition. Runs before the
     // ignition check below in the same Tick, so a conduit heat-damaged below
-    // DamagedConditionThreshold this tick can ignite via that same, unchanged check on a later
-    // tick if it's also powered and in enough O2 — spread reuses the existing ignition rule
-    // rather than adding a second one.
+    // DamagedConditionThreshold this tick can ignite via that same check on a later tick — spread
+    // reuses the existing ignition rule rather than adding a second one.
     private const float HeatDamagePerSecond = 0.05f;
 
     public void Tick(double dt)

@@ -3,14 +3,12 @@ using Scavengineers.Sim.ShipModel;
 
 namespace Scavengineers.Sim.Hazards;
 
-/// <summary>
-/// Passive wear — everything in the ship slowly degrades over time on its own, whether or not
-/// anything else is happening to it (FireSystem's own local heat damage to nearby conduits stacks
-/// on top of this baseline rather than replacing it). Decays every Fixture's own Condition except
-/// BatteryFixture/ThrusterFixture (whose Condition already means charge, a different concept — see
-/// their own doc comments) plus every structural surface's health (Deck.FloorHealth/CeilingHealth/
-/// WallHealth) for every present cell/sealed edge — a breached/missing surface has nothing left to decay.
-/// </summary>
+/// <summary>Passive wear — everything in the ship slowly degrades over time on its own, whether
+/// or not anything else is happening to it (FireSystem's own local heat damage to nearby conduits
+/// stacks on top of this baseline rather than replacing it). Decays every Fixture's own Condition
+/// except BatteryFixture/ThrusterFixture (whose Condition already means charge) plus every
+/// structural surface's health for every present cell/sealed edge — a breached/missing surface
+/// has nothing left to decay.</summary>
 public sealed class WearSystem(Deck deck)
 {
     // Placeholder/tunable — a multi-hour real-time bake from full health (1.0) down to 0 with no

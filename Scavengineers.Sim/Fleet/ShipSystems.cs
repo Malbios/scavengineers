@@ -6,27 +6,21 @@ using Scavengineers.Sim.ShipModel;
 
 namespace Scavengineers.Sim.Fleet;
 
-/// <summary>
-/// One ship's whole simulation — its <see cref="ShipModel.Deck"/> plus the systems reading it —
-/// bundled so it can be created, ticked and inspected with no Godot node anywhere in sight.
+/// <summary>One ship's whole simulation — its <see cref="ShipModel.Deck"/> plus the systems
+/// reading it — bundled so it can be created, ticked and inspected with no Godot node anywhere in
+/// sight: a ship the player isn't aboard has no loaded scene, so its sim must run without one.
+/// The <c>ShipSim</c> node owns one of these and delegates; the systems themselves have no idea
+/// whether a scene exists.
 ///
-/// <para>This is the shape docs/architecture/multi-ship-fleet.md asks for: "a ship the player isn't
-/// aboard has no loaded scene, so its sim must run without one." Previously the systems were owned
-/// by the <c>ShipSim</c> *node* and ticked from its <c>_PhysicsProcess</c>, which made that
-/// literally impossible — a ship not in the scene tree could not simulate at all. Now the node owns
-/// one of these and delegates; the systems themselves have no idea whether a scene exists.</para>
-///
-/// <para>Which systems a ship has is deliberately not uniform: atmosphere and wear apply to every
-/// ship, a power system only exists once something can source power, and fire only for a ship that
+/// Which systems a ship has is deliberately not uniform: atmosphere and wear apply to every ship,
+/// a power system only exists once something can source power, and fire only for a ship that
 /// opted into the conduit hazard. Nulls here mean "this ship genuinely has no such system", not
-/// "not initialised yet".</para>
-/// </summary>
+/// "not initialised yet".</summary>
 public sealed class ShipSystems
 {
     /// <summary>How much simulated time a single coarse tick advances. Chosen so an absent ship
-    /// still pays its full costs — the plan's "time acceleration is a presentation skip, not a cost
-    /// skip" rule applies just as much to a ship you aren't standing on — while costing ~1/60th of
-    /// the per-frame work, since every one of these ticks runs a connectivity flood-fill.</summary>
+    /// still pays its full costs while costing ~1/60th of the per-frame work, since every one of
+    /// these ticks runs a connectivity flood-fill.</summary>
     public const double CoarseTickSeconds = 1.0;
 
     private double _coarseAccumulator;
@@ -68,15 +62,12 @@ public sealed class ShipSystems
     }
 
     /// <summary>Level-of-detail tick for a ship with no player present: banks elapsed time and
-    /// spends it in <see cref="CoarseTickSeconds"/> lumps. The same systems run over the same total
-    /// dt — nothing is skipped or discounted, it's just integrated in fewer, larger steps.
-    ///
-    /// <para>Every system here integrates over dt rather than assuming a fixed step, which is what
-    /// makes this safe: wear decays by rate × dt, and atmosphere venting/diffusion are Lerps whose
-    /// factors are clamped (see AtmosphereSystem's MaxDiffusionFactorPerTick) precisely so a large
-    /// dt can't overshoot into oscillation. Fire spread is coarser-grained than at 60fps — it
-    /// re-evaluates ignition once a second instead of 60 times — which is the intended tradeoff for
-    /// a ship nobody is watching.</para></summary>
+    /// spends it in <see cref="CoarseTickSeconds"/> lumps. The same systems run over the same
+    /// total dt — nothing is skipped or discounted, just integrated in fewer, larger steps. Every
+    /// system here integrates over dt rather than assuming a fixed step, which is what makes this
+    /// safe: wear decays by rate × dt, and atmosphere venting/diffusion are Lerps whose factors
+    /// are clamped so a large dt can't overshoot into oscillation. Fire spread is coarser-grained
+    /// than at 60fps — it re-evaluates ignition once a second instead of 60 times.</summary>
     public void TickCoarse(double dt)
     {
         _coarseAccumulator += dt;
@@ -97,8 +88,7 @@ public sealed class ShipSystems
         Deck.Cells.Select(cell => (cell, Atmosphere.VolumeAt(cell)));
 
     /// <summary>Restores saved per-cell atmosphere. Cells the save doesn't mention, or that no
-    /// longer exist on this deck, are left at whatever startup produced — the same missing-ID
-    /// tolerance the rest of the save system uses (docs/architecture/save-schema.md).</summary>
+    /// longer exist on this deck, are left at whatever startup produced.</summary>
     public void ApplyVolumes(IEnumerable<(CellCoord Cell, AtmosphereVolume Volume)> volumes)
     {
         foreach (var (cell, volume) in volumes)
