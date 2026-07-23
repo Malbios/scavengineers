@@ -41,6 +41,30 @@ Rules genuinely held:
   restoring air first would let the very next tick re-vent rooms the save had already repaired.
   Fires are replaced wholesale, so a save with none genuinely puts a burning ship out.
 
+## Two properties of the capture mechanism worth knowing before you build on it
+
+Both follow from `SaveManager` collecting state by scanning `GetTree().GetNodesInGroup("saveable")`
+and keying purely by `SaveId`.
+
+- **Capture is a live-tree scan, so anything not in the tree is not saved.** This is the real
+  constraint on freeing scene subtrees at runtime, and it is what makes "free the destination you
+  left" a much bigger job than it looks: freeing one silently drops its build state, its procgen
+  `LayoutSeed`, its door/console state, and any contract `mission_item` inside it. Per-ship *sim*
+  state is already immune (`ShipSystems` is a plain object), but the node-owned save state is not.
+  See `space-and-travel.md`.
+
+- **Duplicate `SaveId`s are not an error — they are silent data loss.** Two live nodes sharing an id
+  means the second capture overwrites the first and both load the same state back. Nothing warns.
+  This is a live hazard wherever one scene is instanced more than once, because an id authored in
+  the shared scene is inherited by every instance that doesn't override it. It shipped that way:
+  `Derelict.tscn`'s `Deck2/Floor2` carried one hardcoded id no derelict overrode, collapsing all five
+  wrecks' second-deck build state onto a single key.
+
+  Destination ids come from `Data/destinations.json` overrides now, and a JSON typo has the same
+  effect — `DestinationManager` warns on an unknown property but the node still keeps its scene
+  default. `WorldSceneRegressionTests` resolves every destination's *effective* id, through JSON
+  overrides and scene inheritance both, and asserts uniqueness.
+
 ## Known gaps against the rules above
 
 - **In-flight verb progress is not saved**, deliberately for now: every verb is ~0.6 s and

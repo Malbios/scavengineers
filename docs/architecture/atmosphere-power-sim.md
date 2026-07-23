@@ -52,17 +52,25 @@ above the Sim layer, since it's a game-balance rule rather than a connectivity o
   feed. If room-detection ever becomes gameplay-load-bearing (crew pathing, per-room systems),
   derive the zones from `AtmosphereSystem.ComponentContaining` rather than growing this parallel
   path.
-- **Every query re-runs the whole flood-fill.** `PowerSystem.IsPowered` → `PoweredNodes()` →
-  `FindComponents`, and `Neighbors` is itself a linear scan of every fixture, so one query is
-  O(F²); `ShipSim.DemandedPower` calls it per fixture (O(F³)), and `ShipSim.IsPowered` calls
-  `DemandedPower` for its overload check. Several nodes call `ShipSim.IsPowered` every physics
-  frame (`PoweredDeviceIndicator`, `ToggleLightVerbTarget`, `InteriorDoorVerbTarget`,
-  `AirlockDoorVerbTarget`, `ShipBuildTarget`), and `FireSystem.Tick` calls it once per conduit.
-  Fine at today's fixture counts; the fix when it stops being fine is a cached
-  `PoweredNodes()`/`DemandedPower` invalidated on structural change — which is what the
-  "recompute lazily on structural change" rule above already asks for and nothing currently does.
-  `AtmosphereSystem.IsConnectedToOutside` has the same shape and is called every frame from
-  `Player._PhysicsProcess`.
+- ~~**Every power query re-runs the whole flood-fill.**~~ **Fixed.** `PowerSystem` used to be
+  O(F³) end to end — `Neighbors` linear-scanned every fixture (making one `FindComponents` O(F²)),
+  `PoweredNodes()` re-ran it per query, and `ShipSim.DemandedPower` called it *per fixture* while
+  `IsPowered` called `DemandedPower` for its overload check. Five node types call
+  `ShipSim.IsPowered` every physics frame and `FireSystem.Tick` calls it once per conduit, over a
+  fixture count the player can grow without bound by placing conduits. Now: a
+  `Dictionary<CellCoord, List<Fixture>>` tile index makes `Neighbors` O(1), `PoweredNodes()` is
+  memoized, and `DemandedPower` resolves it once and tests set membership. O(F) overall.
+
+  **The cache validates itself rather than being invalidated.** It holds a snapshot of the
+  conductivity-relevant state (fixture id, tile, switch open, thruster charged) and compares field by
+  field. A `Invalidate()` call chain was rejected deliberately: `TravelConsoleVerbTarget`'s drain loop
+  mutates thruster `Condition` straight on `Deck.Fixtures` with no `PowerSystem` reference, so a
+  forget-to-invalidate bug was a real risk, and a stale power grid fails as wrong behaviour rather
+  than as an error. A self-computed signature cannot go stale. It deliberately excludes general
+  `Condition`, which `WearSystem` decays every tick and which would defeat the cache entirely.
+
+- **`AtmosphereSystem.IsConnectedToOutside` still has the un-memoized shape**, and is called every
+  frame from `Player._PhysicsProcess`. Same fix applies if it ever matters.
 
 ## Before editing this subsystem
 

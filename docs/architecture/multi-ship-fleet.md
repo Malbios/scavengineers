@@ -34,6 +34,17 @@ Full detail: `docs/project-plan.md` §4 (deferred features), §5 "Multi-ship sea
   would make time pass only where the player is looking, which inverts the "presentation skip is not
   a cost skip" rule (plan §5).
 
+  **But the sim is Godot-free while its *ownership* is not.** `ShipSim` (a `Node`) constructs and
+  holds the `ShipSystems`, so the state can't outlive the node even though nothing in it depends on
+  Godot. That distinction is invisible day to day and decisive the moment anything wants to free a
+  ship's scene: freeing it destroys the sim that the coarse tick exists to keep running — an absent
+  ship wouldn't tick slowly, it would cease to exist.
+
+  The missing piece is a **`FleetRegistry`**: one entry per ship holding the `ShipSystems` (and the
+  node-owned save state, per `save-schema.md`), alive independently of any scene, with `ShipSim`
+  demoted to a *view* onto its entry. That is the actual prerequisite for runtime destination
+  loading/unloading — not the scene work, which is done (`space-and-travel.md`).
+
 ## Explicitly deferred
 
 Crew NPCs with physiological/psychological needs, modular ship construction (tile-by-tile building UI), economy/stations/factions — all postponed well beyond MVP. Don't implement crew AI or fleet UI now; just don't violate the seams above while building single-ship MVP code.

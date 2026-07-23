@@ -6,6 +6,7 @@ Solo-dev, Windows-first 3D survival/salvage game in Godot 4.7 (Forward+, Jolt ph
 
 - `docs/project-plan.md` is the authoritative design document. Read it (or the relevant `docs/architecture/*.md` extract) before proposing or making design-level changes.
 - `docs/architecture/*.md` — one file per subsystem, each a short extract of settled decisions plus a pointer back to the plan section. Read the relevant one before editing that subsystem's code.
+- `docs/scene-authoring.md` — `.tscn` gotchas, node startup order, and the two headless tools that make scene refactors verifiable. Read before touching any scene file.
 - This file is the operating rules layered on top of both.
 
 ## Non-negotiable architecture rules
@@ -54,13 +55,14 @@ No formal Phase 1 exit-gate check (`docs/project-plan.md` §7) has been done yet
 
 Known architectural debt worth knowing before you build on it (details in the relevant `docs/architecture/*.md`):
 
-- **Destinations are data.** `DestinationManager` instantiates every `Data/destinations.json` row under `World.tscn`'s `BubbleRoot` at startup — adding one is a single JSON row. Absent destinations are kept, not freed; freeing them needs sim ownership moved off `ShipSim` first (`FleetRegistry`) or it undoes the coarse LOD tick and loses build state. See `docs/architecture/space-and-travel.md`.
-- **Two verification tools for scene work, since nothing in the test suite loads `World.tscn` and `--headless --quit` won't catch a mesh pointing at the wrong `SubResource` of the right type:** `Tools/scene_digest.gd` diffs a scene's authored data before/after a refactor (run it around *any* `.tscn` surgery), and `Tools/world_smoke.gd` runs the real world headless for a few frames and checks what `DestinationManager` actually built.
+- **A ship's sim is Godot-free but its *ownership* isn't.** `ShipSim` (a `Node`) holds the `ShipSystems`, so ship state can't outlive its scene. Destinations are instantiated from `Data/destinations.json` at startup and then *kept*, never freed — freeing one would destroy the sim its own coarse LOD tick exists to keep running, and drop the build state, layout seed and mission items `SaveManager` reads off the live tree. The fix is a `FleetRegistry` with `ShipSim` demoted to a view; that, not scene work, is the prerequisite for runtime load/unload. See `docs/architecture/multi-ship-fleet.md`.
 - **`Scripts/Verbs/ShipBuildTarget.cs` (~2 800 lines) is the remaining god class.** Its pieces are genuinely entangled — 37 `[Export]` resources and 7 placement dictionaries that every candidate collaborator reads — so a split there needs a real seam, not just a new file. `Player.cs` was decomposed (2 422 → 1 958) into `PlayerHudView` / `PanelController` / `InventoryWindowView`; follow that pattern's *rule*, not its shape: split where the data boundary is real.
 - Verb progress isn't serialized. Deliberate — every verb is ~0.6 s and button-held; revisit with time acceleration, not before.
 
-A real test harness exists and runs today across three projects: `Scavengineers.Sim.Tests` (pure C# sim logic, xUnit), `Scavengineers.Scripts.Tests` (Godot-adjacent C# logic, xUnit), and `Scavengineers.NodeTests` (GdUnit4, Godot node/scene-level tests). Run headless via `GODOT_BIN=<path> dotnet test <project>`. All three pass as of 2026-07-23 (86 / 1117 / 258).
+A real test harness exists and runs today across three projects: `Scavengineers.Sim.Tests` (pure C# sim logic, xUnit), `Scavengineers.Scripts.Tests` (Godot-adjacent C# logic, xUnit), and `Scavengineers.NodeTests` (GdUnit4, Godot node/scene-level tests). Run headless via `GODOT_BIN=<path> dotnet test <project>`. All three pass as of 2026-07-23 (86 / 1118 / 258).
 
-**Verifying NodeTests properly:** most node startup here happens in a `CallDeferred` from `_Ready`, and `SceneTree.PhysicsFrame` fires *before* any `_PhysicsProcess` — so tests that await a fixed number of frames and then assert are racing, and they win on an idle machine. Wait on a condition instead (`Scavengineers.NodeTests/FrameWait.cs`). To surface this class of bug at all, force a rebuild before each run (`(Get-Item <some .cs>).LastWriteTime = Get-Date`) and run 4-6 times; a few clean back-to-back runs prove nothing.
+**Verifying NodeTests properly:** most node startup here happens in a `CallDeferred` from `_Ready`, and `SceneTree.PhysicsFrame` fires *before* any `_PhysicsProcess` — so tests that await a fixed number of frames and then assert are racing, and they win on an idle machine. Wait on a condition instead (`Scavengineers.NodeTests/FrameWait.cs`). To surface this class of bug at all, force a rebuild before each run (`(Get-Item <some .cs>).LastWriteTime = Get-Date`) and run 4-6 times; a few clean back-to-back runs prove nothing. Full ordering rules in `docs/scene-authoring.md`.
+
+**Scene edits are not covered by any of that** — nothing in the test suite loads `World.tscn`. Digest the scene before and after with `Tools/scene_digest.gd` and diff; `Tools/world_smoke.gd` checks what actually gets built at runtime. Both headless, both in `docs/scene-authoring.md`.
 
 CI is still intentionally deferred — no `.github/workflows` exists yet. Add one only when explicitly asked.

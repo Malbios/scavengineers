@@ -88,7 +88,7 @@ overrode, so all five wrecks' second-deck build state was one shared slot.
 
 `DestinationManager` instantiates every `DestinationCatalog` entry under `World.tscn`'s `BubbleRoot`
 at startup and registers it with the travel console. That removed eight hand-placed sibling groups
-from `World.tscn` (1108 → 385 lines) and all seven parallel `NodePath` arrays from
+from `World.tscn` (1108 → 474 lines) and all seven parallel `NodePath` arrays from
 `TravelConsoleVerbTarget`. **Adding a destination is one row of `destinations.json`.**
 
 A destination row carries `scene`, a position, and `overrides` — a node path → property → value map,
