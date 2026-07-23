@@ -435,6 +435,8 @@ SaveId = "derelict_ship_sim_1"
 SaveId = "derelict_build_target_1"
 [node name="ShipSim2" parent="Derelict1/Deck2" index="0"]
 SaveId = "derelict_ship_sim_1_deck2"
+[node name="Floor2" parent="Derelict1/Deck2" index="1"]
+SaveId = "derelict_build_target_1_deck2"
 [node name="DamagedConduit" parent="Derelict1" index="19"]
 SaveId = "damaged_conduit_1"
 [node name="InteriorDoor" parent="Derelict1" index="20"]
@@ -449,6 +451,8 @@ SaveId = "derelict_ship_sim_2"
 SaveId = "derelict_build_target_2"
 [node name="ShipSim2" parent="Derelict2/Deck2" index="0"]
 SaveId = "derelict_ship_sim_2_deck2"
+[node name="Floor2" parent="Derelict2/Deck2" index="1"]
+SaveId = "derelict_build_target_2_deck2"
 [node name="DamagedConduit" parent="Derelict2" index="19"]
 SaveId = "damaged_conduit_2"
 [node name="InteriorDoor" parent="Derelict2" index="20"]
@@ -464,6 +468,8 @@ GenerateLoot = true
 SaveId = "derelict_build_target_3"
 [node name="ShipSim2" parent="Derelict3/Deck2" index="0"]
 SaveId = "derelict_ship_sim_3_deck2"
+[node name="Floor2" parent="Derelict3/Deck2" index="1"]
+SaveId = "derelict_build_target_3_deck2"
 [node name="DamagedConduit" parent="Derelict3" index="19"]
 SaveId = "damaged_conduit_3"
 [node name="InteriorDoor" parent="Derelict3" index="20"]
@@ -479,6 +485,8 @@ GenerateLoot = true
 SaveId = "derelict_build_target_4"
 [node name="ShipSim2" parent="Derelict4/Deck2" index="0"]
 SaveId = "derelict_ship_sim_4_deck2"
+[node name="Floor2" parent="Derelict4/Deck2" index="1"]
+SaveId = "derelict_build_target_4_deck2"
 [node name="DamagedConduit" parent="Derelict4" index="19"]
 SaveId = "damaged_conduit_4"
 [node name="InteriorDoor" parent="Derelict4" index="20"]
@@ -494,6 +502,8 @@ GenerateLoot = true
 SaveId = "derelict_build_target_5"
 [node name="ShipSim2" parent="Derelict5/Deck2" index="0"]
 SaveId = "derelict_ship_sim_5_deck2"
+[node name="Floor2" parent="Derelict5/Deck2" index="1"]
+SaveId = "derelict_build_target_5_deck2"
 [node name="DamagedConduit" parent="Derelict5" index="19"]
 SaveId = "damaged_conduit_5"
 [node name="InteriorDoor" parent="Derelict5" index="20"]

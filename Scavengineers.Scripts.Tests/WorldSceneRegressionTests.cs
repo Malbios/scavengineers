@@ -37,45 +37,113 @@ public class WorldSceneRegressionTests
         Assert.Contains(propertyLines, l => l.Trim() == "collision_layer = 2");
     }
 
-    /// <summary>Both Stations instance one Scenes/Station.tscn, so every SaveId in that scene is
-    /// authored once and inherited twice. A saveable node added there without a matching override
-    /// on the Station2 instance gives two live nodes the same save id, and SaveManager keys purely
-    /// by id — the second write silently wins and one Station's state vanishes into the other's.
-    /// That fails as a wrong-state bug on load, not as an error, so it needs catching here.</summary>
+    /// <summary>Every destination in World.tscn instances a shared scene — 5 Derelicts off
+    /// Derelict.tscn, 2 Stations off Station.tscn — so a SaveId authored in the shared scene is
+    /// inherited by every instance that doesn't override it. SaveManager keys purely by id, so two
+    /// live nodes sharing one means the second capture silently overwrites the first and every
+    /// instance loads the same state back. Nothing errors; the wrong ship just has your walls.
+    ///
+    /// This caught Derelict.tscn's Deck2/Floor2 shipping SaveId "derelict_build_target_1_deck2"
+    /// with no per-derelict override, so all five wrecks' second-deck build state collided.</summary>
     [Fact]
-    public void EverySaveIdAuthoredInStationScene_IsOverriddenForTheStation2Instance()
+    public void NoTwoNodesInTheWorld_ShareASaveId_AcrossInstancedDestinationScenes()
     {
-        var stationIds = SaveIdsByNode(Path.Combine(RepoRoot(), "Scenes", "Station.tscn"), parent: null);
-        Assert.NotEmpty(stationIds);
+        var world = Path.Combine(RepoRoot(), "Scenes", "World.tscn");
+        var owners = new Dictionary<string, string>();
 
-        var station2Ids = SaveIdsByNode(Path.Combine(RepoRoot(), "Scenes", "World.tscn"), parent: "Station2");
-
-        foreach (var (node, inheritedId) in stationIds)
+        void Claim(string saveId, string owner)
         {
-            Assert.True(
-                station2Ids.TryGetValue(node, out var overriddenId),
-                $"Station.tscn's '{node}' has SaveId '{inheritedId}' but the Station2 instance in World.tscn never overrides it, so both Stations would save under that one id");
-            Assert.NotEqual(inheritedId, overriddenId);
+            Assert.False(
+                owners.TryGetValue(saveId, out var existing),
+                $"SaveId '{saveId}' is used by both '{existing}' and '{owner}' — one will silently overwrite the other on save");
+            owners[saveId] = owner;
+        }
+
+        var instances = InstancedScenes(world).ToList();
+        var instanceNames = instances.Select(i => i.Instance).ToHashSet();
+
+        // Nodes authored inline in World.tscn itself (HomeShip, the two shared airlocks, ...).
+        // An instance's override blocks live in this same file and are counted below instead.
+        foreach (var (node, saveId) in SaveIdsByNode(world, instance: null))
+        {
+            if (!instanceNames.Contains(node.Split('/')[0]))
+            {
+                Claim(saveId, node);
+            }
+        }
+
+        foreach (var (instanceName, scenePath) in instances)
+        {
+            var overrides = SaveIdsByNode(world, instance: instanceName);
+            var inherited = SaveIdsByNode(Path.Combine(RepoRoot(), scenePath), instance: null);
+            Assert.NotEmpty(inherited);
+
+            foreach (var (node, inheritedId) in inherited)
+            {
+                Claim(overrides.TryGetValue(node, out var overridden) ? overridden : inheritedId, $"{instanceName}/{node}");
+            }
         }
     }
 
-    /// <summary>Maps node name to its authored SaveId, over the blocks whose parent matches — null
-    /// meaning "a direct child of the scene root", which is where every saveable Station node
-    /// lives.</summary>
-    private static Dictionary<string, string> SaveIdsByNode(string scenePath, string? parent)
+    /// <summary>Maps each root-level instance in World.tscn to the scene file it instances, by
+    /// resolving its ExtResource id against the header.</summary>
+    private static IEnumerable<(string Instance, string ScenePath)> InstancedScenes(string worldPath)
     {
-        var wantedParent = parent is null ? "\"" + "." + "\"" : $"\"{parent}\"";
+        var lines = File.ReadAllLines(worldPath);
+        var scenesByResourceId = lines
+            .Where(l => l.StartsWith("[ext_resource type=\"PackedScene\""))
+            .ToDictionary(l => Between(l, "id=\"", "\""), l => Between(l, "path=\"res://", "\""));
+
+        foreach (var line in lines.Where(l => l.StartsWith("[node ") && l.Contains("parent=\".\"") && l.Contains("instance=ExtResource(")))
+        {
+            var resourceId = Between(line, "instance=ExtResource(\"", "\"");
+            if (scenesByResourceId.TryGetValue(resourceId, out var scenePath))
+            {
+                yield return (Between(line, "name=\"", "\""), scenePath);
+            }
+        }
+    }
+
+    /// <summary>Maps a node's path (relative to the scene root, or to the named instance) to its
+    /// authored SaveId. `instance` null means the scene's own nodes rather than an instance's
+    /// override blocks.</summary>
+    private static Dictionary<string, string> SaveIdsByNode(string scenePath, string? instance)
+    {
         var result = new Dictionary<string, string>();
-        var lines = File.ReadAllLines(scenePath);
         var currentNode = (string?)null;
 
-        foreach (var line in lines)
+        foreach (var line in File.ReadAllLines(scenePath))
         {
             if (line.StartsWith("[node "))
             {
+                currentNode = null;
+
+                // An instance's own header carries no SaveId, and root-level nodes of World.tscn
+                // that *are* instances are handled by the caller, not here.
+                if (!line.Contains("parent=\"") || line.Contains("instance=ExtResource("))
+                {
+                    continue;
+                }
+
+                var parent = Between(line, "parent=\"", "\"");
                 var name = Between(line, "name=\"", "\"");
-                var nodeParent = line.Contains("parent=") ? line[line.IndexOf("parent=", StringComparison.Ordinal)..] : null;
-                currentNode = nodeParent is not null && nodeParent.StartsWith($"parent={wantedParent}", StringComparison.Ordinal) ? name : null;
+
+                // "." is the scene root; otherwise parent is a path below it. For an instance's
+                // overrides the parent is prefixed with the instance name, which is stripped so
+                // both sides key on the same scene-relative path.
+                if (instance is null)
+                {
+                    currentNode = parent == "." ? name : $"{parent}/{name}";
+                }
+                else if (parent == instance)
+                {
+                    currentNode = name;
+                }
+                else if (parent.StartsWith($"{instance}/", StringComparison.Ordinal))
+                {
+                    currentNode = $"{parent[(instance.Length + 1)..]}/{name}";
+                }
+
                 continue;
             }
 
